@@ -384,11 +384,12 @@ def precheck(v, cand):
     refuse, review = [], []
     if cand.get("never_train"):
         refuse.append("in the never-train list")
-    # a source mid-pipeline (being fetched, fetched, intaken) takes its next
-    # pipeline step first; an admitted one is collected again only when its
-    # last fetch stopped at a byte cap (partial: the next shard)
-    if cand.get("status") in ("quarantined", "closed", "held", "fetching", "fetched", "names_pending", "intaken") or (
-            cand.get("status") == "admitted" and not cand.get("partial")):
+    # a source mid-pipeline (being fetched, fetched, intaken, or waiting for
+    # its next intake shard) takes its next pipeline step first; an admitted
+    # one is collected again only when its last fetch stopped at a byte cap
+    # (partial: the next shard)
+    if cand.get("status") in ("quarantined", "closed", "held", "fetching", "fetched", "names_pending", "intaken",
+                              "shard_pending") or (cand.get("status") == "admitted" and not cand.get("partial")):
         refuse.append("source status %s" % cand.get("status"))
     lic = str(cand.get("licence") or "").strip().lower()
     if lic in ("", "unknown", "unresolved", "none"):
@@ -528,6 +529,11 @@ def d29(v):
     cites = [v.ccite("/discover")]
     if not last:
         return _silent("D29", "discovery has not run", cites=cites)
+    pend = sorted(s for s, r in (v.c("/sources") or {}).items() if (r or {}).get("status") == "shard_pending")
+    if pend:
+        # a source whose intake left images deferred still has data to give (its next shards): not exhausted
+        return _silent("D29", "%s wait%s for the next intake shard" % (", ".join(pend), "s" if len(pend) == 1
+                                                                        else ""), cites=cites)
     age = _days(v.c("/now_utc"), last)
     open_c = [c for c in (v.c("/candidates") or []) if isinstance(c, dict) and not precheck(v, c)[0]
               and not precheck(v, c)[1]]
@@ -564,8 +570,11 @@ def d21(v):
         # the yield is verified target boxes ADMITTED (7.4): judged only once the
         # admission of the source's fetched data has been observed; a source
         # still being fetched, intaken or admitted has admitted nothing yet, and
-        # judging it then would close every source at its first fetch
-        if r.get("status") != "admitted" or not r.get("yield_recorded"):
+        # judging it then would close every source at its first fetch. A source
+        # whose intake left images deferred (continuation shards, amendment
+        # 2026-10-03) is judged once its last shard is admitted: its bytes are
+        # all fetched, its boxes only partly admitted
+        if r.get("status") != "admitted" or not r.get("yield_recorded") or deferred_left(v, r):
             continue
         got = (_num(r.get("bytes")) or 0.0) / 1e9
         total = (_num(r.get("total_bytes")) or 0.0) / 1e9 or got
@@ -1693,12 +1702,77 @@ def compare_due(v):
                  {"propose": {"lever": "LC", "exp": exp}})
 
 
+def deferred_left(v, r):
+    """The images a source's intake has left deferred (collect.intake step
+    1b): what the stream folded (`intake_deferred`), else its latest batch's
+    summary.json in the evidence (shard.deferred_remaining, else
+    yield.images_deferred: a batch committed before shards existed is the
+    first of its fetch). 0 when neither says."""
+    n = _num(r.get("intake_deferred"))
+    if n is None and r.get("batch"):
+        s = v.ev.json("intake/%s/summary.json" % r["batch"]) or {}
+        sh = s.get("shard") if isinstance(s.get("shard"), dict) else {}
+        n = _num(sh.get("deferred_remaining"))
+        if n is None:
+            n = _num((s.get("yield") or {}).get("images_deferred"))
+    return int(n or 0)
+
+
+def _unadmitted(v, r):
+    """The source's committed intake batches not yet admitted, oldest first,
+    whose summary.json the evidence holds (a shard committed by a job the
+    stream saw fail is admitted too, never skipped). A source the stream
+    recorded before admitted_batches existed has only its latest batch to
+    admit (the stream admitted each batch while it was the latest)."""
+    if isinstance(r.get("admitted_batches"), list):
+        done, todo = set(r["admitted_batches"]), list(r.get("batches") or []) or (
+            [r["batch"]] if r.get("batch") else [])
+    else:
+        done, todo = set(), [r["batch"]] if r.get("batch") else []
+    out = []
+    for b in todo:
+        if b not in done and b not in out and v.ev.json("intake/%s/summary.json" % b) is not None:
+            out.append(b)
+    return out
+
+
+def shard_waits(v):
+    """Why a source's next intake shard (L16I on a shard_pending source)
+    waits, or []. It comes after the work that delays E1's first result:
+    DR0's DATA item (L17 eval-hits, Step 1's one-time jobs, the probe), which
+    must run before DR0 can propose L23V (only when DATA has nothing due);
+    and E1's base v3 while an arm that requires it is not built and base v3
+    is not built either (missing, running, or ended without a complete
+    summary), since splits v3 reads every committed intake batch and was
+    pre-registered on the first shard. A base v3 build that failed, or one
+    whose arms are built, no longer holds the shards."""
+    out = []
+    try:
+        d = r0(v)
+    except Exception:  # noqa: BLE001 - an R0 record that cannot be read holds the shard (fail closed)
+        return ["DR0 cannot be read"]
+    due = ((d.get("detail") or {}).get("due") or {}) if d.get("fired") else {}
+    if due.get("DATA"):
+        out.append("DR0's %s %s is due on the DATA lane" % (due["DATA"].get("lever"), due["DATA"].get("verb") or ""))
+    st = v.c("/stage") or {}
+    e1 = [b for b in (v.dom.get("baselines") or {}).get("items") or [] if b.get("requires") == "base3"
+          and (st.get("baselines") or {}).get(b["id"]) in (None, "missing")]
+    if e1 and st.get("base3") in (None, "missing", "running", "unconfirmed"):
+        out.append("E1's base v3 (splits v3, L23V) is %s and arm %s waits for it: it reads every committed intake "
+                   "batch" % (st.get("base3") or "missing", e1[0]["id"]))
+    return out
+
+
 def pipeline(v):
     """DPIPE: a source part-way through the DATA pipeline takes its next step
     (fetched on the lab -> sync; fetched -> intake; intaken -> admit its batch;
     an intake refused for class names -> L26 on the lab, then L16S of the
-    names layer, after which the stream makes it fetched again)."""
+    names layer, after which the stream makes it fetched again). Then, last,
+    a source whose intake left images deferred (shard_pending) -> L16I, its
+    next shard, unless shard_waits holds it; a shard committed but not yet
+    admitted is admitted first."""
     srcs = v.c("/sources") or {}
+    boot = v.c("/stage/step1_stream/bootstrap")
     for s in sorted(srcs):
         r = srcs[s] or {}
         nxt = None
@@ -1713,13 +1787,27 @@ def pipeline(v):
             nxt = {"lever": "L16S", "source": s}
         elif r.get("status") == "fetched":
             nxt = {"lever": "L16I", "source": s}
-        elif r.get("status") == "intaken" and r.get("batch") and v.c("/stage/step1_stream/bootstrap") \
-                and v.ev.json("intake/%s/summary.json" % r["batch"]) is not None:
-            # admitted only once its intake summary (the guard's counts, D28) is observed
-            nxt = {"lever": "L17", "verb": "admit", "intake": r["batch"], "source": s}
+        elif r.get("status") in ("intaken", "shard_pending") and boot and _unadmitted(v, r):
+            # admitted only once its intake summary (the guard's counts, D28) is observed; every committed
+            # batch of the source, oldest first, so no shard is skipped
+            nxt = {"lever": "L17", "verb": "admit", "intake": _unadmitted(v, r)[0], "source": s}
         if nxt:
             return _diag("DPIPE", True, "info", "source %s is %s -> %s" % (s, r.get("status"), nxt["lever"]),
                          [v.ccite(E.pointer("sources", s, "status"))], [nxt["lever"]], None, {"propose": nxt})
+    # continuation shards (amendment 2026-10-03), after every other pipeline step and after DR0's DATA item and
+    # E1's base v3 (shard_waits)
+    pending = [s for s in sorted(srcs) if (srcs[s] or {}).get("status") == "shard_pending"]
+    if pending:
+        waits = shard_waits(v)
+        if waits:
+            return _silent("DPIPE", "%s wait%s for the next intake shard: %s" % (
+                ", ".join(pending), "s" if len(pending) == 1 else "", "; ".join(waits)),
+                cites=[v.ccite(E.pointer("sources", s, "status")) for s in pending] + [v.ccite("/stage")])
+        s = pending[0]
+        n = deferred_left(v, srcs[s] or {})
+        return _diag("DPIPE", True, "info", "source %s has %d image(s) its intake deferred -> L16I (the next shard)"
+                     % (s, n), [v.ccite(E.pointer("sources", s, "status"))], ["L16I"], None,
+                     {"propose": {"lever": "L16I", "source": s, "deferred": n}})
     return _silent("DPIPE", "no source waits for its next pipeline step")
 
 

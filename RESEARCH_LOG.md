@@ -13,6 +13,14 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-03 (latest) — Continuation intake: all 230,899 SIU images can flow, 50,000 per shard
+
+**Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap to 0.90 = 0.021. Training set 7,493 images (P_1).
+
+**Supply.** SIU (`zenodo_15808623`) has 230,899 boxed images. Its first intake batch took 40,000 (39,958 rows) and deferred 190,899, which no later intake could take. Now the next intakes of the same fetch record take the deferred images as continuation shards. Each shard is at most 50,000 images (the new cap, Step 1's admit cap), so the rest is 4 shards: 50,000, 50,000, 50,000 and 40,899. A shard over the kept tree skips the extraction and the second hash of the 49.7 GB blob. Inside one fetch, the shards are judged as one batch for duplicates. Measured read-only on `i0004`, 46 % of the rows sit within 3 dHash bits of another row; with the earlier shards in the near-duplicate index, about half of every later shard would have been refused.
+
+**Order.** The stream holds the shards until E1's base v3 is built (pre-registered on the first 40,000 SIU frames) and DR0's eval-hits has run, so E1's first result is not delayed. After that, one shard is intaken and admitted at a time until nothing is deferred. Details: docs/CONTINUOUS_LOOP.md §3.2, amendment 2026-10-03.
+
 ## 2026-10-03 (later) — E1 pre-registered: does a much larger weed-box set place better boxes?
 
 **Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap 0.021; class-agnostic 0.8901, so the boxes cap it. Training set 7,493 images (P_1); nothing added since s001.

@@ -6,7 +6,26 @@ Under the intake lock, fail closed at every step, nothing written before the
 guard loads:
   1. arrival check: fetch.json and every blob it lists must hash as recorded
      (a lab fetch synced to the cluster is verified here, by sha256);
-     an intake of the same fetch record already committed is a no-op;
+     an intake of the same fetch record already committed is a no-op, unless
+     its committed batches left images deferred (1b);
+  1b. continuation shards (amendment 2026-10-03): when the committed batches
+     of this fetch record (same fetch sha256) recorded images 'deferred' that
+     none of them decided since, the intake takes the next shard instead of
+     the no-op: the items no earlier batch of the fetch decided, drawn by
+     cap_items with the same seed (so the shards partition the source and a
+     rerun takes the same shard), at most the cap; a deferred image the
+     source as read now lacks is rejected as not_in_source, so the shards
+     always end. Inside the fetch the shards are judged as one batch: the
+     earlier shards' images seed the exact-duplicate check
+     (exact_dup_intake) and stay out of the guard's intake index
+     (near_dup_intake), which keeps every other batch; every other check of
+     the guard runs as for any batch. A shard whose fetch's extracted tree
+     is complete, and records the fetch sha256 it was extracted from after
+     its blobs hashed as recorded, reuses the tree without hashing the blobs
+     again (no blob is read then; fetch.json is still hashed). The tree is
+     kept while images remain deferred and removed by the batch that leaves
+     none. summary.json's `shard` records the shard's number, the earlier
+     batches and the images still deferred;
   2. the gates that do not need the images: the licence (P6: unresolved ->
      held unless a person's licence override names the source, refused ->
      closed whatever an override says), the registry (quarantined -> closed),
@@ -345,10 +364,12 @@ def extract(blob, name, dest):
     return n
 
 
-def materialise(sdir, fetch_doc, root):
+def materialise(sdir, fetch_doc, root, fetch_sha=None):
     """The source tree: archives extracted under root/<archive name without
     its extension>/ (nested archives once more), other files linked at their
-    names. A tree marked complete is reused."""
+    names. A tree marked complete is reused. The marker records the fetch
+    record's sha256 when the caller gives it (intake, after the arrival check
+    hashed every blob): tree_fetch_sha reads it."""
     root = Path(root)
     done = root / ".complete"
     if done.is_file():
@@ -377,8 +398,19 @@ def materialise(sdir, fetch_doc, root):
             except OSError:
                 shutil.copyfile(blob, t)
             files += 1
-    done.write_text(utc() + "\n")
+    done.write_text(json.dumps({"utc": utc(), "fetch_sha256": fetch_sha}) + "\n")
     return {"reused": False, "files": files}
+
+
+def tree_fetch_sha(root):
+    """The fetch sha256 a complete tree's marker records (materialise), else
+    None: no tree, an incomplete one, or a marker written without it (before
+    2026-10-03, or by rescore_eval_hits)."""
+    try:
+        doc = json.loads((Path(root) / ".complete").read_text())
+    except (OSError, ValueError):
+        return None
+    return str(doc["fetch_sha256"]) if isinstance(doc, dict) and doc.get("fetch_sha256") else None
 
 
 # ------------------------------------------------------------------ helpers
@@ -394,24 +426,43 @@ def _read_options(cfg, fetch_doc):
     return opts
 
 
-def verify_staging(sdir):
-    """fetch.json and every blob it lists, checked (StaleInput on the first
-    that is missing or changed)."""
+def read_fetch(sdir):
+    """(fetch.json, its sha256), its format checked; the blobs unread."""
     p = sdir / "fetch.json"
     if not p.is_file():
         raise Refusal("not_fetched", "no fetch record at %s: fetch the source first (lever L16)" % p, action="refuse")
     doc = read_json(p, "fetch record")
     if doc.get("format") != FORMATS["fetch"]:
         raise StaleInput("%s is not a %s" % (p, FORMATS["fetch"]))
+    return doc, sha256_file(p)
+
+
+def check_blobs(sdir, doc, hashed=True):
+    """Every blob the fetch record lists: present, and hashing as recorded
+    (StaleInput on the first that is missing or changed). hashed=False checks
+    presence and recorded size only, for a continuation shard that reads no
+    blob (intake, step 1b)."""
     for f in doc.get("files") or []:
         b = sdir / "blobs" / f["sha256"]
         if not b.is_file():
             raise StaleInput("staging blob of %s (%s) is missing" % (f["name"], f["sha256"][:12]))
+        if not hashed:
+            if f.get("bytes") is not None and b.stat().st_size != int(f["bytes"]):
+                raise StaleInput("staging blob of %s (%s) has %d bytes, recorded %s"
+                                 % (f["name"], f["sha256"][:12], b.stat().st_size, f["bytes"]))
+            continue
         got = sha256_file(b)
         if got != f["sha256"]:
             raise StaleInput("staging blob of %s changed in transit (%s, recorded %s)"
                              % (f["name"], got[:12], f["sha256"][:12]))
-    return doc, sha256_file(p)
+
+
+def verify_staging(sdir):
+    """fetch.json and every blob it lists, checked (StaleInput on the first
+    that is missing or changed)."""
+    doc, sha = read_fetch(sdir)
+    check_blobs(sdir, doc)
+    return doc, sha
 
 
 def cap_items(items, cap, seed):
@@ -422,8 +473,9 @@ def cap_items(items, cap, seed):
     seeded by `seed` (the fetch record's sha256): every class set, then every
     group (a video's frames), is reached before any gets a second image, and
     the same fetch takes the same images on every run. The rest are deferred,
-    not judged, and recorded as such (decision 'deferred'): no later batch
-    takes them yet, since an intake of a fetch already committed is a no-op."""
+    not judged, and recorded as such (decision 'deferred'): the next intake of
+    the fetch takes its next shard from them (shard_state), drawn here again
+    over the items still undecided, with the same seed."""
     boxed = [it for it in items if it["boxes"]]
     if not cap or len(boxed) <= int(cap):
         return None, None
@@ -464,6 +516,57 @@ def _earlier_manifests(inc):
         p = intake_dir(inc) / b["batch"] / "manifest.jsonl"
         if p.is_file():
             out.extend(read_jsonl(p))
+    return out
+
+
+def _deferred_after(summary):
+    """The images a committed batch left deferred: its shard record's, else
+    (a batch committed before shards existed, always the first of its fetch)
+    its yield's images_deferred."""
+    sh = summary.get("shard") if isinstance(summary.get("shard"), dict) else {}
+    if sh.get("deferred_remaining") is not None:
+        return int(sh["deferred_remaining"])
+    return int(((summary.get("yield") or {}).get("images_deferred")) or 0)
+
+
+def shard_state(inc, source_id, fetch_sha):
+    """The committed batches of this fetch record (step 1b), or None when
+    there is none: {"batches": [names, in commit order], "n": the next
+    shard's number, "decided": the rels they decided (any decision but
+    'deferred'), "remaining": the rels deferred and not decided since}. Each
+    batch's decisions.jsonl must hash to the sha256 its summary.json records
+    (CollectError otherwise: the partition cannot be trusted). When the last
+    batch records no image deferred, its decisions are not read: the fetch is
+    complete and the intake is the no-op."""
+    rows = [b for b in read_jsonl(batches_ledger(inc), missing_ok=True)
+            if b.get("source") == source_id and b.get("fetch_sha256") == fetch_sha]
+    if not rows:
+        return None
+    names = [str(b["batch"]) for b in rows]
+    summ = {}
+    for nm in names:
+        p = intake_dir(inc) / nm / "summary.json"
+        if not p.is_file():
+            raise CollectError("intake batch %s is in batches.jsonl without its %s" % (nm, p))
+        summ[nm] = read_json(p, "intake summary")
+    out = {"batches": names, "n": len(names) + 1, "decided": set(), "remaining": set(), "last": rows[-1]}
+    if _deferred_after(summ[names[-1]]) <= 0:
+        return out
+    deferred = set()
+    for nm in names:
+        dp = intake_dir(inc) / nm / "decisions.jsonl"
+        want = ((summ[nm].get("decisions") or {}) if isinstance(summ[nm].get("decisions"), dict) else {}).get("sha256")
+        if not dp.is_file() or not want or sha256_file(dp) != want:
+            raise CollectError("%s does not hash to the sha256 its summary.json records: the next shard of %s is "
+                               "not drawn" % (dp, source_id))
+        for d in read_jsonl(dp):
+            if d.get("kind") not in ("image", "label") or not d.get("rel"):
+                continue
+            if d.get("decision") == "deferred":
+                deferred.add(str(d["rel"]))
+            else:
+                out["decided"].add(str(d["rel"]))
+    out["remaining"] = deferred - out["decided"]
     return out
 
 
@@ -547,11 +650,25 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
     t0 = time.time()
     with intake_lock(inc, what="collect intake %s" % source_id):
         sdir = staging_dir(source_id, inc)
-        fetch_doc, fetch_sha = verify_staging(sdir)
-        for b in read_jsonl(batches_ledger(inc), missing_ok=True):
-            if b.get("source") == source_id and b.get("fetch_sha256") == fetch_sha:
-                return {"status": "already_intaken", "source": source_id, "batch": b["batch"],
-                        "rows": b.get("rows")}
+        fetch_doc, fetch_sha = read_fetch(sdir)
+        # 1b. the committed batches of this fetch record, and what they left deferred
+        shard = shard_state(inc, source_id, fetch_sha)
+        work = intake_dir(inc) / "work" / safe_name(source_id)
+        root = work / fetch_sha[:12] / "x"
+        # a continuation shard over a complete tree extracted from this very fetch record, after its blobs hashed
+        # as recorded (only intake's materialise writes the fetch sha256 into a tree's marker, and only after
+        # check_blobs hashed them), reads no blob: materialise reuses the tree. So the blobs are not read again
+        # (tens of GB for the largest sources); the batch's every image comes from that tree. Every other intake
+        # hashes them, as before
+        reuse = bool(shard and shard["remaining"]) and tree_fetch_sha(root) == fetch_sha
+        check_blobs(sdir, fetch_doc, hashed=not reuse)
+        arrival = {"fetch_sha256": fetch_sha, "blobs": "presence and size (the tree extracted from them after they "
+                                                       "hashed as recorded is reused; no blob is read)"
+                   if reuse else "sha256"}
+        if shard is not None and not shard["remaining"]:
+            b = shard["last"]
+            return {"status": "already_intaken", "source": source_id, "batch": b["batch"], "rows": b.get("rows"),
+                    "shards": len(shard["batches"]), "deferred_remaining": 0}
         # 2. gates that need no image
         lic = fetch_doc.get("licence") or {}
         if lic.get("class") == "refused":
@@ -585,14 +702,19 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         else:
             copy_scan, copy_scan_rec = None, {"checked": False, "why": "a stand-in guard was given without a LOCK"}
         earlier = _earlier_manifests(inc)
+        # the earlier shards of this fetch are judged with this one as one batch (step 1b): their images seed the
+        # exact-duplicate check and stay out of the intake index, as a batch's own images do. In a capped batch of
+        # video frames, 46 % of the rows were measured within 3 bits of another row of the batch
+        # (docs/CONTINUOUS_LOOP.md, amendment 2026-10-03), so near_dup_intake against the earlier shards would
+        # refuse about half of every later shard
+        mine = set(shard["batches"]) if shard else set()
+        same_fetch = [r for r in earlier if r.get("batch") in mine]
         for r in earlier:
-            if r.get("dhash") is not None:
+            if r.get("dhash") is not None and r.get("batch") not in mine:
                 g.add_intake(int(r["dhash"]), (r.get("batch"), r.get("key")))
         # 4-5. tree, normalise, class map
-        work = intake_dir(inc) / "work" / safe_name(source_id)
-        root = work / fetch_sha[:12] / "x"
         try:
-            materialise(sdir, fetch_doc, root)
+            tree_rec = materialise(sdir, fetch_doc, root, fetch_sha=fetch_sha)
         except (zipfile.BadZipFile, tarfile.TarError, EOFError) as e:
             S.append(inc, source_id, "held", reason="archive_unreadable", codes=["archive_unreadable"], risk="R3",
                      stage="intake", detail=str(e)[:500])
@@ -609,6 +731,13 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
             S.append(inc, source_id, "held", reason="normalise_failed", codes=["normalise_failed"], risk="R3",
                      stage="intake", detail=str(e)[:500])
             raise Refusal("normalise_failed", str(e), action="hold", risk="R3")
+        items = sorted(res.items, key=lambda x: x["rel"])
+        orphans = []
+        if shard is not None:
+            # a continuation shard: the items no earlier batch of this fetch decided (its candidates); a deferred
+            # image the source as read now no longer holds is decided here (not_in_source), so the shards end
+            items = [it for it in items if it["rel"] not in shard["decided"]]
+            orphans = sorted(shard["remaining"] - {it["rel"] for it in items})
         # the legacy-label copy rule (§7.2), again on the class list the files declare: a provider that
         # declares none before download (Kaggle, a repository archive) is judged here, before anything is written
         pf = cfg.raw["prefilter"]
@@ -660,7 +789,8 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         keys = Keys(used=(r.get("key") for r in earlier if r.get("key")), salt=fetch_sha)
         decisions, manifest = [], []
         eval_copies = []                   # dHash copies of evaluation images, kept until they are weighed (D28-v2)
-        seen_sha = {}
+        # an exact byte copy of an earlier shard's row is a duplicate within the fetch's one batch (step 1b)
+        seen_sha = {r["sha256"]: r.get("key") for r in same_fetch if r.get("sha256")}
         reasons = {}
         per_id = {}
         per_src = {}
@@ -676,18 +806,28 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         for f in fetch_doc["files"]:
             decisions.append({"kind": "file", "source": source_id, "name": f["name"], "sha256": f["sha256"],
                               "decision": "archive" if _is_archive(f["name"]) else "file", "reason": "fetched"})
-        for rel in res.images_without_labels:
+        # the files of the source that are not items were decided by its first batch: a later shard decides only
+        # its own images
+        done = shard["decided"] if shard is not None else set()
+        no_label = [rel for rel in res.images_without_labels if rel not in done]
+        for rel in no_label:
             decisions.append({"kind": "image", "source": source_id, "rel": rel, "decision": "rejected",
                               "reason": "no_label"})
             reasons["no_label"] = reasons.get("no_label", 0) + 1
         for rel in res.labels_without_images:
+            if rel in done:
+                continue
             decisions.append({"kind": "label", "source": source_id, "rel": rel, "decision": "rejected",
                               "reason": "no_image"})
             reasons["no_image"] = reasons.get("no_image", 0) + 1
-        if res.rows_without_images:
+        if res.rows_without_images and shard is None:
             decisions.append({"kind": "table_rows", "source": source_id, "decision": "rejected",
                               "reason": "image_not_fetched", "count": res.rows_without_images})
-        items = sorted(res.items, key=lambda x: x["rel"])
+        for rel in orphans:
+            decisions.append({"kind": "image", "source": source_id, "rel": rel, "decision": "rejected",
+                              "reason": "not_in_source"})
+            reasons["not_in_source"] = reasons.get("not_in_source", 0) + 1
+        candidates = sum(1 for it in items if it["boxes"])
         taken, cap_rec = cap_items(items, cfg.intake_max_images(), fetch_sha)
         t_budget = cfg.intake_max_seconds()
         time_deferred = 0
@@ -806,7 +946,11 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                      "guard_counts": gcounts, "index": g.index_record() if hasattr(g, "index_record") else None,
                      "l5_excluded": l5[2] if l5 is not None else {"checked": False, "why": "a stand-in guard was "
                                                                   "given without a LOCK"},
-                     "earlier_intake_images": len(earlier), "copy_scan": copy_scan_rec,
+                     "earlier_intake_images": len(earlier) - len(same_fetch),
+                     "same_fetch_shard_images": {"images": len(same_fetch), "batches": sorted(mine),
+                                                 "why": "the earlier shards of this fetch: exact duplicates only, as "
+                                                        "within one batch (not in the near_dup_intake index)"},
+                     "copy_scan": copy_scan_rec,
                      "seen_index": "not read here: inc2.step1_stream applies exact_dup with its own seen index"})
         write_json_atomic(bdir / "guard.json", gdoc)
         src = header("sources", cfg, inputs={"fetch": {"path": str(sdir / "fetch.json"), "sha256": fetch_sha}},
@@ -823,7 +967,8 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         _register(cfg, source_id, fetch_doc, bdir, batch, len(manifest), [c["name"] for c in res.classes], lic,
                   registry_path=registry_path, research_only=research_only, override=person_licence)
         kept_tb = sum(r["target_boxes"] for r in manifest)
-        seen_imgs = len(items) - time_deferred + len(res.images_without_labels)
+        left = (cap_rec or {}).get("deferred", 0) + time_deferred      # the fetch's boxed images no batch decided
+        seen_imgs = len(items) - time_deferred + len(no_label)
         eval_hits = sum(reasons.get(k, 0) for k in EVAL_REASONS)
         base_hits = reasons.get("base_copy", 0) + reasons.get(L5_REASON, 0)
         checked = len(manifest) + sum(reasons.get(k, 0) for k in ("unhashable",) + EVAL_REASONS + (
@@ -838,7 +983,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
             "boxes_by_class": {_class_name(cfg, k): v for k, v in sorted(per_id.items())},
             "boxes_by_source_class": dict(sorted(per_src.items())),
             "rejected": dict(sorted(reasons.items())), "bytes": fetch_doc.get("bytes"),
-            "images_deferred": (cap_rec or {}).get("deferred", 0) + time_deferred,
+            "images_deferred": left,
             "target_boxes_per_gb": round(kept_tb / gb, 3) if gb > 0 else None}
         summ = header("summary", cfg, inputs={"manifest": {"path": str(bdir / "manifest.jsonl"), "sha256": m_sha},
                                               "decisions": {"path": str(bdir / "decisions.jsonl"), "sha256": d_sha},
@@ -860,18 +1005,29 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                      "licence_override": person_licence,
                      "format": res.format, "copy_scan": copy_scan_rec, "intake_cap": cap_rec,
                      "intake_time": {"budget_s": t_budget, "deferred": time_deferred},
+                     # step 1b: this batch's shard of its fetch record and what it leaves deferred (the stream
+                     # proposes the next shard while deferred_remaining > 0)
+                     "shard": {"n": shard["n"] if shard else 1, "fetch_sha256": fetch_sha,
+                               "earlier_batches": list(shard["batches"]) if shard else [], "candidates": candidates,
+                               "deferred_remaining": left, "tree": "reused" if tree_rec.get("reused") else "extracted",
+                               "arrival": arrival},
                      "seconds": round(time.time() - t0, 3)})
         write_json_atomic(bdir / "summary.json", summ)
         append_chained(batches_ledger(inc), {"format": FORMATS["batch"], "ts": utc(), "batch": batch,
                                              "source": source_id, "fetch_sha256": fetch_sha, "manifest_sha256": m_sha,
-                                             "rows": len(manifest), "target_boxes": kept_tb})
+                                             "rows": len(manifest), "target_boxes": kept_tb,
+                                             "shard": shard["n"] if shard else 1, "deferred_remaining": left})
         S.append(inc, source_id, "intaken", provider=fetch_doc["provider"], ref=fetch_doc["ref"], batch=batch,
-                 seconds=round(time.time() - t0, 3), **{"yield": yld})
-        if not keep_work:
+                 seconds=round(time.time() - t0, 3), shard=shard["n"] if shard else 1, deferred_remaining=left,
+                 **{"yield": yld})
+        if not keep_work and not left:
+            # the extracted tree is kept while images remain deferred, so the next shard does not extract it again;
+            # the batch that leaves none removes it
             shutil.rmtree(work / fetch_sha[:12], ignore_errors=True)
     return {"status": "intaken", "source": source_id, "batch": batch, "rows": len(manifest),
             "target_boxes": kept_tb, "rejected": dict(sorted(reasons.items())), "source_leak": leak,
-            "zero_yield": kept_tb == 0, "dir": str(bdir)}
+            "zero_yield": kept_tb == 0, "dir": str(bdir), "shard": shard["n"] if shard else 1,
+            "deferred_remaining": left}
 
 
 # ------------------------------------------------------------------ D28-v2 sidecar

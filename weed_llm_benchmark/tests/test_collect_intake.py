@@ -78,6 +78,19 @@ Pinned:
     deciding the re-derived image otherwise (reason or match) leaves the hit
     unweighed, the reason naming no evaluation image; changed decisions
     refuse.
+  * continuation shards (step 1b, amendment 2026-10-03): with a cap of 4
+    over 10 boxed images, shard 1 takes 4, shard 2 the next 4 (none decided
+    before, drawn by cap_items with the same seed), shard 3 the last 2 and
+    removes the extracted tree, which the earlier shards kept; a 4th intake
+    is the no-op; a shard killed in its loop commits nothing and its rerun
+    takes the same shard; summary.json, batches.jsonl and sources.jsonl
+    record each shard and the images it leaves deferred; keys never collide;
+    inside the fetch the shards are one batch (an exact copy of an earlier
+    shard's image is exact_dup_intake, a near copy is kept); over a tree
+    whose marker names the fetch record no blob is hashed again, over one
+    whose marker does not they are; decisions that do not hash as recorded
+    refuse the next shard; a deferred image the source no longer holds ends
+    as not_in_source.
 
 Run:  python3 tests/test_collect_intake.py
 """
@@ -474,6 +487,205 @@ def test_intake_cap(cfg):
     check("  the same seed takes the same images; under the cap nothing is deferred",
           again == I.cap_items([{"rel": n, "group": n.split(".mp4")[0], "boxes": [(1,)]} for n in order], 4, "s")[0]
           and I.cap_items([{"rel": "a", "group": "a", "boxes": [(1,)]}], 4, "s") == (None, None), rec)
+
+
+def test_continuation_shards(cfg):
+    """Step 1b (amendment 2026-10-03): the deferred images of a capped batch
+    flow through continuation shards of the same fetch record."""
+    from weed_optimizer_framework.tools.collect import (StaleInput, batches_ledger, intake_dir, staging_dir,
+                                                        state as S, verify_chain)
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.collect import normalize as NZ
+    from weed_optimizer_framework.tools.collect.config import CollectConfig
+    print("continuation shards: a capped fetch is taken shard by shard until nothing is deferred")
+    ref = "cacacaca-0000-0000-0000-000000000021"
+    sid = "weedai_" + ref
+    cats = [{"id": 1, "name": "weed: amaranthus palmeri"}]
+    # five capture groups of two frames each: in pair0 and pair1 the second frame is the first's bytes (an exact
+    # duplicate), in pair2..pair4 a near copy (1-2 dHash bits). The cap draws one frame per group before any
+    # second, so the pairs of the four groups shard 1 reaches straddle two shards
+    imgs = {}
+    for g in range(5):
+        imgs["pair%d.mp4_0.png" % g] = W.img_bytes(720 + g)
+        imgs["pair%d.mp4_1.png" % g] = imgs["pair%d.mp4_0.png" % g] if g < 2 else W.img_bytes(720 + g, paint=(2,))
+    order = sorted(imgs)
+    anns = [{"id": i + 1, "image_id": i, "category_id": 1, "bbox": [10, 20, 40, 40]} for i, n in enumerate(order)]
+    raw = json.loads(json.dumps(cfg.raw))
+    raw["budgets"]["intake_max_images"] = 4
+    cfg2 = CollectConfig(raw, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    fetch_simple(cfg2, ref, coco_files(imgs, cats, anns), cats=("weed: amaranthus palmeri",))
+    fetch_sha = hashlib.sha256((staging_dir(sid) / "fetch.json").read_bytes()).hexdigest()
+    tree = intake_dir() / "work" / sid / fetch_sha[:12]
+    n_ledger = len(batches_ledger().read_text().splitlines())
+
+    def files(r):
+        b = pathlib.Path(r["dir"])
+        return (json.loads((b / "summary.json").read_text()),
+                [json.loads(l) for l in (b / "manifest.jsonl").read_text().splitlines()],
+                [json.loads(l) for l in (b / "decisions.jsonl").read_text().splitlines()],
+                json.loads((b / "guard.json").read_text()))
+
+    def images(dec, decision=None):
+        return {d["rel"] for d in dec if d["kind"] == "image" and (decision is None or d["decision"] == decision)}
+
+    def base(rels):
+        return sorted(x.rsplit("/", 1)[-1] for x in rels)
+
+    r1 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    s1, m1, d1, _g1 = files(r1)
+    taken1 = images(d1) - images(d1, "deferred")
+    # the source as intake reads it (the kept tree), for replaying the draws
+    _t, res = NZ.read(tree / "x", I._read_options(cfg2, json.loads((staging_dir(sid) / "fetch.json").read_text())))
+    src_items = sorted(res.items, key=lambda x: x["rel"])
+    all_rels = {it["rel"] for it in src_items}
+    check("shard 1 takes 4 of 10 and defers 6; its summary records shard 1 and 6 deferred",
+          r1["shard"] == 1 and len(taken1) == 4 and len(images(d1, "deferred")) == 6
+          and s1["shard"]["n"] == 1 and s1["shard"]["deferred_remaining"] == 6 and s1["yield"]["images_deferred"] == 6
+          and s1["shard"]["earlier_batches"] == [] and r1["deferred_remaining"] == 6, (r1, s1.get("shard")))
+    check("  one frame of four different capture groups (the cap's round robin)",
+          len({x.split(".mp4")[0] for x in taken1}) == 4, sorted(taken1))
+    check("  the extracted tree is kept while images remain deferred, its marker naming the fetch record",
+          (tree / "x" / ".complete").is_file() and I.tree_fetch_sha(tree / "x") == fetch_sha, str(tree))
+    blob = next((staging_dir(sid) / "blobs").glob("*"))
+    keep = blob.read_bytes()
+    blob.write_bytes(keep[:-1] + bytes([keep[-1] ^ 0xFF]))     # same size, other bytes: hashing would refuse
+    try:
+        r2 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    finally:
+        blob.write_bytes(keep)
+    s2, m2, d2, g2 = files(r2)
+    taken2 = images(d2) - images(d2, "deferred")
+    want2 = I.cap_items([it for it in src_items if it["rel"] not in taken1], 4, fetch_sha)[0]
+    check("shard 2 takes the next 4: none decided before, drawn by cap_items with the same seed; 2 remain",
+          r2["status"] == "intaken" and r2["shard"] == 2 and len(taken2) == 4 and not taken2 & taken1
+          and taken2 == want2 and len(images(d2, "deferred")) == 2 and s2["shard"]["deferred_remaining"] == 2
+          and s2["shard"]["earlier_batches"] == [r1["batch"]] and s2["intake_cap"]["eligible"] == 6,
+          (base(taken2), base(want2 or []), s2.get("shard")))
+    check("  over the kept tree no blob is read again (a changed blob of the same size passes; fetch.json is "
+          "hashed)", s2["shard"]["tree"] == "reused" and s2["shard"]["arrival"]["blobs"].startswith("presence")
+          and s2["shard"]["arrival"]["fetch_sha256"] == fetch_sha, s2["shard"])
+    check("  the earlier shard's images are out of the near_dup_intake index and counted as the fetch's own",
+          g2["same_fetch_shard_images"]["images"] == len(m1) and g2["same_fetch_shard_images"]["batches"]
+          == [r1["batch"]], g2.get("same_fetch_shard_images"))
+    # a tree whose marker does not name the fetch record (written before shards existed): every blob is hashed
+    (tree / "x" / ".complete").write_text("2026-10-02T00:00:00Z\n")
+    blob.write_bytes(keep[:-1] + bytes([keep[-1] ^ 0xFF]))
+    e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), StaleInput)
+    blob.write_bytes(keep)
+    check("a tree whose marker names no fetch record: the blobs are hashed, and a changed one refuses",
+          e is not None and "changed" in str(e) and len(batches_ledger().read_text().splitlines()) == n_ledger + 2, e)
+    # a shard killed in its per-image loop commits nothing; the rerun takes the same shard
+    real = I._label_text
+
+    def boom(boxes):
+        raise OSError("killed (injected)")
+    I._label_text = boom
+    try:
+        e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), OSError)
+    finally:
+        I._label_text = real
+    check("a shard killed in its loop commits nothing and keeps the tree", e is not None
+          and len(batches_ledger().read_text().splitlines()) == n_ledger + 2 and (tree / "x").is_dir(), e)
+    r3 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    s3, m3, d3, _g3 = files(r3)
+    taken3 = images(d3)
+    check("shard 3 (rerun) takes the last 2, defers none, and removes the work tree",
+          r3["shard"] == 3 and taken3 == all_rels - taken1 - taken2 and not images(d3, "deferred")
+          and s3["shard"]["deferred_remaining"] == 0 and s3["intake_cap"] is None
+          and s3["shard"]["earlier_batches"] == [r1["batch"], r2["batch"]] and s3["shard"]["arrival"]["blobs"]
+          == "sha256" and not tree.exists(), (sorted(taken3), s3.get("shard"), tree.exists()))
+    r4 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    check("a 4th intake of the fetch is the no-op", r4["status"] == "already_intaken" and r4["batch"] == r3["batch"]
+          and r4["shards"] == 3 and r4["deferred_remaining"] == 0
+          and len(batches_ledger().read_text().splitlines()) == n_ledger + 3, r4)
+    dec = d1 + d2 + d3
+    decided = [d for d in dec if d["kind"] == "image" and d["decision"] != "deferred"]
+    check("the shards partition the source: every image decided once", sorted(d["rel"] for d in decided)
+          == sorted(all_rels), sorted(d["rel"] for d in decided))
+    reasons = {d["rel"].rsplit("/", 1)[-1]: d["reason"] for d in decided}
+    rows = m1 + m2 + m3
+    dup = sorted(n for n, why in reasons.items() if why == "exact_dup_intake")
+    check("judged as one batch: of each exact pair one row kept, the other exact_dup_intake (across shards too); "
+          "every near copy kept (no near_dup_intake against an earlier shard)",
+          len(rows) == 8 and len(dup) == 2 and {n.split(".mp4")[0] for n in dup} == {"pair0", "pair1"}
+          and "near_dup_intake" not in reasons.values()
+          and all(reasons.get("pair%d.mp4_%d.png" % (g, k)) == "kept" for g in (2, 3, 4) for k in (0, 1)), reasons)
+    straddle = [g for g in range(5) if len({("pair%d.mp4_%d.png" % (g, k)) in base(taken1) for k in (0, 1)}) == 2]
+    check("  (fixture: shard 1 split four pairs across shards)", len(straddle) == 4, straddle)
+    keys = [r["key"] for r in rows]
+    others = {r.get("key") for b in batches_ledger().read_text().splitlines()
+              for r in ([] if json.loads(b)["source"] == sid else
+                        [json.loads(l) for l in (intake_dir() / json.loads(b)["batch"] / "manifest.jsonl")
+                         .read_text().splitlines()])}
+    check("keys never collide, across the shards and with every other batch", len(set(keys)) == len(keys)
+          and not set(keys) & others, keys)
+    ev = [x for x in S.read() if x["source"] == sid and x["event"] == "intaken"]
+    led = [json.loads(b) for b in batches_ledger().read_text().splitlines() if json.loads(b)["source"] == sid]
+    check("the ledgers record each shard and what it left deferred; their hash chains verify",
+          [(x["shard"], x["deferred_remaining"]) for x in ev] == [(1, 6), (2, 2), (3, 0)]
+          and [(x["shard"], x["deferred_remaining"]) for x in led] == [(1, 6), (2, 2), (3, 0)]
+          and verify_chain(batches_ledger()) == [], (ev, led))
+    # a rerun from the same fetch record takes the same shards (same seed): replayed here over the decisions
+    rerun1, _ = I.cap_items(src_items, 4, fetch_sha)
+    rerun2, _ = I.cap_items([it for it in src_items if it["rel"] not in rerun1], 4, fetch_sha)
+    check("the same seed draws the same shards again", rerun1 == taken1 and rerun2 == taken2, (rerun1, rerun2))
+    # the last shard leaves none deferred: no decisions are read (an earlier shard's, changed here, does not matter)
+    dpath = pathlib.Path(r2["dir"]) / "decisions.jsonl"
+    keep_d = dpath.read_bytes()
+    dpath.write_bytes(keep_d + b"\n")
+    try:
+        e = raises(lambda: I.shard_state(None, sid, fetch_sha), Exception)
+        st = I.shard_state(None, sid, fetch_sha) if e is None else {}
+    finally:
+        dpath.write_bytes(keep_d)
+    check("a fetch whose last shard leaves none deferred reads no decisions (the no-op stays cheap)",
+          e is None and st.get("remaining") == set() and st.get("n") == 4, (e, st))
+
+
+def test_shard_edges(cfg):
+    """shard_state refuses decisions that do not hash as their summary
+    records while images remain deferred; a deferred image the source no
+    longer holds ends as not_in_source, so the shards always end."""
+    from weed_optimizer_framework.tools.collect import CollectError, intake_dir, staging_dir
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.collect.config import CollectConfig
+    print("continuation shards: changed decisions, and a deferred image the source lost")
+    ref = "cacacaca-0000-0000-0000-000000000022"
+    sid = "weedai_" + ref
+    cats = [{"id": 1, "name": "weed: amaranthus palmeri"}]
+    imgs = {"t%d.png" % i: W.img_bytes(760 + i) for i in range(3)}
+    anns = [{"id": i + 1, "image_id": i, "category_id": 1, "bbox": [10, 20, 40, 40]} for i in range(3)]
+    raw = json.loads(json.dumps(cfg.raw))
+    raw["budgets"]["intake_max_images"] = 1
+    cfg2 = CollectConfig(raw, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    fetch_simple(cfg2, ref, coco_files(imgs, cats, anns))
+    r = I.intake(cfg2, sid, guard=W.FakeGuard())
+    fetch_sha = hashlib.sha256((staging_dir(sid) / "fetch.json").read_bytes()).hexdigest()
+    dpath = pathlib.Path(r["dir"]) / "decisions.jsonl"
+    keep = dpath.read_bytes()
+    dpath.write_bytes(keep.replace(b'"deferred"', b'"kept"', 1))
+    try:
+        e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), CollectError)
+    finally:
+        dpath.write_bytes(keep)
+    check("decisions that do not hash as the summary records: the next shard is not drawn", e is not None
+          and "does not hash" in str(e), e)
+    r2 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    check("  restored, the next shard runs (2 deferred -> 1)", r2["status"] == "intaken" and r2["shard"] == 2
+          and r2["deferred_remaining"] == 1 and I.shard_state(None, sid, fetch_sha)["remaining"]
+          and len(I.shard_state(None, sid, fetch_sha)["remaining"]) == 1, r2)
+    # the last deferred image is gone from the kept tree (a source read otherwise than before): decided, not
+    # deferred for ever
+    left = sorted(I.shard_state(None, sid, fetch_sha)["remaining"])
+    tree = intake_dir() / "work" / sid / fetch_sha[:12] / "x"
+    os.unlink(str(tree / left[0]))
+    r3 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    dec3 = [json.loads(l) for l in (pathlib.Path(r3["dir"]) / "decisions.jsonl").read_text().splitlines()]
+    check("a deferred image the source no longer holds is rejected not_in_source; the shards end (0 deferred, "
+          "the tree removed, the next intake the no-op)", r3["shard"] == 3 and r3["rows"] == 0
+          and r3["deferred_remaining"] == 0 and [d["rel"] for d in dec3 if d.get("reason") == "not_in_source"] == left
+          and not tree.exists() and I.intake(cfg2, sid, guard=W.FakeGuard())["status"] == "already_intaken",
+          (r3, [d for d in dec3 if d.get("kind") == "image"]))
 
 
 def fetch_simple(cfg, ref, files, cats=("weed: amaranthus palmeri",), licence="https://creativecommons.org/licenses/by/4.0/"):
@@ -1305,6 +1517,8 @@ def main():
         test_research_only(cfg)
         test_licence_override(cfg)
         test_intake_cap(cfg)
+        test_continuation_shards(cfg)
+        test_shard_edges(cfg)
         test_ftp_box_table(cfg)
         test_unlisted_and_clearance(cfg)
         test_copy_rule_and_keys(cfg)
