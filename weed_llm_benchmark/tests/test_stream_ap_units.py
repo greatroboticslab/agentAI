@@ -6,7 +6,9 @@ records (Stage A, Stage C, the capacity decision), the measurement arms
 (m832, s1024, and the box-quality arms y26l640, y26m640, l640: priced,
 proposed once R0 is complete and only while missing, never the stream's arm),
 E1 (2026-10-03: base v3's build L23V, the arms on splits v3 with cold_budget
-priced from the budget, their agnostic rescore L23E; record only), the dispositions, the replay gate's stream cases, the
+priced from the budget, their agnostic rescore L23E; record only; L23V waits,
+at most 12 h from when the stream first saw the list, for a person to lift
+the quarantines D28 now judges chance, with one card), the dispositions, the replay gate's stream cases, the
 config and the campaign dispatch, and the lab runner. No network, no GPU, no
 ssh.
 
@@ -2023,8 +2025,100 @@ def t_e1():
           [e.get("lever") for e in wu.events("proposed")])
 
 
+def _lift_world(tag, quarantined=("src_lift",)):
+    """_e1_world plus an intake batch of src_lift whose one dHash hit D28-v2 judges chance (pair cos 0.31), and
+    the stream's queue summary quarantining the given sources."""
+    w = _e1_world(tag)
+    w.intake("i0007_src_lift", "src_lift", images=900, reasons={"near_eval_variant": 1}, pair_cos=[0.31])
+    w.queue(0, extra={"quarantined_sources": {x: {"cite": "D28", "seq": 3, "utc": "2026-10-01T00:00:00Z"}
+                                              for x in quarantined}})
+    return w
+
+
+def t_e1_lift_wait():
+    section("E1 (2026-10-03): L23V waits, at most 12 h from when the stream first saw the list, for a person to lift "
+            "the quarantines D28 now judges chance; one card names them and the exact command")
+    th = LS.load_thresholds()
+    check("the bound is pre-registered with its why: D28.lift_wait_hours = 12",
+          LS.t(th, "D28", "lift_wait_hours") == 12 and th["D28"]["lift_wait_hours"].get("why"))
+    w = _lift_world("lift")
+    w.tick(3)
+    d = _diags(w)
+    st = w.state()
+    lw = (st["stage"]["r0"] or {}).get("lift_wait") or {}
+    cards = [c for c in st.get("cards") or [] if c.get("kind") == "quarantine_lift"]
+    wait = (d["DR0"].get("detail") or {}).get("lift_wait") or {}
+    cmd = ("python -m weed_optimizer_framework.tools.inc2.stream unquarantine --source src_lift --stream %s "
+           "--decided-by human:<id>" % w.sid)
+    check("D28 judges src_lift's hit chance and the stream still quarantines it (lift_pending): no L23V; the stream "
+          "keeps when it first saw the list; DR0 says why and until when",
+          d["D28"]["detail"].get("lift_pending") == ["src_lift"]
+          and not [e for e in w.events("proposed") if e.get("lever") == "L23V"]
+          and lw.get("sources") == ["src_lift"] and lw.get("first_seen_utc") in (W.utc(W.T0), W.utc(W.T0 + W.TICK))
+          and wait.get("first_seen_utc") == lw["first_seen_utc"]
+          and wait.get("until_utc") == W.utc(S._secs(lw["first_seen_utc"]) + 12 * 3600) and wait.get("commands") == [cmd]
+          and d["DR0"]["fired"] and "waits until" in d["DR0"]["summary"]
+          and not w.lane("MAINT").get("item"), (d["D28"]["detail"].get("lift_pending"), lw, wait, d["DR0"]["summary"]))
+    check("  one card for a person, naming the source and the exact command",
+          len(cards) == 1 and "src_lift" in cards[0]["title"] and cmd in cards[0]["detail"]
+          and len([e for e in w.events("lift_wait")]) == 1, [c.get("title") for c in st.get("cards") or []])
+    first = lw.get("first_seen_utc")
+    w.tick(6)
+    st = w.state()
+    check("  an hour later: still no L23V, still one card, the same first-seen time",
+          not [e for e in w.events("proposed") if e.get("lever") == "L23V"]
+          and len([c for c in st.get("cards") or [] if c.get("kind") == "quarantine_lift"]) == 1
+          and st["stage"]["r0"]["lift_wait"]["first_seen_utc"] == first, st["stage"]["r0"].get("lift_wait"))
+    w.queue(0, extra={"quarantined_sources": {}})
+    # the platform's own record of the source still says quarantined (L24 set it; a person's unquarantine on the
+    # cluster does not reach it): D28 still names it, but the stream no longer quarantines it
+    sp = S.StreamPaths(str(w.lab), w.domain).state(NAME)
+    stj = json.loads(sp.read_text())
+    stj.setdefault("sources", {})["src_lift"] = {"status": "quarantined", "cite": "D28"}
+    sp.write_text(json.dumps(stj))
+    w.tick(2)
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L23V"]
+    first = pro[0] if pro else {}
+    d = _diags(w)
+    check("a person lifted it (the stream's quarantine no longer lists it, though the platform's source record still "
+          "says quarantined and D28 still names it): L23V is proposed, citing only the lock and /stage/base3, and the "
+          "wait ends",
+          len(pro) == 1 and sorted(c.get("pointer") for c in first.get("cites") or []) == ["/stage/base3", "/stage/lock"]
+          and d["D28"]["detail"].get("cleared_quarantined") == ["src_lift"]
+          and d["D28"]["detail"].get("lift_pending") == []
+          and not w.state()["stage"]["r0"].get("lift_wait") and len(w.events("lift_wait_ended")) == 1,
+          ([e.get("lever") for e in w.events("proposed")], w.state()["stage"]["r0"].get("lift_wait"),
+           d["D28"]["detail"].get("cleared_quarantined")))
+    w2 = _lift_world("lift_timeout")
+    w2.tick(3)
+    w2.advance(12 * 3600 - 3 * W.TICK)
+    w2.tick(1)
+    early = [e for e in w2.events("proposed") if e.get("lever") == "L23V"]
+    w2.tick(2)
+    pro = [e for e in w2.events("proposed") if e.get("lever") == "L23V"]
+    check("not lifted: no L23V before 12 h from the first sight; at 12 h L23V is proposed with the quarantine as it "
+          "stands (the card stays one)", not early and len(pro) == 1
+          and len([c for c in w2.state().get("cards") or [] if c.get("kind") == "quarantine_lift"]) == 1,
+          ([e.get("utc") for e in pro], w2.state()["stage"]["r0"].get("lift_wait")))
+    w3 = _e1_world("lift_none")
+    w3.intake("i0007_src_lift", "src_lift", images=900, reasons={"near_eval_variant": 1}, pair_cos=[0.31])
+    w3.tick(3)
+    check("a source judged chance that the stream does not quarantine: no wait, L23V as before",
+          len([e for e in w3.events("proposed") if e.get("lever") == "L23V"]) == 1
+          and not [c for c in w3.state().get("cards") or [] if c.get("kind") == "quarantine_lift"])
+    w4 = _lift_world("lift_leak")
+    w4.intake("i0007_src_lift", "src_lift", images=900, reasons={"near_eval_variant": 1}, pair_cos=[0.97])
+    w4.tick(3)
+    d4 = _diags(w4)
+    check("a quarantined source whose hit D28 judges a copy (pair cos 0.97) is a leak, not a lift: no wait, L23V as "
+          "before", d4["D28"]["detail"].get("lift_pending") == []
+          and len([e for e in w4.events("proposed") if e.get("lever") == "L23V"]) == 1,
+          (d4["D28"]["detail"].get("lift_pending"), d4["D28"]["summary"][:200]))
+
+
 def main():
-    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_e1, t_formats,
+    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_e1, t_e1_lift_wait,
+               t_formats,
                t_replay_gate,
                t_config, t_lab, t_lanes, t_d28, t_d28_v2, t_d28_v2_sources, t_d28_v2_round3):
         try:

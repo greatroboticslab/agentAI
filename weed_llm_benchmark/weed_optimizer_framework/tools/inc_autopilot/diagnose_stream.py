@@ -733,7 +733,10 @@ def d28(v):
     has one verdict: one that leaks in its intake batches or in Step 1 is
     never also judged chance (detail.cleared, detail.cleared_quarantined),
     and one judged chance in both is stated once, with each path's
-    numbers."""
+    numbers. detail.lift_pending names the sources judged chance that the
+    stream itself still quarantines (its queue summary's
+    quarantined_sources, the ledger fold inc2.base3 reads): DR0 waits a
+    bounded time for a person to lift them before base v3 is built."""
     from ..inc2 import embed_calibration as EC
     from ..inc2 import eval_hits as EH
     th = v.th
@@ -840,12 +843,15 @@ def d28(v):
     if requeued:
         judged += (". Quarantined, now judged chance (a person lifts a quarantine: inc2.stream unquarantine "
                    "--source S --stream %s --decided-by human:<who>): %s" % (v.sid, ", ".join(requeued)))
+    # of those, the ones the stream itself still quarantines (a person's unquarantine leaves the platform's own
+    # source record as it was): what inc2.base3 build reads as quarantined
+    lift = sorted({str(c["source"]) for c in chance if str(c["source"]) in qs})
     if not hits:
         return _diag("D28", False, "info", "no source leaks: no dHash hit at or above the copy threshold in pair "
                      "cosine, no confirmed dHash hits (pair cos >= %g) improbable by chance (P(Binom(images, %g) >= "
                      "confirmed) < %g), no more embedding hits than the false-positive rate predicts (P < %g), no %g "
                      "base-copy share%s" % (confirm, p_conf, alpha, alpha, bc, judged), cites, [], None,
-                     {"cleared": cleared, "cleared_quarantined": requeued})
+                     {"cleared": cleared, "cleared_quarantined": requeued, "lift_pending": lift})
     # Until each leaking source is quarantined (L24) or a person has kept it
     # (denied the quarantine), the rows of it already admitted -- including
     # augmented copies the per-row checks missed -- are still cuttable, and a
@@ -875,7 +881,7 @@ def d28(v):
         "; TRAIN holds until %s is quarantined or kept by a person" % ", ".join(pending) if pending else "", judged),
         cites, ["L24", "OP_CARD"], None, {"leaks": hits, "pending": pending, "hold": "TRAIN" if pending else None,
                                           "stream_exists": inited, "cleared": cleared,
-                                          "cleared_quarantined": requeued,
+                                          "cleared_quarantined": requeued, "lift_pending": lift,
                                           "propose": [{"lever": "L24", "source": h["source"], "cite": "D28"}
                                                       for h in hits] if inited else []})
 
@@ -1510,7 +1516,39 @@ def _eval_hits_due(v):
     return due, cites
 
 
-def r0(v):
+def lift_wait(v, d28=None):
+    """The wait DR0 keeps before it proposes the base v3 build (L23V;
+    docs/CONTINUOUS_LOOP.md, E1, amendment 2026-10-03), or None. inc2.base3
+    build reads the stream's quarantine when its job starts, and a
+    quarantined source never enters arm B; a quarantine is lifted only by a
+    person (inc2.stream unquarantine). So while D28 lists sources it now
+    judges chance that the stream still quarantines (detail.lift_pending),
+    L23V waits for a person, at most D28.lift_wait_hours from when the
+    stream first saw a non-empty list (context /lift_wait, which the
+    ticker keeps across ticks; the first tick that sees the list is its
+    start); past that, L23V is proposed as it stands. With no list, a D28
+    that could not be judged, or no clock, there is no wait."""
+    det = (d28 or {}).get("detail") or {}
+    srcs = sorted({str(x) for x in det.get("lift_pending") or []})
+    if not srcs or (d28 or {}).get("unknown"):
+        return None
+    hours = float(_t(v.th, "D28", "lift_wait_hours"))
+    now_s = v.c("/now_utc")
+    rec = v.c("/lift_wait") or {}
+    first = rec.get("first_seen_utc") if isinstance(rec, dict) and rec.get("first_seen_utc") else now_s
+    now, t0 = _utc(now_s), _utc(first)
+    if now is None or t0 is None:
+        return None
+    until = t0 + datetime.timedelta(hours=hours)
+    if now >= until:  # the bound: L23V as it stands
+        return None
+    return {"sources": srcs, "first_seen_utc": first, "until_utc": until.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "hours": hours, "stream": v.sid,
+            "commands": ["python -m weed_optimizer_framework.tools.inc2.stream unquarantine --source %s --stream %s "
+                         "--decided-by human:<id>" % (x, v.sid) for x in srcs]}
+
+
+def r0(v, d28=None):
     """DR0: the rollout's prerequisites (contract 10 R0, R0b, R1, R2), each
     proposed once in its lane when due, in order: MAINT -- the splits build
     then lock (L23, a person approves the exact D-A command); the baselines
@@ -1522,7 +1560,9 @@ def r0(v):
     once one is done, its native-resolution rescore (L23N, once; not for an
     arm marked native false); E1 (2026-10-03): an arm that requires base3
     waits for splits v3, which is proposed once when that arm is next (L23V),
-    and once both E1 arms are done, their agnostic rescore and E1's verdict
+    after a bounded wait for a person to lift the quarantines D28 now judges
+    chance (lift_wait; `d28` is D28's diagnosis of the same evidence), and
+    once both E1 arms are done, their agnostic rescore and E1's verdict
     (L23E, once). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill), then D28-v2's sidecars for batches
@@ -1531,6 +1571,7 @@ def r0(v):
     out = {"MAINT": None, "DATA": None}
     cites = [v.ccite("/stage")]
     ss = _stream_state(v)
+    wait = None
     exps = v.c("/stage/exp_status") or {}
     ran = st.get("verdicts") or {}
     if not st.get("lock"):
@@ -1608,6 +1649,21 @@ def r0(v):
                 # E1 (2026-10-03): its manifest is splits v3's; proposed once, when this arm is next, never while
                 # it runs or after it failed (a card); the arm is built only once summary.json says complete
                 if st.get("base3") in (None, "missing"):
+                    # the build reads the quarantine at its job's start: a source D28 now judges chance stays out
+                    # of arm B for good unless a person lifts its quarantine first, so L23V waits for that, bounded
+                    wait = lift_wait(v, d28)
+                    if wait:
+                        wait["why"] = ("E1 arm %s (%s) trains splits v3, which is not built: base v3 build waits "
+                                       "until %s for a person to lift the stream's quarantine of %s, which D28 now "
+                                       "judges chance (inc2.stream unquarantine; a card)"
+                                       % (b["id"], b["exp"], wait["until_utc"], ", ".join(wait["sources"])))
+                        cites = [v.ccite("/stage/lock"), v.ccite("/stage/base3"), v.ccite("/lift_wait")]
+                        for x in wait["sources"]:
+                            try:
+                                cites.append(v.cite(v.qname, E.pointer("quarantined_sources", x)))
+                            except KeyError:
+                                pass
+                        break
                     out["MAINT"] = {"lever": "L23V", "baseline": b["id"],
                                     "why": "E1 arm %s (%s) trains splits v3, which is not built: base v3 build "
                                            "(record only)" % (b["id"], b["exp"])}
@@ -1653,11 +1709,14 @@ def r0(v):
             cites = [v.ccite("/stage/lock"), v.ccite(E.pointer("stage", "exp_status", ea["exp"])),
                      v.ccite(E.pointer("stage", "exp_status", eb["exp"])), v.ccite("/stage/agnostic")]
     items = {k: x for k, x in out.items() if x}
-    if not items:
+    if not items and not wait:
         return _silent("DR0", "no rollout prerequisite is due", cites=cites)
     levers = sorted({x["lever"] for x in items.values()})
-    return _diag("DR0", True, "info", "; ".join("%s: %s -> %s" % (k, x["why"], x["lever"]) for k, x in
-                                                sorted(items.items())), cites, levers, None, {"due": items})
+    summary = ["%s: %s -> %s" % (k, x["why"], x["lever"]) for k, x in sorted(items.items())]
+    if wait:
+        summary.append("L23V waits: %s" % wait["why"])
+    return _diag("DR0", True, "info", "; ".join(summary), cites, levers, None,
+                 dict({"due": items}, **({"lift_wait": wait} if wait else {})))
 
 
 def compare_due(v):
@@ -1854,7 +1913,7 @@ def detect(ev, dom, th=None, prior=None, only=None, include_prior_d31=False):
     run("D10S", d10s)
     run("D27", d27)
     run("D26", d26)
-    run("D28", d28)
+    r28 = run("D28", d28)
     run("DCAN", canary)
     run("D25", d25)
     run("D23", d23)
@@ -1873,7 +1932,7 @@ def detect(ev, dom, th=None, prior=None, only=None, include_prior_d31=False):
     run("DPIPE", pipeline)
     run("D20", d20)
     run("D29", d29)
-    run("DR0", r0)
+    run("DR0", r0, r28)
     run("DSA", stage_a)
     run("DCAP", capacity)
     run("DKT", known_truth)

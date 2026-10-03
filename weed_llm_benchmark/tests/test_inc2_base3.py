@@ -7,10 +7,12 @@ inc2.guard, LOCK v2 marked testing), plus a dataset registry, an intake
 batch and a stream ledger of its own.
 
 What is pinned:
-- the config: the shipped base3_v1.json loads, lists the 16 dock slugs as one
-  family, maps every MH-Weed16 id to weed, keeps the test groups and the
-  cwd12 copies out, and a config that lists a slug twice, maps a class to
-  anything but weed or drop, or names an unknown family is refused;
+- the config: the shipped config (base3_v2.json, revision 3) loads, lists
+  the 16 dock slugs as one family, maps every MH-Weed16 id to weed, keeps
+  the test groups and the cwd12 copies out, groups SIU's frames by video
+  (group_regex on real frame names), and a config that lists a slug twice,
+  maps a class to anything but weed or drop, names an unknown family, or
+  has a group_regex that captures no group (registry or intake) is refused;
 - geometry: a polygon line becomes its bounding box, coordinates are
   clipped, a malformed line is a problem; the box side is sqrt(w x h) at
   640; each of the 8 box transforms puts a painted box where funnel.leak's
@@ -66,6 +68,17 @@ What is pinned:
   evaluation group's slug drops it (near_eval_group), summary.json counts it
   and names the slug that is not in the registry;
 - the quarantine is the ledger's: an unquarantine event admits the source;
+- the rows of an increment in flight count as pool rows: an increment cut
+  and not committed (in_segment), or accepted and rolled back (suspect), or
+  of a status the builder does not know, is never held out to test v1, and
+  the build records their count; a withdrawn, 'data' or returned increment's
+  rows are not pool rows;
+- an intake source's group_regex (SIU, revision 3): rows named like the real
+  intake (weed_dataset/Dataset/images/<split>/<EPPO>_week_<n>_IMG_<id>_
+  frame_<k>, the intake capture group the single image) get the video as
+  their session, so a video's frames are one capture group: the holdout and
+  the siu family cap take whole videos, where without it a video's frames
+  were split between test v1 and arm B;
 - inc2.baseline builds E1's arms with cold_budget (the pinned driver
   accepts the definition), a manifest no base v3 summary records and that
   lies outside splits/v3 gets the cold table, and a base v3 manifest that is
@@ -382,8 +395,20 @@ def test_config():
                                 "kg_yuzhenlu__cottonweeddet3", "mediatum_1717366", "zenodo_15808623"))
           and set(conf["intake"]) == {"kg_yuzhenlu__cottonweeddet3", "mediatum_1717366", "zenodo_15808623"})
     check("v2 (revision 2, before any build): SIU is an intake source of family siu, capped at 35 % like the dock "
-          "family", conf["version"] == "v2" and conf["intake"]["zenodo_15808623"]["family"] == "siu"
+          "family", conf["version"].startswith("v2") and conf["intake"]["zenodo_15808623"]["family"] == "siu"
           and conf["rules"]["families"]["siu"]["cap_share"] == 0.35, conf["intake"]["zenodo_15808623"])
+    import re
+    rx = re.compile(conf["intake"]["zenodo_15808623"].get("group_regex") or "^$")
+    names = {"ABUTH_week_10_IMG_1656_frame_0049.jpeg": "ABUTH_week_10_IMG_1656",
+             "ABUTH_week_10_IMG_1656_frame_0088.jpeg": "ABUTH_week_10_IMG_1656",
+             "AMAPA_week_1_IMG_0007_frame_0230.jpeg": "AMAPA_week_1_IMG_0007",
+             "SORVU_week_11_IMG_2210_frame_0001.jpg": "SORVU_week_11_IMG_2210"}
+    got = {n: (rx.search(n).group(1) if rx.search(n) else None) for n in names}
+    check("revision 3 (before any build): SIU's group_regex takes the video from a frame's file name "
+          "(<EPPO>_week_<n>_IMG_<id>_frame_<k>), and the config says revision 3 and why",
+          conf["version"] == "v2 revision 3" and got == names and rx.search("IMG_1656.jpeg") is None
+          and "revision 3 (before any build)" in conf["decided_by"] and "dependent" in conf["decided_by"]
+          and "in flight" in conf["rules"]["holdout"]["why"], (conf["version"], got))
     itmo = conf["sources"]["rf_itmo-mp0nn__grass-detection-4"]["classes"]
     check("rf_itmo: forbs weed; Poa, litter, bare patch, dry grass dropped",
           {k for k, v in itmo.items() if v == "drop"} == {"Dry_grass", "Musor", "Poa_pratensis", "Poa_trivialis",
@@ -415,15 +440,18 @@ def test_config():
                 lambda c: c.update(class_id=11),
                 lambda c: c["evaluation_groups"]["groups"]["NDSU"].append("rf_kinjj__weed-avnag"),
                 lambda c: c.pop("evaluation_groups"),
-                lambda c: c["rules"]["dedupe"].pop("layout_max_bits")):
+                lambda c: c["rules"]["dedupe"].pop("layout_max_bits"),
+                lambda c: c["intake"]["zenodo_15808623"].update(group_regex="[A-Z]{5}_week_\\d+_frame_"),
+                lambda c: c["intake"]["zenodo_15808623"].update(group_regex="(unclosed"),
+                lambda c: c["sources"]["rf_kinjj__weed-avnag"].update(group_regex="IMG_\\d+")):
         c = json.loads(B3.CONFIG.read_text())
         mut(c)
         p = TMP / "bad_conf.json"
         p.write_text(json.dumps(c))
         bad.append(refused(B3.load_config, p) is not None)
     check("a slug both included and excluded, a role other than weed/drop, an unknown family, another class id, an "
-          "evaluation group listing an included slug, no evaluation groups or no layout_max_bits refuse the config",
-          all(bad), bad)
+          "evaluation group listing an included slug, no evaluation groups, no layout_max_bits, or a group_regex that "
+          "captures no group or does not compile (intake or registry) refuse the config", all(bad), bad)
 
 
 def test_geometry():
@@ -1234,6 +1262,181 @@ def test_intake_family(f):
     check("  an intake source whose family has no rule refuses the config", refused(B3.load_config, tmp))
 
 
+def _cut(sid, inc, seg, rows):
+    """A cut line of inc2.stream's ledger for increment `inc` of segment `seg`; its rows sidecar is written
+    outside the stream's directory, which make_stream recreates."""
+    p = S.StreamPaths(sid)
+    side = TMP / "sidecars" / sid / ("%s.rows.jsonl" % inc)
+    side.parent.mkdir(parents=True, exist_ok=True)
+    side.write_text("".join(json.dumps({"key": r["key"], "sha256": r["sha256"], "source": r["source"],
+                                        "hashes": {}}, sort_keys=True) + "\n" for r in rows))
+    return {"event": "cut", "increment": inc, "segment": seg, "step": 1,
+            "manifest": {"path": str(p.inc_manifest(inc)), "sha256": "0" * 64, "n_images": len(rows)},
+            "rows": {"path": str(side), "sha256": C.sha256_file(side)}, "meta": {"path": str(p.inc_meta(inc))},
+            "sources": sorted({r["source"] for r in rows}), "by": "platform"}
+
+
+def test_in_flight(Wd, reg, cp, f):
+    print("the rows of an increment in flight count as pool rows for the holdout")
+    check("released statuses: data, stale, withdrawn, every return disposition and a bisect's verdicts; in_segment, "
+          "suspect, accepted and an unknown status are not released",
+          all(B3.released_status(x) for x in ("data", "stale", "withdrawn", "species", "flips", "recipe", "hold",
+                                              "truth_helps", "bisect_helps", "bisect_hurts", "bisect_neutral"))
+          and not any(B3.released_status(x) for x in ("in_segment", "suspect", "accepted", "brand_new", None)))
+    rows = f["intake_rows"]
+    big = [{"key": "src_big__train_images_big_%02d" % i, "sha256": "f%063d" % i, "source": "src_big"} for i in range(2)]
+    # inc0001 cut (in_segment); inc0002 cut, then its build was killed (withdrawn); inc0003 committed as 'data';
+    # inc0004 accepted then rolled back (suspect); inc0005 of a status this builder does not know
+    events = [_cut(SID, "inc0001", 2, rows[2:]), _cut(SID, "inc0002", 3, big[:1]),
+              {"event": "withdraw", "segment": 3, "orphan_increments": ["inc0002"], "reason": "test", "by": "platform"},
+              _cut(SID, "inc0003", 1, big[1:]), _cut(SID, "inc0004", 1, rows[1:2]),
+              {"event": "build", "segment": 1, "exp": "%s_s001" % SID, "base_pool": "P_0",
+               "increments": ["inc0003", "inc0004"], "recipes": ["r0"], "truth": False, "by": "platform"},
+              {"event": "commit", "segment": 1, "dispositions": {"inc0003": "data", "inc0004": "accepted"},
+               "counted": {}, "by": "platform"},
+              {"event": "rollback", "to": "P_0", "from": "P_1", "suspect": ["inc0004"], "by": "platform"},
+              QUAR]
+    make_stream(SID, events)
+    q, rec, (keys, shas) = B3.quarantined_sources(SID)
+    fl = rec["in_flight"]
+    check("quarantined_sources: in flight are inc0001 (in_segment, 4 rows) and inc0004 (suspect, 1 row); the "
+          "withdrawn inc0002 and the 'data' inc0003 are not; the record counts 5 rows",
+          sorted(fl["increments"]) == ["inc0001", "inc0004"] and fl["rows"] == 5
+          and fl["increments"]["inc0001"] == {"status": "in_segment", "segment": 2, "rows": 4}
+          and fl["increments"]["inc0004"]["status"] == "suspect"
+          and {r["key"] for r in rows[1:]} <= keys and not ({b["key"] for b in big} & keys)
+          and rec["pool_rows"] == 0 and list(q) == ["src_quar"], (fl, rec["pool_rows"]))
+    orig = S.Fold._ev_commit
+
+    def odd(self, e):
+        orig(self, e)
+        self.increments["inc0004"]["status"] = "brand_new"
+    S.Fold._ev_commit = odd
+    try:
+        _q, rec2, (keys2, _s) = B3.quarantined_sources(SID)
+    finally:
+        S.Fold._ev_commit = orig
+    check("  an increment of a status the builder does not know counts as in flight (fail closed)",
+          "inc0004" in rec2["in_flight"]["increments"] and rows[1]["key"] in keys2, rec2["in_flight"])
+    side = TMP / "sidecars" / SID / "inc0001.rows.jsonl"
+    side.write_text(side.read_text() + "\n")
+    check("  an increment's rows sidecar that no longer hashes as its cut line says refuses the build (the rows "
+          "it trains on are unknown)", refused(B3.quarantined_sources, SID) is not None)
+    # end to end: the rule would hold every group, yet no row of an increment in flight is held out
+    clear_v3()
+    make_stream(SID, [_cut(SID, "inc0001", 2, rows[2:]), QUAR])
+    conf = json.loads(cp.read_text())
+    conf["rules"]["holdout"].update(min_images=6, max_images=6, share=1.0)
+    allp = TMP / "base3_flight.json"
+    allp.write_text(json.dumps(conf))
+    with holds({"int_src__00": []}):
+        summ = B3.build(SID, conf_path=allp, registry=reg, testing=True, procs=2, loader=LOADER)
+    held = {json.loads(x)["key"] for x in (B3.out_dir() / B3.PROVENANCE).read_text().splitlines()
+            if json.loads(x)["holdout_v1"]}
+    it = summ["per_source"]["int_src"]
+    stv = summ["inputs"]["stream"]
+    check("an increment cut before the build (in_segment): none of its 4 intake rows is held out to test v1, though "
+          "the rule would take every group (int_src: %d held of %d kept); summary.json records the in-flight rows "
+          "(%s) and the candidate rows marked (%s)" % (it["holdout_v1"], it["in_B"] + it["holdout_v1"],
+                                                      stv.get("in_flight", {}).get("rows"),
+                                                      stv.get("pool_marked_rows")),
+          not ({r["key"] for r in rows[2:]} & held) and it["in_B"] >= 4
+          and stv["in_flight"]["rows"] == 4 and stv["in_flight"]["increments"]["inc0001"]["status"] == "in_segment"
+          and stv["pool_rows"] == 0 and stv["pool_marked_rows"] >= 4, (sorted(held), it, stv.get("in_flight")))
+    clear_v3()
+    make_stream(SID, [QUAR])
+
+
+def _vid_rows(src, batch, frames, rel_dir="weed_dataset/Dataset/images/test"):
+    """An intake batch named as zenodo_15808623's i0004 is (key <src>__weed_dataset__Dataset__images__<split>__<name>,
+    the intake's capture group and session the image's own path); frames: [(name, split or None)]."""
+    idir = C.INC_DIR / "intake" / batch
+    (idir / "images").mkdir(parents=True, exist_ok=True)
+    out = []
+    for name, split in frames:
+        rel = "%s/%s" % (rel_dir if split is None else rel_dir.rsplit("/", 1)[0] + "/" + split, name)
+        key = "%s__%s" % (src, rel[:-len(".jpeg")].replace("/", "__"))
+        img = idir / "images" / (key + ".jpeg")
+        out.append({"key": key, "image": str(img), "rel": rel, "sha256": hashlib.sha256(key.encode()).hexdigest(),
+                    "label": str(idir / "labels" / (key + ".txt")), "label_sha256": "0" * 64, "source": src,
+                    "capture_group": rel, "capture_group_basis": "image", "session": rel, "width": 720,
+                    "height": 960, "dhash": h64(key), "holds": [], "licence": "cc-by-nc-sa-4.0",
+                    "research_only": True})
+    (idir / "manifest.jsonl").write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in out))
+    return idir, out
+
+
+def test_intake_video_groups():
+    print("an intake source's group_regex (SIU, revision 3): a video's frames are one capture group")
+    shipped, _sha = B3.load_config()
+    zrx = shipped["intake"]["zenodo_15808623"]["group_regex"]
+    vids = ["ABUTH_week_10_IMG_1656", "AMAPA_week_3_IMG_0420", "SIDSP_week_7_IMG_0999", "ECHCG_week_2_IMG_1200"]
+    frames = [("%s_frame_%04d.jpeg" % (v, k), None) for v in vids for k in (1, 49, 88, 120)]
+    frames.append(("%s_frame_%04d.jpeg" % (vids[0], 200), "train"))     # the same video under the source's train/
+    frames.append(("IMG_0001.jpeg", None))                               # a name the pattern does not match
+    idir, man = _vid_rows("vid_src", "i0009_vid_src", frames)
+    try:
+        conf = unit_conf(share=0.25, min_images=1, max_images=6, max_group=400)
+        conf["intake"] = {"vid_src": {"tier": 1, "classes": "all_weed", "family": "siu", "group_regex": zrx}}
+        rows, _rec = B3.intake_rows(conf, holds_view={})
+        R = by_key(rows)
+        gk = {r["rel"].rsplit("/", 1)[1]: R[r["key"]]["group_key"] for r in man}
+        check("rows named like the real intake (the capture group the single image) get the video as their session "
+              "(group_key '<source>|<video>'), from the original file name, whatever folder holds it; an unmatched "
+              "name gets none",
+              all(gk["%s_frame_%04d.jpeg" % (v, k)] == "vid_src|%s" % v for v in vids for k in (1, 49, 88, 120))
+              and gk["%s_frame_0200.jpeg" % vids[0]] == "vid_src|%s" % vids[0] and gk["IMG_0001.jpeg"] is None
+              and all(R[r["key"]]["capture"] == "vid_src|%s" % r["rel"] for r in man), gk)
+
+        def synth(rws):
+            out = []
+            for r in rws:
+                x = srow(r["key"], source=r["source"], kind=r["kind"], tier=r["tier"], family=r["family"],
+                         capture=r["capture"], group_key=r["group_key"])
+                out.append(x)
+            return out
+        sel = synth(rows)
+        B3.select(sel, conf)
+        S_ = by_key(sel)
+        vid_of = {r["key"]: (r["group_key"] or r["key"]) for r in rows}
+        groups = {}
+        for k, x in S_.items():
+            groups.setdefault(vid_of[k], set()).add(x["group"])
+        held = held_of(sel)
+        split = [v for v in groups if v.startswith("vid_src|") and 0 < sum(1 for k in held if vid_of[k] == v)
+                 < sum(1 for k in S_ if vid_of[k] == v)]
+        check("each video is one capture group (%d videos), and the holdout takes whole videos: %d frames held, no "
+              "video split between test v1 and arm B" % (len(vids), len(held)),
+              all(len(g) == 1 for g in groups.values()) and len({next(iter(g)) for v, g in groups.items()
+                                                                  if v.startswith("vid_src|")}) == len(vids)
+              and held and not split, (sorted(held), split))
+        conf0 = json.loads(json.dumps(conf))
+        conf0["intake"]["vid_src"].pop("group_regex")
+        rows0, _r = B3.intake_rows(conf0, holds_view={})
+        sel0 = synth(rows0)
+        B3.select(sel0, conf0)
+        held0 = held_of(sel0)
+        split0 = [v for v in vids if 0 < sum(1 for k in held0 if vid_of[k] == "vid_src|" + v)
+                  < sum(1 for k in vid_of if vid_of[k] == "vid_src|" + v)]
+        check("  without the group_regex (revision 2) the intake capture group is the single frame, and frames of "
+              "one video land in both test v1 and arm B (%d videos split)" % len(split0), len(split0) >= 1,
+              sorted(held0))
+        # the siu family cap drops whole videos
+        conf2 = unit_conf(share=0.0, min_images=0, max_images=0, max_group=400)
+        conf2["rules"]["families"] = {"siu": {"cap_share": 0.35}}
+        conf2["intake"] = conf["intake"]
+        sel2 = synth(rows) + [srow("other%02d" % i, source="src_other") for i in range(12)]
+        rec2 = B3.select(sel2, conf2)
+        S2_ = by_key(sel2)
+        part = [v for v in vids if len({S2_[k]["drop"] for k in vid_of if vid_of[k] == "vid_src|" + v}) > 1]
+        cap = rec2["family_caps"]["siu"]
+        check("the siu cap (35 %%: at most %d of %d frames beside 12 other rows) drops whole videos (%d frames "
+              "dropped), never part of one" % (cap["cap"], cap["before"], cap["dropped"]),
+              cap["cap"] == 6 and cap["after"] <= 6 and cap["dropped"] >= 4 and not part, (cap, part))
+    finally:
+        shutil.rmtree(str(idir), ignore_errors=True)
+
+
 def main():
     t0 = time.time()
     Wd = W.build_world()
@@ -1249,10 +1452,12 @@ def main():
     test_leak_weighed(Wd, reg, cp, f)
     test_count_and_quarantine(Wd, reg, cp, f, built)
     test_pool_rows(Wd, reg, cp, f)
+    test_in_flight(Wd, reg, cp, f)
     test_walltime(Wd, reg, cp)
     test_baseline_budget(Wd, reg, cp)
     test_prior_lists(Wd, reg, cp)
     test_intake_family(f)
+    test_intake_video_groups()
     print("\n%d failure(s) in %.0fs" % (len(FAILURES), time.time() - t0))
     if FAILURES:
         for x in FAILURES:

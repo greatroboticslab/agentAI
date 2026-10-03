@@ -1,7 +1,7 @@
 {
  "format": "inc2-base3-config/1",
- "version": "v2",
- "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-03): E1, weed-box base v3 (pre-registered), revision 2 (before any build): v1 plus zenodo_15808623 as an intake source capped as a family; human:harry567566@gmail.com under the 2026-09-30 grant",
+ "version": "v2 revision 3",
+ "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-03): E1, weed-box base v3 (pre-registered), revision 3 (before any build): revision 2 (v1 plus zenodo_15808623 as an intake source capped as a family) with zenodo_15808623's frames grouped by video (intake group_regex), because frames of one video in both test v1 and arm B would make test v1 dependent on arm B, and with every row of an increment the stream has in flight kept out of test v1 as a pool row is; human:harry567566@gmail.com under the 2026-09-30 grant",
  "class_id": 12,
  "why": "Every weed box of every admitted source becomes INC class 12 (OtherPlant), so the E1 models are one-class weed detectors that every inc2 check, the pinned driver and the locked scorer accept; crop and non-plant boxes are dropped (background); an image without a weed box after the rules is not admitted. The include list is an allow-list: a registry slug that is not listed here is never read (excluded, 'not listed').",
  "rules": {
@@ -41,7 +41,7 @@
    "max_images": 400,
    "group_bits": 6,
    "max_group": 400,
-   "why": "Main-test holdout v1: from every included external source ~15 % of its kept rows (min 30, max 400 images), in whole capture groups, never trained. A capture group joins images within 6 dHash bits under the 8 variants (both directions), near and layout copies, the same Roboflow export stem across the source (across the family for a family), the intake capture group and a source's file-name session (group_regex). It is computed before the stream's quarantine is applied, so test v1 is the same whichever sources are quarantined (a quarantined source's held rows stay in test v1; its other rows stay out of arm B). Groups are named and ordered by their own content: per source, by stable_int(seed_text/source/sha256 of the group's sorted member sha256s), a group holding a row of an earlier build's test list first. A group is taken only while every source with rows in it stays at or under 400 held images, and each source's own count includes its rows held in other sources' groups. A group touching base_v2 or any row of the stream's pools (an image a current model trained on), or larger than 400 images, is never held out. Every row an earlier build's test list holds (splits/*/test_v1/*.jsonl: the same bytes or key, a shared capture relation, or within 6 dHash bits under the 8 variants) never trains."
+   "why": "Main-test holdout v1: from every included external source ~15 % of its kept rows (min 30, max 400 images), in whole capture groups, never trained. A capture group joins images within 6 dHash bits under the 8 variants (both directions), near and layout copies, the same Roboflow export stem across the source (across the family for a family), the intake capture group and a source's file-name session (group_regex: a registry source's on its file names, an intake source's on its rows' original file names). It is computed before the stream's quarantine is applied, so test v1 is the same whichever sources are quarantined (a quarantined source's held rows stay in test v1; its other rows stay out of arm B). Groups are named and ordered by their own content: per source, by stable_int(seed_text/source/sha256 of the group's sorted member sha256s), a group holding a row of an earlier build's test list first. A group is taken only while every source with rows in it stays at or under 400 held images, and each source's own count includes its rows held in other sources' groups. A group touching base_v2, any row of the stream's pools (an image a current model trained on) or any row of an increment the stream has in flight (cut, suspect, or any status that has not released its rows: a pool may still take it; revision 3), or larger than 400 images, is never held out. Every row an earlier build's test list holds (splits/*/test_v1/*.jsonl: the same bytes or key, a shared capture relation, or within 6 dHash bits under the 8 variants) never trains."
   },
   "families": {
    "dock": {
@@ -50,7 +50,7 @@
    },
    "siu": {
     "cap_share": 0.35,
-    "why": "One greenhouse, one set of potted plants, filmed: at most 35 % of base v3's images, as the dock family (S <= floor(0.35 / 0.65 x non-SIU images), applied after the holdout by seeded whole capture groups, a video's frames being one group). Without it the 40,000 frames would be about 63 % of arm B, and arm B would mostly measure one greenhouse; with it, arm B is about 35K images (23K as is plus about 12K SIU). Decided before any build, from counts only."
+    "why": "One greenhouse, one set of potted plants, filmed: at most 35 % of base v3's images, as the dock family (S <= floor(0.35 / 0.65 x non-SIU images), applied after the holdout by seeded whole capture groups, a video's frames being one group through the source's group_regex, revision 3). Without it the 40,000 frames would be about 63 % of arm B, and arm B would mostly measure one greenhouse; with it, arm B is about 35K images (23K as is plus about 12K SIU). Decided before any build, from counts only."
    }
   },
   "walltime": {
@@ -332,7 +332,8 @@
    "tier": 1,
    "classes": "all_weed",
    "family": "siu",
-   "note": "SIU Weed Growth Stage (CC BY-NC-SA 4.0, research only): 16 species (Palmer amaranth, waterhemp, ragweed, prickly sida and 12 other weeds) over 11 weeks, potted plants in one greenhouse, frames of 360-degree videos; its intake batch takes 40,000 of 203,567 frames (collect budgets.intake_max_images); a row is admitted once Step 1 releases its intake holds"
+   "group_regex": "(?P<group>[A-Z]{5}_week_\\d+_IMG_\\d+)_frame_",
+   "note": "SIU Weed Growth Stage (CC BY-NC-SA 4.0, research only): 16 species (Palmer amaranth, waterhemp, ragweed, prickly sida and 12 other weeds) over 11 weeks, potted plants in one greenhouse, frames of 360-degree videos; its intake batch takes 40,000 of 203,567 frames (collect budgets.intake_max_images); a row is admitted once Step 1 releases its intake holds; revision 3: group_regex takes the video from each frame's original file name (<EPPO>_week_<n>_IMG_<id>_frame_<k>), so a video's frames are one capture group: test v1, arm B and the siu cap take whole videos (i0004_zenodo_15808623, read on the cluster 2026-10-03: all 39,958 rows match, 331 videos, 14-230 frames each, median 116; its intake_cap record: 230,899 eligible frames, 40,000 taken, 190,899 deferred)"
   }
  },
  "excluded": {

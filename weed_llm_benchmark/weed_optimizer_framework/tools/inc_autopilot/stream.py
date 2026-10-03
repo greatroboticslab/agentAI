@@ -1309,6 +1309,9 @@ class StreamRun(object):
                 "d33_species": sorted({s for h in st.get("d33_history") or [] if h.get("fired")
                                        for s in h.get("species") or []}),
                 "doublings": int(st.get("doublings") or 0), "bisected": st.get("bisected"),
+                # DR0's bounded wait for a person before the base v3 build (_lift_wait); outside /stage, which
+                # some R0 items cite whole
+                "lift_wait": copy.deepcopy(((st.get("stage") or {}).get("r0") or {}).get("lift_wait")),
                 "rollbacks": copy.deepcopy(st.get("rollbacks") or []),
                 "limits": {"gb_per_source": (LS.limits("L16") or {}).get("gb_per_source"),
                            "attempts_per_source": (LS.limits("L16") or {}).get("attempts_per_source")}}
@@ -1420,6 +1423,7 @@ class StreamRun(object):
             st["lanes"][ln]["diag_hold"] = holds[ln]
             if holds[ln] != old:
                 self._ledger("lane_hold" if holds[ln] else "lane_hold_cleared", lane=ln, hold=holds[ln] or old)
+        self._lift_wait(by)
         # R0 records: Stage A, Stage C, the capacity decision
         dsa = by.get("DSA") or {}
         if dsa.get("fired") and not (st.get("stage_a") or {}).get("ready"):
@@ -1438,6 +1442,49 @@ class StreamRun(object):
         if len(held) >= int(LS.t(self.th, "stop_loss", "held_lanes_to_pause")):
             return self._pause("stop-loss: %d lanes are held (%s)" % (len(held), ", ".join(
                 "%s: %s" % (ln, st["lanes"][ln]["hold"]) for ln in held)))
+
+    def _lift_wait(self, by):
+        """DR0's bounded wait before the base v3 build (diagnose_stream.
+        lift_wait). The diagnoses are recomputed every tick, so the stream
+        state keeps when D28 first listed sources it judges chance that the
+        stream still quarantines (stage.r0.lift_wait, read back as context
+        /lift_wait): the first tick that sees a non-empty list starts
+        the wait, the list's membership may change without restarting it,
+        and an empty list ends it (a D28 that could not be judged changes
+        nothing). While DR0 defers L23V, one card names the sources and the
+        exact command (deduplicated by its text, which changes only with the
+        list or the deadline)."""
+        st = self.st
+        r0 = st.setdefault("stage", {}).setdefault("r0", {})
+        d28 = by.get("D28") or {}
+        if d28 and not d28.get("unknown"):
+            lp = sorted({str(x) for x in (d28.get("detail") or {}).get("lift_pending") or []})
+            rec = r0.get("lift_wait")
+            if lp and not (rec or {}).get("first_seen_utc"):
+                r0["lift_wait"] = {"first_seen_utc": self.utc, "sources": lp}
+                self._ledger("lift_wait", sources=lp, first_seen_utc=self.utc, trigger=["D28"],
+                             reasons=["D28 judges these sources' dHash hits chance and the stream still quarantines "
+                                      "them: base v3 (L23V) waits for a person, bounded"])
+            elif lp:
+                rec["sources"] = lp
+            elif rec:
+                r0.pop("lift_wait", None)
+                self._ledger("lift_wait_ended", sources=rec.get("sources"), first_seen_utc=rec.get("first_seen_utc"),
+                             trigger=["D28"], reasons=["D28 lists no cleared source the stream still quarantines"])
+        w = ((by.get("DR0") or {}).get("detail") or {}).get("lift_wait")
+        if isinstance(w, dict) and w.get("sources"):
+            self._card("quarantine_lift",
+                       "Base v3 (L23V) waits until %s: a person lifts the quarantine of %s, or decides to keep it"
+                       % (w.get("until_utc"), ", ".join(w["sources"])),
+                       "D28 now judges the dHash hits of %s chance, but the stream still quarantines %s, and the base "
+                       "v3 build (inc2.base3 build, L23V) reads the quarantine when its job starts: a quarantined "
+                       "source never enters arm B. Only a person lifts a quarantine; on the cluster, from the "
+                       "repository's root: %s. L23V is proposed once they are lifted, or at %s (%g h after the list "
+                       "was first seen, %s) with the quarantine as it stands."
+                       % (", ".join(w["sources"]), "it" if len(w["sources"]) == 1 else "them",
+                          "; ".join(w.get("commands") or []), w.get("until_utc"), float(w.get("hours") or 0),
+                          w.get("first_seen_utc")),
+                       trigger=["DR0", "D28"])
 
     def digest(self):
         """The sha256 of everything a decision read (the evidence's canonical

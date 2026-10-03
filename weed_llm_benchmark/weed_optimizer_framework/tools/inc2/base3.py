@@ -20,9 +20,10 @@ inc2 check, the pinned driver and the locked scorer accept; their
 class-agnostic dev mAP50-95 compares directly with b_v2_m640's.
 
 Inputs (all recorded by sha256 in summary.json):
-  * the pre-registered config base3_v1.json beside this module: the
-    allow-list of sources, each class name's role (weed or drop), the
-    families and provider tiers, every rule's numbers;
+  * the pre-registered config base3_v2.json beside this module (CONFIG):
+    the allow-list of sources, each class name's role (weed or drop), the
+    families and provider tiers, each source's file-name capture group
+    (group_regex, registry and intake sources alike), every rule's numbers;
   * splits v2's base_v2.jsonl (by LOCK v2's sha256) and its provenance
     (dHash and 8 variants of each row);
   * the dataset registry (REPO/results/framework/dataset_registry.json):
@@ -39,7 +40,10 @@ Inputs (all recorded by sha256 in summary.json):
   * the stream's source quarantines (--stream SID: inc2.stream's ledger
     fold, its head recorded): a quarantined source's rows never enter arm B.
     The quarantine is an input, never a constant here, and it is applied
-    after the holdout (below), so test v1 does not depend on it;
+    after the holdout (below), so test v1 does not depend on it. The same
+    fold gives the rows the stream has trained on or may still pool: every
+    pool's rows and every row of an increment in flight (cut, suspect, or
+    any status that has not released its rows);
   * the evaluation groups' images (config "evaluation_groups": test v1's
     groups and the OOD-dev groups, every slug excluded): their 8-variant
     dHashes from the v1 Step 1 pool, else hashed from the registry's
@@ -47,7 +51,7 @@ Inputs (all recorded by sha256 in summary.json):
   * every test list an earlier build wrote (INC_DIR/splits/*/test_v1/
     *.jsonl, whatever its directory is now called): never trained.
 
-The rules (pre-registered; base3_v1.json "rules"). base_v2 rows are exempt
+The rules (pre-registered; the config's "rules"). base_v2 rows are exempt
 from every box, image and source rule: arm A is base_v2 whole.
   * Classes: a box of a 'weed' class becomes class 12, a box of a 'drop'
     class is removed (background); a class id with no name, or a name the
@@ -96,7 +100,9 @@ from every box, image and source rule: arm A is base_v2 whole.
     sources are quarantined): capture groups join images within 6 dHash
     bits under the 8 variants (both directions), their copy edges, the same
     Roboflow export stem (across a family), the intake capture group and a
-    source's group_regex session. A group is named by its own content (the
+    source's group_regex session (a registry source's on its file names, an
+    intake source's on its rows' original file names: SIU's video). A group
+    is named by its own content (the
     sha256 of its members' sorted sha256s), never by row positions. From
     each included external source (quarantined or not), whole groups it
     owns are held out in the order stable_int("inc2/base3/test_v1/<source>/
@@ -105,9 +111,10 @@ from every box, image and source rule: arm A is base_v2 whole.
     source's count includes its rows held in other sources' groups, and a
     group is taken only while every source with rows in it stays at or
     under 400. A group touching base_v2 or a row of the stream's pools (an
-    image a current model trained on), or larger than 400 images, is never
-    held out (summary.json counts each source's rows in such groups by
-    reason). Held-out rows never train and are listed in
+    image a current model trained on) or of an increment in flight (one a
+    pool may still take), or larger than 400 images, is never held out
+    (summary.json counts each source's rows in such groups by reason).
+    Held-out rows never train and are listed in
     splits/v3/test_v1/<source>.jsonl (with their capture relations) for a
     later never-train index v3 and for every later build.
   * The quarantine: a quarantined source's rows that are not held out
@@ -264,13 +271,13 @@ def load_config(path=None):
             raise Base3Error("source %s has no weed class" % s)
         if e.get("family") is not None and e["family"] not in fams:
             raise Base3Error("source %s: family %r has no rule" % (s, e["family"]))
-        if e.get("group_regex"):
-            re.compile(e["group_regex"])
+        _group_regex(s, e)
     for s, e in conf["intake"].items():
         if e.get("classes") != "all_weed":
             raise Base3Error("intake source %s: only 'all_weed' is supported" % s)
         if e.get("family") is not None and e["family"] not in fams:
             raise Base3Error("intake source %s: family %r has no rule" % (s, e["family"]))
+        _group_regex(s, e)
     dd = conf["rules"].get("dedupe") or {}
     if not isinstance(dd.get("layout_max_bits"), int) or dd["layout_max_bits"] < 0:
         raise Base3Error("%s: rules.dedupe.layout_max_bits must be a whole number of bits" % path)
@@ -285,6 +292,20 @@ def load_config(path=None):
         if inside:
             raise Base3Error("evaluation group %s lists %s, which the config does not exclude" % (g, inside))
     return conf, C.sha256_file(path)
+
+
+def _group_regex(source, entry):
+    """The compiled group_regex of a config entry (None without one); a
+    pattern that does not compile or captures no group refuses the config."""
+    if not entry.get("group_regex"):
+        return None
+    try:
+        rx = re.compile(entry["group_regex"])
+    except re.error as e:
+        raise Base3Error("source %s: group_regex %r does not compile (%s)" % (source, entry["group_regex"], e))
+    if rx.groups < 1:
+        raise Base3Error("source %s: group_regex %r captures no group" % (source, entry["group_regex"]))
+    return rx
 
 
 # ------------------------------------------------------------------ geometry
@@ -748,8 +769,14 @@ def base_rows(conf, lock=None, production=True):
 def intake_rows(conf, holds_view=None):
     """The listed intake sources' committed batches (INC_DIR/intake/<batch>/
     manifest.jsonl), every label id a weed box. A row with intake holds is
-    admitted only when Step 1's queue holds it with none left."""
+    admitted only when Step 1's queue holds it with none left. A source with
+    a group_regex sets each row's file-name session as a registry source's
+    rows have it (group_key '<source>|<group 1>'), matched on the row's
+    original file name (its 'rel' in the source, else its image's name): the
+    intake's own capture group may be the single image (SIU's frames), and
+    the session joins every frame of a video into one capture group."""
     idir = Path(C.INC_DIR) / "intake"
+    rxs = {s: _group_regex(s, e) for s, e in conf["intake"].items()}
     out, rec = [], {}
     try:
         batches = sorted(p for p in os.listdir(idir) if (idir / p / "manifest.jsonl").is_file())
@@ -769,6 +796,9 @@ def intake_rows(conf, holds_view=None):
                            family=conf["intake"][src].get("family"), tier=conf["intake"][src].get("tier", 1))
             row["sha256"], row["session"] = r.get("sha256"), str(r.get("session") or r.get("capture_group") or "")
             row["capture"] = "%s|%s" % (src, r.get("capture_group")) if r.get("capture_group") else None
+            if rxs.get(src) is not None:
+                m = rxs[src].search(os.path.basename(str(r.get("rel") or r["image"])))
+                row["group_key"] = "%s|%s" % (src, m.group(1)) if m else None
             row["W"], row["H"] = r.get("width"), r.get("height")
             row["dhash"] = int(r["dhash"]) if r.get("dhash") is not None else None
             row["licence"], row["research_only"] = r.get("licence"), r.get("research_only")
@@ -823,7 +853,7 @@ def registry_rows(conf, registry, sources=None):
         imgs, every = _list_files(root)
         rec[slug]["images"] = len(imgs)
         log("registry %s: %d images listed in %.0fs" % (slug, len(imgs), time.time() - t0))
-        rx = re.compile(sc["group_regex"]) if sc.get("group_regex") else None
+        rx = _group_regex(slug, sc)
         seen_keys = set()
         for p in imgs:
             rel = str(p.relative_to(root))
@@ -1653,11 +1683,31 @@ def distinct_photos(rows):
 
 
 # ------------------------------------------------------------------- driver
+def released_status(status):
+    """True for an increment status (inc2.stream's fold) whose rows have
+    left the stream's way to a pool: quarantined ('data'), returned to the
+    queue (a return disposition, a bisect's verdict) or released (a stale
+    base, withdrawn). A returned or released row reaches a pool again only
+    through a new cut, and the cutter never cuts a test v1 row
+    (step1_stream.test_v1_rows). Every other status -- in_segment (cut, its
+    segment not yet committed), suspect (accepted, then rolled back), or any
+    status this list does not know -- may still put its rows in a pool."""
+    from . import stream as S
+    s = str(status)
+    return s in (S.DATA, "stale", "withdrawn") + tuple(S.RETURN_DISPOSITIONS) or s.startswith("bisect_")
+
+
 def quarantined_sources(sid):
     """({source: record}, ledger record, (pool keys, pool image sha256s)) of
-    the stream: its quarantined sources and the rows of every pool it has
-    trained on, through inc2.stream's ledger fold (fail closed: no stream, no
-    build). A pool row never enters the main-test holdout (select)."""
+    the stream: its quarantined sources, and the rows of every pool it has
+    trained on and of every increment in flight, through inc2.stream's
+    ledger fold (fail closed: no stream, no build). Such a row never enters
+    the main-test holdout (select). An increment in flight is one whose
+    status has not released its rows (released_status): a segment cut
+    before this build trains on rows no accepted pool holds yet, and its
+    commit may accept them into the next pool, so they count as pool rows
+    exactly as an accepted pool's do. The record counts both (pool_rows;
+    in_flight: per increment its status and rows, and the rows in all)."""
     from . import stream as S
     try:
         st = S.Stream(sid, quiet=True)
@@ -1669,12 +1719,25 @@ def quarantined_sources(sid):
             for r in f.pool_rows(name):
                 keys.add(str(r.get("key")))
                 shas.add(str(r.get("sha256")))
+        n_pool = len(keys)
+        flight, fkeys = {}, set()
+        for inc, rec in f.increments.items():
+            if rec.get("status") == S.ACCEPTED or released_status(rec.get("status")):
+                continue                     # an accepted increment's rows are its pool's (above)
+            rows = f.inc_rows(inc)
+            flight[inc] = {"status": rec.get("status"), "segment": rec.get("segment"), "rows": len(rows)}
+            for k, r in rows.items():
+                fkeys.add(str(k))
+                keys.add(str(k))
+                if r.get("sha256"):
+                    shas.add(str(r["sha256"]))
     except Exception as e:  # noqa: BLE001 - an unreadable ledger is no quarantine record: refuse
-        raise Base3Error("the stream %s's ledger or pools cannot be read (%s: %s): the quarantine is unknown"
-                         % (sid, type(e).__name__, e))
+        raise Base3Error("the stream %s's ledger, pools or increments cannot be read (%s: %s): the quarantine "
+                         "and the rows it trains on are unknown" % (sid, type(e).__name__, e))
     return dict(f.q_sources), {"sid": sid, "ledger": str(st.p.ledger), "head_sha256": f.head,
                                "events": f.events, "quarantined_sources": sorted(f.q_sources),
-                               "pools": sorted(f.pools), "pool_rows": len(keys)}, (keys, shas)
+                               "pools": sorted(f.pools), "pool_rows": n_pool,
+                               "in_flight": {"increments": flight, "rows": len(fkeys)}}, (keys, shas)
 
 
 def queue_holds():
@@ -1751,13 +1814,18 @@ def gather(conf, sid, registry=None, testing=False):
 
 
 def mark_pool(rows, pool):
-    """in_pool on every row the stream has trained on (its pools: base_v2 and
-    every accepted increment), by key or by the original's sha256: such a row
+    """in_pool on every row the stream has trained on or may still pool (its
+    pools: base_v2 and every accepted increment; every increment in flight,
+    quarantined_sources), by key or by the original's sha256: such a row
     never enters the main-test holdout, whatever its source (select). Called
-    again once the originals' sha256s are known."""
+    again once the originals' sha256s are known. Returns the number of
+    candidate rows marked besides base_v2's."""
     keys, shas = pool
+    n = 0
     for r in rows:
         r["in_pool"] = r["kind"] == BASE_KIND or r["key"] in keys or (r["sha256"] or "") in shas
+        n += 1 if r["in_pool"] and r["kind"] != BASE_KIND else 0
+    return n
 
 
 def per_source(rows, recs, quarantine, lifted=()):
@@ -1851,7 +1919,7 @@ def count(sid, out, conf_path=None, registry=None, testing=False, hashes=None):
         list(ex.map(hashes.fill, live))
     log("hashes: %d rows (%d hashed here) in %.0fs" % (len(live), sum(1 for r in live if r.get("hashed_here")),
                                                        time.time() - th0))
-    mark_pool(rows, recs["pool"])
+    inputs["stream"]["pool_marked_rows"] = mark_pool(rows, recs["pool"])
     guards, grec = run_guard(live, production=not testing)
     th, th_sha = load_thresholds()
     _guard_drops(rows)
@@ -1955,7 +2023,7 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
     written = sum(1 for r in todo if r.get("png_written"))
     log("materialised in %.0fs: %d PNG(s) written, %d used as they are" % (
         time.time() - tm, written, sum(1 for r in todo if r.get("train_image") == r["image"])))
-    mark_pool(rows, recs["pool"])
+    inputs["stream"]["pool_marked_rows"] = mark_pool(rows, recs["pool"])
     live = [r for r in rows if not r["drop"]]
     guards, grec = run_guard(live, production=not testing)
     if scanner is None:

@@ -93,7 +93,7 @@
  "D26": {
   "walltime_share": {
    "value": 0.8,
-   "why": "Contract 6.4 D26: hold builds when the projected longest run of the next build is at least 0.8 of its walltime limit (cold 8 h, incremental 3 h, build 4 h), before a run times out the way the round scheduler's did on 2026-08-29."
+   "why": "Contract 6.4 D26: hold builds when the projected longest run of the next build is at least 0.8 of its walltime limit (cold 8 h, incremental 3 h, build 12 h since 2026-10-03, 4 h before), before a run times out the way the round scheduler's did on 2026-08-29."
   }
  },
  "D27": {
@@ -125,6 +125,11 @@
   "base_copy_share": {
    "value": 0.2,
    "why": "Contract 6.4 D28: or with at least 20 % base copies (a re-upload of the base's own photographs)."
+  },
+  "lift_wait_hours": {
+   "value": 12,
+   "decided_by": "docs/CONTINUOUS_LOOP.md, E1, amendment 2026-10-03 (before any build): human:harry567566@gmail.com under the 2026-09-30 grant",
+   "why": "Base v3 (inc2.base3 build, L23V) reads the stream's source quarantines when its job starts, and a quarantined source never enters arm B; only a person lifts a quarantine (inc2.stream unquarantine). D28-v2's sidecars may judge a quarantined source's dHash hits chance (rf_tuf and rf_zbm50, about 5,900 arm-B images, were quarantined by the one-hit rule), so while D28 lists such sources that the stream still quarantines, DR0 defers L23V and raises one card naming them and the exact command, for at most 12 h from when the stream first saw the list: long enough for a person to read a card overnight, short enough that E1 is not held for a day; past it L23V is proposed with the quarantine as it stands."
   }
  },
  "D29": {

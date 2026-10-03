@@ -291,13 +291,13 @@
   "probe_hours": 0.5,
   "splits_hours": 4.0,
   "rescore_hours_per_run": 0.25,
-  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job holds one V100 for up to its 4 h walltime, a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed. A native-resolution rescore (L23N, 2026-10-01) is one scoring pass per final run: dev and ImageWeeds are 3,825 images, at up to 210 ms per image (54.5 ms measured for n640 at 640, x 2.2 for YOLO11m measured at 640, x 1.69 for 832 px) 0.22 GPU-h, rounded up to 0.25 per run; the reference's dev pass is priced as a run too."
+  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job is priced at 4 GPU-h, the 4 h walltime it had until 2026-10-03 (its limit is 12 h since, for the base v3 build; the price of every build job is settled from sacct when it ends), a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed. A native-resolution rescore (L23N, 2026-10-01) is one scoring pass per final run: dev and ImageWeeds are 3,825 images, at up to 210 ms per image (54.5 ms measured for n640 at 640, x 2.2 for YOLO11m measured at 640, x 1.69 for 832 px) 0.22 GPU-h, rounded up to 0.25 per run; the reference's dev pass is priced as a run too."
  },
  "walltime": {
   "cold_h": 8.0,
   "incremental_h": 3.0,
-  "build_h": 4.0,
-  "why": "Contract 5.6 and 6.4 D26: driver.COLD_TIME_LIMIT 8 h, run_inc_job.sh --time 3 h, a build job 4 h."
+  "build_h": 12.0,
+  "why": "Contract 5.6 and 6.4 D26: driver.COLD_TIME_LIMIT 8 h, run_inc_job.sh --time 3 h, a build job 12 h (run_inc2_build.sh, 2026-10-03; it was 4 h until the base v3 build needed more)."
  },
  "prior": {
   "exp": "realloop_v1",

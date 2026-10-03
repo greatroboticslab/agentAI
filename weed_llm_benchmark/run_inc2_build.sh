@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=40G
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/logs/%x_%j.out
 #
 # The v2 (continuous loop) experiment builds as a batch job: docs/CONTINUOUS_LOOP.md
@@ -61,6 +61,23 @@
 # One builder per name: the lock INC_DIR/_campaign/locks/<name>.build (O_EXCL:
 # "<job id> <host> <utc>"), released on exit; a lock whose job squeue no longer
 # knows is taken over. The stream module holds its own stream.lease besides.
+#
+# Time limit: 12 h for every verb (2026-10-03, was 4 h). The base v3 build
+# (L23V) had never run at its size: about 107K candidate rows, SIU's 40,000
+# frames written as 640 px PNGs, the DINOv2 copy check on every external row,
+# 39,898 evaluation-group images hashed; the read-only count alone took 28-61
+# min on 65,712 rows. sbatch reads the #SBATCH lines when the job is
+# submitted and a running job can only lower its own limit, so the script
+# cannot give one verb a longer limit than another; the submitter could pass
+# --time, but every caller (the platform's levers and a person) submits this
+# script as it is. Effect on the other verbs: Slurm's priority on Bridges-2
+# (priority/multifactor: age, fair share, QOS; job size and partition weigh
+# 0) does not read the time limit, but the backfill scheduler fits a 12 h
+# request into fewer gaps than a 4 h one, so a stream build, a milestone or a
+# baseline build may start later than it did; a build that hangs holds its
+# V100 up to 12 h instead of 4 h. The price of a build job stays the stream
+# domain's build_job_hours estimate (4 GPU-h), settled from sacct when the job
+# ends.
 #
 # The job imports the OUTER package copy ($REPO/weed_optimizer_framework)
 # through PYTHONPATH; deploy there first. Nothing is synced or reset here.
@@ -216,7 +233,7 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/train.py tools/inc2/baseline.py tools/inc2/pilot4.py tools/inc2/gate3.py
          tools/inc2/scorer_sidecar.py tools/inc2/scorer_native.py tools/inc2/step1_stream.py tools/inc2/mask.py
          tools/inc2/eval_hits.py tools/inc2/stream.py
-         tools/inc2/stream_report.py tools/inc2/base3.py tools/inc2/base3_v1.json tools/inc2/scorer_agnostic.py
+         tools/inc2/stream_report.py tools/inc2/base3.py tools/inc2/base3_v2.json tools/inc2/scorer_agnostic.py
          tools/inc_autopilot/stream_thresholds.json)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 

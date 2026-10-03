@@ -2948,3 +2948,66 @@ Decided under the same grant, before L23V was deployed or base v3 built. `base3_
 - A pot-level test split for MFWD (its photos are one 6-bit component).
 - A card when an L23V job finishes without a complete summary (`unconfirmed`): today the stream waits silently.
 - The never-train index v3 should cover every `splits/*/test_v1/*.jsonl` and the evaluation groups' images.
+
+### Revision 3 and the build's pre-flight fixes (2026-10-03, before any build)
+
+Decided under the same grant, before L23V was proposed or base v3 built. `base3_v2.json` keeps its name and is revised in place (`version` "v2 revision 3"; summary.json pins its sha256). Where this section and the text above differ, this section holds. A pre-flight audit of the build path, run while SIU's intake batch `i0004_zenodo_15808623` waited for Step 1's admit, found four defects.
+
+**1. The build's time limit.** `run_inc2_build.sh` asked 4 h for every verb. The base v3 build has never run at its size: about 107K candidate rows, SIU's 40,000 frames (720 × 960) written as 640 px PNGs, the DINOv2 copy check on every external row, 39,898 evaluation-group images hashed; the read-only `count` alone took 28–61 min on 65,712 rows.
+- The limit is now 12 h for every verb. sbatch reads `#SBATCH` lines at submission and a running job can only lower its own limit, so the script cannot give one verb a longer limit than another.
+- Effect on the other verbs (stream build, milestone, fork, feasibility, bisect, splits, baseline, pilot4): Bridges-2's Slurm (priority/multifactor; age 10,000, fair share 1,000,000, QOS 5,000,000, job size 0, partition 0; read from `scontrol show config`) does not weigh the time limit, so priority is unchanged. The backfill scheduler (bf_window 7,200 min, bf_resolution 3,600 s) fits a 12 h request into fewer gaps than a 4 h one, so these jobs may start later than before. A build that hangs holds its V100 for up to 12 h instead of 4 h.
+- Prices are unchanged: a build job is still priced at the stream domain's `build_job_hours` (4 GPU-h) and settled from sacct. `walltime.build_h` (D26) and the policy rows' text say 12 h. D26 reads a build's limit only with a recorded build duration, and the platform records none.
+- The drift list hashes `tools/inc2/base3_v2.json`, the config the builder loads, in place of `base3_v1.json`.
+
+**2. Increments in flight are pool rows for the holdout.**
+- *The defect.* `inc2.base3.quarantined_sources` returned the rows of every accepted pool, and `select` never holds such a row out to test v1. A segment cut before the build (s002 is expected right after SIU's admit) trains on rows that no accepted pool holds yet. If base3 held some of them out and the segment were then accepted, the stream's next pool would hold test v1 images.
+- *The fix.* Every row of an increment whose status has not released its rows now counts as a pool row, by key or by the sha256 of the image it trains on. That covers `in_segment` (cut, not committed), `suspect` (accepted, then rolled back) and any status the builder does not know (fail closed).
+- *What is excluded.* `inc2.base3.released_status` names the statuses that are not counted: `data`, `stale`, `withdrawn`, every return disposition and a bisect's verdicts. A returned or released row reaches a pool again only through a new cut, and the cutter never cuts a test v1 row.
+- *The record.* summary.json's `inputs.stream` records `in_flight` (each increment's status, segment and rows; the rows in all) next to `pool_rows`, plus `pool_marked_rows`, the candidate rows the build marked.
+- *Failure.* An increment's rows sidecar that does not hash as its cut line records refuses the build.
+
+**3. SIU's frames are grouped by video (revision 3).** The intake's capture group for `zenodo_15808623` is the single image. Without a video relation, frames of one video could be split between test v1 and arm B. Neighbouring frames are near copies that 6 dHash bits do not always join, so test v1 would depend on arm B.
+- *The fix.* `intake.zenodo_15808623.group_regex` is `(?P<group>[A-Z]{5}_week_\d+_IMG_\d+)_frame_`. `intake_rows` applies an intake source's `group_regex` the way `registry_rows` applies a registry source's, to the row's original file name (`rel`, else the image's name). It sets `group_key` = `<source>|<video>`, so the capture groups, the holdout, the earlier-test-list match (each test list row's `capture_keys`) and the siu family cap all take whole videos.
+- *Config check.* A `group_regex` that does not compile or captures no group refuses the config, for registry and intake sources alike.
+- *Read on the cluster (read-only, 2026-10-03).* All 39,958 rows of `i0004_zenodo_15808623` match. There are 331 videos of 14–230 frames each (median 116; 264 with over 100 frames). The batch's `intake_cap` record says 230,899 eligible frames, 40,000 taken and 190,899 deferred.
+- *Group sizes.* On the manifest's stored dHashes (the identity variant only), the 6-bit components alone number 19,939 (largest 518 frames; 85 already span 2–18 videos). With the video relation there are 218 groups: the largest hold 4,437 (35 videos), 2,393, 2,092, 1,579 and 674 frames, and 210 groups of at most 400 frames hold 27,169 frames.
+- *Consequences.* SIU's part of test v1 is at most 400 frames, a few whole videos. The siu cap drops whole groups in its seeded order, so SIU in arm B can end below its cap by up to one group (4,437 frames on these numbers; the 8 variants can only join more).
+
+**4. L23V waits, bounded, for a person to lift cleared quarantines.**
+- *The defect.* After L17 eval-hits writes the D28-v2 sidecars, D28 may judge a quarantined source's hits chance: rf_tuf and rf_zbm50 hold about 5,900 arm-B images. Lifting a quarantine is a person's decision (`inc2.stream unquarantine`). DR0 would have proposed L23V on the next tick, and the build reads the quarantine when its job starts, so those sources would have been built out of base v3 for good.
+- *What D28 reports.* D28's detail adds `lift_pending`: the sources judged chance that the stream itself still quarantines (its queue summary's `quarantined_sources`, the fold the build reads). The platform's own source record can still say quarantined after a person's unquarantine on the cluster, which is why the list is not D28's `cleared_quarantined`.
+- *How DR0 waits.* While the list is non-empty, DR0 does not propose L23V. Its detail carries `lift_wait`: the sources, the first-seen time, the deadline and one exact command per source, `python -m weed_optimizer_framework.tools.inc2.stream unquarantine --source S --stream SID --decided-by human:<id>`. The ticker raises one card (kind `quarantine_lift`) naming them, deduplicated by its text.
+- *How the stream remembers.* Diagnoses are recomputed every tick, so the stream state keeps the first-seen time (`stage.r0.lift_wait`, context `/lift_wait`, outside `/stage`, which some R0 items cite whole), with ledger lines `lift_wait` and `lift_wait_ended`. The first tick that sees a non-empty list starts the wait, a change in its membership does not restart it, an empty list ends it, and a D28 that could not be judged changes nothing.
+- *The bound.* After `D28.lift_wait_hours` (12, stream_thresholds.json, with its why) from the first sight, L23V is proposed with the quarantine as it stands, citing only the lock and `/stage/base3` as before. Other R0 items (L23N, L23E) are not held by the wait.
+
+**How verified.**
+- `tests/test_inc2_base3.py`:
+  - *the config*: the shipped revision's version and decided_by; SIU's regex on real frame names; a regex without a group or that does not compile refused, for intake and registry sources;
+  - *`released_status`*: every status;
+  - *`quarantined_sources` on a ledger with five increments*: in_segment and suspect counted, withdrawn and data not, an unknown status counted, a sidecar that no longer hashes refused;
+  - *a full build with an increment in flight*: the rule would hold every group, yet none of its 4 rows is held out; summary.json records 4 in-flight rows;
+  - *intake rows named like the real batch*: every frame of a video, including one under the source's `train/` folder, gets `group_key` `<source>|<video>`, and an unmatched name gets none. Each video is one capture group, the holdout takes whole videos, and without the regex 3 of 4 videos are split. The siu cap drops whole videos, never part of one.
+- `tests/test_inc2_stream.py`: the drift list hashes `base3_v2.json`, not `base3_v1.json`; the time limit is 12 h.
+- `tests/test_stream_ap_units.py` (`t_e1_lift_wait`), in the platform's world:
+  - *D28 judges a quarantined source's hit chance (pair cos 0.31)*: no L23V; the first-seen time kept; one card with the exact command; an hour later still one card and the same first-seen time.
+  - *The stream lifts it*: L23V is proposed with its usual two cites and the wait ends, even with the platform's own source record still saying quarantined.
+  - *Not lifted*: no L23V before 12 h from the first sight, L23V at 12 h, still one card.
+  - *Neither wait applies*: for a source judged chance that the stream does not quarantine, or one whose hit is a copy (pair cos 0.97, a leak).
+- Mutation check: 9 mutants of the new logic, each killed by these tests. They covered:
+  - the in-flight keys dropped;
+  - the intake `group_key` left unset;
+  - every status released;
+  - the group-count check off;
+  - the 12 h bound ignored;
+  - `lift_pending` read from `cleared_quarantined`;
+  - the wait off;
+  - the first-seen time reset every tick;
+  - no card.
+- The affected suites pass with 0 failures: `test_inc2_base3.py`, `test_inc2_e1.py`, `test_inc2_stream.py`, `test_inc2_step1_stream.py`, every `test_stream_ap_*.py`, `test_stream_pipeline.py`, plus the policy and governance tests the policy texts touch.
+
+**Deploy.** The changed files change `executor.code_hash()` and the stream rules version: `diagnose_stream.py`, `stream.py`, `stream_thresholds.json`, `stream_domains/weed.json` and `brain/policy_actions.json`. Sync the lab and both cluster copies from one commit, then run `executor.run_replay_tests` so envelope grants resume. `inc2/base3.py` and `base3_v2.json` are read only by the build job. Nothing here changes `inc2/step1_stream.py` or what `collect/` imports.
+
+**Open items (added).**
+- The stream's cutter matches test v1 by bytes, key and dHash only (`step1_stream.test_v1_rows` → `base3.mark_prior`), not by capture relation. A later SIU batch (190,899 frames are deferred) could hold other frames of a held-out video that lie more than 6 bits from every held frame, and the cutter would not stop them. `test_v1_rows` should pass each queue row's capture keys (the same `group_regex`) once `step1_stream.py` may change.
+- After a person's unquarantine, the platform's own source record stays `quarantined`, and D28 keeps naming the source in `cleared_quarantined` (L23V is not held by it, since `lift_pending` reads the stream's quarantine).
+- A read-only `count` after SIU's admit shows SIU's groups, its test v1 share and how far the whole-group cap falls below 35 %.

@@ -13,6 +13,18 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-03 (night) — Base v3's pre-build fixes: SIU by video, in-flight rows, a 12 h build, a bounded wait for lifted quarantines
+
+**Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap to 0.90 = 0.021. Training set 7,493 images (P_1); base v3 (about 35K planned) is not built yet.
+
+**SIU's intake batch, read on the cluster.** It holds 39,958 frames of 331 videos (14–230 frames each, median 116). The intake cap took 40,000 of 230,899 eligible frames and deferred 190,899.
+
+**Four fixes before the build (base v3 revision 3, pre-registered; docs/CONTINUOUS_LOOP.md):**
+- SIU's frames are grouped by video, so test v1 and arm B never share a video.
+- Rows of an increment the stream has in flight count as pool rows, so a segment cut before the build cannot carry test v1 images into a pool.
+- The build job may run 12 h, not 4 h (every build verb, since sbatch cannot vary it per verb).
+- L23V waits, at most 12 h, with one card, for a person to lift quarantines D28 now judges chance, such as rf_tuf and rf_zbm50 (about 5,900 arm-B images).
+
 ## 2026-10-03 (later) — E1 pre-registered: does a much larger weed-box set place better boxes?
 
 **Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap 0.021; class-agnostic 0.8901, so the boxes cap it. Training set 7,493 images (P_1); nothing added since s001.

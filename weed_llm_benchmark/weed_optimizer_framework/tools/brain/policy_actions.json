@@ -1964,7 +1964,7 @@
         "gpu_type": "v100-32",
         "gpu_count": 1,
         "hours_param": "est_gpu_hours",
-        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
+        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 12 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
       },
       "dry_run_variant": null,
       "allowed_tiers": [
@@ -2011,7 +2011,7 @@
         "gpu_type": "v100-32",
         "gpu_count": 1,
         "hours_param": "est_gpu_hours",
-        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
+        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 12 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
       },
       "dry_run_variant": null,
       "allowed_tiers": [
@@ -2253,7 +2253,7 @@
         "gpu_type": "v100-32",
         "gpu_count": 1,
         "hours_param": "est_gpu_hours",
-        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
+        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 12 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
       },
       "dry_run_variant": null,
       "allowed_tiers": [
@@ -2327,7 +2327,7 @@
         "gpu_type": "v100-32",
         "gpu_count": 1,
         "hours_param": "est_gpu_hours",
-        "why": "One GPU-shared build job (run_inc2_build.sh, one V100, up to its 4 h walltime) that writes splits v3 and trains nothing: est_gpu_hours is levers_stream.price's 'zero_job' estimate (the build job's walltime), charged to the campaign envelope and settled from sacct when the job ends."
+        "why": "One GPU-shared build job (run_inc2_build.sh, one V100, up to its 12 h walltime) that writes splits v3 and trains nothing: est_gpu_hours is levers_stream.price's 'zero_job' estimate (the stream domain's build_job_hours, 4 GPU-h), charged to the campaign envelope and settled from sacct when the job ends."
       },
       "dry_run_variant": null,
       "allowed_tiers": [
@@ -2414,7 +2414,7 @@
         "gpu_type": "v100-32",
         "gpu_count": 1,
         "hours_param": "est_gpu_hours",
-        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
+        "why": "A stream build: the build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 12 h walltime) plus the experiment it defines, whose runs go through run_inc2_job.sh on one V100 each: est_gpu_hours is levers_stream.price's cost model of contract 5.6 (est.), charged to the campaign envelope and released when the experiment's report spend is recorded."
       },
       "dry_run_variant": null,
       "allowed_tiers": [
@@ -2458,7 +2458,7 @@
         "gpu_type": "v100-32",
         "gpu_count": 1,
         "hours_param": "est_gpu_hours",
-        "why": "A build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 4 h walltime): the stream's P_0 dHashes; settled from sacct when the job ends (budget.record_job_spend)."
+        "why": "A build job (run_inc2_build.sh, one V100 on GPU-shared, up to its 12 h walltime): the stream's P_0 dHashes; settled from sacct when the job ends (budget.record_job_spend)."
       },
       "dry_run_variant": null,
       "allowed_tiers": [

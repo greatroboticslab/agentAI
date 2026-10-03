@@ -1702,10 +1702,19 @@ def test_build_script():
         pkg_dir = PKG_ROOT / "weed_optimizer_framework" / "tools" / "/".join(rel)
         need.add("tools/%s/__init__.py" % "/".join(rel) if pkg_dir.is_dir() else "tools/%s.py" % "/".join(rel))
     need.add("tools/funnel/domains/weed.json")        # the domain config the splits build and the scan read
-    need.update(("tools/inc2/base3_v1.json", "tools/inc_autopilot/stream_thresholds.json"))   # inc2.base3 reads both
+    from weed_optimizer_framework.tools.inc2 import base3 as B3
+    conf_rel = "tools/inc2/%s" % B3.CONFIG.name                  # the config inc2.base3 loads (base3_v2.json)
+    need.update((conf_rel, "tools/inc_autopilot/stream_thresholds.json"))   # inc2.base3 reads both
     check("the drift check hashes every module the builders import (including the copy scan's funnel.embed, leak, "
           "estimate, domain, ledger, semisup_labeler) and the funnel domain config",
           pr.returncode == 0 and need and not (need - listed), (pr.stderr[-300:], sorted(need - listed)))
+    check("the drift check hashes the base v3 config the builder loads (%s), not the one it no longer reads "
+          "(base3_v1.json)" % conf_rel, conf_rel == "tools/inc2/base3_v2.json" and conf_rel in listed
+          and "tools/inc2/base3_v1.json" not in listed, sorted(x for x in listed if "base3" in x))
+    hdr = dict(re.findall(r"^#SBATCH --([a-z-]+)=(\S+)", text, re.M))
+    check("the time limit is 12 h, for every verb (sbatch reads it at submission; the base v3 build needs more than "
+          "the old 4 h), and the script states why and what it costs the other verbs",
+          hdr.get("time") == "12:00:00" and "Time limit: 12 h for every verb" in text and "backfill" in text, hdr)
     repo = TMP / "sh_repo"
     inc = TMP / "sh_inc"
     shims = TMP / "sh_shims"
