@@ -174,7 +174,7 @@ from . import common as C2
 FORMAT = "inc2-base3-summary/1"
 COUNT_FORMAT = "inc2-base3-count/1"
 CONFIG_FORMAT = "inc2-base3-config/1"
-CONFIG = Path(__file__).resolve().with_name("base3_v1.json")
+CONFIG = Path(__file__).resolve().with_name("base3_v2.json")
 VERSION = "v3"
 ARM_A, ARM_B = "base_v2_weed", "base_v3_weed"
 ARMS = {"A": ARM_A, "B": ARM_B}
@@ -269,6 +269,8 @@ def load_config(path=None):
     for s, e in conf["intake"].items():
         if e.get("classes") != "all_weed":
             raise Base3Error("intake source %s: only 'all_weed' is supported" % s)
+        if e.get("family") is not None and e["family"] not in fams:
+            raise Base3Error("intake source %s: family %r has no rule" % (s, e["family"]))
     dd = conf["rules"].get("dedupe") or {}
     if not isinstance(dd.get("layout_max_bits"), int) or dd["layout_max_bits"] < 0:
         raise Base3Error("%s: rules.dedupe.layout_max_bits must be a whole number of bits" % path)
@@ -764,7 +766,7 @@ def intake_rows(conf, holds_view=None):
         for r in mine:
             src = r["source"]
             row = _new_row(src, INTAKE_KIND, conf["intake"][src], r["image"], r["label"], r["key"],
-                           tier=conf["intake"][src].get("tier", 1))
+                           family=conf["intake"][src].get("family"), tier=conf["intake"][src].get("tier", 1))
             row["sha256"], row["session"] = r.get("sha256"), str(r.get("session") or r.get("capture_group") or "")
             row["capture"] = "%s|%s" % (src, r.get("capture_group")) if r.get("capture_group") else None
             row["W"], row["H"] = r.get("width"), r.get("height")

@@ -362,7 +362,7 @@ def clear_v3():
 
 # ------------------------------------------------------------------- tests
 def test_config():
-    print("the shipped config (base3_v1.json)")
+    print("the shipped config (base3_v2.json)")
     conf, sha = B3.load_config()
     dock = sorted(s for s, e in conf["sources"].items() if e.get("family") == "dock")
     check("16 dock slugs form one family, capped at 35 %% (%d listed)" % len(dock),
@@ -379,8 +379,11 @@ def test_config():
                                 "project_agml__maize_weed_detection", "weedai_5c78d067-8750-4803-9cbe-57df8fae55e4",
                                 "rf_main-otq0a__weed-in-paddy-field-wmjlr", "rf_1111-gzfxi__weed-chilling",
                                 "cottonweed_sp8", "rf_agrobot-weed-workspace__weed-detection-sd89f",
-                                "kg_yuzhenlu__cottonweeddet3", "mediatum_1717366"))
-          and set(conf["intake"]) == {"kg_yuzhenlu__cottonweeddet3", "mediatum_1717366"})
+                                "kg_yuzhenlu__cottonweeddet3", "mediatum_1717366", "zenodo_15808623"))
+          and set(conf["intake"]) == {"kg_yuzhenlu__cottonweeddet3", "mediatum_1717366", "zenodo_15808623"})
+    check("v2 (revision 2, before any build): SIU is an intake source of family siu, capped at 35 % like the dock "
+          "family", conf["version"] == "v2" and conf["intake"]["zenodo_15808623"]["family"] == "siu"
+          and conf["rules"]["families"]["siu"]["cap_share"] == 0.35, conf["intake"]["zenodo_15808623"])
     itmo = conf["sources"]["rf_itmo-mp0nn__grass-detection-4"]["classes"]
     check("rf_itmo: forbs weed; Poa, litter, bare patch, dry grass dropped",
           {k for k, v in itmo.items() if v == "drop"} == {"Dry_grass", "Musor", "Poa_pratensis", "Poa_trivialis",
@@ -1218,6 +1221,19 @@ def test_prior_lists(Wd, reg, cp):
         shutil.rmtree(d)
 
 
+def test_intake_family(f):
+    print("an intake source's family: its rows carry it (the family cap applies), an unknown one refuses")
+    conf = json.loads(B3.CONFIG.read_text())
+    conf["intake"] = {"int_src": {"tier": 1, "classes": "all_weed", "family": "siu"}}
+    rows, _rec = B3.intake_rows(conf, holds_view={})
+    check("every row of an intake source listed with family siu is of family siu",
+          rows and all(r["family"] == "siu" for r in rows), [r["family"] for r in rows])
+    conf["intake"]["int_src"]["family"] = "nope"
+    tmp = TMP / "conf_family.json"
+    tmp.write_text(json.dumps(conf))
+    check("  an intake source whose family has no rule refuses the config", refused(B3.load_config, tmp))
+
+
 def main():
     t0 = time.time()
     Wd = W.build_world()
@@ -1236,6 +1252,7 @@ def main():
     test_walltime(Wd, reg, cp)
     test_baseline_budget(Wd, reg, cp)
     test_prior_lists(Wd, reg, cp)
+    test_intake_family(f)
     print("\n%d failure(s) in %.0fs" % (len(FAILURES), time.time() - t0))
     if FAILURES:
         for x in FAILURES:

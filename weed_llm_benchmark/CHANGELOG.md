@@ -10814,3 +10814,7 @@ Every result sat near test 0.85, against the 0.90 goal.
   - 1,969 of the 2,636 test v1 rows of E1's base v3 are in the v1 Step 1 pool, and nothing stopped a segment from taking them into a training pool.
   - `step1_stream.load_queue` now marks every row a `splits/*/test_v1/*.jsonl` list holds (bytes, key or dHash within 6 bits under the 8 variants, `base3.mark_prior`) as `test_v1`, not eligible, and the cutter skips it (reason `test_v1`). An unreadable list refuses the read.
   - Test: `test_inc2_stream.py` `test_test_v1_never_cut`.
+- **E1 base v3 revision 2: SIU joins as a capped family (2026-10-03, before any build).**
+  - `inc2/base3_v2.json`: v1 plus `zenodo_15808623` (intake, family `siu`), capped at 35 % of base v3 like the dock family. Arm B goes from about 23K to about 35K images (estimate); uncapped, SIU would be about 63 % of it.
+  - `inc2.base3.intake_rows` passes the intake source's family. An unknown intake family refuses the config.
+  - Tests: `test_inc2_base3.py`.
