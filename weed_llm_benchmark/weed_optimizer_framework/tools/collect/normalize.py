@@ -675,10 +675,32 @@ def read_yolo(tree, opts=None):
 
 
 # ------------------------------------------------------------------ hf parquet
+def _write_new(p, data):
+    """data at p as a new file (a temporary file renamed over p), unless p
+    already holds exactly these bytes. A file at p is never written into:
+    collect.intake links a batch's images to these files and keeps them
+    between the continuation shards of a fetch (amendment 2026-10-03), so
+    writing in place would change, or on a failed write cut short, an image
+    of a committed batch."""
+    try:
+        if p.stat().st_size == len(data) and p.read_bytes() == data:
+            return
+    except OSError:
+        pass
+    tmp = p.with_name(".%s.%d.tmp" % (p.name, os.getpid()))
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, p)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
 def read_hf_parquet(tree, opts=None, out_images=None):
     """Parquet shards with an image column ({bytes, path}) and objects
     ({bbox, category}); bbox_format "xywh" (default) or "xyxy", in pixels.
-    Images are written under out_images (a directory the caller owns)."""
+    Images are written under out_images (a directory the caller owns), each
+    as a new file (_write_new)."""
     try:
         import pyarrow.parquet as pq
     except ImportError:
@@ -711,7 +733,7 @@ def read_hf_parquet(tree, opts=None, out_images=None):
             rel = "%s/%06d%s" % (os.path.splitext(f)[0].replace("/", "__"), i, ext if ext in IMG_EXTS else ".jpg")
             p = out_images / rel
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_bytes(data)
+            _write_new(p, data)
             try:
                 from PIL import Image
                 with Image.open(io.BytesIO(data)) as pim:
