@@ -459,13 +459,77 @@ class LabRunner(object):
         _write_json(sp, spec)
         env = dict(os.environ)
         env["PYTHONPATH"] = self.cwd + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-        subprocess.Popen([self.python, "-m", "weed_optimizer_framework.tools.inc_autopilot.stream", "lab-run",
-                          "--spec", str(sp)], cwd=self.cwd, env=env, stdin=subprocess.DEVNULL,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        proc = subprocess.Popen([self.python, "-m", "weed_optimizer_framework.tools.inc_autopilot.stream", "lab-run",
+                                 "--spec", str(sp)], cwd=self.cwd, env=env, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        _write_json(sp, dict(spec, pid=proc.pid))
         return {"job": job, "spec": str(sp)}
 
     def poll(self, job):
-        return _read_json(self.root / ("%s.result.json" % job))
+        """The job's result, None while it runs, or a failure when its
+        process is gone without writing one. A lab-run killed from outside (a
+        dashboard restart under KillMode=control-group, an OOM kill, a reboot)
+        never writes its result, and the lane that follows it waited for ever:
+        on 2026-10-03 a deploy killed the zenodo_15808623 fetch and its L16L
+        item stayed 'running' with nothing behind it."""
+        rp = self.root / ("%s.result.json" % job)
+        res = _read_json(rp)
+        if res is not None:
+            return res
+        sp = self.root / ("%s.spec.json" % job)
+        spec = _read_json(sp)
+        if not isinstance(spec, dict):
+            return None
+        if _lab_run_alive(spec, sp):
+            return None
+        res = _read_json(rp)            # it may have finished between the two reads
+        if res is not None:
+            return res
+        return {"ok": False, "rc": None, "lost": True, "job": job, "finished_utc": M.utc_now(),
+                "error": "the lab process of %s is gone and wrote no result (killed from outside: a restart, "
+                         "an OOM kill or a reboot)" % job}
+
+
+def _lab_run_alive(spec, spec_path):
+    """Whether a lab-run process of this spec is still running: its recorded
+    pid when it still runs 'lab-run --spec <spec_path>', else (a spec written
+    before pids were recorded, or a reused pid) any process whose command
+    line names the spec. Unknown (no process table to read) counts as alive."""
+    marker = str(spec_path)
+    pid = spec.get("pid")
+    cmd = _cmdline(pid) if isinstance(pid, int) and pid > 0 else None
+    if cmd is not None and marker in cmd:
+        return True
+    try:
+        out = subprocess.run(["ps", "-eo", "pid=,args="], capture_output=True, text=True, timeout=20).stdout
+    except (OSError, subprocess.SubprocessError):
+        return True
+    if not out.strip():
+        return True
+    for line in out.splitlines():
+        if marker in line and "lab-run" in line:
+            return True
+    return False
+
+
+def _cmdline(pid):
+    """The command line of a running pid ('' when gone), or None when it
+    cannot be read."""
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return ""
+    except (PermissionError, OSError, ValueError):
+        pass
+    try:
+        raw = Path("/proc/%d/cmdline" % int(pid)).read_bytes()
+        return raw.replace(b"\0", b" ").decode("utf-8", "replace")
+    except OSError:
+        try:
+            return subprocess.run(["ps", "-o", "args=", "-p", str(int(pid))], capture_output=True, text=True,
+                                  timeout=20).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None
 
 
 def lab_run(spec_path):

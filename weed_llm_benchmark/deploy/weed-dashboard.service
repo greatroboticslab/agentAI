@@ -7,6 +7,10 @@ WorkingDirectory=%h/weed_llm_benchmark
 ExecStart=%h/weed_llm_benchmark/deploy/run_dashboard_labserver.sh
 Restart=always
 RestartSec=5
+# A restart stops uvicorn only (ExecStart execs it). The stream ticker's lab jobs (detached lab-run
+# processes: multi-hour fetches, syncs) keep running across a deploy; under the default
+# control-group mode a restart killed them (2026-10-03: the zenodo_15808623 fetch).
+KillMode=process
 
 [Install]
 WantedBy=default.target

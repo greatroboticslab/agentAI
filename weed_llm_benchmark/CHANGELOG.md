@@ -10773,3 +10773,8 @@ Every result sat near test 0.85, against the 0.90 goal.
   - Rule: every dHash hit still drops its image; a hit is confirmed at pair cosine >= 0.80; a source leaks if any hit reaches the v2 copy threshold (0.946384) or its confirmed hits are improbable under chance (P(Binom(n, 6.29e-4) >= k) < 0.001, summed over all of a source's batches); a hit without a pair-cosine record fails closed (old rule).
   - Producers: new `inc2/eval_hits.py`; `collect/intake.py` scores each hit in the intake job (`HF_HUB_OFFLINE=1` for intake); `inc2.step1_stream eval-hits` (lever L17 verb) re-scores the hits of committed batches (b0000 and legacy intake batches) into sidecars so the 12 quarantined sources can be re-judged; D28 lists `cleared_quarantined` for a person's `unquarantine`.
   - Three review rounds (per-batch judging let shards escape; a source could be both a leak and "cleared"; evaluation keys in a shipped reason); all reviewer mutants killed.
+- **Lab jobs survive deploys; a killed lab job is noticed (2026-10-03).**
+  - Live: the D28-v2 deploy restarted the dashboard under systemd `KillMode=control-group`, which killed the running zenodo_15808623 fetch; `LabRunner.poll` read only the result file, so the L16L item stayed 'running' and blocked the DATA lane.
+  - `LabRunner.launch` records the lab-run pid; `poll` returns a `lost` failure when no result exists and no lab-run of the spec is alive (pid, else any process naming the spec), so the lane fails the step and proposes again.
+  - `deploy/weed-dashboard.service`: `KillMode=process` (the start script execs uvicorn), so a restart no longer kills detached lab jobs.
+  - New `tests/test_stream_ap_lab_lost.py` (real processes: running, killed, finished, legacy spec; stream-world re-proposal).
