@@ -110,7 +110,17 @@
   "source_alpha": {
    "value": 0.001,
    "mirrors": "inc2/embed_calibration.py SOURCE_ALPHA",
-   "why": "Contract 6.4 D28 as amended on 2026-09-29 (decision L-9; the funnel's amendment A2, docs/FUNNEL_AUDIT.md 14): a source is a leak and is quarantined (L24) when one of its images is within 6 dHash bits of an evaluation image under any of the 8 variants, or when its embedding hits are improbable under the copy detector's per-image false-positive rate: P(Binom(images, p_false) >= hits) < 0.001 (inc2.embed_calibration.source_verdict), p_false being the v2 calibration's one-sided 97.5 % upper bound. It replaces 'never_train_share >= 0.05': at a per-image rate p a source of n images holds about n p chance hits, so a share rule quarantines by a source's size and domain, not by copying (at the funnel's first threshold, 805 of 1,915 3SeasonWeedDet10 2022 images were flagged, none a capture-session copy)."
+   "why": "Contract 6.4 D28 as amended on 2026-09-29 (decision L-9; the funnel's amendment A2, docs/FUNNEL_AUDIT.md 14) and on 2026-10-03 (D28-v2, amendment V3-1): a source is a leak and is quarantined (L24) when its embedding hits are improbable under the copy detector's per-image false-positive rate, P(Binom(images, p_false) >= hits) < 0.001 (inc2.embed_calibration.source_verdict, p_false the v2 calibration's one-sided 97.5 % upper bound), or, for its dHash hits (within 6 bits of an evaluation image under any of the 8 variants), when one reaches the v2 calibration's cos_threshold in pair cosine or its confirmed hits are improbable, P(Binom(images, p_confirmed) >= confirmed) < 0.001 (inc2.eval_hits.verdict); a dHash hit without a pair cosine is still a leak on its own (fail closed). The 2026-09-29 amendment replaced 'never_train_share >= 0.05': at a per-image rate p a source of n images holds about n p chance hits, so a share rule quarantines by a source's size and domain, not by copying (at the funnel's first threshold, 805 of 1,915 3SeasonWeedDet10 2022 images were flagged, none a capture-session copy)."
+  },
+  "confirm_cos": {
+   "value": 0.8,
+   "decided_by": "D28-v2, amendment V3-1 (docs/CONTINUOUS_LOOP.md, 2026-10-03), pre-registered",
+   "why": "A dHash hit is confirmed when the DINOv2 pair cosine between the hit image and the evaluation image it matched is at least 0.80. Measured 2026-10-01 (read-only): the 49 dHash hits of the 102,920 Step 1 pool images (all 12 sources the stream had quarantined under D28, every hit at 5-6 bits under a flip or rotation variant) have pair cosines -0.05..0.66 (median 0.106) and 0.744 at most, while true flip and rotation copies score >= 0.896 (5th percentile) and the weakest augmentation family >= 0.826. 0.80 sits above every measured chance hit and below every copy family."
+  },
+  "p_confirmed": {
+   "value": 0.000629,
+   "decided_by": "D28-v2, amendment V3-1 (docs/CONTINUOUS_LOOP.md, 2026-10-03), pre-registered",
+   "why": "The per-image rate of confirmed chance hits that D28's binomial test assumes: P(Binom(images, p_confirmed) >= confirmed hits) < source_alpha makes a leak. No confirmed-hit calibration exists yet, so it is set to the bound of the UNCONFIRMED rate: the 6-bit 8-variant dHash rule hits 4.76e-4 of same-domain images by chance (one-sided 97.5 % upper bound 6.29e-4, measured 2026-10-01). Every confirmed hit is a hit, so this bounds the chance rate of confirmed hits from above, and the test never calls chance a leak by underestimating the rate. A tighter value needs a calibration of the confirmed rate itself (a person's decision, recorded here)."
   },
   "base_copy_share": {
    "value": 0.2,

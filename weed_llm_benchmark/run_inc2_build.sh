@@ -197,7 +197,7 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/embed_calibration.py
          tools/inc2/train.py tools/inc2/baseline.py tools/inc2/pilot4.py tools/inc2/gate3.py
          tools/inc2/scorer_sidecar.py tools/inc2/scorer_native.py tools/inc2/step1_stream.py tools/inc2/mask.py
-         tools/inc2/stream.py
+         tools/inc2/eval_hits.py tools/inc2/stream.py
          tools/inc2/stream_report.py)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 

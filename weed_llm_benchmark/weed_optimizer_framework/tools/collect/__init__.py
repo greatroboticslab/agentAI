@@ -54,6 +54,7 @@ FORMATS = {
     "decision": "collect-intake-decision/1",
     "guard": "collect-intake-guard/1",
     "summary": "collect-intake-summary/1",
+    "eval_hits": "inc2-eval-hit-sidecar/1",          # intake/<batch>/eval_hits.json (inc2.eval_hits.SIDECAR_FORMAT)
     "state": "collect-state/1",
     "placement": "collect-placement/1",
     "names_cache": "collect-names-cache/1",

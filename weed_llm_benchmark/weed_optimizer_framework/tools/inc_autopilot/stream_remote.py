@@ -13,7 +13,8 @@ prints exactly one "INCAP <json>" line (remote.emit).
         are theirs); then the stream summary (the queue summary, the stream
         ledger with its hash chain checked, the dev scores of the named
         experiments' base runs, step1_stream/status.json, every intake batch
-        summary, the fold of intake/sources.jsonl, the network probe's
+        summary and its D28-v2 sidecar eval_hits.json when there is one, the
+        fold of intake/sources.jsonl, the network probe's
         placement, the splits lock status), squeue and the builds' provenance
         (remote status), sacct of the named jobs, the allocation balance and
         end date (`projects`), the /ocean quota, and the sha256 of every stream
@@ -22,7 +23,7 @@ prints exactly one "INCAP <json>" line (remote.emit).
                   [--decided-by A] [--dry-run] -- ARGS ...
         sbatch -p GPU-shared of a stream job script, ARGS checked against the
         script's grammar: collect (run_inc_collect.sh fetch|intake|probe),
-        admit (run_inc2_stream.sh admit|bootstrap|knowntruth|backfill|scan-holds),
+        admit (run_inc2_stream.sh admit|bootstrap|knowntruth|backfill|scan-holds|eval-hits),
         build (run_inc2_build.sh <pkg>.stream init|build|milestone|fork|feasibility|bisect,
         <pkg>.splits build|lock, <pkg>.baseline build|rescore-native, <pkg>.pilot4 build).
         Always GPU-shared: the allocation refuses RM-shared ("Invalid qos"),
@@ -62,7 +63,7 @@ V2_JOB_SCRIPT = "run_inc2_job.sh"
 PARTITION = "GPU-shared"
 SCRIPTS = {"collect": "run_inc_collect.sh", "admit": "run_inc2_stream.sh", "build": "run_inc2_build.sh"}
 VERBS = {"collect": ("fetch", "intake", "probe"),
-         "admit": ("admit", "bootstrap", "knowntruth", "backfill", "scan-holds")}
+         "admit": ("admit", "bootstrap", "knowntruth", "backfill", "scan-holds", "eval-hits")}
 BUILD_VERBS = {"stream": ("init", "build", "milestone", "fork", "feasibility", "bisect"), "splits": ("build", "lock"),
                "baseline": ("build", "rescore-native"), "pilot4": ("build",)}
 RUN_VERBS = {"stream": ("commit", "compare", "choose-arm", "rollback", "quarantine", "release"),
@@ -504,6 +505,9 @@ def stream_summary(sid, dev_exps=()):
         if R.NAME_RE.match(b) or BATCH_RE.match(b):
             if (idir / b / "summary.json").is_file():
                 put("intake/%s/summary.json" % b, idir / b / "summary.json")
+                # D28-v2: the sidecar that weighs again the dHash hits of a batch committed before the
+                # amendment (collect.intake.rescore_eval_hits; pair cosines and keys, no pixels)
+                put("intake/%s/eval_hits.json" % b, idir / b / "eval_hits.json")
     sinfo = {}
     srows, sbad = _jsonl(idir / "sources.jsonl", info=sinfo)
     if srows is not None:
@@ -645,7 +649,7 @@ COLLECT_FLAGS = {"fetch": {"--source": ("source", SOURCE_RE), "--max-bytes": ("m
                            "--candidates": ("candidates", _CAND)},
                  "intake": {"--source": ("source", SOURCE_RE)}, "probe": {}}
 ADMIT_FLAGS = {"admit": {"--intake": ("intake", BATCH_RE)}, "bootstrap": {}, "knowntruth": {}, "backfill": {},
-               "scan-holds": {"--hold": ("hold", _ENUM(*HOLDS))}}
+               "scan-holds": {"--hold": ("hold", _ENUM(*HOLDS))}, "eval-hits": {}}
 REQUIRED = {("collect", "fetch"): ("source", "max_bytes"), ("collect", "intake"): ("source",),
             ("admit", "admit"): ("intake",), ("admit", "scan-holds"): ("hold",),
             ("stream", "init"): ("stream", "stage_b"),

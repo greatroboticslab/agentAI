@@ -59,6 +59,14 @@ The admission (stage 6) is inc2.mask.decide (D-B); --rule image restores the
 v1 image rule (whole or not admitted), which is how the equivalence test
 compares this module with verify pool + crops + admit.
 
+D28-v2 (docs/CONTINUOUS_LOOP.md, amendment 2026-10-03): a row GuardV2 refuses
+as a dHash copy of an evaluation image is also weighed by its pair cosine
+with the evaluation image it matched, from the copy scanner's own descriptors
+(score_eval_hits, inc2.eval_hits). The row keeps "pair_cos", batch.json the
+batch's record ("eval_hits"), and status.json folds it per source
+(eval_hits_scored, eval_hit_pair_cos, eval_hit_copy_threshold) for the
+autopilot's D28.
+
 Holds (a row is eligible for a cut only with none left; queue/events.jsonl
 releases them): h6_scan (the embedding copy scan has not cleared the row: a
 source that is not provenance-cleared and was not scanned, or a registry slug
@@ -91,6 +99,7 @@ from ..inc import common as C
 from ..inc import select as S
 from ..inc import verify as V
 from ..near_dup import HOLDOUT_NEAR_DUP_BITS, NEAR_DUP_BITS, NearHashIndex
+from . import eval_hits as EH
 from . import mask as MK
 
 # ------------------------------------------------------------------ constants
@@ -309,7 +318,8 @@ def verify_ledger(path):
 
 def _module_hashes():
     out = {}
-    for m in PINNED_MODULES + OWN_MODULES + ("tools/inc2/guard.py", "tools/inc2/common.py"):
+    for m in PINNED_MODULES + OWN_MODULES + ("tools/inc2/guard.py", "tools/inc2/common.py",
+                                             "tools/inc2/eval_hits.py"):
         p = PKG_DIR / m
         out[m] = _sha_file(p) if p.is_file() else None
     return out
@@ -887,6 +897,82 @@ def scan_reason(hit, masked=False):
     """The refusal reason of a copy-scan hit."""
     r = "unhashable_embed" if (hit or {}).get("unscannable") else "near_eval_embed"
     return ("masked_" + r) if masked else r
+
+
+V2_CAL_FORMAT = "inc2-embed-calibration/2"     # inc2.embed_calibration.FORMAT (EC.state's "format")
+
+
+def copy_threshold(scanner):
+    """(threshold, its calibration record) that D28-v2 compares a dHash hit's
+    pair cosine with: the v2 calibration's cos_threshold (decision L-9(c),
+    read through inc2.embed_calibration by load_scanner) when the scanner
+    holds it, else the lowest threshold it holds (a per-pair threshold is
+    lower, so never less strict); (None, None) without a calibration."""
+    cals = [c for c in ((scanner.cal if scanner is not None else None) or {}).values() if c]
+    if not cals:
+        return None, None
+    v2 = [c for c in cals if c.get("format") == V2_CAL_FORMAT]
+    c = min(v2 or cals, key=lambda x: float(x["threshold"]))
+    return float(c["threshold"]), {"path": c.get("path"), "sha256": c.get("sha256"), "format": c.get("format")}
+
+
+def score_eval_hits(rows, scanner, procs=1, guards=None):
+    """D28-v2's evidence for a batch (inc2.eval_hits; docs/CONTINUOUS_LOOP.md,
+    amendment 2026-10-03): the pair cosine of every row GuardV2 refused as a
+    dHash copy of an evaluation image (near_eval_v2, near_eval_variant), with
+    the evaluation image its match names, from the copy scanner's own
+    evaluation descriptors (its EvalIndex) and embedder: the scan's view of
+    both images, on the scale of the calibration's threshold. Sets each such
+    row's "pair_cos" (None and "pair_cos_why" when it cannot be scored) and
+    returns the batch record D28 reads (eval_hits.record, kept in batch.json
+    and folded per source into status.json). Without a scanner index nothing
+    is scored and the record says why; D28 then reads those hits by its
+    one-hit rule (fail closed). Never raises: the guard has already refused
+    the rows, this only weighs them. With guards, each hit is weighed against
+    the guard's match and every other evaluation image within the
+    never-train radius of it (inc2.eval_hits.eval_matches), and keeps the
+    highest pair cosine."""
+    hits = [r for r in rows if r.get("decision") in EH.DHASH_HIT_REASONS]
+    thr, cal = copy_threshold(scanner)
+    index = getattr(scanner, "index", None) if scanner is not None else None
+    name = getattr(getattr(index, "embedder", None), "name", None)
+    items = []
+    for r in hits:
+        m = r.get("guard_match") if isinstance(r.get("guard_match"), dict) else {}
+        also = None
+        if guards is not None and index is not None:
+            try:
+                also = EH.eval_matches(guards, guards.variants_fn(r.get("image")))
+            except Exception:  # noqa: BLE001 - without the list the guard's own match is weighed alone
+                also = None
+        items.append({"key": "%s|%s" % (r.get("input"), r.get("item")), "source": r.get("source"),
+                      "image": r.get("image"), "split": m.get("split"), "eval_key": m.get("key"), "also": also})
+    why, scored = None, {}
+    if not items:
+        pass
+    elif index is None or getattr(index, "embedder", None) is None:
+        why = "no copy scanner index (no passed calibration loaded): the hits are not weighed"
+    else:
+        pos = {(str(s), str(k)): j for j, (s, k) in enumerate(zip(index.split, index.eval_key))}
+
+        def eval_desc(split, key):
+            j = pos.get((split, key))
+            return None if j is None else index.Xn[j]
+        scored = EH.pair_cosines(items, index.embedder, eval_desc=eval_desc, procs=procs)
+    for r, it in zip(hits, items):
+        got = scored.get(it["key"]) or {}
+        r["pair_cos"] = got.get("pair_cos")
+        if r["pair_cos"] is None:
+            r["pair_cos_why"] = got.get("why") or why
+        elif (got.get("weighed") or 0) > 1:
+            r["pair_cos_weighed"], r["pair_cos_best"] = got["weighed"], got.get("best")
+    rec = EH.record(items, scored, embedder_name=name, copy_threshold=thr, calibration=cal, why=why)
+    if items:
+        log("  dHash hits on evaluation images: %d, %d with a pair cosine (max %s)%s"
+            % (rec["hits"], rec["scored"], max((v["max_pair_cos"] for v in rec["per_source"].values()
+                                                if v["max_pair_cos"] is not None), default="n/a"),
+               "; %s" % rec["why"] if rec["why"] else ""))
+    return rec
 
 
 def calibration_state(path):
@@ -1745,12 +1831,14 @@ def ingest(layout, items, guards, scanner, procs=1, bid=None):
             r["scanned"] = w
             if res.get(r["key"]) is not None:
                 r["decision"], r["guard_match"] = scan_reason(res[r["key"]]), res[r["key"]]
+    # D28-v2: the pair cosine of every dHash copy of an evaluation image (the scanner holds both descriptors)
+    eval_rec = score_eval_hits(rows, scanner, procs, guards)
     for r in rows:
         counts[r["decision"]] += 1
         r["hold_join_conflict"] = r["key"] in conflict_twins
     summary = {"items": len(items), "decisions": dict(sorted(counts.items())), "consumed_keys": n_consumed,
                "guard": guards.record, "scanner": scanner.record() if scanner is not None else None,
-               "scanned": {w: len(rs) for w, rs in sorted(by_which.items())}}
+               "scanned": {w: len(rs) for w, rs in sorted(by_which.items())}, "eval_hits": eval_rec}
     return rows, summary
 
 
@@ -2390,7 +2478,7 @@ def run_batch(layout, spec, list_fn, embedder, guards, scanner=None, rule="box",
                "per_source_refusals": {k: dict(v) for k, v in sorted(per_ref.items())},
                "species_verdicts": {k: dict(v) for k, v in sorted(sp_verdicts.items())}, "embeddings": emb,
                "guard": isum.get("guard"),
-               "scanner": isum.get("scanner"), "scanned": isum.get("scanned"),
+               "scanner": isum.get("scanner"), "scanned": isum.get("scanned"), "eval_hits": isum.get("eval_hits"),
                "inputs": {"plan_items": _file_rec(bdir / "plan_items.jsonl"),
                           "ingest": _file_rec(bdir / "ingest.jsonl"),
                           "crops": _file_rec(bdir / "crops.csv"), "verdicts": _file_rec(bdir / "verdicts.npz"),
@@ -2566,6 +2654,8 @@ def backfill(layout, guards, scanner=None, census_path=None, require_census=True
                 if res.get(r["key"]) is not None:
                     r["decision"], r["guard_match"] = scan_reason(res[r["key"]]), res[r["key"]]
                     refused[r["decision"]] += 1
+        # D28-v2: the pair cosine of every dHash copy of an evaluation image
+        eval_rec = score_eval_hits(rows, scanner, procs, guards)
         # admission: whole (increment pool) and D-B (candidates)
         cset = set(cand)
         X, emb = v1_embeddings if v1_embeddings is not None else load_v1_embeddings(crops)
@@ -2714,7 +2804,12 @@ def backfill(layout, guards, scanner=None, census_path=None, require_census=True
                "admission": dict(sorted(adm_all.items())), "reconciliation": recon, "base": base_rec,
                "priors": prior_rec, "licences": lic_rec, "consumed_keys": n_cons, "guard": guards.record,
                "scanner": scanner.record(), "scanned": {w: len(rs) for w, rs in sorted(by_which.items())},
-               "embeddings": emb if isinstance(emb, dict) else None,
+               "eval_hits": eval_rec, "embeddings": emb if isinstance(emb, dict) else None,
+               # b0000 writes no ingest.jsonl: each hit's match and pair cosine are kept here
+               "eval_hit_pairs": [{"key": r["key"], "source": r["source"], "decision": r["decision"],
+                                   "match": r.get("guard_match"), "pair_cos": r.get("pair_cos"),
+                                   "pair_cos_why": r.get("pair_cos_why")}
+                                  for r in rows if r["decision"] in EH.DHASH_HIT_REASONS],
                "inputs": dict(_v1_records(), increment_pool=_file_rec(vf["increment_pool"]),
                               base_selected=_file_rec(vf["base_selected"]), clusters=_file_rec(vf["clusters"]),
                               select_summary=_file_rec(vf["select_summary"]), reference=_file_rec(layout.reference)),
@@ -3260,6 +3355,253 @@ def check_status(doc):
     return probs
 
 
+# ----------------------------------------------------- D28-v2 sidecars
+EVAL_HITS_DIR = "eval_hits"          # step1_stream/eval_hits/<batch>.json
+
+
+def eval_hits_sidecar_path(layout, bid):
+    return layout.root / EVAL_HITS_DIR / ("%s.json" % bid)
+
+
+def dhash_counts(doc):
+    """{source: dHash hits on evaluation images} a batch record counted (its
+    per_source_decisions near_eval_v2 + near_eval_variant)."""
+    out = {}
+    for src, dec in ((doc or {}).get("per_source_decisions") or {}).items():
+        n = sum(int((dec or {}).get(k) or 0) for k in EH.DHASH_HIT_REASONS)
+        if n > 0:
+            out[str(src)] = n
+    return out
+
+
+def _weighs_all(rec, counts):
+    """True when an eval_hits record holds a pair cosine for every dHash hit
+    the batch counted, source by source."""
+    per = (rec or {}).get("per_source") if isinstance((rec or {}).get("per_source"), dict) else {}
+    return all(len([c for c in ((per.get(s) or {}).get("pair_cos") or []) if c is not None]) >= n
+               for s, n in counts.items())
+
+
+def _sidecar_rows(layout, bid, doc, guards):
+    """(rows in ingest's form for the dHash hits of a committed batch, {row key:
+    why it cannot be weighed}, the files read). b0000 (no ingest.jsonl): the
+    rows admission.jsonl records refused near_eval_v2 or near_eval_variant,
+    each image and dHash from the v1 pool manifest and dHash cache (the image
+    checked against the manifest's sha256), the guard's match decided again by
+    GuardV2 on them (the same pinned LOCK, so the same decision: one that
+    differs is recorded, never weighed). A later batch: its ingest.jsonl
+    (checked against the sha256 its batch.json records), each image checked
+    against the row's sha256 and decided again the same way."""
+    bdir = layout.batch_dir(bid)
+    rows, failed, inputs = [], {}, {}
+
+    def again(r, image, dhash, sha):
+        k = "%s|%s" % (r["input"], r["item"])
+        if not image or not Path(image).is_file():
+            failed[k] = "the image %s is gone" % image
+        elif sha and _sha_file(image) != sha:
+            failed[k] = "the image no longer hashes to the recorded sha256"
+        else:
+            reason, match, _h = guards._decide(image, int(dhash), guards.variants_fn(image))
+            mm, rm = (match if isinstance(match, dict) else {}), (r.get("guard_match")
+                                                                 if isinstance(r.get("guard_match"), dict) else None)
+            if reason != r["decision"] or (rm is not None and (mm.get("split"), mm.get("key"))
+                                           != (rm.get("split"), rm.get("key"))):
+                failed[k] = "GuardV2 now decides %s (%s:%s), the batch recorded %s" % (
+                    reason, mm.get("split"), mm.get("key"), r["decision"])
+            else:
+                r["guard_match"] = match
+        rows.append(r)
+
+    if doc.get("kind") == KIND_BACKFILL:
+        vf = v1_files()
+        adm = bdir / "admission.jsonl"
+        inputs = {"admission": _file_rec(adm), "pool": _file_rec(vf["pool"]), "pool_meta": _file_rec(vf["pool_meta"])}
+        hit = [a for a in _read_jsonl(adm) if a.get("refusal") in EH.DHASH_HIT_REASONS]
+        keys = {a["key"] for a in hit}
+        pool = {r["key"]: r for r in C.read_manifest(vf["pool"]) if r["key"] in keys}
+        meta = {m["key"]: m for m in V._read_jsonl(vf["pool_meta"]) if m.get("key") in keys}
+        for a in hit:
+            pr, m = pool.get(a["key"]) or {}, meta.get(a["key"]) or {}
+            r = {"input": "v1", "item": a["key"], "key": a["key"], "source": a.get("source"), "image": pr.get("image"),
+                 "decision": a["refusal"], "guard_match": None}
+            if m.get("dhash") is None:
+                failed["v1|%s" % a["key"]] = "the v1 pool manifest or dHash cache lacks it"
+                rows.append(r)
+                continue
+            again(r, pr.get("image"), m["dhash"], pr.get("sha256"))
+        return rows, failed, inputs
+    ing = bdir / "ingest.jsonl"
+    want = ((doc.get("inputs") or {}).get("ingest") or {}).get("sha256")
+    inputs = {"ingest": _file_rec(ing)}
+    if not ing.is_file() or (want and _sha_file(ing) != want):
+        return rows, {"*": "%s is missing or does not hash to the sha256 batch.json records" % ing}, inputs
+    for x in _read_jsonl(ing):
+        if x.get("decision") in EH.DHASH_HIT_REASONS:
+            r = {"input": x.get("input"), "item": x.get("item"), "key": x.get("key"), "source": x.get("source"),
+                 "image": x.get("image"), "decision": x["decision"], "guard_match": x.get("guard_match")}
+            if x.get("dhash") is None:
+                failed["%s|%s" % (r["input"], r["item"])] = "its ingest row holds no dHash"
+                rows.append(r)
+                continue
+            again(r, x.get("image"), x["dhash"], x.get("sha256"))
+    return rows, failed, inputs
+
+
+def step1_eval_hits(layout, bid, doc, sha, guards, scanner, procs=1):
+    """D28-v2's sidecar of one committed Step 1 batch whose batch.json does not
+    weigh its dHash hits (committed before the amendment):
+    step1_stream/eval_hits/<batch>.json, the batch's hits re-derived
+    (_sidecar_rows) and weighed by the copy scanner's embedder and evaluation
+    descriptors (score_eval_hits, with every evaluation image within the
+    radius). doc: the batch.json read; sha: the sha256 of the bytes it was
+    parsed from (recorded as batch_json_sha256, which write_status compares
+    with the ledger's). batch.json is never rewritten (the stream ledger
+    hash-locks it): write_status folds the sidecar in its place. Returns the
+    sidecar."""
+    rows, failed, inputs = _sidecar_rows(layout, bid, doc, guards)
+    why_all = failed.pop("*", None)          # the batch's rows cannot be read at all: nothing is weighed
+    ok = [r for r in rows if "%s|%s" % (r["input"], r["item"]) not in failed]
+    rec0 = score_eval_hits(ok, scanner, procs, guards) if ok else {}
+    thr, cal = copy_threshold(scanner)
+    items, merged = [], {}
+    for r in rows:
+        k = "%s|%s" % (r["input"], r["item"])
+        items.append({"key": k, "source": r.get("source"), "reason": r["decision"], "match": r.get("guard_match")})
+        if k in failed:
+            merged[k] = {"pair_cos": None, "why": failed[k]}
+        elif r.get("pair_cos") is not None:
+            m = r.get("guard_match") if isinstance(r.get("guard_match"), dict) else {}
+            merged[k] = {"pair_cos": r["pair_cos"], "why": None, "weighed": r.get("pair_cos_weighed") or 1,
+                         "best": r.get("pair_cos_best") or [m.get("split"), m.get("key")]}
+        else:
+            merged[k] = {"pair_cos": None, "why": r.get("pair_cos_why") or rec0.get("why") or "not weighed"}
+    name = rec0.get("embedder") or getattr(getattr(getattr(scanner, "index", None), "embedder", None), "name", None)
+    rec = EH.record(items, merged, embedder_name=name, copy_threshold=thr, calibration=cal,
+                    why=why_all or (None if ok else (rec0.get("why") if rec0 else None)))
+    side = EH.sidecar(bid, rec, EH.sidecar_pairs(items, merged), "step1", batch_json_sha256=sha, built_utc=_utc(),
+                      batch_kind=doc.get("kind"), counted=dhash_counts(doc), inputs=inputs,
+                      scanner=scanner.record() if scanner is not None else None, guard=guards.record,
+                      modules=_module_hashes())
+    _write_json(eval_hits_sidecar_path(layout, bid), side)
+    log("  %s: %d dHash hit(s) weighed again into %s, %d with a pair cosine (max %s)"
+        % (bid, rec["hits"], eval_hits_sidecar_path(layout, bid), rec["scored"],
+           max((c for v in rec["per_source"].values() for c in v["pair_cos"]), default="n/a")))
+    return side
+
+
+def _collect_config():
+    """The collector's domain config (collect.__main__.default_config), which
+    collect.intake.rescore_eval_hits reads a fetch's format options from."""
+    from ..collect import config as CF
+    from ..collect.__main__ import default_config
+    return CF.load(default_config())
+
+
+def eval_hits(layout, guards, scanner, bids=None, intakes=None, procs=1, force=False, lock_path=None, cfg=None):
+    """step1_stream eval-hits (D28-v2; docs/CONTINUOUS_LOOP.md, amendment
+    2026-10-03; lever L17 verb eval-hits): weigh again, into sidecars, the
+    dHash hits on evaluation images of every committed batch whose own
+    record does not weigh them, so that D28 judges its source by the
+    amendment's rule instead of the one-hit fallback:
+      * each Step 1 batch (b0000 and later; known-truth batches are not a
+        source's supply) -> step1_stream/eval_hits/<batch>.json
+        (step1_eval_hits), folded per source into status.json by
+        write_status;
+      * each intake batch -> intake/<batch>/eval_hits.json
+        (collect.intake.rescore_eval_hits, given this job's embedder,
+        evaluation descriptors and GuardV2), which the snapshot ships and D28
+        reads.
+    bids / intakes: only these (None: every batch that needs it; bids []:
+    no Step 1 batch; intakes False: no intake batch). A batch that already
+    has a sidecar is skipped unless force. Without a copy scanner index no
+    Step 1 sidecar is written (it would weigh nothing), nor for a batch.json
+    that no longer hashes to the sha256 the ledger commits (it would never be
+    folded): those batches are "failed". Writes the
+    one_time index's "eval_hits" (what ran, when) and status.json. Returns
+    {"step1": {bid: result}, "intake": {batch: result}}; the CLI exits 2
+    when any batch is "failed"."""
+    out = {"step1": {}, "intake": {}}
+    index = getattr(scanner, "index", None) if scanner is not None else None
+    with writer_lock(layout):
+        for e in verify_ledger(layout.ledger):
+            bid = e["batch"]
+            if bids is not None and bid not in bids:
+                continue
+            # the sidecar names the batch.json it was made from by the sha256 of the very bytes read here
+            # (write_status folds it only when that is the sha256 the ledger commits)
+            bj = layout.batch_dir(bid) / "batch.json"
+            try:
+                raw = bj.read_bytes()
+                doc = (json.loads(raw.decode("utf-8")) if raw.strip() else {}) or {}
+            except FileNotFoundError:
+                raw, doc = None, {}
+            except (OSError, ValueError) as ex:
+                raise StreamError("unreadable JSON %s (%s)" % (bj, ex))
+            counts = dhash_counts(doc)
+            if doc.get("kind") == KIND_KNOWNTRUTH or not counts or _weighs_all(doc.get("eval_hits"), counts):
+                out["step1"][bid] = {"status": "not_needed"}
+                continue
+            if eval_hits_sidecar_path(layout, bid).is_file() and not force:
+                out["step1"][bid] = {"status": "exists"}
+                continue
+            if index is None or getattr(index, "embedder", None) is None:
+                # a sidecar that weighs nothing would use up the batch's attempt: none is written, the job fails
+                out["step1"][bid] = {"status": "failed", "why": "no copy scanner index (no passed calibration "
+                                                                "loaded): nothing can be weighed"}
+                continue
+            sha = _sha_bytes(raw)
+            if sha != e["batch_json_sha256"]:
+                # a sidecar of a batch.json that changed since commit would never be folded: none is written
+                out["step1"][bid] = {"status": "failed", "why": "batch.json hashes to %s, not to the sha256 the "
+                                                                "ledger commits (%s): changed since commit"
+                                                                % (sha[:12], str(e["batch_json_sha256"])[:12])}
+                continue
+            side = step1_eval_hits(layout, bid, doc, sha, guards, scanner, procs)
+            out["step1"][bid] = {"status": "written", "hits": side["eval_hits"]["hits"],
+                                 "scored": side["eval_hits"]["scored"]}
+        if intakes is not False:
+            d = layout.inc_dir / "intake"
+            names = sorted(n for n in (os.listdir(d) if d.is_dir() else []) if (d / n / "summary.json").is_file())
+            todo = [n for n in names if intakes is None or n in intakes]
+            try:
+                from ..collect import intake as CI
+                need = [n for n in todo if force or (CI.eval_hits_needed(_read_json(d / n / "summary.json", {}) or {})
+                                                     and not (d / n / CI.EVAL_HITS_NAME).is_file())]
+                cfg = cfg if cfg is not None or not need else _collect_config()
+            except Exception as e:  # noqa: BLE001 - the collector cannot be loaded: its batches wait (fail closed)
+                need = []
+                for n in todo:
+                    out["intake"][n] = {"status": "failed", "why": "the collector does not load (%s: %s)"
+                                                                 % (type(e).__name__, str(e)[:200])}
+            pos = {(str(sp), str(k)): j for j, (sp, k) in enumerate(zip(index.split, index.eval_key))} \
+                if index is not None else {}
+
+            def eval_desc(split, key):
+                j = pos.get((split, key))
+                return None if j is None else index.Xn[j]
+            for n in todo:
+                if n in out["intake"]:
+                    continue
+                if n not in need:
+                    out["intake"][n] = {"status": "not_needed"}
+                    continue
+                try:
+                    out["intake"][n] = CI.rescore_eval_hits(
+                        cfg, n, inc=layout.inc_dir, lock_path=lock_path, guard=guards.guard,
+                        embedder=getattr(index, "embedder", None), eval_desc=eval_desc if index is not None else None,
+                        force=force)
+                except Exception as e:  # noqa: BLE001 - one batch that cannot be weighed never stops the others
+                    out["intake"][n] = {"status": "failed", "why": "%s: %s" % (type(e).__name__, str(e)[:300])}
+                log("  intake %s: %s" % (n, out["intake"][n]))
+        ot = Index(layout, "one_time", {})
+        ot.data["eval_hits"] = {"utc": _utc(), "step1": {k: v.get("status") for k, v in out["step1"].items()},
+                                "intake": {k: v.get("status") for k, v in out["intake"].items()}}
+        ot.save()
+        write_status(layout)
+    return out
+
+
 def _intake_pending(layout):
     out = {}
     d = layout.inc_dir / "intake"
@@ -3300,9 +3642,39 @@ def write_status(layout):
     # what Step 1 saw and refused per source (D28 reads images_seen and near_eval_embed): every judged item
     # of every batch, the refusals after admission (masked copies), and the queue rows refused later
     # (serve-holds' copy scan, domain dev, supersession)
+    # D28-v2 reads, per source, the pair cosines of its dHash hits on evaluation images (a batch's eval_hits
+    # record, or, for a batch committed before the record existed, its sidecar step1_stream/eval_hits/<batch>.json
+    # when that weighed exactly the hits the batch counted and was made from the committed batch.json); a hit
+    # counted in decision:near_eval_* without one is read by the one-hit rule (fail closed). "eval_hits" lists
+    # the batches still due for a sidecar (step1_stream eval-hits, L17) and how each sidecar was read.
+    hit_cos, hit_thr = collections.defaultdict(list), {}
+    eh_status = {"due": [], "sidecars": {}}
+    led_sha = {e["batch"]: e.get("batch_json_sha256") for e in ledger}
     for b, d in docs.items():
         if d.get("kind") == KIND_KNOWNTRUTH:
             continue                         # base copies measured, not a source's supply
+        eh = d.get("eval_hits") if isinstance(d.get("eval_hits"), dict) else {}
+        counts = dhash_counts(d)
+        if counts and not _weighs_all(eh, counts):
+            sp = eval_hits_sidecar_path(layout, b)
+            side = _read_json(sp, None) if sp.is_file() else None
+            if side is None:
+                eh_status["due"].append(b)
+            else:
+                rec, why = EH.usable_sidecar(side, b, counts)
+                if rec is not None and side.get("batch_json_sha256") != led_sha.get(b):
+                    rec, why = None, "it was made from another batch.json than the one the ledger commits"
+                srec = side.get("eval_hits") if isinstance(side.get("eval_hits"), dict) else {}
+                eh_status["sidecars"][b] = {"used": rec is not None, "why": why, "hits": srec.get("hits"),
+                                            "scored": srec.get("scored"), "built_utc": side.get("built_utc")}
+                if rec is not None:
+                    eh = rec
+        for src, rec in ((eh.get("per_source") or {}) if isinstance(eh.get("per_source"), dict) else {}).items():
+            per_source[src]["eval_hits_scored"] += int((rec or {}).get("scored") or 0)
+            hit_cos[src].extend(float(c) for c in ((rec or {}).get("pair_cos") or []))
+            if eh.get("copy_threshold") is not None:
+                t = float(eh["copy_threshold"])
+                hit_thr[src] = min(hit_thr.get(src, t), t)
         for src, dec in (d.get("per_source_decisions") or {}).items():
             for k, n in dec.items():
                 per_source[src]["decision:%s" % k] += int(n)
@@ -3348,7 +3720,8 @@ def write_status(layout):
         first.setdefault(e.get("kind"), e.get("utc"))
     ot = Index(layout, "one_time", {}).data if layout.index("one_time").exists() else {}
     one_time = {"bootstrap": pins.get("built_utc") if pins else None, "backfill": first.get(KIND_BACKFILL),
-                "knowntruth": first.get(KIND_KNOWNTRUTH) or (ot.get("knowntruth") or {}).get("utc")}
+                "knowntruth": first.get(KIND_KNOWNTRUTH) or (ot.get("knowntruth") or {}).get("utc"),
+                "eval_hits": (ot.get("eval_hits") or {}).get("utc")}
     doc = {"format": STATUS_FORMAT, "built_utc": _utc(), "one_time": one_time,
            "stream_version": int(pins.get("stream_version", STREAM_VERSION)),
            "versions": {"verifier": VERIFIER_VERSION, "reference": REFERENCE_VERSION,
@@ -3384,9 +3757,13 @@ def write_status(layout):
                                                                      REFIT_SPECIES_NEW_BOXES,
                                                                      REFIT_SPECIES_UNKNOWN_SHARE),
                               "fired": bool(trig_prec or trig_sp)},
-           "human_queue": {"rows": len(_read_jsonl(layout.human))},
+           "human_queue": {"rows": len(_read_jsonl(layout.human))}, "eval_hits": eh_status,
            "per_source": {s: dict({"images_seen": 0, "near_eval_embed": 0, "target_boxes_admitted": 0}, **v)
                           for s, v in sorted(per_source.items())}}
+    for s, row in doc["per_source"].items():
+        if s in hit_cos or "eval_hits_scored" in row:
+            row["eval_hit_pair_cos"] = sorted(hit_cos.get(s, []), reverse=True)
+            row["eval_hit_copy_threshold"] = hit_thr.get(s)
     _write_json(layout.status, doc)
     return doc
 
@@ -3425,11 +3802,16 @@ def build_parser():
     ap = argparse.ArgumentParser(prog="python -m weed_optimizer_framework.tools.inc2.step1_stream",
                                  description="Incremental Step 1 with per-box admission (docs/CONTINUOUS_LOOP.md §3.3)")
     ap.add_argument("verb", choices=("bootstrap", "admit", "backfill", "knowntruth", "rejoin", "serve-holds",
-                                     "scan-holds", "status", "verify"),
-                    help="scan-holds is serve-holds under the name the autopilot submits (L17 --hold)")
+                                     "scan-holds", "eval-hits", "status", "verify"),
+                    help="scan-holds is serve-holds under the name the autopilot submits (L17 --hold); eval-hits "
+                         "weighs again, into sidecars, the dHash hits of batches committed before D28-v2 (L17)")
     ap.add_argument("--state-dir", default=None, help="default INC_DIR/step1_stream")
     ap.add_argument("--lock", default=None, help="the splits v2 LOCK.json (default INC_DIR/splits/v2/LOCK.json)")
-    ap.add_argument("--intake", default=None, help="admit: the collect intake batch name")
+    ap.add_argument("--intake", default=None, help="admit: the collect intake batch name; eval-hits: only this "
+                                                    "intake batch (with --batch-id: those Step 1 batches too)")
+    ap.add_argument("--batch-id", action="append", default=None,
+                    help="eval-hits: only this committed Step 1 batch (repeatable; default every batch that needs it)")
+    ap.add_argument("--force", action="store_true", help="eval-hits: write a sidecar again where one exists")
     ap.add_argument("--registry", action="store_true", help="admit: new paths of the v1 registry slugs")
     ap.add_argument("--slugs", default=None, help="admit --registry: only these slugs (comma-separated)")
     ap.add_argument("--rule", choices=("box", "image"), default="box", help="admission rule (D-B box, v1 image)")
@@ -3451,6 +3833,16 @@ def build_parser():
     ap.add_argument("--cap", type=int, default=BATCH_CAP, help="images per batch")
     ap.add_argument("--no-amp", action="store_true")
     return ap
+
+
+def eval_hits_scope(a):
+    """(bids, intakes) for eval_hits from the CLI's flags: neither --batch-id
+    nor --intake -> every batch that needs a sidecar (None, None); --batch-id
+    only -> those Step 1 batches and no intake batch; --intake only -> that
+    intake batch and no Step 1 batch ([]); both -> both."""
+    if not (a.batch_id or a.intake):
+        return None, None
+    return list(a.batch_id or []), ([a.intake] if a.intake else False)
 
 
 def main(argv=None):
@@ -3505,6 +3897,16 @@ def main(argv=None):
                 rejoin(layout, a.slug, guards, scanner, procs=a.procs)
             elif a.verb in ("serve-holds", "scan-holds"):
                 serve_holds(layout, scanner, domain_dev_path=a.domain_dev, kinds=a.hold)
+            elif a.verb == "eval-hits":
+                bids, intakes = eval_hits_scope(a)
+                out = eval_hits(layout, guards, scanner, bids=bids, intakes=intakes, procs=a.procs,
+                                force=a.force, lock_path=pins["splits"]["lock"])
+                bad = sorted("%s %s" % (k, n) for k in ("step1", "intake") for n, v in out[k].items()
+                             if v.get("status") == "failed")
+                print(json.dumps(out, indent=1, default=str))
+                if bad:
+                    # a batch left without a sidecar is proposed again: a failed job, not a silent loop
+                    raise StreamError("no sidecar for %s" % ", ".join(bad))
     except StreamError as e:
         log("FAILED: %s" % e)
         return 2

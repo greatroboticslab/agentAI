@@ -29,6 +29,23 @@ Pinned (acceptance of group C):
     dev image; a registry slug absent from the v1 pool and one whose join
     changed are refused; a v1 slug with evaluation near-copies yields rows
     held h6_scan, and rows without a licence are held licence;
+  * D28-v2 (amendment 2026-10-03): each dHash copy of an evaluation image
+    carries its pair cosine with the image GuardV2 matched (the copy
+    scanner's descriptors; the byte copy 1.0), batch.json records them
+    (eval_hits), status.json folds them per source and the autopilot's D28
+    reads the fold; without a scanner index, or for a match that names no
+    evaluation image, a hit is left unweighed with the reason. A batch whose
+    batch.json does not weigh its hits (made before the amendment) is
+    weighed again by eval-hits into step1_stream/eval_hits/<batch>.json
+    (b0000 from admission.jsonl, the v1 pool and dHash cache through
+    GuardV2), batch.json untouched; status.json lists it as due until then,
+    folds a sidecar made from the committed batch.json that weighed exactly
+    its hits, and refuses any other (a sidecar records the sha256 of the
+    batch.json bytes read; a batch.json changed since commit gets none);
+    a hit is weighed against every evaluation image within the radius, not
+    only the guard's match; the CLI exits 2 when a batch gets no sidecar,
+    and eval-hits --intake X alone weighs no Step 1 batch; run_inc2_stream.sh
+    accepts eval-hits and hashes the collector package for it;
   * pins: an altered verifier.npz, another embedder, another v2 index and a
     canary drift each refuse before anything is written;
   * state: global crop ids are contiguous and disjoint, a committed batch is
@@ -766,6 +783,7 @@ def test_registry_planted(lay, guards, rows, sel):
     check("the funnel's passed leak_v1.json is reused by sha256", scanner.cal["funnel"] is not None
           and scanner.cal["funnel"]["sha256"] == C.sha256_file(C.INC_DIR / "funnel" / "leak_v1.json")
           and scanner.cal["own"] is None)
+    pre = copy_layout(lay, "stream_pre_d28v2")    # the same state, to replay this batch as one made before D28-v2
     doc = SS.run_batch(lay, "registry:a_species", lambda: SS.list_registry(lay, ["a_species"]), TV.FakeEmbedder(),
                        guards, scanner, procs=1)
     rows_all = batch_rows(lay, doc["batch"])
@@ -782,6 +800,8 @@ def test_registry_planted(lay, guards, rows, sel):
           rows_b["a_species__p_aug_crop"]["guard_match"]["eval_key"] == dev[1]["key"]
           and rows_b["a_species__p_aug_shear"]["guard_match"]["eval_key"] == test[1]["key"],
           rows_b["a_species__p_aug_crop"]["guard_match"])
+    test_eval_hit_cosines(lay, doc, rows_all, scanner, theta, guards)
+    test_eval_hit_sidecars(pre, guards, scanner, theta, rows)
     pre = {r["stem"]: r["decision"] for r in rows_all if r["stem"] not in want}
     check("the v1 images of the slug are not read again; the four v1 dropped before hashing (not in the v1 dHash "
           "cache) are read once, dropped the same way, and marked processed",
@@ -803,6 +823,254 @@ def test_registry_planted(lay, guards, rows, sel):
     check("the batch's known truth: the tsw copy box-matched to its expert labels", "tsw22" in kt["per_set"]
           and kt["per_set"]["tsw22"]["boxes"] == 3 and kt["overall"]["verified_precision_wilson_lb"] is not None, kt)
     return scanner, theta
+
+
+def test_eval_hit_cosines(lay, doc, rows_all, scanner, theta, guards):
+    """D28-v2 (docs/CONTINUOUS_LOOP.md, amendment 2026-10-03): the admit job
+    weighs every dHash copy of an evaluation image by its pair cosine with the
+    evaluation image GuardV2 matched, from the copy scanner's own descriptors;
+    batch.json keeps the record, status.json folds it per source, and the
+    autopilot's D28 reads it."""
+    print("D28-v2: the dHash hits' pair cosines (the admit job)")
+    from weed_optimizer_framework.tools.inc2 import embed_calibration as EC
+    from weed_optimizer_framework.tools.inc2 import eval_hits as EH
+    check("step1_stream's restated v2 calibration format is inc2.embed_calibration's",
+          SS.V2_CAL_FORMAT == EC.FORMAT, SS.V2_CAL_FORMAT)
+    stems = {r["stem"]: r for r in rows_all}
+    hits = {s: stems[s] for s in ("p_devbyte", "p_testflip", "p_devrot")}
+    check("every row GuardV2 refused as a dHash copy of an evaluation image carries its pair cosine with the image "
+          "it matched (the byte copy of dev: 1.0)", all(r.get("pair_cos") is not None for r in hits.values())
+          and hits["p_devbyte"]["pair_cos"] == 1.0 and all(r["decision"] in EH.DHASH_HIT_REASONS
+                                                           for r in hits.values()),
+          {s: (r["decision"], r.get("pair_cos"), r.get("guard_match")) for s, r in hits.items()})
+    rec = doc.get("eval_hits") or {}
+    row = (rec.get("per_source") or {}).get("a_species") or {}
+    check("batch.json records them (eval_hits: 3 hits, 3 weighed, the calibration's threshold and embedder; no "
+          "evaluation key in the record)", rec.get("format") == EH.FORMAT and rec.get("hits") == 3
+          and rec.get("scored") == 3 and row.get("pair_cos") == sorted((r["pair_cos"] for r in hits.values()),
+                                                                       reverse=True)
+          and rec.get("copy_threshold") == theta and rec.get("embedder") == scanner.index.embedder.name
+          and "dev__" not in json.dumps(rec) and "test__" not in json.dumps(rec), rec)
+    st = SS.write_status(lay)
+    ps = st["per_source"].get("a_species") or {}
+    n_dh = sum(int(ps.get("decision:%s" % k, 0)) for k in EH.DHASH_HIT_REASONS)
+    check("status.json folds them per source: eval_hits_scored, eval_hit_pair_cos (descending), "
+          "eval_hit_copy_threshold; the schema still checks", ps.get("eval_hits_scored", 0) >= 3
+          and len(ps.get("eval_hit_pair_cos") or []) == ps.get("eval_hits_scored")
+          and ps["eval_hit_pair_cos"] == sorted(ps["eval_hit_pair_cos"], reverse=True)
+          and ps.get("eval_hit_copy_threshold") == theta and SS.check_status(st) == [], ps)
+    try:
+        from weed_optimizer_framework.tools.inc_autopilot import diagnose_stream as DS
+        from weed_optimizer_framework.tools.inc_autopilot import evidence as E
+        from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LS
+        ev = E.from_texts({"step1_stream/status.json": json.dumps(st)}, "x", context={"sid": "none"})
+        d = DS.by_id(DS.detect(ev, LS.load_domain("weed"), LS.load_thresholds(), only=("D28",)))["D28"]
+        leak = next((h for h in (d.get("detail") or {}).get("leaks") or [] if h["source"] == "a_species"), {})
+        dv = (leak.get("verdict") or {}).get("dhash") or {}
+        check("the autopilot's D28 reads the fold: a_species leaks %s" % (
+            "by the byte copy at or above the copy threshold" if len(ps["eval_hit_pair_cos"]) >= n_dh else
+            "by the one-hit rule (an earlier batch left %d hit(s) unweighed)" % (n_dh - len(ps["eval_hit_pair_cos"]))),
+              d.get("fired") and dv and ((dv.get("copy_hits") or 0) >= 1 if len(ps["eval_hit_pair_cos"]) >= n_dh
+                                         else dv.get("fail_closed")), (dv, d.get("summary")))
+    except ImportError as e:
+        NOTES.append("D28 interop skipped: the autopilot's stream diagnoses do not load (%s)" % e)
+    # no index: nothing weighed, the reason recorded (fail closed downstream); a match without its key likewise
+    plain = [dict(r, pair_cos=None) for r in hits.values()]
+    rec0 = SS.score_eval_hits(plain, SS.CopyScanner())
+    check("without a copy scanner index nothing is weighed: every hit unscored with the reason, the record says why",
+          rec0["hits"] == 3 and rec0["scored"] == 0 and "no copy scanner index" in (rec0.get("why") or "")
+          and all(r["pair_cos"] is None and "no copy scanner index" in r.get("pair_cos_why", "") for r in plain), rec0)
+    odd = [dict(hits["p_devbyte"], guard_match={"planted": "no evaluation key"}, pair_cos=None)]
+    rec1 = SS.score_eval_hits(odd, scanner)
+    check("a match that names no evaluation image is unscored (never a guess)", rec1["scored"] == 0
+          and odd[0]["pair_cos"] is None and "neither" in odd[0].get("pair_cos_why", ""), (rec1, odd))
+    # the pair: a hit is weighed against every evaluation image within the never-train radius, not only the one the
+    # guard names (GuardV2 returns the first match it finds): with the guard's match planted as the evaluation image
+    # least like the byte copy of dev, the copy still keeps 1.0 from the dev original within 0 bits of it
+    idx = scanner.index
+    Xn = np.asarray(idx.Xn, dtype=np.float32)
+    pos = {(str(sp), str(k)): j for j, (sp, k) in enumerate(zip(idx.split, idx.eval_key))}
+    m0 = hits["p_devbyte"]["guard_match"]
+    j0 = pos[(str(m0["split"]), str(m0["key"]))]
+    far = min((j for j in range(len(idx.eval_key)) if j != j0), key=lambda j: float(Xn[j] @ Xn[j0]))
+    planted = {"split": str(idx.split[far]), "key": str(idx.eval_key[far])}
+    alone = [dict(hits["p_devbyte"], guard_match=planted, pair_cos=None)]
+    every = [dict(hits["p_devbyte"], guard_match=planted, pair_cos=None)]
+    SS.score_eval_hits(alone, scanner)
+    rec2 = SS.score_eval_hits(every, scanner, guards=guards)
+    check("a hit whose guard match is an unrelated evaluation image (pair cos %s alone) keeps 1.0 from the "
+          "evaluation image it copies within the radius (pair_cos_best names it): the guard's match is not weighed "
+          "alone" % alone[0].get("pair_cos"), alone[0].get("pair_cos") is not None and alone[0]["pair_cos"] < theta
+          and every[0].get("pair_cos") == 1.0 and rec2["scored"] == 1
+          and every[0].get("pair_cos_best") == [str(m0["split"]), str(m0["key"])], (alone[0].get("pair_cos"), every))
+
+
+def _d28(st, extra=None):
+    """The autopilot's D28 over a status.json (None when group F does not load)."""
+    try:
+        from weed_optimizer_framework.tools.inc_autopilot import diagnose_stream as DS
+        from weed_optimizer_framework.tools.inc_autopilot import evidence as E
+        from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LS
+    except ImportError as e:
+        NOTES.append("D28 interop skipped: the autopilot's stream diagnoses do not load (%s)" % e)
+        return None
+    texts = {"step1_stream/status.json": json.dumps(st)}
+    texts.update(extra or {})
+    ev = E.from_texts(texts, "x", context={"sid": "none"})
+    return DS.by_id(DS.detect(ev, LS.load_domain("weed"), LS.load_thresholds(), only=("D28",)))["D28"]
+
+
+def test_eval_hit_sidecars(pre, guards, scanner, theta, rows):
+    """D28-v2: a committed batch whose batch.json does not weigh its dHash hits
+    (made before the amendment; here, the same registry batch admitted without
+    a copy scanner) is weighed again by step1_stream eval-hits into
+    step1_stream/eval_hits/<batch>.json; batch.json is never rewritten (the
+    ledger hash-locks it); write_status folds the sidecar per source, and D28
+    judges the source by it. b0000 (no ingest.jsonl) is re-derived from
+    admission.jsonl, the v1 pool manifest and dHash cache through GuardV2."""
+    from weed_optimizer_framework.tools.inc2 import eval_hits as EH
+    print("D28-v2: the sidecars of Step 1 batches committed before the amendment (step1_stream eval-hits)")
+    doc = SS.run_batch(pre, "registry:a_species", lambda: SS.list_registry(pre, ["a_species"]), TV.FakeEmbedder(),
+                       guards, None, procs=1)
+    bid = doc["batch"]
+    led = {e["batch"]: e for e in SS.verify_ledger(pre.ledger)}
+    st = SS.write_status(pre)
+    ps = st["per_source"]["a_species"]
+    n_dh = sum(int(ps.get("decision:%s" % k, 0)) for k in EH.DHASH_HIT_REASONS)
+    check("fixture: the batch counts dHash hits that its own record does not weigh: status.json lists it as due for a "
+          "sidecar, and D28 reads its source by the one-hit rule", (doc.get("eval_hits") or {}).get("scored") == 0
+          and n_dh >= 3 and st["eval_hits"]["due"] == [bid] and SS.check_status(st) == [], (st["eval_hits"], n_dh))
+    d = _d28(st)
+    if d is not None:
+        dv = next(((h.get("verdict") or {}).get("dhash") or {} for h in (d.get("detail") or {}).get("leaks") or []
+                   if h["source"] == "a_species"), {})
+        check("  (D28: fail closed)", d.get("fired") and dv.get("fail_closed"), d.get("summary"))
+    sha_before = C.sha256_file(pre.batch_dir(bid) / "batch.json")
+    blind = SS.eval_hits(pre, guards, SS.CopyScanner(), intakes=False)
+    check("without a copy scanner index no sidecar is written (it would weigh nothing and use up the batch's "
+          "attempt): the batch is 'failed' and stays due", blind["step1"].get(bid, {}).get("status") == "failed"
+          and not SS.eval_hits_sidecar_path(pre, bid).exists()
+          and json.loads(pre.status.read_text())["eval_hits"]["due"] == [bid], blind["step1"])
+    out = SS.eval_hits(pre, guards, scanner, intakes=False)
+    side = json.loads(SS.eval_hits_sidecar_path(pre, bid).read_text())
+    dev_byte = next((p for p in side["pairs"] if "p_devbyte" in p["key"]), {})
+    check("eval-hits writes step1_stream/eval_hits/<batch>.json: every hit re-derived (its ingest row, the image's "
+          "sha256, GuardV2's decision again) and weighed by the copy scanner (the byte copy of dev: 1.0)",
+          out["step1"].get(bid, {}).get("status") == "written" and side["format"] == EH.SIDECAR_FORMAT
+          and side["batch"] == bid and side["batch_json_sha256"] == led[bid]["batch_json_sha256"]
+          and side["eval_hits"]["hits"] == n_dh and side["eval_hits"]["scored"] == n_dh
+          and dev_byte.get("pair_cos") == 1.0 and (dev_byte.get("match") or {}).get("split") == "dev"
+          and side["eval_hits"]["copy_threshold"] == theta, (out, side["eval_hits"]))
+    check("  batch.json is untouched (the ledger's hash still holds) and the state verifies",
+          C.sha256_file(pre.batch_dir(bid) / "batch.json") == sha_before == led[bid]["batch_json_sha256"]
+          and SS.verify_state(pre) == [], SS.verify_state(pre))
+    st2 = json.loads(pre.status.read_text())
+    ps2 = st2["per_source"]["a_species"]
+    check("status.json folds the sidecar in the batch's place: nothing due, the sidecar used, every hit of a_species "
+          "with its pair cosine, one_time.eval_hits stamped", st2["eval_hits"]["due"] == []
+          and st2["eval_hits"]["sidecars"][bid]["used"] is True and len(ps2.get("eval_hit_pair_cos") or []) == n_dh
+          and 1.0 in ps2["eval_hit_pair_cos"] and ps2.get("eval_hit_copy_threshold") == theta
+          and isinstance(st2["one_time"].get("eval_hits"), str) and SS.check_status(st2) == [], st2["eval_hits"])
+    d = _d28(st2)
+    if d is not None:
+        dv = next(((h.get("verdict") or {}).get("dhash") or {} for h in (d.get("detail") or {}).get("leaks") or []
+                   if h["source"] == "a_species"), {})
+        check("the autopilot's D28 now judges a_species by the pair cosines: a leak by the byte copy at or above the "
+              "copy threshold, not by the fallback", d.get("fired") and (dv.get("copy_hits") or 0) >= 1
+              and not dv.get("fail_closed"), (dv, d.get("summary")))
+    again = SS.eval_hits(pre, guards, scanner, intakes=False)
+    check("a second run leaves the sidecar alone (one attempt per batch; --force writes it again)",
+          again["step1"].get(bid, {}).get("status") == "exists", again["step1"])
+    sp = SS.eval_hits_sidecar_path(pre, bid)
+    keep = sp.read_text()
+    sp.write_text(json.dumps(dict(json.loads(keep), batch_json_sha256="0" * 64)))
+    st3 = SS.write_status(pre)
+    check("a sidecar made from another batch.json than the one the ledger commits is not used: its hits fall back "
+          "to the one-hit rule", st3["eval_hits"]["sidecars"][bid]["used"] is False
+          and "another batch.json" in st3["eval_hits"]["sidecars"][bid]["why"]
+          and st3["per_source"]["a_species"].get("eval_hit_pair_cos") == [], st3["eval_hits"])
+    bad = json.loads(keep)
+    bad["eval_hits"]["per_source"]["a_species"]["hits"] = n_dh + 1
+    sp.write_text(json.dumps(bad))
+    st3 = SS.write_status(pre)
+    check("  nor one that weighed another number of hits than the batch counted", not st3["eval_hits"]["sidecars"][
+        bid]["used"] and "weighed" in st3["eval_hits"]["sidecars"][bid]["why"], st3["eval_hits"])
+    sp.write_text(keep)
+    SS.write_status(pre)
+    # the sidecar records the sha256 of the batch.json bytes the job read, never the ledger's: a batch.json changed
+    # since commit gets no sidecar (it would never be folded), and a sidecar made from one is not folded
+    bj = pre.batch_dir(bid) / "batch.json"
+    bj_keep = bj.read_bytes()
+    bj.write_bytes(bj_keep + b"\n")
+    try:
+        chg = SS.eval_hits(pre, guards, scanner, bids=[bid], intakes=False, force=True)
+        untouched = sp.read_text() == keep
+        sha_chg = C.sha256_file(bj)
+        side_chg = SS.step1_eval_hits(pre, bid, json.loads(bj.read_bytes()), sha_chg, guards, scanner)
+    finally:
+        bj.write_bytes(bj_keep)
+    check("eval-hits gives no sidecar to a batch whose batch.json no longer hashes to the sha256 the ledger "
+          "commits (it would never be folded): the batch is 'failed' and its sidecar is left as it was",
+          chg["step1"].get(bid, {}).get("status") == "failed" and "ledger commits" in chg["step1"][bid].get("why", "")
+          and untouched, chg["step1"])
+    st4 = SS.write_status(pre)
+    check("  a sidecar made from a changed batch.json records the sha256 of the bytes read, and write_status does "
+          "not fold it", side_chg["batch_json_sha256"] == sha_chg != led[bid]["batch_json_sha256"]
+          and st4["eval_hits"]["sidecars"][bid]["used"] is False
+          and "another batch.json" in st4["eval_hits"]["sidecars"][bid]["why"], st4["eval_hits"])
+    sp.write_text(keep)
+    SS.write_status(pre)
+    # the CLI's scope: --intake X alone weighs that intake batch and no Step 1 batch (the help text's promise)
+
+    def scope(*argv):
+        return SS.eval_hits_scope(SS.build_parser().parse_args(["eval-hits"] + list(argv)))
+    check("the CLI eval-hits --intake X (no --batch-id) weighs only that intake batch, no Step 1 batch; --batch-id "
+          "only those Step 1 batches, no intake batch; both, both; neither, every batch that needs it",
+          scope("--intake", "i1") == ([], ["i1"]) and scope("--batch-id", "b1") == (["b1"], False)
+          and scope("--intake", "i1", "--batch-id", "b1", "--batch-id", "b2") == (["b1", "b2"], ["i1"])
+          and scope() == (None, None), [scope("--intake", "i1"), scope("--batch-id", "b1"), scope()])
+    none = SS.eval_hits(pre, guards, scanner, bids=[], intakes=False, force=True)
+    check("  and eval_hits with bids [] touches no Step 1 batch (force or not)", none["step1"] == {}
+          and sp.read_text() == keep, none["step1"])
+    # b0000: no ingest.jsonl; its hits come back through admission.jsonl, the v1 pool and dHash cache, and GuardV2
+    b0 = pre.batch_dir("b0000")
+    adm = b0 / "admission.jsonl"
+    adm_keep = adm.read_bytes()
+    vf = SS.v1_files()
+    pool = C.read_manifest(vf["pool"])
+    meta = V._read_jsonl(vf["pool_meta"])
+    dev0 = rows["dev"][0]
+    copy_img = TMP / "eh_v1" / "v1_devcopy.jpg"
+    copy_img.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(dev0["image"], copy_img)
+    tmpl, mtmpl = pool[0], next(m for m in meta if m["key"] == pool[0]["key"])
+    pool2 = pool + [dict(tmpl, key="a_species__v1_devcopy", image=str(copy_img), sha256=C.sha256_file(copy_img),
+                         source="a_species")]
+    meta2 = meta + [dict(mtmpl, key="a_species__v1_devcopy", dhash=int(C.dhash(copy_img)))]
+    (TMP / "eh_v1" / "pool.jsonl").write_text("".join(json.dumps(r) + "\n" for r in pool2))
+    (TMP / "eh_v1" / "pool_meta.jsonl").write_text("".join(json.dumps(r) + "\n" for r in meta2))
+    with open(adm, "a") as fh:
+        fh.write(json.dumps({"key": "a_species__v1_devcopy", "source": "a_species", "refusal": "near_eval_v2"}) + "\n")
+        fh.write(json.dumps({"key": pool[1]["key"], "source": pool[1]["source"],
+                             "refusal": "near_eval_variant"}) + "\n")
+    real = SS.v1_files
+    SS.v1_files = lambda: dict(vf, pool=TMP / "eh_v1" / "pool.jsonl", pool_meta=TMP / "eh_v1" / "pool_meta.jsonl")
+    try:
+        d0 = dict(json.loads((b0 / "batch.json").read_text()),
+                  per_source_decisions={"a_species": {"near_eval_v2": 1}, pool[1]["source"]: {"near_eval_variant": 1}})
+        side0 = SS.step1_eval_hits(pre, "b0000", d0, "f" * 64, guards, scanner)
+    finally:
+        SS.v1_files = real
+        adm.write_bytes(adm_keep)
+    p0 = {p["key"]: p for p in side0["pairs"]}
+    hit0, odd0 = p0.get("v1|a_species__v1_devcopy") or {}, p0.get("v1|%s" % pool[1]["key"]) or {}
+    check("b0000's sidecar: a v1 pool image that copies a dev image is re-derived from admission.jsonl, the v1 pool "
+          "manifest and dHash cache, decided again by GuardV2 (near_eval_v2, the dev key) and weighed (1.0)",
+          hit0.get("pair_cos") == 1.0 and (hit0.get("match") or {}).get("key") == dev0["key"]
+          and side0["batch"] == "b0000" and side0["batch_kind"] == SS.KIND_BACKFILL, hit0)
+    check("  a row GuardV2 no longer refuses as recorded is left unweighed with the reason (never guessed)",
+          odd0.get("pair_cos") is None and "GuardV2 now decides" in (odd0.get("pair_cos_why") or ""), odd0)
+    SS.eval_hits_sidecar_path(pre, "b0000").unlink()
 
 
 def test_exif_masked(guards, rows, lay):
@@ -1505,6 +1773,25 @@ def test_status_cli(lay, guards):
                          capture_output=True, text=True, env=env)
     check("the CLI refuses a --lock other than the pinned splits v2 LOCK (exit 2): the guard is the pinned one",
           out.returncode == 2 and "is not the pinned splits v2 LOCK" in out.stdout, out.stdout[-300:] + out.stderr[-300:])
+    # eval-hits (L17's D28-v2 verb): a batch it cannot give a sidecar fails the job, never a silent no-op
+    fake = C.INC_DIR / "intake" / "i9999_evalhits_fake"
+    fake.mkdir(parents=True, exist_ok=True)
+    (fake / "summary.json").write_text(json.dumps({"source": "fake_src", "batch": fake.name, "images": 10,
+                                                   "guard": {"near_eval_v2": 1},
+                                                   "decisions": {"file": "decisions.jsonl", "sha256": "0" * 64}}))
+    argv = [sys.executable, "-m", "weed_optimizer_framework.tools.inc2.step1_stream", "eval-hits", "--state-dir",
+            str(lay.root), "--funnel-leak", str(TMP / "none.json"), "--leak", str(TMP / "none.json")]
+    out = subprocess.run(argv, cwd=str(ROOT), capture_output=True, text=True, env=env)
+    check("the CLI eval-hits tries every intake batch whose hits no record weighs, and exits 2 when one gets no "
+          "sidecar (here its decisions are missing), naming it", out.returncode == 2
+          and "no sidecar for intake i9999_evalhits_fake" in out.stdout and not (fake / "eval_hits.json").exists(),
+          out.stdout[-600:] + out.stderr[-300:])
+    shutil.rmtree(fake)
+    out = subprocess.run(argv, cwd=str(ROOT), capture_output=True, text=True, env=env)
+    st = json.loads(lay.status.read_text())
+    check("  with nothing left to weigh it exits 0 and stamps one_time.eval_hits", out.returncode == 0
+          and isinstance(st["one_time"].get("eval_hits"), str) and st["eval_hits"]["due"] == [],
+          out.stdout[-300:] + out.stderr[-300:])
 
 
 # ------------------------------------------------------------- job script
@@ -1569,6 +1856,22 @@ def test_job_script():
           out_c.returncode == 2 and "module tools/collect/licence.py: nested" in out_c.stdout
           and "differs from the nested" in out_c.stderr, out_c.stdout[-400:] + out_c.stderr[-300:])
     check("an unknown verb and no verb refuse (exit 2)", job("pool").returncode == 2 and job().returncode == 2)
+    out = job("eval-hits")
+    check("eval-hits (L17's D28-v2 verb) runs; it hashes every file of the collector package into the log "
+          "(collect.intake.rescore_eval_hits re-derives intake hit images) and needs torch and transformers",
+          out.returncode == 0 and "DRY RUN: python -u -m weed_optimizer_framework.tools.inc2.step1_stream eval-hits"
+          in out.stdout and "module tools/collect/intake.py:" in out.stdout
+          and "module tools/collect/normalize.py:" in out.stdout and "torch, transformers" in out.stdout,
+          out.stdout[-600:] + out.stderr[-300:])
+    out_a = job("admit", "--intake", "b7")
+    check("  (only eval-hits: admit does not hash the collector's intake module)",
+          "module tools/collect/intake.py:" not in out_a.stdout, out_a.stdout[-300:])
+    (outer / "tools" / "collect" / "intake.py").write_text("# stale\n")
+    out_c = job("eval-hits")
+    (outer / "tools" / "collect" / "intake.py").unlink()
+    check("  an outer collect/intake.py that differs from the nested copy refuses eval-hits (exit 2)",
+          out_c.returncode == 2 and "differs from the nested" in out_c.stderr,
+          out_c.stdout[-300:] + out_c.stderr[-300:])
     out = job("scan-holds", "--hold", "h6_scan")
     check("scan-holds --hold h6_scan (the autopilot's L17 form) runs", out.returncode == 0
           and "DRY RUN: python -u -m weed_optimizer_framework.tools.inc2.step1_stream scan-holds --hold h6_scan"

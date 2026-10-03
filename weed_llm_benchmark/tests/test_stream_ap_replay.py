@@ -850,13 +850,20 @@ def s14():
           not [s for s in w.submits if "b0009" in s["argv"]], [s["argv"][-3:] for s in w.submits])
     w.intake("b0009", "leaky", images=100, eval_share=0.06, base_share=0.01,
              reasons={"near_eval_v2": 4, "near_eval_variant": 2, "base_copy": 1})
+    # D28-v2: a large source whose two dHash hits the intake weighed at pair cos 0.12 and 0.31 (chance)
+    w.intake("b0010", "chancy", images=3000, eval_share=0.0007, reasons={"near_eval_variant": 2},
+             pair_cos=[0.12, 0.31])
     w.tick(3)
     d = _diag(w)["D28"]
-    check("D28: 6 % of the source's checked images refused by the never-train v2 guard (the intake summary's "
-          "source_leak) -> L24 and a card",
+    check("D28: the source's dHash copies of evaluation images, with no pair cosine recorded (the intake "
+          "summary's guard counts; D28-v2's fail-closed rule) -> L24 and a card",
           d["fired"] and "L24" in d["levers"], d["summary"])
     q = [r for r in w.runs if "quarantine" in r]
     check("  L24 ran on the source, cited D28", q and "leaky" in q[0] and "D28" in q[0], w.runs)
+    check("  D28-v2: the source whose two hits were weighed at pair cos 0.12 and 0.31 is judged chance and not "
+          "quarantined", not any("chancy" in r for r in w.runs) and "chancy: 2 dHash hit(s) in 3002 images, "
+          "0 confirmed" in d["summary"] and not any(h["source"] == "chancy" for h in d["detail"]["leaks"]),
+          (d["summary"], w.runs))
     check("  a leak card", any(c.get("kind") in ("leak", "escalation") for c in w.state()["cards"]))
     check("  and its images never reach the queue: its batch is never admitted",
           not [s for s in w.submits if "b0009" in s["argv"]], [s["argv"][-3:] for s in w.submits])

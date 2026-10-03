@@ -59,7 +59,25 @@ Pinned:
   * decision L-9(c): the rows held for the copy scan are bound to the v2
     embedding calibration LOCK v2 records (manifest, guard.json,
     summary.json); a file that does not hash as recorded, or a production
-    LOCK that records none, refuses the intake.
+    LOCK that records none, refuses the intake;
+  * D28-v2 (amendment 2026-10-03): each image the real GuardV2 refuses as a
+    dHash copy of an evaluation image is weighed by its pair cosine (a
+    stand-in descriptor for the calibration's embedder) before its copy is
+    removed, in its decision and summary.json eval_hits: a flipped dev copy
+    at 1.0 (the autopilot's D28: a leak), another picture 2 dHash bits from a
+    dev image below 0.80 (D28: chance); a failing or foreign embedder, or no
+    bound calibration, leaves the hit unweighed (D28: fail closed); a batch
+    without a hit never calls the embedder. A hit is weighed against every
+    evaluation image within the never-train radius and keeps the highest (a
+    mirrored copy whose guard match is an unrelated neighbour: 1.0). The
+    copies are removed even when the per-image loop fails. A batch whose
+    summary does not weigh its hits gets intake/<batch>/eval_hits.json from
+    rescore_eval_hits (re-derived from the staging blob, its own files
+    untouched, no evaluation key or path in it), which D28 reads; a changed
+    staging, a file that does not hash to its decision's sha256, or GuardV2
+    deciding the re-derived image otherwise (reason or match) leaves the hit
+    unweighed, the reason naming no evaluation image; changed decisions
+    refuse.
 
 Run:  python3 tests/test_collect_intake.py
 """
@@ -183,6 +201,13 @@ def test_batch(cfg, eval_img, base_img):
           and sm["source_leak"]["fires"] and sm["zero_yield"] is False, sm["yield"])
     check("the ledgers' hash chains verify", verify_chain(batches_ledger()) == []
           and verify_chain(sources_ledger()) == [])
+    eh = sm.get("eval_hits") or {}
+    p4 = [d for d in dec if d.get("reason") == "near_eval_v2"]
+    check("D28-v2: the dHash copy is recorded in summary.json eval_hits, unweighed (no v2 calibration is bound to a "
+          "stand-in guard), and its decision says why", eh.get("hits") == 1 and eh.get("scored") == 0
+          and "no v2 embedding calibration" in (eh.get("why") or "") and (eh.get("per_source") or {}).get(SID, {})
+          .get("pair_cos") == [] and len(p4) == 1 and p4[0].get("pair_cos") is None
+          and "no v2 embedding calibration" in (p4[0].get("pair_cos_why") or ""), (eh, p4))
     d28_reads(sm, r["batch"])
     ev = [e for e in S.read() if e["source"] == SID]
     check("sources.jsonl: intaken, with the batch and the yield", ev[-1]["event"] == "intaken"
@@ -194,13 +219,11 @@ def test_batch(cfg, eval_img, base_img):
     return b
 
 
-def d28_reads(sm, batch):
+def run_d28(summaries, sidecars=None):
     """The autopilot's own D28 (inc_autopilot.diagnose_stream.d28, read-only)
-    over this summary.json: the leak the collector measured (1 near-eval copy
-    of 6 images the guard checked) must fire there too, and a summary without
-    the leak fields would stay silent (the check can fail). summary.json
-    carries both forms D28 may read: source_leak {eval_share, base_share} and
-    the flat images and guard counts."""
+    over {batch: summary.json} and {batch: eval_hits.json} (the D28-v2
+    sidecars the snapshot ships beside them); None when group F's package does
+    not load."""
     try:
         from weed_optimizer_framework.tools.inc_autopilot import diagnose_stream as DS
         from weed_optimizer_framework.tools.inc_autopilot import evidence as E
@@ -208,7 +231,7 @@ def d28_reads(sm, batch):
         th = LS.load_thresholds()
     except Exception as e:  # noqa: BLE001 - group F's package is optional here
         print("  skip D28 interop: the autopilot's stream diagnoses do not load here (%s)" % e)
-        return
+        return None
 
     class Ev(object):
         def __init__(self, arts):
@@ -224,12 +247,26 @@ def d28_reads(sm, batch):
         def get(self, name, ptr, default=None):
             return default
 
-    name = "intake/%s/summary.json" % batch
-    d = DS.d28(DS.View(Ev({name: json.loads(json.dumps(sm))}), {"sid": "s"}, th))
+    arts = {"intake/%s/summary.json" % b: json.loads(json.dumps(sm)) for b, sm in summaries.items()}
+    arts.update({"intake/%s/eval_hits.json" % b: json.loads(json.dumps(sd)) for b, sd in (sidecars or {}).items()})
+    return DS.d28(DS.View(Ev(arts), {"sid": "s"}, th))
+
+
+def d28_reads(sm, batch):
+    """The autopilot's own D28 over this summary.json: the leak the collector
+    measured (1 near-eval copy of 6 images the guard checked, which a stand-in
+    guard without a LOCK leaves unweighed: D28-v2's one-hit rule, fail closed)
+    must fire there too, and a summary without the leak fields would stay
+    silent (the check can fail). summary.json carries both forms D28 may read:
+    source_leak {eval_share, base_share} and the flat images and guard
+    counts."""
+    d = run_d28({batch: sm})
+    if d is None:
+        return
     check("the autopilot's D28 fires on this summary.json (the fields it reads are there)",
           d.get("fired") and SID in json.dumps(d.get("detail") or {}), d)
     bare = {k: v for k, v in sm.items() if k not in ("images", "guard", "source_leak", "decisions")}
-    d0 = DS.d28(DS.View(Ev({name: bare}), {"sid": "s"}, th))
+    d0 = run_d28({batch: bare})
     check("... and it would stay silent on a summary without the leak fields (so the check above can fail)",
           not d0.get("fired"), d0)
 
@@ -698,7 +735,15 @@ def test_real_guard(cfg):
     e = raises(lambda: I.intake(cfg, sid3, lock_path=prod), GuardUnavailable)
     check("a production LOCK v2 that records no L-5 list refuses the intake (the exclusions cannot be checked)",
           e is not None and "l5_excluded_sha256" in str(e), e)
+    eh = json.loads((pathlib.Path(r["dir"]) / "summary.json").read_text()).get("eval_hits") or {}
+    check("D28-v2: with a testing LOCK that binds no v2 calibration the flipped dev copy is recorded unweighed "
+          "(D28 reads it by the one-hit rule)", eh.get("hits") == 1 and eh.get("scored") == 0
+          and "no v2 embedding calibration" in (eh.get("why") or ""), eh)
     test_copy_scan_binding(cfg, evals, base, cats, anns)
+    test_eval_hit_cosines(cfg, evals, base, cats)
+    test_eval_hit_sidecar(cfg, evals, base, cats)
+    test_eval_copies_removed_on_failure(cfg, evals, base, cats)
+    test_eval_hit_all_matches(cfg, evals, base, cats)
 
 
 def write_v2_calibration(d, threshold=0.91, testing=True):
@@ -761,6 +806,396 @@ def test_copy_scan_binding(cfg, evals, base, cats, anns):
     e = raises(lambda: I.intake(cfg, sid2, lock_path=prod), GuardUnavailable)
     check("a production LOCK v2 that records no v2 calibration refuses the intake (its held rows could not be bound)",
           e is not None and "embed_calibration_v2_sha256" in str(e), e)
+
+
+class ContentEmbedder(object):
+    """A stand-in for the copy scan's DINOv2 descriptor: the same picture, up
+    to its 8 flips and rotations, gets the same unit vector (a flipped copy
+    scores 1.0, as true flip copies score >= 0.896 with DINOv2), and any other
+    picture an unrelated one (a seeded random vector), however close its
+    dHash. fail: every call raises (no GPU, no weights)."""
+    dim = 64
+
+    def __init__(self, name="facebook/dinov2-base:cls", fail=False):
+        self.name, self.fail, self.calls = name, fail, 0
+
+    def __call__(self, pils):
+        import numpy as np
+        from PIL import Image
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("the descriptor model cannot be loaded")
+        out = []
+        for p in pils:
+            a = np.asarray(p.convert("L").resize((8, 8), Image.BOX), dtype=np.uint8) // 32
+            forms = [np.rot90(a, k) for k in range(4)] + [np.rot90(a.T, k) for k in range(4)]
+            seed = int(hashlib.sha256(min(np.ascontiguousarray(f).tobytes() for f in forms)).hexdigest()[:8], 16)
+            v = np.random.default_rng(seed).normal(size=self.dim)
+            out.append(v / np.linalg.norm(v))
+        return np.stack(out).astype(np.float32)
+
+
+def test_eval_hit_cosines(cfg, evals, base, cats):
+    """D28-v2 (docs/CONTINUOUS_LOOP.md, amendment 2026-10-03): each image the
+    real GuardV2 refuses as a dHash copy of an evaluation image is weighed by
+    its pair cosine with the evaluation image it matched (the v2
+    calibration's embedder, here a stand-in), recorded in its decision and in
+    summary.json eval_hits, and only then removed; a hit that cannot be
+    weighed is recorded so (D28: fail closed); a batch without a hit loads no
+    model. The autopilot's D28 reads the records."""
+    from PIL import Image
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.inc2 import eval_hits as EH
+    print("D28-v2: the dHash hits' pair cosines (intake)")
+    check("the collector's dHash reasons are inc2.eval_hits' (one list)",
+          tuple(I.DHASH_EVAL_REASONS) == tuple(EH.DHASH_HIT_REASONS))
+    lock = make_lock_v2(evals, [base], [])
+    sha = write_v2_calibration(lock.parent)
+    lk = json.loads(lock.read_text())
+    lk["embed_calibration_v2_sha256"] = sha
+    lock.write_text(json.dumps(lk))
+
+    def png(im):
+        import io
+        buf = io.BytesIO()
+        im.save(buf, format="PNG")
+        return buf.getvalue()
+    with Image.open(evals["dev"][0]) as im:
+        flipped = png(im.transpose(Image.FLIP_LEFT_RIGHT))
+    W.grid_img(TMP / "eh" / "chance.png", 910, paint=(2,), fmt="PNG")     # the dev grid, one cell repainted
+    chance = (TMP / "eh" / "chance.png").read_bytes()
+
+    def source(ref, imgs):
+        anns = [{"id": i, "image_id": i, "category_id": 1, "bbox": [10, 20, 40, 40]} for i in range(len(imgs))]
+        return fetch_simple(cfg, ref, coco_files(imgs, cats, anns))
+
+    def batch(r):
+        b = pathlib.Path(r["dir"])
+        dec = [json.loads(x) for x in (b / "decisions.jsonl").read_text().splitlines()]
+        return b, json.loads((b / "summary.json").read_text()), [d for d in dec if d.get("reason") in
+                                                                 I.DHASH_EVAL_REASONS]
+    emb = ContentEmbedder()
+    sid = source("e1e1e1e1-0000-0000-0000-000000000001", {"a_flip.png": flipped, "b_ok.png": W.img_bytes(941)})
+    r = I.intake(cfg, sid, lock_path=lock, embedder=emb)
+    b, sm, hit = batch(r)
+    eh = sm.get("eval_hits") or {}
+    row = (eh.get("per_source") or {}).get(sid) or {}
+    check("a flipped dev copy (near_eval_variant) is weighed: pair cosine 1.0 with the dev image it matched, in its "
+          "decision and in summary.json eval_hits (the calibration's threshold 0.91 and embedder recorded)",
+          len(hit) == 1 and hit[0]["reason"] == "near_eval_variant" and hit[0].get("pair_cos") == 1.0
+          and eh.get("hits") == 1 and eh.get("scored") == 1 and row.get("pair_cos") == [1.0]
+          and eh.get("copy_threshold") == 0.91 and eh.get("embedder") == emb.name
+          and (eh.get("calibration") or {}).get("sha256") == sha and eh.get("format") == EH.FORMAT, (hit, eh))
+    kept = sorted(p.name for p in (b / "images").iterdir())
+    check("... and only then removed: the batch holds the clean image alone",
+          len(kept) == 1 and kept[0].endswith("b_ok.png"), kept)
+    d = run_d28({r["batch"]: sm})
+    if d is not None:
+        dv = ((((d.get("detail") or {}).get("leaks") or [{}])[0].get("verdict") or {}).get("dhash") or {})
+        check("the autopilot's D28 reads it: a hit at or above the copy threshold is a leak (not by the bare hit)",
+              d.get("fired") and dv.get("copy_hits") == 1 and not dv.get("fail_closed"), d.get("summary"))
+    sid = source("e1e1e1e1-0000-0000-0000-000000000002", {"a_chance.png": chance, "b_ok.png": W.img_bytes(942)})
+    r = I.intake(cfg, sid, lock_path=lock, embedder=emb)
+    b, sm, hit = batch(r)
+    eh = sm.get("eval_hits") or {}
+    check("a dHash near-copy that is another picture (the dev grid with one cell repainted, %s bits) is refused and "
+          "weighed: pair cosine %s < 0.80" % ((hit[0].get("match") or {}).get("bits") if hit else None,
+                                               hit[0].get("pair_cos") if hit else None),
+          len(hit) == 1 and hit[0]["reason"] in I.DHASH_EVAL_REASONS and hit[0].get("pair_cos") is not None
+          and hit[0]["pair_cos"] < 0.8 and eh.get("scored") == 1, (hit, eh))
+    d = run_d28({r["batch"]: sm})
+    if d is not None:
+        check("... and the autopilot's D28 judges it chance: the source is not quarantined, and the summary states "
+              "its hits, confirmed hits, max pair cos, P and verdict", not d.get("fired")
+              and "%s: 1 dHash hit(s) in 2 images, 0 confirmed (pair cos >= 0.8)" % sid in d.get("summary", "")
+              and "-> chance" in d.get("summary", ""), d.get("summary"))
+    bad = ContentEmbedder(fail=True)
+    sid = source("e1e1e1e1-0000-0000-0000-000000000003", {"a_flip.png": flipped, "b_ok.png": W.img_bytes(943)})
+    r = I.intake(cfg, sid, lock_path=lock, embedder=bad)
+    b, sm, hit = batch(r)
+    eh = sm.get("eval_hits") or {}
+    check("an embedder that fails never fails the intake: the hit is recorded unweighed with the reason, and its "
+          "copy is removed", r["status"] == "intaken" and bad.calls >= 1 and eh.get("hits") == 1
+          and eh.get("scored") == 0 and "cannot be described" in (eh.get("why") or "")
+          and hit and hit[0].get("pair_cos") is None and len(list((b / "images").iterdir())) == 1, (eh, hit))
+    d = run_d28({r["batch"]: sm})
+    if d is not None:
+        check("... and D28 reads an unweighed hit by the one-hit rule (fail closed)", d.get("fired") and (
+            (((d["detail"]["leaks"][0].get("verdict") or {}).get("dhash") or {}).get("fail_closed"))), d.get("summary"))
+    other = ContentEmbedder(name="another-model:cls")
+    sid = source("e1e1e1e1-0000-0000-0000-000000000004", {"a_flip.png": flipped, "b_ok.png": W.img_bytes(944)})
+    r = I.intake(cfg, sid, lock_path=lock, embedder=other)
+    _b, sm, _hit = batch(r)
+    eh = sm.get("eval_hits") or {}
+    check("an embedder other than the calibration's is not used: unweighed, with the reason", eh.get("scored") == 0
+          and other.calls == 0 and "is not the calibration's" in (eh.get("why") or ""), eh)
+    never = ContentEmbedder(fail=True)
+    sid = source("e1e1e1e1-0000-0000-0000-000000000005", {"b_ok.png": W.img_bytes(945)})
+    r = I.intake(cfg, sid, lock_path=lock, embedder=never)
+    _b, sm, _hit = batch(r)
+    eh = sm.get("eval_hits") or {}
+    check("a batch without a dHash hit records none and never calls the embedder (no model is loaded)",
+          never.calls == 0 and eh.get("hits") == 0 and eh.get("per_source") == {}, eh)
+    scored = EH.pair_cosines([{"key": "k", "image": str(TMP / "eh" / "missing.png"), "split": "dev",
+                               "eval_key": "dev_0", "eval_image": str(evals["dev"][0])},
+                              {"key": "k2", "image": str(evals["dev"][0]), "split": "dev", "eval_key": "nope"}],
+                             ContentEmbedder())
+    check("inc2.eval_hits.pair_cosines: an image that cannot be read, or an evaluation image neither held nor "
+          "given, is unscored with the reason (never raises)", scored["k"]["pair_cos"] is None
+          and "cannot be described" in scored["k"]["why"] and scored["k2"]["pair_cos"] is None
+          and "neither" in scored["k2"]["why"], scored)
+
+
+def _bound_lock(evals, base):
+    """LOCK v2 over these evaluation images with a bound v2 calibration (copy
+    threshold 0.91, embedder facebook/dinov2-base:cls)."""
+    lock = make_lock_v2(evals, [base], [])
+    sha = write_v2_calibration(lock.parent)
+    lk = json.loads(lock.read_text())
+    lk["embed_calibration_v2_sha256"] = sha
+    lock.write_text(json.dumps(lk))
+    return lock
+
+
+def _png(im):
+    import io
+    buf = io.BytesIO()
+    im.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _source(cfg, ref, imgs, cats):
+    anns = [{"id": i, "image_id": i, "category_id": 1, "bbox": [10, 20, 40, 40]} for i in range(len(imgs))]
+    return fetch_simple(cfg, ref, coco_files(imgs, cats, anns))
+
+
+def test_eval_hit_sidecar(cfg, evals, base, cats):
+    """D28-v2: an intake batch whose summary does not weigh its dHash hits (one
+    committed before the amendment; here, one whose embedder failed) is
+    weighed again into intake/<batch>/eval_hits.json by
+    collect.intake.rescore_eval_hits: each hit image re-derived from the
+    staging blob by its decision's rel, checked against its sha256 and
+    GuardV2's decision, weighed and removed; the batch's own files are never
+    rewritten; the autopilot's D28 judges the source by the sidecar."""
+    from PIL import Image
+    from weed_optimizer_framework.tools.collect import CollectError, intake_dir
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.inc2 import eval_hits as EH
+    from weed_optimizer_framework.tools.inc import common as C
+    print("D28-v2: the sidecar of an intake batch committed before the amendment")
+    lock = _bound_lock(evals, base)
+    with Image.open(evals["dev"][0]) as im:
+        flipped = _png(im.transpose(Image.FLIP_LEFT_RIGHT))
+    W.grid_img(TMP / "eh" / "chance.png", 910, paint=(2,), fmt="PNG")
+    chance = (TMP / "eh" / "chance.png").read_bytes()
+    legacy = {}
+    for name, img, ref in (("chance", chance, "e2e2e2e2-0000-0000-0000-000000000001"),
+                           ("copy", flipped, "e2e2e2e2-0000-0000-0000-000000000002")):
+        sid = _source(cfg, ref, {"a_hit.png": img, "b_ok.png": W.img_bytes(951 + len(legacy))}, cats)
+        r = I.intake(cfg, sid, lock_path=lock, embedder=ContentEmbedder(fail=True))
+        b = pathlib.Path(r["dir"])
+        legacy[name] = (sid, r["batch"], b, json.loads((b / "summary.json").read_text()))
+    sid, batch, b, sm = legacy["chance"]
+    before = {f: C.sha256_file(b / f) for f in ("summary.json", "decisions.jsonl", "manifest.jsonl")}
+    check("fixture: the batch's own record weighs none of its hit (the embedder failed), so it needs a sidecar",
+          (sm.get("eval_hits") or {}).get("scored") == 0 and I.eval_hits_needed(sm), sm.get("eval_hits"))
+    d0 = run_d28({batch: sm})
+    if d0 is not None:
+        check("  and D28 reads it by the one-hit rule: quarantined (fail closed)", d0.get("fired"), d0.get("summary"))
+    bad = ContentEmbedder(fail=True)
+    e = raises(lambda: I.rescore_eval_hits(cfg, batch, lock_path=lock, embedder=bad), CollectError)
+    check("an embedder that fails weighs nothing: no sidecar is written (it would use up the batch's attempt), the "
+          "call refuses so the platform's job fails and the batch stays due", e is not None and bad.calls >= 1
+          and "could not be weighed" in str(e) and not (b / I.EVAL_HITS_NAME).exists(), e)
+    emb = ContentEmbedder()
+    res = I.rescore_eval_hits(cfg, batch, lock_path=lock, embedder=emb)
+    side = json.loads((b / I.EVAL_HITS_NAME).read_text())
+    rec = side.get("eval_hits") or {}
+    row = (rec.get("per_source") or {}).get(sid) or {}
+    pair = (side.get("pairs") or [{}])[0]
+    check("rescore_eval_hits writes intake/<batch>/eval_hits.json: the hit re-derived from the staging blob and "
+          "weighed (pair cos < 0.80, the calibration's threshold and embedder recorded)",
+          res["status"] == "written" and side.get("format") == EH.SIDECAR_FORMAT and side.get("batch") == batch
+          and rec.get("hits") == 1 and rec.get("scored") == 1 and row.get("pair_cos") and row["pair_cos"][0] < 0.8
+          and rec.get("copy_threshold") == 0.91 and rec.get("embedder") == emb.name, (res, rec))
+    dev_keys = [json.loads(x)["key"] for x in (lock.parent / "dev.jsonl").read_text().splitlines()]
+    check("  the sidecar (which the snapshot ships) holds the hit key, its reason and the pair cosine: no evaluation "
+          "path, key or pixels", pair.get("key") and pair.get("reason") in I.DHASH_EVAL_REASONS
+          and "match" not in pair and str(evals["dev"][0]) not in json.dumps(side)
+          and not any(k in json.dumps(side) for k in dev_keys), pair)
+    after = {f: C.sha256_file(b / f) for f in before}
+    work = intake_dir() / "work"
+    left = sorted(str(p) for p in work.rglob("*") if p.is_file() and "eval_hits_" in str(p)) if work.is_dir() else []
+    check("  the batch's own files are unchanged and the re-derived images are gone (its work directory removed)",
+          after == before and not left and sorted(x.name for x in (b / "images").iterdir()) == [
+              x for x in sorted(y.name for y in (b / "images").iterdir()) if "b_ok" in x], (after == before, left))
+    d = run_d28({batch: sm}, {batch: side})
+    if d is not None:
+        check("the autopilot's D28 judges the source by the sidecar: chance, not quarantined, its numbers stated",
+              not d.get("fired") and "%s: 1 dHash hit(s)" % sid in d.get("summary", "")
+              and "-> chance" in d.get("summary", ""), d.get("summary"))
+    check("a second run finds the sidecar (no rewrite); force writes it again",
+          I.rescore_eval_hits(cfg, batch, lock_path=lock, embedder=emb)["status"] == "exists"
+          and I.rescore_eval_hits(cfg, batch, lock_path=lock, embedder=emb, force=True)["status"] == "written")
+    sid2, batch2, b2, sm2 = legacy["copy"]
+    I.rescore_eval_hits(cfg, batch2, lock_path=lock, embedder=emb)
+    side2 = json.loads((b2 / I.EVAL_HITS_NAME).read_text())
+    d = run_d28({batch2: sm2}, {batch2: side2})
+    if d is not None:
+        dv = ((((d.get("detail") or {}).get("leaks") or [{}])[0].get("verdict") or {}).get("dhash") or {})
+        check("a legacy batch holding a flipped dev copy: its sidecar weighs it at 1.0 and D28 quarantines by the "
+              "copy threshold, not by the bare hit", d.get("fired") and dv.get("copy_hits") == 1
+              and not dv.get("fail_closed"), d.get("summary"))
+    edit_fetch(sid2, title="re-fetched")
+    res = I.rescore_eval_hits(cfg, batch2, lock_path=lock, embedder=emb, force=True)
+    side3 = json.loads((b2 / I.EVAL_HITS_NAME).read_text())
+    check("when the staging now holds another fetch, the hit cannot be re-derived: recorded unweighed with the "
+          "reason (D28: fail closed), never guessed", res["status"] == "written" and side3["eval_hits"]["scored"] == 0
+          and "another fetch" in json.dumps(side3["pairs"]), side3["pairs"])
+    d = run_d28({batch2: sm2}, {batch2: side3})
+    if d is not None:
+        check("  and D28 fails closed on it", d.get("fired"), d.get("summary"))
+    sid4 = _source(cfg, "e2e2e2e2-0000-0000-0000-000000000004", {"a_hit.png": flipped, "b_ok.png": W.img_bytes(955)},
+                   cats)
+    r4 = I.intake(cfg, sid4, lock_path=lock, embedder=emb)
+    check("a batch whose own record weighs its hits needs no sidecar", I.rescore_eval_hits(
+        cfg, r4["batch"], lock_path=lock, embedder=emb)["status"] == "not_needed"
+          and not (pathlib.Path(r4["dir"]) / I.EVAL_HITS_NAME).exists())
+    dp = b / "decisions.jsonl"
+    keep = dp.read_bytes()
+    dp.write_bytes(keep + b"\n")
+    e = raises(lambda: I.rescore_eval_hits(cfg, batch, lock_path=lock, embedder=emb, force=True), CollectError)
+    check("decisions that no longer hash as the summary records refuse (nothing is weighed from them)",
+          e is not None and "does not hash" in str(e), e)
+    dp.write_bytes(keep)
+    # the re-derived image must be the decision's own: the file at its rel hashes to the decision's sha256, and
+    # GuardV2 refuses it again with the same reason and the same match; otherwise the hit stays unweighed with the
+    # reason, and the sidecar (which the snapshot ships) names no evaluation image even then
+    sm_keep = (b / "summary.json").read_bytes()
+    eval_keys = sorted(json.loads(x)["key"] for f in lock.parent.glob("*.jsonl") if f.stem in ("dev", "test",
+                                                                                              "imageweeds")
+                       for x in f.read_text().splitlines() if x.strip())
+
+    def tampered(edit):
+        rows = [json.loads(x) for x in keep.decode().splitlines() if x.strip()]
+        for r in rows:
+            if r.get("kind") == "image" and r.get("reason") in I.DHASH_EVAL_REASONS:
+                edit(r)
+        dp.write_text("".join(json.dumps(r) + "\n" for r in rows))
+        s2 = json.loads(sm_keep)
+        s2["decisions"]["sha256"] = C.sha256_file(dp)
+        (b / "summary.json").write_text(json.dumps(s2))
+        try:
+            res = I.rescore_eval_hits(cfg, batch, lock_path=lock, embedder=emb, force=True)
+            return res, json.loads((b / I.EVAL_HITS_NAME).read_text()), (b / "summary.json").read_text()
+        finally:
+            dp.write_bytes(keep)
+            (b / "summary.json").write_bytes(sm_keep)
+    hit_m = next(json.loads(x).get("match") or {} for x in keep.decode().splitlines()
+                 if x.strip() and json.loads(x).get("reason") in I.DHASH_EVAL_REASONS)
+    other_reason = {"near_eval_v2": "near_eval_variant", "near_eval_variant": "near_eval_v2"}
+    other_key = next(k for k in eval_keys if k != hit_m.get("key"))
+    for what, edit, says in (
+            ("the decision's sha256 is not the file's", lambda r: r.update(sha256="0" * 64), "no longer hashes"),
+            ("GuardV2 refuses it for another reason than the decision records",
+             lambda r: r.update(reason=other_reason[r["reason"]]), "judges the re-derived image otherwise"),
+            ("GuardV2 matches it to another evaluation image than the decision records",
+             lambda r: r["match"].update(key=other_key), "another evaluation image than the recorded match")):
+        res, side_t, sm_t = tampered(edit)
+        whys = [p.get("pair_cos_why") or "" for p in side_t.get("pairs") or []]
+        check("a hit whose re-derived image fails a check (%s) is left unweighed with the reason, never weighed"
+              % what, res["status"] == "written" and side_t["eval_hits"]["scored"] == 0
+              and any(says in w for w in whys), (res, whys))
+        check("  and neither the sidecar nor the summary names an evaluation image (no split:key in the reason)",
+              not any(k in json.dumps(side_t) or k in sm_t for k in eval_keys)
+              and str(evals["dev"][0]) not in json.dumps(side_t), (whys, side_t["eval_hits"].get("why")))
+    res = I.rescore_eval_hits(cfg, batch, lock_path=lock, embedder=emb, force=True)
+    check("  with the batch's files as committed the hit is weighed again", res["status"] == "written"
+          and res["scored"] == 1, res)
+
+
+def test_eval_copies_removed_on_failure(cfg, evals, base, cats):
+    """The copies of evaluation images an intake keeps until they are weighed
+    never outlive the per-image loop: a failure anywhere in it (here, writing
+    a later image's label) removes them before the error propagates."""
+    from PIL import Image
+    from weed_optimizer_framework.tools.collect import intake_dir
+    from weed_optimizer_framework.tools.collect import intake as I
+    print("D28-v2: a failure in the per-image loop leaves no copy of an evaluation image behind")
+    lock = _bound_lock(evals, base)
+    with Image.open(evals["dev"][0]) as im:
+        flipped = _png(im.transpose(Image.FLIP_LEFT_RIGHT))
+    sid = _source(cfg, "e3e3e3e3-0000-0000-0000-000000000001", {"a_flip.png": flipped, "b_ok.png": W.img_bytes(961)},
+                  cats)
+    real = I._label_text
+
+    def boom(boxes):
+        raise OSError("disk full (injected)")
+    I._label_text = boom
+    try:
+        e = raises(lambda: I.intake(cfg, sid, lock_path=lock, embedder=ContentEmbedder()), OSError)
+    finally:
+        I._label_text = real
+    open_batches = [p for p in intake_dir().iterdir() if p.is_dir() and (p / "images").is_dir()
+                    and not (p / "summary.json").exists()]
+    left = sorted(x.name for p in open_batches for x in (p / "images").iterdir())
+    check("the injected failure propagates, and the uncommitted batch holds no copy of the evaluation image (the "
+          "flipped dev copy was removed in the loop's finally)", e is not None and open_batches
+          and not any("a_flip" in n for n in left), (e, left))
+    r = I.intake(cfg, sid, lock_path=lock, embedder=ContentEmbedder())
+    check("  the next intake redoes the batch whole", r["status"] == "intaken", r)
+
+
+def test_eval_hit_all_matches(cfg, evals, base, cats):
+    """A hit is weighed against every evaluation image within the never-train
+    radius, not only the one GuardV2 names: when the guard's first match (by
+    the image's own dHash) is an unrelated picture and a true copy sits within
+    the radius under a flip, the hit keeps the copy's pair cosine."""
+    import random
+    from PIL import Image
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.inc2 import eval_hits as EH
+    print("D28-v2: the pair cosine is the highest over every evaluation image within the radius")
+
+    def grid(seed, flip=False, paint=()):
+        rng = random.Random(seed)
+        g = [[rng.randrange(256) for _ in range(9)] for _ in range(8)]
+        if flip:
+            g = [list(reversed(row)) for row in g]
+        for r in paint:
+            g[r][8] = 255 if g[r][8] <= g[r][7] else 0
+        im = Image.new("L", (9, 8))
+        im.putdata([v for row in g for v in row])
+        return im.resize((144, 128), Image.NEAREST).convert("RGB")
+    e1 = TMP / "am" / "dev_e1.png"
+    e2 = TMP / "am" / "test_e2.png"
+    e1.parent.mkdir(parents=True, exist_ok=True)
+    grid(970).save(e1, format="PNG")                         # the true original (dev)
+    grid(970, flip=True, paint=(1, 4)).save(e2, format="PNG")   # another picture, a dHash neighbour of its mirror
+    ev = {"dev": list(evals["dev"]) + [e1], "test": list(evals["test"]) + [e2], "imageweeds": list(evals["imageweeds"])}
+    lock = _bound_lock(ev, base)
+    hit = _png(grid(970, flip=True))                         # a mirrored copy of e1
+    sid = _source(cfg, "e4e4e4e4-0000-0000-0000-000000000001", {"a_hit.png": hit, "b_ok.png": W.img_bytes(971)}, cats)
+    emb = ContentEmbedder()
+    r = I.intake(cfg, sid, lock_path=lock, embedder=emb)
+    b = pathlib.Path(r["dir"])
+    dec = [json.loads(x) for x in (b / "decisions.jsonl").read_text().splitlines()]
+    h = [d for d in dec if d.get("reason") in I.DHASH_EVAL_REASONS]
+    m = (h[0].get("match") or {}) if h else {}
+    first = EH.pair_cosines([{"key": "k", "image": str(TMP / "am" / "hit.png"), "split": "test", "eval_key": "x",
+                              "eval_image": str(e2)}], emb) if (TMP / "am" / "hit.png").write_bytes(hit) else {}
+    check("fixture: GuardV2 names the unrelated neighbour (test, by the image's own dHash) as its match, and that "
+          "pair alone scores below 0.80", len(h) == 1 and h[0]["reason"] == "near_eval_v2" and m.get("split") == "test"
+          and (first.get("k") or {}).get("pair_cos") is not None and first["k"]["pair_cos"] < 0.8, (h, first))
+    sm = json.loads((b / "summary.json").read_text())
+    row = ((sm.get("eval_hits") or {}).get("per_source") or {}).get(sid) or {}
+    check("the hit is weighed against every evaluation image within 6 bits under the 8 variants and keeps the "
+          "highest: 1.0, the mirrored dev original (pair_cos_best names it)", row.get("pair_cos") == [1.0]
+          and h[0].get("pair_cos") == 1.0 and (h[0].get("pair_cos_best") or [None])[0] == "dev", (row, h))
+    d = run_d28({r["batch"]: sm})
+    if d is not None:
+        check("  so D28 quarantines it as a copy (with the guard's match alone it would have been chance)",
+              d.get("fired"), d.get("summary"))
 
 
 def test_ftp_box_table(cfg):

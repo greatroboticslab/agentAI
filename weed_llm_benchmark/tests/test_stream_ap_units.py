@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -121,11 +122,18 @@ def t_menu():
     try:
         from weed_optimizer_framework.tools.inc2 import step1_stream as S1
         for params in ({"verb": "admit", "intake": "i0001_zen_1"}, {"verb": "bootstrap"}, {"verb": "knowntruth"},
-                       {"verb": "backfill"}):
+                       {"verb": "backfill"}, {"verb": "eval-hits"}):
             argv = LS.render("L17", LS.policy_params("L17", params))
             args = argv[argv.index("run_inc2_stream.sh") + 1:]
             ns = S1.build_parser().parse_args(args)
             check("L17 %s: group C's step1_stream parser reads its argv" % args[0], ns.verb == args[0], ns)
+        pp = LS.policy_params("L17", {"verb": "eval-hits"})
+        argv = LS.render("L17", pp)
+        ok, bad = LS.check_params("L17", pp)
+        req = SR.parse_submit("admit", argv[argv.index("run_inc2_stream.sh") + 1:])
+        check("L17 eval-hits (D28-v2's sidecars): inside the policy row's bounds, read back by the executor, and "
+              "accepted by stream-submit admit with no flags", ok and X.params_from_argv("inc_stream_admit", argv)
+              == pp and req["verb"] == "eval-hits" and req["params"] == {}, (bad, argv, req))
         argv = LS.render("L17", LS.policy_params("L17", {"verb": "scan-holds", "hold": "h6_scan"}))
         check("L17 scan-holds: run_inc2_stream.sh's alias of serve-holds (the parser's own verb)",
               S1.build_parser().parse_args(["serve-holds"] + argv[argv.index("scan-holds") + 1:]).hold == ["h6_scan"])
@@ -365,11 +373,14 @@ def t_evidence():
     for n in ("stream/weed_stream_v1/queue_summary.json", "stream/weed_stream_v1/ledger.jsonl",
               "stream/weed_stream_v1/dev_scores.json", "step1_stream/status.json", "intake/b0001/summary.json",
               "intake/sources.json", "intake/placement.json", "splits/v2/lock_status.json",
-              "capacity/capacity_v1.json", "canary_v2/canary.json", "pilot_v4/stage_a.json"):
+              "capacity/capacity_v1.json", "canary_v2/canary.json", "pilot_v4/stage_a.json",
+              "intake/i0003_rf_x/eval_hits.json"):
         check("allowed: %s" % n, E.allowed(n))
     for n in ("stream/x/pool/P_1.jsonl", "intake/staging/a/b.jpg", "splits/v2/LOCK.json", "stream/x/scores/test.json",
               "step1_stream/queue/queue.jsonl", "capacity/capacity_v1_report.json", "capacity/capacity_v1_report.md",
-              "stream/x/milestones/m001/research_log_entry.md", "stream/stage_a.json"):
+              "stream/x/milestones/m001/research_log_entry.md", "stream/stage_a.json",
+              "intake/i0003_rf_x/images/a.jpg", "step1_stream/eval_hits/b0000.json",
+              "step1_stream/eval_hits/b0000/x.json", "intake/eval_hits.json"):
         check("refused: %s" % n, not E.allowed(n))
     check("stream, step1_stream and intake are not experiments", {"stream", "step1_stream", "intake"} <=
           set(E.RESERVED_DIRS) and not E.allowed("stream/exp.json"))
@@ -1325,7 +1336,8 @@ def t_d28():
     check("one embedding hit in a 15-image source (6.7 % of it, over the old 5 % share) is chance at a 1 % "
           "per-image rate: no leak", not d["fired"], d.get("summary"))
     d = d28({"intake/b0002_copy/summary.json": summary("zen:copy", 15, {"near_eval_variant": 1})})
-    check("a source with a planted copy (a flip within 6 dHash bits of a dev image) leaks: D28 -> L24",
+    check("a source with a planted copy (a flip within 6 dHash bits of a dev image) and no pair-cosine record "
+          "leaks (D28-v2's fail-closed rule): D28 -> L24",
           d["fired"] and "L24" in d["levers"] and d["detail"]["leaks"][0]["source"] == "zen:copy"
           and d["detail"]["leaks"][0]["verdict"]["dhash_hits"] == 1, d.get("summary"))
     d = d28({"intake/b0003_many/summary.json": summary("zen:many", 15, {"near_eval_embed": 5})})
@@ -1365,10 +1377,446 @@ def t_d28():
           "200 embedding hits are", got == ["rf_copy", "rf_many"], (got, d.get("summary")))
 
 
+COPY_COS = 0.946384                  # the cluster's v2 calibration threshold (job 47260765)
+
+
+def t_d28_v2():
+    section("D28-v2 (docs/CONTINUOUS_LOOP.md, amendment 2026-10-03, pre-registered V3-1): a dHash hit is weighed by "
+            "its pair cosine with the evaluation image it matched; a hit without one is a leak (fail closed)")
+    from weed_optimizer_framework.tools.collect import intake as CI
+    from weed_optimizer_framework.tools.inc2 import eval_hits as EH
+    dom, th = LS.load_domain("weed"), LS.load_thresholds()
+    check("the thresholds, each with its why: confirm_cos 0.80, p_confirmed 6.29e-4 (the unconfirmed rate's "
+          "one-sided 97.5 % bound), source_alpha 0.001",
+          LS.t(th, "D28", "confirm_cos") == 0.8 and LS.t(th, "D28", "p_confirmed") == 0.000629
+          and LS.t(th, "D28", "source_alpha") == 0.001
+          and all(th["D28"][k].get("why") for k in ("confirm_cos", "p_confirmed", "source_alpha")), th["D28"])
+    check("the dHash reasons are one list: D28's, inc2.eval_hits' and the collector's",
+          tuple(DS.D28_DHASH_REASONS) == tuple(EH.DHASH_HIT_REASONS) == tuple(CI.DHASH_EVAL_REASONS))
+    lock = {"splits/v2/lock_status.json": json.dumps({"splits_version": "v2", "locked": True, "embed_calibration_v2": {
+        "p_false": 0.0105, "cos_threshold": COPY_COS}})}
+
+    def intake(src, images, hits, pair_cos=None, record=True, copy_t=COPY_COS, embed=0):
+        reasons = {"near_eval_variant": hits, "near_eval_embed": embed}
+        doc = {"format": "collect-summary/1", "source": src, "batch": "b", "images": images, "guard": reasons,
+               "source_leak": {"eval_share": round((hits + embed) / float(images), 4), "base_share": 0.0},
+               "copy_scan": {"checked": True, "p_false": 0.0105, "cos_threshold": COPY_COS}}
+        if record:
+            keys = [{"key": "%s/%d" % (src, i), "source": src} for i in range(hits)]
+            scored = {"%s/%d" % (src, i): {"pair_cos": c} for i, c in enumerate(pair_cos or [])}
+            doc["eval_hits"] = EH.record(keys, scored, "facebook/dinov2-base:cls", copy_t)
+        return {"intake/i_%s/summary.json" % src: json.dumps(doc)}
+
+    def step1(rows):
+        per = {}
+        for src, (seen, hits, cos) in rows.items():
+            r = {"images_seen": seen, "near_eval_embed": 0, "decision:near_eval_variant": hits,
+                 "decision:pool": seen - hits}
+            if cos is not None:
+                r.update(eval_hits_scored=len(cos), eval_hit_pair_cos=sorted(cos, reverse=True),
+                         eval_hit_copy_threshold=COPY_COS)
+            per[src] = r
+        return {"step1_stream/status.json": json.dumps({"format": "inc2-step1-stream/status/1", "per_source": per})}
+
+    def d28(*parts, with_lock=True):
+        texts = dict(lock) if with_lock else {}
+        for p in parts:
+            texts.update(p)
+        ev = E.from_texts(texts, "x", context={"sid": "none"})
+        return DS.by_id(DS.detect(ev, dom, th, only=("D28",)))["D28"]
+
+    def dv(d, src):
+        for h in ((d.get("detail") or {}).get("leaks") or []) + ((d.get("detail") or {}).get("cleared") or []):
+            if h.get("source") == src:
+                return (h.get("verdict") or {}).get("dhash") or h.get("dhash") or {}
+        return {}
+
+    # the 12 live sources of 2026-10-01: 49 hits in all, 1-23 per source, pair cos -0.05..0.66 (median about 0.1)
+    # in the 11 Step 1 sources and 0.744 in the one intake source
+    cos48 = [round(-0.05 + 0.71 * (i / 47.0) ** 2.2, 6) for i in range(48)]
+    cos48 = [cos48[(7 * i) % 48] for i in range(48)]
+    sizes = [20000, 9000, 6000, 5000, 4000, 3000, 2500, 2000, 1500, 800, 400]
+    counts = [23, 6, 4, 3, 3, 2, 2, 2, 1, 1, 1]
+    rows, k = {}, 0
+    for i, (n, h) in enumerate(zip(sizes, counts)):
+        rows["live_%02d" % i] = (n, h, cos48[k:k + h])
+        k += h
+    live = [step1(rows), intake("live_intake", 614, 1, [0.744])]
+    d = d28(*live)
+    cl = (d.get("detail") or {}).get("cleared") or []
+    check("the 12 live-like sources (49 dHash hits, every pair cos < 0.80, max 0.744) do not quarantine: each is "
+          "judged chance, 0 confirmed, P = 1", not d["fired"] and len(cl) == 12 and sum(c["dhash"]["hits"] for c in cl)
+          == 49 and all(c["dhash"]["verdict"] == "chance" and c["dhash"]["confirmed"] == 0
+                        and c["dhash"]["p_value"] == 1.0 for c in cl), (d.get("summary"), cl[:2]))
+    check("  and the diagnosis states, for each source, its hits, confirmed hits, max pair cos, P and verdict",
+          "live_00: 23 dHash hit(s) in 20000 images, 0 confirmed (pair cos >= 0.8), max pair cos %.3f, P = 1 -> chance"
+          % max(rows["live_00"][2]) in d["summary"] and "live_intake: 1 dHash hit(s) in 614 images, 0 confirmed "
+          "(pair cos >= 0.8), max pair cos 0.744, P = 1 -> chance" in d["summary"]
+          and d["summary"].count("-> chance") == 12 and max(cos48) == 0.66 and sorted(cos48)[24] < 0.12,
+          d.get("summary"))
+    old = d28(step1({s: (n, h, None) for s, (n, h, _c) in rows.items()}),
+              intake("live_intake", 614, 1, record=False))
+    check("  without the pair cosines (the old rule's input) the same 12 quarantine: fail closed",
+          old["fired"] and len(old["detail"]["leaks"]) == 12
+          and all(h["verdict"]["dhash"]["fail_closed"] for h in old["detail"]["leaks"]), old.get("summary"))
+    # a planted copy: one hit at pair cos 0.95, at or above the copy threshold
+    d = d28(intake("planted", 614, 1, [0.95]))
+    check("a planted hit at pair cos 0.95 (>= the v2 copy threshold 0.946384) quarantines: D28 -> L24",
+          d["fired"] and "L24" in d["levers"] and dv(d, "planted").get("copy_hits") == 1
+          and dv(d, "planted").get("verdict") == "leak"
+          and "planted (1 dHash hit(s) in 614 images, 1 confirmed (pair cos >= 0.8), max pair cos 0.950" in d["summary"]
+          and "at or above the copy threshold 0.946384" in d["summary"], d.get("summary"))
+    d = d28(step1({"rf_planted": (5000, 2, [0.95, 0.10])}))
+    check("  and so in Step 1's per-source counts", d["fired"] and dv(d, "rf_planted").get("copy_hits") == 1,
+          d.get("summary"))
+    d = d28(intake("one_confirmed", 1000, 1, [0.94]))
+    check("one confirmed hit below the copy threshold (pair cos 0.94) in 1,000 images is chance (P = 0.47 >= 0.001): "
+          "its image is dropped, its source is not quarantined", not d["fired"]
+          and dv(d, "one_confirmed").get("confirmed") == 1 and abs(dv(d, "one_confirmed")["p_value"] - 0.467) < 0.01,
+          d.get("summary"))
+    # many confirmed hits: improbable by chance
+    d = d28(intake("many", 2000, 9, [0.82, 0.83, 0.85, 0.86, 0.88, 0.9, 0.91, 0.93, 0.2]))
+    check("8 confirmed hits (pair cos 0.82-0.93, all below the copy threshold) in 2,000 images, 1.26 expected: "
+          "P < 0.001 -> a leak by the binomial rule", d["fired"] and dv(d, "many").get("confirmed") == 8
+          and dv(d, "many").get("copy_hits") == 0 and dv(d, "many")["p_value"] < 0.001, d.get("summary"))
+    d = d28(intake("few", 2000, 3, [0.82, 0.85, 0.9]))
+    check("  3 confirmed in 2,000 is chance (P >= 0.001)", not d["fired"] and dv(d, "few").get("confirmed") == 3,
+          d.get("summary"))
+    # fail closed
+    d = d28(intake("bare", 614, 1, record=False))
+    check("a batch with a dHash hit and no pair-cosine record falls back to the one-hit rule: quarantined",
+          d["fired"] and dv(d, "bare").get("fail_closed") and dv(d, "bare").get("verdict") == "leak (fail closed)",
+          d.get("summary"))
+    d = d28(intake("half", 614, 2, [0.1]))
+    check("  so does one whose record weighs fewer hits than the guard counted (1 of 2)",
+          d["fired"] and dv(d, "half").get("fail_closed") and "only 1 with a pair cosine" in d["summary"],
+          d.get("summary"))
+    d = d28(step1({"rf_old": (3000, 3, [0.1, 0.2])}))
+    check("  and a Step 1 source with hits from a batch that recorded none (3 hits, 2 pair cosines)",
+          d["fired"] and dv(d, "rf_old").get("fail_closed"), d.get("summary"))
+    # an SIU-sized source
+    cos95 = [round(-0.05 + 0.79 * i / 94.0, 6) for i in range(95)]
+    d = d28(intake("siu_like", 200000, 95, cos95))
+    check("an SIU-sized source (200,000 images) with 95 chance hits, all below 0.80, does not quarantine "
+          "(about 126 confirmed hits would be expected by chance)", not d["fired"]
+          and dv(d, "siu_like").get("confirmed") == 0 and dv(d, "siu_like").get("expected_confirmed") == 125.8,
+          d.get("summary"))
+    d = d28(intake("siu_some", 200000, 95, cos95[:92] + [0.81, 0.85, 0.9]))
+    check("  nor with 3 of them confirmed (P = 1)", not d["fired"] and dv(d, "siu_some").get("confirmed") == 3,
+          d.get("summary"))
+    old = d28(intake("siu_like", 200000, 95, record=False))
+    check("  under the old rule (no record) it would have been quarantined", old["fired"], old.get("summary"))
+    # the copy threshold: the producer's record, else the LOCK's; with neither, confirm_cos stands in
+    d = d28(intake("nothr", 1000, 1, [0.85], copy_t=None), with_lock=False)
+    check("with no copy threshold known (no record, no LOCK), confirm_cos stands in: a hit at 0.85 is a leak "
+          "(never less strict)", d["fired"] and dv(d, "nothr").get("copy_cos") == 0.8, d.get("summary"))
+    d = d28(intake("nothr", 1000, 1, [0.85], copy_t=None))
+    check("  with the LOCK's v2 threshold it is chance", not d["fired"] and dv(d, "nothr").get("copy_cos") == COPY_COS,
+          d.get("summary"))
+    check("an embedding hit keeps its own rule beside the dHash verdict (1 in 15 at the LOCK's rate: chance; 5 in "
+          "15: a leak)", not d28(intake("e1", 15, 0, [], embed=1))["fired"]
+          and d28(intake("e5", 15, 0, [], embed=5))["fired"])
+
+
+def t_d28_v2_sources():
+    section("D28-v2, round 2: a source is judged over all its intake batches; the boundaries; the sidecars of "
+            "batches committed before the amendment; every source stated; DR0's L17 eval-hits")
+    from weed_optimizer_framework.tools.inc2 import eval_hits as EH
+    dom, th = LS.load_domain("weed"), LS.load_thresholds()
+
+    def lock(t=COPY_COS):
+        return {"splits/v2/lock_status.json": json.dumps({"splits_version": "v2", "locked": True,
+                                                          "embed_calibration_v2": {"p_false": 0.0105,
+                                                                                   "cos_threshold": t}})}
+
+    def summary(src, batch, images, hits, pair_cos=None, record=True, copy_t=COPY_COS):
+        doc = {"format": "collect-summary/1", "source": src, "batch": batch, "images": images,
+               "guard": {"near_eval_variant": hits, "near_eval_embed": 0},
+               "source_leak": {"eval_share": round(hits / float(images), 4), "base_share": 0.0},
+               "copy_scan": {"checked": True, "p_false": 0.0105, "cos_threshold": COPY_COS}}
+        if record:
+            keys = [{"key": "%s/%s/%d" % (src, batch, i), "source": src} for i in range(hits)]
+            scored = {"%s/%s/%d" % (src, batch, i): {"pair_cos": c} for i, c in enumerate(pair_cos or [])}
+            doc["eval_hits"] = EH.record(keys, scored, "facebook/dinov2-base:cls", copy_t)
+        return {"intake/%s/summary.json" % batch: json.dumps(doc)}
+
+    def sidecar(src, batch, hits, pair_cos, of=None):
+        keys = [{"key": "%s/%s/%d" % (src, batch, i), "source": src} for i in range(hits)]
+        scored = {"%s/%s/%d" % (src, batch, i): {"pair_cos": c} for i, c in enumerate(pair_cos)}
+        rec = EH.record(keys, scored, "facebook/dinov2-base:cls", COPY_COS)
+        return {"intake/%s/eval_hits.json" % batch: json.dumps(EH.sidecar(of or batch, rec, [], "intake",
+                                                                           source=src))}
+
+    def d28(*parts, t=COPY_COS, context=None, only="D28"):
+        texts = dict(lock(t))
+        for x in parts:
+            texts.update(x)
+        ev = E.from_texts(texts, "x", context=dict({"sid": "none"}, **(context or {})))
+        return DS.by_id(DS.detect(ev, dom, th, only=(only,)))[only]
+
+    def dv(d, src):
+        for h in ((d.get("detail") or {}).get("leaks") or []) + ((d.get("detail") or {}).get("cleared") or []):
+            if h.get("source") == src:
+                return (h.get("verdict") or {}).get("dhash") or h.get("dhash") or {}
+        return {}
+
+    # 1. shards: one source in 5 batches of 1,000 images, 3, 3, 2, 2, 2 confirmed hits at 0.85
+    counts = (3, 3, 2, 2, 2)
+    shards = [summary("shardy", "i%04d_shardy" % (i + 1), 1000, k, [0.85] * k) for i, k in enumerate(counts)]
+    d = d28(*shards)
+    v = dv(d, "shardy")
+    leak = next((h for h in (d.get("detail") or {}).get("leaks") or [] if h["source"] == "shardy"), {})
+    check("a source split into 5 intake batches of 1,000 images with 3, 3, 2, 2, 2 confirmed hits (pair cos 0.85) "
+          "is judged as one source: 12 confirmed in 5,000 images, 3.1 expected, P ~ 1.1e-4 < 0.001 -> a leak",
+          d["fired"] and v.get("images") == 5000 and v.get("hits") == 12 and v.get("confirmed") == 12
+          and 0.5e-4 < v.get("p_value", 1) < 2e-4 and leak.get("batches") == ["i%04d_shardy" % (i + 1)
+                                                                               for i in range(5)]
+          and len([c for c in d["cites"] if c.get("pointer") == "/source"]) == 5, (v, d.get("summary")))
+    alone = [d28(x) for x in shards]
+    check("  while each batch alone is chance (P 0.026 or 0.13): the per-batch reading let the shards escape",
+          not any(x["fired"] for x in alone) and all(0.02 < dv(x, "shardy")["p_value"] < 0.2 for x in alone),
+          [dv(x, "shardy").get("p_value") for x in alone])
+    d = d28(*(shards[:4] + [summary("shardy", "i0005_shardy", 1000, 2, record=False)]))
+    v = dv(d, "shardy")
+    check("  one shard with hits and no pair-cosine record fails the whole source closed (only 10 of 12 weighed), "
+          "and its row states the confirmed hits it has", d["fired"] and v.get("fail_closed") and v.get("scored") == 10
+          and v.get("confirmed") == 10 and "only 10 with a pair cosine, 10 confirmed among them" in d["summary"],
+          (v, d.get("summary")))
+    two = [summary("dup2", "i0001_dup2", 1000, 1, [0.97], copy_t=0.95),
+           summary("dup2", "i0002_dup2", 1000, 1, [0.1], copy_t=0.99)]
+    d = d28(*two, t=0.999)
+    check("  the copy threshold of a source is the lowest any of its batches recorded (0.95 of 0.95, 0.99 and the "
+          "LOCK's 0.999): its hit at 0.97 is a copy", d["fired"] and dv(d, "dup2").get("copy_cos") == 0.95
+          and dv(d, "dup2").get("copy_hits") == 1, d.get("summary"))
+    # 4. the boundaries, exactly
+    d = d28(summary("at080", "i0001_at080", 2000, 8, [0.8] * 8))
+    check("8 hits exactly at confirm_cos 0.80 in 2,000 images are confirmed: P < 0.001 -> a leak (>=, not >)",
+          d["fired"] and dv(d, "at080").get("confirmed") == 8 and dv(d, "at080")["p_value"] < 0.001, d.get("summary"))
+    d = d28(summary("atcopy", "i0001_atcopy", 1000, 1, [COPY_COS]))
+    check("one hit exactly at the copy threshold 0.946384 is a copy: a leak (>=, not >)",
+          d["fired"] and dv(d, "atcopy").get("copy_hits") == 1 and dv(d, "atcopy").get("confirmed") == 1,
+          d.get("summary"))
+    d = d28(summary("lowt", "i0001_lowt", 1000, 1, [0.948], copy_t=0.95))
+    check("the producer recorded 0.95, the LOCK 0.946384: a hit at 0.948 is a copy by the lower of the two (a leak)",
+          d["fired"] and dv(d, "lowt").get("copy_cos") == COPY_COS and dv(d, "lowt").get("copy_hits") == 1,
+          d.get("summary"))
+    d = d28(summary("lowt2", "i0001_lowt2", 1000, 1, [0.948], copy_t=COPY_COS), t=0.95)
+    check("  and the other way round (record 0.946384, LOCK 0.95): still a leak", d["fired"]
+          and dv(d, "lowt2").get("copy_cos") == COPY_COS, d.get("summary"))
+    # 2. the sidecar of a batch committed before the amendment
+    old = summary("legacy", "i0003_legacy", 614, 1, record=False)
+    d = d28(old)
+    check("an intake batch committed before the amendment (no pair cosines) quarantines by the one-hit rule",
+          d["fired"] and dv(d, "legacy").get("fail_closed"), d.get("summary"))
+    d = d28(old, sidecar("legacy", "i0003_legacy", 1, [0.744]))
+    check("  its sidecar intake/<batch>/eval_hits.json (collect.intake.rescore_eval_hits) weighs the hit again: "
+          "pair cos 0.744 -> chance, not quarantined, and the summary states it",
+          not d["fired"] and dv(d, "legacy").get("verdict") == "chance" and dv(d, "legacy").get("max_pair_cos") == 0.744
+          and "legacy: 1 dHash hit(s) in 614 images, 0 confirmed (pair cos >= 0.8), max pair cos 0.744, P = 1 -> "
+              "chance" in d["summary"], d.get("summary"))
+    d = d28(old, sidecar("legacy", "i0003_legacy", 1, [0.97]))
+    check("  a sidecar that finds a copy (0.97) quarantines, and D28 cites the sidecar", d["fired"]
+          and dv(d, "legacy").get("copy_hits") == 1
+          and any(c.get("artifact") == "intake/i0003_legacy/eval_hits.json" for c in d["cites"]), d["cites"][-3:])
+    for why, side in (("another number of hits (2 for the guard's 1)",
+                       sidecar("legacy", "i0003_legacy", 2, [0.1, 0.2])),
+                      ("another batch", sidecar("legacy", "i0003_legacy", 1, [0.1], of="i0009_other"))):
+        d = d28(old, side)
+        check("  a sidecar that weighed %s is not used: fail closed" % why, d["fired"]
+              and dv(d, "legacy").get("fail_closed"), d.get("summary"))
+    rec_ok, _w = EH.usable_sidecar(json.loads(list(sidecar("s", "b", 2, [0.1, 0.2]).values())[0]), "b", {"s": 2})
+    rec_bad, why_bad = EH.usable_sidecar({"format": "x"}, "b", {"s": 2})
+    check("inc2.eval_hits.usable_sidecar: the batch and the per-source hit counts must match, the format must be "
+          "the sidecar's", rec_ok is not None and rec_bad is None and "not an" in why_bad, why_bad)
+    # 7. every source stated; the quarantined ones D28 now clears are named for a person
+    many = [summary("src%02d" % i, "i%04d_src%02d" % (i + 1, i), 900, 1, [0.1 + 0.01 * i]) for i in range(25)]
+    d = d28(*many)
+    check("25 sources judged chance: the summary states every one of them, no 'and N more'",
+          not d["fired"] and d["summary"].count("-> chance") == 25 and not re.search(r"and \d+ more", d["summary"])
+          and len(d["detail"]["cleared"]) == 25, d.get("summary")[-300:])
+    d = d28(old, sidecar("legacy", "i0003_legacy", 1, [0.744]),
+            context={"sources": {"legacy": {"status": "quarantined", "cite": "D28"}}})
+    check("a source quarantined under the one-hit rule that D28-v2 clears is named for a person (inc2.stream "
+          "unquarantine): the quarantine is a person's to lift", not d["fired"]
+          and d["detail"].get("cleared_quarantined") == ["legacy"] and "unquarantine" in d["summary"]
+          and "legacy" in d["summary"].split("Quarantined, now judged chance")[-1], d.get("summary"))
+    # DR0: the platform runs the sidecars (L17 eval-hits), once the one-time jobs are done
+    stage = {"lock": True, "placement": True, "probe_ran": True, "baselines": {}, "exp_status": {},
+             "step1_stream": {"bootstrap": True, "knowntruth": True, "backfill": True}}
+    st_due = {"step1_stream/status.json": json.dumps({"format": "inc2-step1-stream/status/1", "per_source": {},
+                                                      "eval_hits": {"due": ["b0000"], "sidecars": {}}})}
+    d = d28(old, st_due, context={"stage": stage}, only="DR0")
+    data = ((d.get("detail") or {}).get("due") or {}).get("DATA") or {}
+    check("DR0 proposes L17 eval-hits when Step 1's b0000 and an intake batch hold hits no record weighs and no "
+          "sidecar exists yet", d["fired"] and data.get("lever") == "L17" and data.get("verb") == "eval-hits"
+          and "Step 1 batch b0000" in data.get("why", "") and "intake batch i0003_legacy" in data.get("why", ""),
+          (data, d.get("summary")))
+    st_done = {"step1_stream/status.json": json.dumps({"format": "inc2-step1-stream/status/1", "per_source": {},
+                                                       "eval_hits": {"due": [], "sidecars": {"b0000": {
+                                                           "used": True}}}})}
+    d = d28(old, sidecar("legacy", "i0003_legacy", 1, [0.744]), st_done, context={"stage": stage}, only="DR0")
+    data = ((d.get("detail") or {}).get("due") or {}).get("DATA")
+    check("  and not once every such batch has its sidecar", data is None or data.get("verb") != "eval-hits",
+          (data, d.get("summary")))
+    st_old = {"step1_stream/status.json": json.dumps({"format": "inc2-step1-stream/status/1", "per_source": {
+        "rf_old": {"images_seen": 3000, "decision:near_eval_variant": 2, "decision:pool": 2998}}})}
+    d = d28(st_old, context={"stage": stage}, only="DR0")
+    data = ((d.get("detail") or {}).get("due") or {}).get("DATA") or {}
+    check("  and from a status.json written before the sidecars existed (no eval_hits section) whose source rows "
+          "count dHash hits without pair cosines: eval-hits finds the batches itself", data.get("verb") == "eval-hits"
+          and "rf_old" in data.get("why", ""), (data, d.get("summary")))
+    d = d28(old, st_due, context={"stage": dict(stage, step1_stream={"bootstrap": True, "knowntruth": True,
+                                                                      "backfill": False})}, only="DR0")
+    data = ((d.get("detail") or {}).get("due") or {}).get("DATA") or {}
+    check("  nor before Step 1's one-time jobs are done (backfill first)", data.get("verb") == "backfill", data)
+
+
+def t_d28_v2_round3():
+    section("D28-v2, round 3: one verdict per source across intake and Step 1; a source's batches combined "
+            "(pair-cosine cap, embedding rate, base-copy share); DR0 never proposes a batch with a sidecar again")
+    from weed_optimizer_framework.tools.inc2 import eval_hits as EH
+    dom, th = LS.load_domain("weed"), LS.load_thresholds()
+
+    def lock(p=0.0105):
+        ec = {"cos_threshold": COPY_COS}
+        if p is not None:
+            ec["p_false"] = p
+        return {"splits/v2/lock_status.json": json.dumps({"splits_version": "v2", "locked": True,
+                                                          "embed_calibration_v2": ec})}
+
+    def summary(src, batch, images, hits, pair_cos=None, rec_hits=None, embed=0, p=0.0105, base_share=0.0):
+        """An intake summary: hits dHash hits the guard counted, a record weighing rec_hits (default hits) of
+        them with pair_cos (None: no record), embed embedding hits judged under p (None: no copy-scan
+        record), and its base-copy share."""
+        doc = {"format": "collect-summary/1", "source": src, "batch": batch, "images": images,
+               "guard": {"near_eval_variant": hits, "near_eval_embed": embed},
+               "source_leak": {"eval_share": round((hits + embed) / float(images), 4), "base_share": base_share},
+               "copy_scan": ({"checked": True, "p_false": p, "cos_threshold": COPY_COS} if p is not None
+                             else {"checked": False})}
+        if pair_cos is not None:
+            n = len(pair_cos) if rec_hits is None else rec_hits
+            keys = [{"key": "%s/%s/%d" % (src, batch, i), "source": src} for i in range(n)]
+            doc["eval_hits"] = EH.record(keys, {"%s/%s/%d" % (src, batch, i): {"pair_cos": c}
+                                                for i, c in enumerate(pair_cos)}, "facebook/dinov2-base:cls",
+                                         COPY_COS)
+        return {"intake/%s/summary.json" % batch: json.dumps(doc)}
+
+    def sidecar(src, batch, hits, pair_cos, of=None):
+        keys = [{"key": "%s/%s/%d" % (src, batch, i), "source": src} for i in range(hits)]
+        rec = EH.record(keys, {"%s/%s/%d" % (src, batch, i): {"pair_cos": c} for i, c in enumerate(pair_cos)},
+                        "facebook/dinov2-base:cls", COPY_COS)
+        return {"intake/%s/eval_hits.json" % batch: json.dumps(EH.sidecar(of or batch, rec, [], "intake",
+                                                                           source=src))}
+
+    def status(per_source, due=None):
+        doc = {"format": "inc2-step1-stream/status/1", "per_source": per_source}
+        if due is not None:
+            doc["eval_hits"] = {"due": due, "sidecars": {}}
+        return {"step1_stream/status.json": json.dumps(doc)}
+
+    def run(*parts, context=None, only="D28"):
+        texts = dict(lock())
+        for x in parts:
+            texts.update(x)
+        ev = E.from_texts(texts, "x", context=dict({"sid": "none"}, **(context or {})))
+        return DS.by_id(DS.detect(ev, dom, th, only=(only,)))[only]
+
+    def srcs(d, key):
+        return [x["source"] if isinstance(x, dict) else x for x in (d.get("detail") or {}).get(key) or []]
+
+    def leak_of(d, src):
+        return next((h for h in (d.get("detail") or {}).get("leaks") or [] if h["source"] == src), {})
+
+    quarantined = {"sources": {"S": {"status": "quarantined", "cite": "D28"},
+                               "T": {"status": "quarantined", "cite": "D28"}}}
+    # 1. N1: a source judged chance in one path and a leak in the other is a leak, never cleared
+    s_chance = summary("S", "i0001_S", 100, 1, [0.3])
+    s_leak = status({"S": {"images_seen": 100, "near_eval_embed": 20, "decision:pool": 80,
+                           "decision:near_eval_embed": 20}})
+    d = run(s_chance, s_leak, context=quarantined)
+    check("a quarantined source whose intake dHash hit is chance (0.30) but whose Step 1 embedding hits leak (20 "
+          "in 100) is a leak: not in detail.cleared nor cleared_quarantined, and no unquarantine is suggested",
+          d["fired"] and srcs(d, "leaks") == ["S"] and srcs(d, "cleared") == [] and
+          d["detail"].get("cleared_quarantined") == [] and "Quarantined, now judged chance" not in d["summary"],
+          (d["detail"].get("cleared"), d["detail"].get("cleared_quarantined"), d.get("summary")))
+    check("  its intake numbers are stated with the leak (requirement 5)",
+          "its intake dHash hits alone: 1 dHash hit(s) in 100 images" in d["summary"]
+          and (leak_of(d, "S").get("dhash_elsewhere") or [{}])[0].get("path") == "intake", d.get("summary"))
+    d = run(summary("S", "i0001_S", 1000, 1, [0.97]), status({"S": {
+        "images_seen": 500, "decision:near_eval_variant": 1, "decision:pool": 499, "eval_hit_pair_cos": [0.2],
+        "eval_hit_copy_threshold": COPY_COS}}), context=quarantined)
+    check("  and the other way round (an intake copy at 0.97, a chance Step 1 hit at 0.2): a leak, not cleared, "
+          "its Step 1 numbers stated with the leak", d["fired"] and srcs(d, "leaks") == ["S"]
+          and srcs(d, "cleared") == [] and d["detail"].get("cleared_quarantined") == []
+          and "its Step 1 dHash hits alone: 1 dHash hit(s) in 500 images" in d["summary"],
+          (d["detail"].get("cleared"), d.get("summary")))
+    t_both = (summary("T", "i0001_T", 500, 1, [0.1]), status({"T": {
+        "images_seen": 500, "near_eval_embed": 0, "decision:near_eval_variant": 1, "decision:pool": 499,
+        "eval_hit_pair_cos": [0.2], "eval_hit_copy_threshold": COPY_COS}}))
+    d = run(*t_both, context=quarantined)
+    row = ((d.get("detail") or {}).get("cleared") or [{}])[0]
+    check("a source judged chance in both intake and Step 1 is listed once (cleared, cleared_quarantined) and "
+          "stated once with each path's numbers", not d["fired"] and srcs(d, "cleared") == ["T"]
+          and d["detail"].get("cleared_quarantined") == ["T"] and d["summary"].count("T: ") == 1
+          and "(intake) and 1 dHash hit(s) in 500 images" in d["summary"] and "(Step 1)" in d["summary"]
+          and sorted(row.get("dhash_by_path") or {}) == ["Step 1", "intake"]
+          and d["summary"].split("Quarantined, now judged chance")[-1].count("T") == 1, d.get("summary"))
+    # 2. m8: a batch's pair cosines count at most its own hits
+    d = run(summary("cap", "i0001_cap", 1000, 1, [0.1, 0.1], rec_hits=2),
+            summary("cap", "i0002_cap", 1000, 1, None))
+    v = (leak_of(d, "cap").get("verdict") or {}).get("dhash") or {}
+    check("a batch whose record weighs more cosines (2) than its guard counted hits (1) lends none to another batch "
+          "of the source that weighs none: 1 of 2 weighed, fail closed", d["fired"] and v.get("fail_closed")
+          and v.get("scored") == 1 and v.get("hits") == 2, (v, d.get("summary")))
+    # 3. m11: the embedding rule's rate is the lowest of the batches with embedding hits
+    d = run(summary("emb", "i0001_emb", 100, 0, embed=1, p=0.0105), summary("emb", "i0002_emb", 100, 0, embed=2,
+                                                                            p=0.0001))
+    v = leak_of(d, "emb").get("verdict") or {}
+    check("a source's embedding hits are judged at the lowest rate any of its batches was judged under (3 hits in "
+          "200 at 1e-4: P ~ 1.3e-6, a leak; at 0.0105 it would be chance)", d["fired"] and v.get("p_false") == 0.0001
+          and v.get("hits") == 3 and v.get("p_value", 1) < 1e-4, (v, d.get("summary")))
+    # 4. m12: the base-copy share is the highest of any batch, not the last one read
+    d = run(summary("base", "i0001_base", 400, 0, base_share=0.25), summary("base", "i0002_base", 400, 0,
+                                                                            base_share=0.0))
+    check("a source with 25 % base copies in its first batch and none in its second leaks by the 20 % rule (the "
+          "highest share, not the last batch's)", d["fired"] and leak_of(d, "base").get("base_copy_share") == 0.25,
+          d.get("summary"))
+    # 5. m13: one batch with embedding hits and no rate fails the embedding rule closed
+    d = run(summary("nop", "i0001_nop", 1000, 0, embed=1, p=0.0105), summary("nop", "i0002_nop", 1000, 0, embed=1,
+                                                                             p=None), lock(None))
+    v = leak_of(d, "nop").get("verdict") or {}
+    check("one batch with embedding hits judged under no rate (no copy-scan record, no LOCK rate) fails the source's "
+          "embedding rule closed, though 2 hits in 2,000 at the other batch's 0.0105 are chance",
+          d["fired"] and v.get("p_false") is None and any("fail closed" in w for w in v.get("why") or []),
+          (v, d.get("summary")))
+    d = run(summary("nop", "i0001_nop", 1000, 0, embed=1, p=0.0105), summary("nop", "i0002_nop", 1000, 0, embed=1,
+                                                                             p=0.0105), lock(None))
+    check("  and with both rates recorded, the same hits are chance", not d["fired"], d.get("summary"))
+    # 6. m14: a batch whose sidecar exists is not proposed again, whatever the sidecar weighed
+    stage = {"lock": True, "placement": True, "probe_ran": True, "baselines": {}, "exp_status": {},
+             "step1_stream": {"bootstrap": True, "knowntruth": True, "backfill": True}}
+    old = summary("legacy", "i0003_legacy", 614, 1, None)
+    for why, side in (("weighed none of its hit (partial)", sidecar("legacy", "i0003_legacy", 1, [])),
+                      ("weighed another number of hits (unusable)", sidecar("legacy", "i0003_legacy", 2, [0.1, 0.2])),
+                      ("names another batch (unusable)", sidecar("legacy", "i0003_legacy", 1, [0.1], of="i0009_x"))):
+        d = run(old, side, status({}, due=[]), context={"stage": stage}, only="DR0")
+        data = ((d.get("detail") or {}).get("due") or {}).get("DATA")
+        d2 = run(old, side)
+        check("an intake batch whose sidecar %s is not proposed for eval-hits again (one attempt per batch; a person "
+              "re-runs it with --force), and D28 fails it closed" % why,
+              (data is None or data.get("verb") != "eval-hits") and d2["fired"]
+              and ((leak_of(d2, "legacy").get("verdict") or {}).get("dhash") or {}).get("fail_closed"),
+              (data, d2.get("summary")))
+    d = run(old, status({}, due=[]), context={"stage": stage}, only="DR0")
+    data = ((d.get("detail") or {}).get("due") or {}).get("DATA") or {}
+    check("  while the same batch without a sidecar is proposed", data.get("verb") == "eval-hits"
+          and "intake batch i0003_legacy" in data.get("why", ""), data)
+
+
 def main():
     for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_formats,
                t_replay_gate,
-               t_config, t_lab, t_lanes, t_d28):
+               t_config, t_lab, t_lanes, t_d28, t_d28_v2, t_d28_v2_sources, t_d28_v2_round3):
         try:
             fn()
         except Exception as e:

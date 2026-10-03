@@ -39,6 +39,11 @@ executed by the real module it names:
        fake network, intake against the real LOCK v2): the autopilot admits
        the clean one's batch (L17 admit --intake, real step1_stream) and D28
        quarantines the one holding a mirrored dev image before admission;
+       that batch's own pair cosines then removed (a batch committed before
+       D28-v2), DR0 proposes L17 eval-hits, the real step1_stream eval-hits
+       weighs the hit again from the staging blob into
+       intake/<batch>/eval_hits.json, the snapshot ships it and D28 judges
+       the source by it;
   deploy deploy/deploy_funnel.sh --dry-run ships every stream module, job
        script, test and fixture the replay gate needs.
 
@@ -55,7 +60,11 @@ Honest scope (every deviation from the platform is named here):
   * Embedders are stand-ins: v1 Step 1 and step1_stream use test_inc_verify's
     colour embedder; the copy scan uses a hue-histogram descriptor, with a
     threshold set from this world (the funnel's leak_v1.json is written as a
-    passed calibration, as the funnel's leak step would).
+    passed calibration, as the funnel's leak step would). The descriptor is
+    summed over the image's 8 flips and rotations, so a mirrored copy scores
+    1.0 against its original, as DINOv2's nearly does: D28-v2 weighs each
+    dHash hit by that pair cosine (b0000's mirrored test image, the intake's
+    mirrored dev image).
   * capacity-verdict refuses test-mode scores and has no --testing: the
     same function is called with testing_ok. The canary is judged against
     b0_v1's real runs and Stage A (pilot_v4) needs pilot_v3's real bins,
@@ -176,26 +185,36 @@ def jl(path):
 class HueEmbedder:
     """The copy detector's descriptor (a stand-in for DINOv2 whole-image
     features): hue histograms of lit, saturated pixels on a 3 x 3 grid,
-    L2-normalised; it survives crops, shears and brightness changes."""
+    summed over the image's 8 flips and rotations, L2-normalised; it survives
+    crops, shears and brightness changes, and a flipped or rotated copy gets
+    the descriptor of its original, as DINOv2's nearly does (true flip and
+    rotation copies score >= 0.896 in pair cosine, D28-v2)."""
     bins, grid = 16, 3
     dim = bins * grid * grid
+    D4 = (None, Image.Transpose.FLIP_LEFT_RIGHT, Image.Transpose.FLIP_TOP_BOTTOM, Image.Transpose.ROTATE_90,
+          Image.Transpose.ROTATE_180, Image.Transpose.ROTATE_270, Image.Transpose.TRANSPOSE,
+          Image.Transpose.TRANSVERSE)
 
     def __init__(self, model="facebook/dinov2-base", pooling="cls"):
         self.model_name, self.pooling = str(model), pooling
         self.name = FE.embedder_name(self.model_name, pooling)
 
+    def _grid(self, im):
+        hsv = np.asarray(im.convert("HSV"), dtype=np.int64)
+        H, W = hsv.shape[:2]
+        parts = []
+        for gy in range(self.grid):
+            for gx in range(self.grid):
+                c = hsv[gy * H // self.grid:(gy + 1) * H // self.grid, gx * W // self.grid:(gx + 1) * W // self.grid]
+                m = (c[..., 1] > 40) & (c[..., 2] > 30)
+                parts.append(np.bincount((c[..., 0][m] * self.bins) // 256, minlength=self.bins))
+        return np.concatenate(parts).astype(np.float32)
+
     def __call__(self, pils):
         out = []
         for p in pils:
-            hsv = np.asarray(p.convert("RGB").convert("HSV"), dtype=np.int64)
-            H, W = hsv.shape[:2]
-            parts = []
-            for gy in range(self.grid):
-                for gx in range(self.grid):
-                    c = hsv[gy * H // self.grid:(gy + 1) * H // self.grid, gx * W // self.grid:(gx + 1) * W // self.grid]
-                    m = (c[..., 1] > 40) & (c[..., 2] > 30)
-                    parts.append(np.bincount((c[..., 0][m] * self.bins) // 256, minlength=self.bins))
-            h = np.concatenate(parts).astype(np.float32)
+            rgb = p.convert("RGB")
+            h = sum(self._grid(rgb if t is None else rgb.transpose(t)) for t in self.D4)
             n = np.linalg.norm(h)
             out.append(h / n if n > 0 else h)
         return np.stack(out)
@@ -456,7 +475,7 @@ def write_funnel_inputs():
         return emb(pils)
     E = desc(ev)
     cand = [str(p) for p in sorted((REPO / "datasets").glob("harv_*/images/*"))
-            if "copy_crop_dev" not in p.name]
+            if not p.name.startswith("copy_")]          # the planted copies (the mirrored test image scores 1.0)
     cand += [r["image"] for s in ("ood22", "ood23") for r in C.read_manifest(C.manifest_path(s))]
     other = float((desc(cand) @ E.T).max())
     crop = REPO / "datasets" / "harv_veto" / "images" / "copy_crop_dev.png"
@@ -1215,6 +1234,12 @@ def stage_native_rescore(w):
                   for b in w.dom["baselines"]["items"] if b.get("measure")), (cards, held, len(pro)))
 
 
+def d28_now(w):
+    """The autopilot's last D28 diagnosis (the campaign's diagnoses.json)."""
+    doc = rj(W.S.StreamPaths(str(w.lab), w.domain).diagnoses(W.NAME), {}) or {}
+    return next((d for d in doc.get("diagnoses") or [] if d.get("id") == "D28"), {})
+
+
 def stage_leak_and_audit(w):
     stage("the leaking veto source (D28 -> L24)")
     q = summary(w)
@@ -1223,6 +1248,16 @@ def stage_leak_and_audit(w):
           "stream existed, with no failed L24 before it", "harv_veto" in (q.get("quarantined_sources") or {})
           and stop.count("L24") >= 1 and not any(e.get("lever") == "L24" for e in w.events("failed")),
           (q.get("quarantined_sources"), stop, [e.get("reason") for e in w.events("failed")][-3:]))
+    row = (rj(INC / "step1_stream" / "status.json", {}).get("per_source") or {}).get("harv_veto") or {}
+    leak = next((h for h in (d28_now(w).get("detail") or {}).get("leaks") or [] if h.get("source") == "harv_veto"),
+                {})
+    dv = (leak.get("verdict") or {}).get("dhash") or {}
+    check("D28-v2: b0000 weighed the mirrored test image by its pair cosine (the copy scanner's descriptors), "
+          "status.json folds it per source, and D28 reads it: a hit at or above the copy threshold is a leak",
+          row.get("decision:near_eval_variant") == 1 and row.get("eval_hits_scored") == 1
+          and row.get("eval_hit_pair_cos") and row["eval_hit_pair_cos"][0] >= row.get("eval_hit_copy_threshold")
+          and dv.get("copy_hits") == 1 and not dv.get("fail_closed") and dv.get("verdict") == "leak",
+          (row, dv))
 
 
 def stage_milestone1(w):
@@ -1451,6 +1486,7 @@ def stage_intake(w):
           all((INC / "intake" / "staging" / s_ / "fetch.json").is_file() for s_ in (clean, leak)))
     rc_c, batch_c, dec_c = intake_cli(clean)
     rc_l, batch_l, dec_l = intake_cli(leak)
+    WORLD["intake_leak"] = (str(batch_l), leak)
     check("collect intake against the real LOCK v2 (real GuardV2): the clean source keeps its 5 images; in the "
           "other the mirrored dev image is refused (near_eval_variant) and 5 are kept",
           rc_c == 0 and rc_l == 0 and list(dec_c.values()).count("kept") == 5
@@ -1458,6 +1494,19 @@ def stage_intake(w):
     leak_i = rj(INC / "intake" / str(batch_l) / "summary.json", {}).get("source_leak") or {}
     check("the intake summary's source_leak (D28's input) holds the evaluation share 1/6",
           abs((leak_i.get("eval_share") or 0) - 1 / 6.0) < 1e-3 and leak_i.get("fires") is True, leak_i)
+    eh_l = rj(INC / "intake" / str(batch_l) / "summary.json", {}).get("eval_hits") or {}
+    eh_c = rj(INC / "intake" / str(batch_c) / "summary.json", {}).get("eval_hits") or {}
+    row = (eh_l.get("per_source") or {}).get(leak) or {}
+    hit = [d for d in jl(INC / "intake" / str(batch_l) / "decisions.jsonl") if d.get("reason") == "near_eval_variant"]
+    check("D28-v2 at intake: the mirrored dev image was weighed before its copy was removed (pair cosine %s with "
+          "the dev image it matched, by the v2 calibration's embedder; copy threshold %s); the clean batch records "
+          "no hit" % (row.get("pair_cos"), eh_l.get("copy_threshold")),
+          eh_l.get("hits") == 1 and eh_l.get("scored") == 1 and row.get("pair_cos") == [1.0]
+          and eh_l.get("copy_threshold")
+          == (rj(C2.LOCK_PATH, {}).get("embed_calibration_v2") or {}).get("cos_threshold")
+          and len(hit) == 1 and hit[0].get("pair_cos") == 1.0 and (hit[0].get("match") or {}).get("split") == "dev"
+          and not list((INC / "intake" / str(batch_l) / "images").glob("*p5.*"))
+          and eh_c.get("hits") == 0 and eh_c.get("per_source") == {}, (eh_l, hit, eh_c))
     n0 = len(w.jobs)
     ok = w.run_until(lambda: any(a and a[0] == "admit" for n, a, rc_ in w.jobs[n0:]) and
                      leak in (summary(w).get("quarantined_sources") or {}), max_ticks=30, note="intake")
@@ -1481,6 +1530,50 @@ def stage_intake(w):
           "are eligible supply", stop and leak in (q.get("quarantined_sources") or {})
           and ((q.get("eligible") or {}).get("by_source") or {}).get(clean) == 5,
           (len(stop), q.get("quarantined_sources"), (q.get("eligible") or {}).get("by_source")))
+    d = d28_now(w)
+    dv = next((((h.get("verdict") or {}).get("dhash") or {}) for h in (d.get("detail") or {}).get("leaks") or []
+               if h.get("source") == leak), {})
+    check("D28-v2 judged the leaking source by the pair cosine its intake summary records (a hit at or above the "
+          "copy threshold, not the bare dHash hit), and its summary states hits, confirmed hits, max pair cos, P and "
+          "the verdict", dv.get("copy_hits") == 1 and not dv.get("fail_closed")
+          and "%s (1 dHash hit(s) in 6 images, 1 confirmed (pair cos >= 0.8), max pair cos 1.000, P = " % leak
+          in d.get("summary", "") and "-> leak" in d.get("summary", ""), (dv, d.get("summary")))
+
+
+def stage_eval_hits(w):
+    stage("D28-v2's sidecars: an intake batch committed before the amendment (no pair cosines) is weighed again "
+          "by the platform (DR0 -> L17 eval-hits, the real step1_stream eval-hits) and D28 judges its source by them")
+    batch_l, leak = WORLD["intake_leak"]
+    sp = INC / "intake" / batch_l / "summary.json"
+    keep = sp.read_bytes()
+    sm = json.loads(keep)
+    sp.write_text(json.dumps({k: v for k, v in sm.items() if k != "eval_hits"}, indent=1, sort_keys=True))
+    n0 = len(w.jobs)
+    ok = w.run_until(lambda: any(a and a[0] == "eval-hits" for n, a, rc_ in w.jobs[n0:]), max_ticks=20,
+                     note="eval-hits")
+    eh = [(a, rc_) for n, a, rc_ in w.jobs[n0:] if a and a[0] == "eval-hits"]
+    side = rj(INC / "intake" / batch_l / "eval_hits.json", {})
+    row = ((side.get("eval_hits") or {}).get("per_source") or {}).get(leak) or {}
+    pro = [e for e in w.events("proposed") if e.get("lever") == "L17" and "eval-hits" in (e.get("argv") or [])]
+    check("with the batch's own record gone, DR0 proposed L17 eval-hits and the platform ran the real step1_stream "
+          "eval-hits once (exit 0): intake/<batch>/eval_hits.json weighs the mirrored dev image again from the "
+          "staging blob (pair cos 1.0), summary.json and decisions.jsonl untouched",
+          ok and len(eh) == 1 and eh[0][1] == 0 and len(pro) == 1 and side.get("batch") == batch_l
+          and row.get("pair_cos") == [1.0] and json.loads(sp.read_text()).get("eval_hits") is None,
+          (eh, [e.get("argv") for e in pro], side.get("eval_hits")))
+    for _ in range(3):
+        w.tick()
+        w.process_jobs()
+    d = d28_now(w)
+    dv = next((((h.get("verdict") or {}).get("dhash") or {}) for h in (d.get("detail") or {}).get("leaks") or []
+               if h.get("source") == leak), {})
+    again = [a for n, a, rc_ in w.jobs[n0:] if a and a[0] == "eval-hits"]
+    check("the snapshot ships the sidecar and D28 judges the source by it (a copy at the copy threshold, not the "
+          "fail-closed fallback), citing it; eval-hits is not proposed again", dv.get("copy_hits") == 1
+          and not dv.get("fail_closed") and len(again) == 1
+          and any(c.get("artifact") == "intake/%s/eval_hits.json" % batch_l for c in d.get("cites") or []),
+          (dv, len(again), [c.get("artifact") for c in d.get("cites") or []][-4:]))
+    sp.write_bytes(keep)
 
 
 def stage_invariants(w):
@@ -1568,6 +1661,7 @@ def main_stages():
     stage_report(w)
     stage_f9(w)
     stage_intake(w)
+    stage_eval_hits(w)
     stage_native_rescore(w)
     stage_invariants(w)
     if os.environ.get("STREAM_PIPELINE_COMMANDS"):

@@ -272,7 +272,8 @@
    "control": "The frozen verifier (pinned sha) and the known-truth base copies (verified_precision).",
    "success": "A committed batch: queue rows appended, status.json updated.",
    "falsifier": "Known-truth precision with a Wilson lower bound < 0.99: a verifier refit is proposed (X11).",
-   "estimator": "admit"
+   "estimator": "admit",
+   "note": "Verb eval-hits (D28-v2, docs/CONTINUOUS_LOOP.md amendment 2026-10-03): DR0 proposes it when a committed batch counts dHash hits on evaluation images that neither its own record nor a sidecar weighs (status.json eval_hits.due, an intake summary without intake/<batch>/eval_hits.json). It writes the sidecars (step1_stream/eval_hits/<batch>.json, intake/<batch>/eval_hits.json) and status.json, so D28 judges those sources by the amendment's rule; a batch it cannot give a sidecar fails the job (exit 2), never a silent re-proposal."
   },
   "L18": {
    "name": "segment",

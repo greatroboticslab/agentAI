@@ -1864,7 +1864,8 @@
             "bootstrap",
             "knowntruth",
             "backfill",
-            "scan-holds"
+            "scan-holds",
+            "eval-hits"
           ]
         },
         "intake": {
@@ -1897,7 +1898,7 @@
         "round-scheduler",
         "human"
       ],
-      "description": "Lever L17 (R2, gated): incremental Step 1 over an intake batch (admit), its one-time jobs (bootstrap, knowntruth, backfill; contract 10 R1), and the stream's own copy detector over h6_scan holds past their deadline (scan-holds)."
+      "description": "Lever L17 (R2, gated): incremental Step 1 over an intake batch (admit), its one-time jobs (bootstrap, knowntruth, backfill; contract 10 R1), the stream's own copy detector over h6_scan holds past their deadline (scan-holds), and D28-v2's sidecars (eval-hits, docs/CONTINUOUS_LOOP.md amendment 2026-10-03): the dHash hits of batches committed before the amendment weighed again by their pair cosine, so D28 judges their sources by its rule, not the one-hit fallback."
     },
     "inc_build_segment": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.stream {verb} --stream {stream} [--k {k}] [--exp {exp}] [--holdout {holdout}] [--m {m}] [--recipes {recipes}]",

@@ -18,7 +18,14 @@
 #
 # Partition. GPU-shared with one V100: the allocation is a GPU allocation and
 # RM-shared submissions fail with "Invalid qos" (FUNNEL_AUDIT_RUNNER.md, note
-# 33). The collector never uses the GPU and never trains.
+# 33). The collector never trains. Only intake may use the GPU: a batch with a
+# dHash copy of an evaluation image describes it with the v2 calibration's
+# DINOv2 (D28-v2), which runs on the GPU when CUDA is there.
+#
+# Network. Compute nodes have no internet, so intake runs with
+# HF_HUB_OFFLINE=1 and its DINOv2 comes from the Hugging Face cache (as in
+# run_inc2_stream.sh). Only intake: fetch may need the network (a provider
+# served by Hugging Face), and the other verbs load no model.
 #
 # Placement. fetch runs here only for a provider the network probe placed on
 # the cluster (INC_DIR/intake/placement.json); the collector itself refuses any
@@ -43,14 +50,20 @@
 #     ($REPO/weed_llm_benchmark) and logs the sha256 of every file of the
 #     collector package and of the modules it calls (the funnel's package
 #     init, domain, names, taxonomy and fetch; inc/__init__, inc/common and
-#     inc/verify; inc2/__init__, inc2/common and inc2/guard, which intake
-#     needs; near_dup, cwd12_species, registry_lock, license_audit, and
-#     mega_trainer.py, whose dHash every guard uses and whose never-train slugs
-#     the collector parses). It refuses when the script that runs, or
+#     inc/verify; inc2/__init__, inc2/common, inc2/guard,
+#     inc2/embed_calibration and inc2/eval_hits, which intake needs; near_dup,
+#     cwd12_species, registry_lock, license_audit, and mega_trainer.py, whose
+#     dHash every guard uses and whose never-train slugs the collector parses;
+#     funnel/leak, funnel/embed and semisup_labeler, through which intake
+#     describes the images it refuses as dHash copies of evaluation images,
+#     D28-v2). It refuses when the script that runs, or
 #     $REPO/run_inc_collect.sh, differs from the nested copy of this script,
 #     and when a module intake needs is missing. It never rewrites the
 #     checkout: no reset, no copying of the nested package over the outer one;
-#   * the imports each verb needs (PIL and numpy for intake);
+#   * the imports each verb needs (PIL and numpy for intake). torch and
+#     transformers are not required: only a batch with a dHash copy of an
+#     evaluation image loads the descriptor model, and without it that hit is
+#     recorded unweighed, which D28 reads as a leak (fail closed);
 #   * Python logging is configured (logging.basicConfig) before the verb runs,
 #     so the collector's log lines reach the job log.
 # Nothing here uploads anywhere or syncs any labelling service.
@@ -85,12 +98,16 @@ case "$VERB" in
     *) usage ;;
 esac
 ARGS=("$@")
+if [ "$VERB" = intake ]; then
+    export HF_HUB_OFFLINE=1
+fi
 
 mkdir -p "$LOGS" || exit 1
 source "$CONDA_SH" || exit 1
 conda activate bench || { echo "FATAL: conda activate bench failed" >&2; exit 1; }
 echo "=== inc_collect $VERB ${ARGS[*]-}  $(date)  job ${SLURM_JOB_ID:-none} on $(hostname) ==="
 echo "python: $(command -v python)  $(python -V 2>&1)"
+echo "HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-unset}"
 
 sha() {
     if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -c1-64; else shasum -a 256 "$1" | cut -c1-64; fi
@@ -112,14 +129,15 @@ fi
 COL_FILES="$(cd "$CODE/weed_optimizer_framework" && find tools/collect -type f \( -name '*.py' -o -name '*.json' \) \
              ! -path '*/__pycache__/*' | LC_ALL=C sort)"
 for m in $COL_FILES tools/funnel/__init__.py tools/funnel/domain.py tools/funnel/names.py tools/funnel/taxonomy.py \
-         tools/funnel/fetch.py tools/funnel/leak.py tools/funnel/domains/weed.json tools/inc/__init__.py \
-         tools/inc/common.py tools/inc/verify.py tools/near_dup.py tools/cwd12_species.py tools/registry_lock.py \
-         tools/license_audit.py tools/mega_trainer.py; do
+         tools/funnel/fetch.py tools/funnel/leak.py tools/funnel/embed.py tools/funnel/domains/weed.json \
+         tools/inc/__init__.py tools/inc/common.py tools/inc/verify.py tools/near_dup.py tools/cwd12_species.py \
+         tools/registry_lock.py tools/license_audit.py tools/mega_trainer.py tools/semisup_labeler.py; do
     f="$CODE/weed_optimizer_framework/$m"
     [ -f "$f" ] || { echo "FATAL: module missing in the nested copy: $m" >&2; exit 1; }
     echo "module $m: $(sha "$f")"
 done
-for m in tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py tools/inc2/embed_calibration.py; do
+for m in tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py tools/inc2/embed_calibration.py \
+         tools/inc2/eval_hits.py; do
     f="$CODE/weed_optimizer_framework/$m"
     if [ -f "$f" ]; then
         echo "module $m: $(sha "$f")"

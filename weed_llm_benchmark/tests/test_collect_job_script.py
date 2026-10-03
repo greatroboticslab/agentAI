@@ -23,7 +23,11 @@ Pinned:
     and of the modules it calls, and prints the verb with its arguments;
   * an outer $REPO/run_inc_collect.sh that differs from the nested copy
     refuses (an identical one runs); intake refuses when the nested copy lacks
-    the copy guard module (fail closed).
+    the copy guard module (fail closed);
+  * intake, and only intake, runs with HF_HUB_OFFLINE=1 (compute nodes have no
+    internet; D28-v2 describes its dHash hits with DINOv2 from the Hugging
+    Face cache), while fetch keeps the network; the script no longer says the
+    collector never uses the GPU (intake's DINOv2 runs on it).
 
 No network, no GPU, no Slurm.
 
@@ -79,6 +83,7 @@ def job(args, env=None, script=RUN, repo=REPO):
               "INC_COLLECT_CONDA_SH": str(CONDA), "INC_COLLECT_DRY_RUN": "1"})
     e.pop("INC_DIR", None)
     e.pop("REPO", None)
+    e.pop("HF_HUB_OFFLINE", None)
     e.update(env or {})
     r = subprocess.run(["bash", str(script)] + list(args), capture_output=True, text=True, env=e, timeout=300)
     return r.returncode, r.stdout, r.stderr
@@ -112,6 +117,8 @@ def test_static():
           "git reset" not in code and "rsync" not in code and not re.search(r"\bcp\b", code), None)
     check("no labelling-service sync or upload", "AUTO_SYNC" not in text and "roboflow" not in text.lower()
           and "upload" not in code.lower(), None)
+    check("the script no longer claims the collector never uses the GPU (intake's DINOv2 runs on it, D28-v2)",
+          "never uses the GPU" not in text and "export HF_HUB_OFFLINE=1" in code, None)
 
 
 def test_runs():
@@ -127,6 +134,14 @@ def test_runs():
         check("%s: exit 0, every collector file logged with its sha256, the verb and its arguments" % verb,
               rc == 0 and not wrong and dry and dry[-1].endswith(("%s %s" % (verb, " ".join(args))).rstrip()),
               (rc, err[-400:], wrong[:3], dry))
+    offline = {}
+    for verb, args in (("intake", ["--source", "x"]), ("fetch", ["--source", "x", "--max-bytes", "5"]),
+                       ("probe", [])):
+        rc, out, err = job([verb] + args)
+        offline[verb] = re.findall(r"^HF_HUB_OFFLINE: (\S+)$", out, flags=re.M)
+    check("intake runs with HF_HUB_OFFLINE=1 (DINOv2 from the Hugging Face cache, no internet on compute nodes); "
+          "fetch and probe keep the network", offline == {"intake": ["1"], "fetch": ["unset"], "probe": ["unset"]},
+          offline)
     rc, out, err = job(["summary"])
     for m in ("tools/mega_trainer.py", "tools/inc/common.py", "tools/funnel/taxonomy.py", "tools/license_audit.py"):
         check("the called module %s is logged" % m, ("module %s: %s" % (m, sha(ROOT / "weed_optimizer_framework" / m)))

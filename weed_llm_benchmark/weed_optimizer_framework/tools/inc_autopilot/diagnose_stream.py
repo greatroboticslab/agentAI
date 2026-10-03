@@ -594,6 +594,13 @@ def d21(v):
 # and an embedding hit (the calibrated copy detector).
 D28_DHASH_REASONS = ("near_eval_v2", "near_eval_variant")
 D28_EMBED_REASON = "near_eval_embed"
+def _d28_pair_cos(values):
+    """The pair cosines a producer recorded (a list), or None without a list.
+    A value that is not a number is dropped, so its hit counts as unscored
+    (fail closed)."""
+    if not isinstance(values, list):
+        return None
+    return [c for c in (_num(x) for x in values) if c is not None]
 
 
 def _d28_counts(s):
@@ -608,24 +615,43 @@ def _d28_counts(s):
     return int(_num(s.get("images")) or 0), dh, int(_num(g.get(D28_EMBED_REASON)) or 0), counted
 
 
-def d28(v):
-    """D28 source_leak (contract 6.4, amended 2026-09-29 by decision L-9 and the
-    funnel's amendment A2): a source leaks when one of its images is a dHash
-    copy of an evaluation image (6 bits, any of the 8 variants), or when it has
-    more embedding hits than the per-image false-positive rate of the copy
-    detector predicts (inc2.embed_calibration.source_verdict: P(Binom(images,
-    p_false) >= hits) < source_alpha), or when its base-copy share reaches
-    base_copy_share. A share of never-train refusals alone is no longer the
-    rule: at a per-image rate p, a source of n images holds about n p chance
-    hits. p_false is the one the batch was judged under (its copy_scan record),
-    else the splits LOCK's v2 calibration (splits/v2/lock_status.json); with
-    neither, any embedding hit flags (fail closed)."""
-    from ..inc2 import embed_calibration as EC
-    th = v.th
-    alpha, bc = float(_t(th, "D28", "source_alpha")), float(_t(th, "D28", "base_copy_share"))
-    lock = v.ev.json("splits/v2/lock_status.json") or {}
-    lock_p = _num(((lock.get("embed_calibration_v2") or {}) if isinstance(lock, dict) else {}).get("p_false"))
-    hits, cites = [], []
+def _d28_batch_cos(v, name, s, src, dh, counted):
+    """(pair cosines or None, the producer's copy threshold or None, the
+    artifact they come from) of one intake batch's dHash hits (D28-v2): the
+    summary's own record (eval_hits), or, when that weighs fewer than the
+    batch's hits (a batch committed before the amendment), its sidecar
+    intake/<batch>/eval_hits.json (collect.intake.rescore_eval_hits) when the
+    sidecar weighed exactly the hits the summary counts
+    (inc2.eval_hits.usable_sidecar). None: nothing weighs them, and the
+    one-hit rule reads them (fail closed)."""
+    from ..inc2 import eval_hits as EH
+    eh = s.get("eval_hits") if isinstance(s.get("eval_hits"), dict) else {}
+    per = eh.get("per_source") if isinstance(eh.get("per_source"), dict) else {}
+    row = per.get(src)
+    cos = _d28_pair_cos(row.get("pair_cos")) if counted and isinstance(row, dict) else None
+    rec_t, used = _num(eh.get("copy_threshold")), name
+    if counted and dh and (cos is None or len(cos) < dh):
+        side = name[:-len("summary.json")] + "eval_hits.json"
+        rec, _why = EH.usable_sidecar(v.ev.json(side), name.split("/")[1], {src: dh})
+        srow = (rec.get("per_source") or {}).get(src) if rec else None
+        scos = _d28_pair_cos(srow.get("pair_cos")) if isinstance(srow, dict) else None
+        if scos is not None and len(scos) > len(cos or ()):
+            cos, rec_t, used = scos, _num(rec.get("copy_threshold")), side
+    return cos, rec_t, used
+
+
+def _d28_intake_sources(v, lock_p):
+    """{source: what its intake batches say together} (D28-v2: a source is
+    judged over all its batches, so splitting it into shards never escapes the
+    binomial rule): the images, dHash and embedding hits summed; the pair
+    cosines of every batch (each batch's at most as many as its hits, so a
+    batch weighing fewer than its hits leaves the source short of pair
+    cosines: fail closed); the lowest copy threshold a producer recorded; the
+    per-image false-positive rate of the embedding rule (the lowest of the
+    batches with embedding hits, None when one of them has none: fail
+    closed); the highest base-copy share of any batch (a share is a batch's,
+    and the highest is never less strict than their mean)."""
+    out = {}
     for name in sorted(v.ev.artifacts):
         if not (name.startswith("intake/") and name.endswith("/summary.json")):
             continue
@@ -641,42 +667,192 @@ def d28(v):
         if not counted and (ev_share or 0.0) > 0:
             # never-train refusals without their reasons: a dHash copy cannot be ruled out (fail closed)
             dh = max(dh, 1)
-        verdict = EC.source_verdict(n, emb, 0, dh, p, alpha=alpha)
-        if verdict["flagged"] or (base_share or 0.0) >= bc - EPS:  # stream-mutation: SM10
-            hits.append({"source": s.get("source"), "batch": name.split("/")[1], "never_train_share": ev_share,
-                         "base_copy_share": base_share, "verdict": verdict})
-            cites.append(v.cite(name, "/source"))
-            for ptr in ("/source_leak/eval_share", "/source_leak/base_share", "/images", "/copy_scan/p_false") + tuple(
-                    "/guard/%s" % k for k in D28_DHASH_REASONS + (D28_EMBED_REASON,)):
-                try:
-                    cites.append(v.cite(name, ptr))
-                except KeyError:
-                    pass
+        src = str(s.get("source"))
+        cos, rec_t, used = _d28_batch_cos(v, name, s, src, dh, counted)
+        a = out.setdefault(src, {"source": s.get("source"), "names": [], "sidecars": [], "images": 0, "dhash": 0,
+                                 "embed": 0, "cos": None, "thresholds": [], "p_embed": [], "p_any": [],
+                                 "p_missing": False, "eval_refused": None, "base_share": None})
+        a["names"].append(name)
+        a["images"] += n
+        a["dhash"] += dh
+        a["embed"] += emb
+        if dh and cos is not None:
+            a["cos"] = (a["cos"] or []) + sorted(cos, reverse=True)[:dh]
+        if used != name:
+            a["sidecars"].append(used)
+        if rec_t is not None:
+            a["thresholds"].append(rec_t)
+        if emb and p is None:
+            a["p_missing"] = True
+        elif emb:
+            a["p_embed"].append(p)
+        if p is not None:
+            a["p_any"].append(p)
+        if ev_share is not None:
+            a["eval_refused"] = (a["eval_refused"] or 0.0) + ev_share * n
+        if base_share is not None:
+            a["base_share"] = max(a["base_share"] or 0.0, base_share)
+    for a in out.values():
+        ps = a["p_embed"] or a["p_any"]
+        a["p_false"] = None if a["p_missing"] else (min(ps) if ps else lock_p)
+        a["copy_threshold"] = min(a["thresholds"]) if a["thresholds"] else None
+        a["never_train_share"] = (None if a["eval_refused"] is None else
+                                  round(a["eval_refused"] / float(a["images"]), 4) if a["images"] else 0.0)
+        a["batches"] = [nm.split("/")[1] for nm in a["names"]]
+    return out
+
+
+def d28(v):
+    """D28 source_leak (contract 6.4, amended 2026-09-29 by decision L-9 and the
+    funnel's amendment A2, and 2026-10-03 by D28-v2, amendment V3-1). A source
+    leaks when
+      * its dHash hits say so (inc2.eval_hits.verdict; a hit is an image within
+        6 bits of an evaluation image under any of the 8 variants, which
+        GuardV2 drops on its own): one hit's pair cosine with its matched
+        evaluation image reaches the v2 calibration's cos_threshold, or its
+        confirmed hits (pair cosine >= confirm_cos) are improbable,
+        P(Binom(images, p_confirmed) >= confirmed) < source_alpha. A hit
+        without a pair cosine falls back to the old rule, one hit is a leak
+        (fail closed). The pair cosines are the producers' records: the
+        intake summary's "eval_hits" (or, for a batch committed before the
+        amendment, its sidecar intake/<batch>/eval_hits.json) and Step 1's
+        per-source "eval_hit_pair_cos" (status.json folds Step 1's sidecars
+        too). A source is judged over all its intake batches together
+        (_d28_intake_sources): a source split into shards is one source;
+      * or it has more embedding hits than the copy detector's per-image
+        false-positive rate predicts (inc2.embed_calibration.source_verdict:
+        P(Binom(images, p_false) >= hits) < source_alpha);
+      * or its base-copy share reaches base_copy_share.
+    A share of never-train refusals alone is no rule: at a per-image rate p, a
+    source of n images holds about n p chance hits. p_false is the one the
+    batch was judged under (its copy_scan record), else the splits LOCK's v2
+    calibration (splits/v2/lock_status.json); with neither, any embedding hit
+    flags (fail closed). The copy threshold is the lower of the producer's
+    record and the LOCK's v2 cos_threshold; with neither, confirm_cos stands
+    in (never less strict). The summary gives, for every source with dHash
+    hits, its hits, confirmed hits, max pair cosine, P and verdict. A source
+    has one verdict: one that leaks in its intake batches or in Step 1 is
+    never also judged chance (detail.cleared, detail.cleared_quarantined),
+    and one judged chance in both is stated once, with each path's
+    numbers."""
+    from ..inc2 import embed_calibration as EC
+    from ..inc2 import eval_hits as EH
+    th = v.th
+    alpha, bc = float(_t(th, "D28", "source_alpha")), float(_t(th, "D28", "base_copy_share"))
+    confirm, p_conf = float(_t(th, "D28", "confirm_cos")), float(_t(th, "D28", "p_confirmed"))
+    lock = v.ev.json("splits/v2/lock_status.json") or {}
+    lec = (lock.get("embed_calibration_v2") or {}) if isinstance(lock, dict) else {}
+    lec = lec if isinstance(lec, dict) else {}
+    lock_p, lock_t = _num(lec.get("p_false")), _num(lec.get("cos_threshold"))
+
+    def judge(n, dh, emb, p, cos, rec_t):
+        ts = [t for t in (rec_t, lock_t) if t is not None]
+        dv = EH.verdict(n, dh, cos, confirm, min(ts) if ts else None, p_conf, alpha)
+        ev = EC.source_verdict(n, emb, 0, 0, p, alpha=alpha)
+        return dict(ev, dhash_hits=int(dh), dhash=dv, flagged=bool(dv["flagged"] or ev["flagged"]),
+                    why=list(dv["why"]) + list(ev["why"]))
+
+    hits, cites, chance = [], [], []
+    for src, a in sorted(_d28_intake_sources(v, lock_p).items()):
+        verdict = judge(a["images"], a["dhash"], a["embed"], a["p_false"], a["cos"], a["copy_threshold"])
+        if verdict["flagged"] or (a["base_share"] or 0.0) >= bc - EPS:  # stream-mutation: SM10
+            hits.append({"source": a["source"], "batch": a["batches"][0], "batches": a["batches"],
+                         "never_train_share": a["never_train_share"], "base_copy_share": a["base_share"],
+                         "verdict": verdict})
+            for name in a["names"]:
+                cites.append(v.cite(name, "/source"))
+                for ptr in ("/source_leak/eval_share", "/source_leak/base_share", "/images", "/copy_scan/p_false",
+                            E.pointer("eval_hits", "per_source", src, "pair_cos"),
+                            "/eval_hits/copy_threshold") + tuple(
+                        "/guard/%s" % k for k in D28_DHASH_REASONS + (D28_EMBED_REASON,)):
+                    try:
+                        cites.append(v.cite(name, ptr))
+                    except KeyError:
+                        pass
+            for side in a["sidecars"]:
+                for ptr in (E.pointer("eval_hits", "per_source", src, "pair_cos"), "/eval_hits/copy_threshold"):
+                    try:
+                        cites.append(v.cite(side, ptr))
+                    except KeyError:
+                        pass
+        elif a["dhash"]:
+            chance.append({"source": a["source"], "batch": a["batches"][0], "batches": a["batches"],
+                           "verdict": verdict, "path": "intake"})
     st = v.ev.json("step1_stream/status.json") or {}
     for src, row in sorted(((st.get("per_source") or {}).items())):
         row = row or {}
         seen = int(_num(row.get("images_seen")) or 0)
         emb = int(_num(row.get("near_eval_embed")) or 0)
         dh = sum(int(_num(row.get("decision:%s" % k)) or 0) for k in D28_DHASH_REASONS)
-        if not seen or any(h["source"] == src for h in hits):
+        if not seen:
             continue
-        verdict = EC.source_verdict(seen, emb, 0, dh, lock_p, alpha=alpha)
+        verdict = judge(seen, dh, emb, lock_p, _d28_pair_cos(row.get("eval_hit_pair_cos")),
+                        _num(row.get("eval_hit_copy_threshold")))
+        known = next((h for h in hits if str(h["source"]) == str(src)), None)
+        if known is not None:
+            # the source already leaks by its intake batches: its Step 1 dHash numbers are stated with that leak
+            if dh:
+                known.setdefault("dhash_elsewhere", []).append({"path": "Step 1", "dhash": verdict["dhash"]})
+            continue
         if verdict["flagged"]:
             hits.append({"source": src, "batch": None, "never_train_share": (emb + dh) / float(seen),
                          "base_copy_share": None, "near_eval_embed": emb, "verdict": verdict})
             cites += [v.cite("step1_stream/status.json", E.pointer("per_source", src, "near_eval_embed")),
                       v.cite("step1_stream/status.json", E.pointer("per_source", src, "images_seen"))]
+            for k in ["decision:%s" % r for r in D28_DHASH_REASONS] + ["eval_hit_pair_cos", "eval_hit_copy_threshold"]:
+                try:
+                    cites.append(v.cite("step1_stream/status.json", E.pointer("per_source", src, k)))
+                except KeyError:
+                    pass
+        elif dh:
+            chance.append({"source": src, "batch": None, "verdict": verdict, "path": "Step 1"})
+    # a source has one verdict: a leak in either path wins, so a source that leaks is never also judged chance
+    # (cleared, or named below for lifting its quarantine), and its dHash numbers of the other path are stated
+    # with its leak; a source judged chance in both paths is stated once, with each path's numbers
+    leaking = {str(h["source"]): h for h in hits}
+    one = {}
+    for c in chance:
+        if str(c["source"]) in leaking:
+            leaking[str(c["source"])].setdefault("dhash_elsewhere", []).append(
+                {"path": c.get("path") or "intake", "dhash": c["verdict"]["dhash"]})
+            continue
+        got = one.setdefault(str(c["source"]), dict(c, verdicts=[]))
+        got["verdicts"].append((c.get("path") or "intake", c["verdict"]["dhash"]))
+    chance = list(one.values())
+
+    def stated(c):
+        vs = c["verdicts"]
+        if len(vs) == 1:
+            return "%s: %s" % (c["source"], EH.describe(vs[0][1]))
+        return "%s: %s" % (c["source"], " and ".join("%s (%s)" % (EH.describe(dv), p) for p, dv in vs))
+    # every source with dHash hits is stated with its numbers (requirement 5): the leaks below, the rest here
+    judged = "; ".join(stated(c) for c in chance)
+    judged = (". dHash hits judged chance: %s" % judged) if chance else ""
+    cleared = [dict({"source": c["source"], "batch": c["batch"], "batches": c.get("batches") or [],
+                     "dhash": c["verdicts"][0][1]},
+                    **({"dhash_by_path": {p: dv for p, dv in c["verdicts"]}} if len(c["verdicts"]) > 1 else {}))
+               for c in chance]
+    # a source quarantined before D28-v2 (by the one-hit rule) whose hits are now judged chance stays
+    # quarantined: only a person lifts a quarantine (inc2.stream unquarantine), and this names them
+    qs = set(((v.queue() or {}).get("quarantined_sources") or {}))
+    srcs = v.c("/sources") or {}
+    requeued = sorted({str(c["source"]) for c in chance if str(c["source"]) in qs
+                       or (srcs.get(str(c["source"])) or {}).get("status") == "quarantined"})
+    if requeued:
+        judged += (". Quarantined, now judged chance (a person lifts a quarantine: inc2.stream unquarantine "
+                   "--source S --stream %s --decided-by human:<who>): %s" % (v.sid, ", ".join(requeued)))
     if not hits:
-        return _silent("D28", "no source with a dHash copy, more embedding hits than its false-positive rate predicts "
-                              "(P < %g) or a %g base-copy share" % (alpha, bc))
+        return _diag("D28", False, "info", "no source leaks: no dHash hit at or above the copy threshold in pair "
+                     "cosine, no confirmed dHash hits (pair cos >= %g) improbable by chance (P(Binom(images, %g) >= "
+                     "confirmed) < %g), no more embedding hits than the false-positive rate predicts (P < %g), no %g "
+                     "base-copy share%s" % (confirm, p_conf, alpha, alpha, bc, judged), cites, [], None,
+                     {"cleared": cleared, "cleared_quarantined": requeued})
     # Until each leaking source is quarantined (L24) or a person has kept it
     # (denied the quarantine), the rows of it already admitted -- including
     # augmented copies the per-row checks missed -- are still cuttable, and a
     # copy of dev raises dev, so the gate would prefer exactly those increments
     # (contract 3.2). TRAIN holds meanwhile: no segment is cut from a source
     # under a pending leak quarantine (shadow mode files L24 for a person).
-    qs = set(((v.queue() or {}).get("quarantined_sources") or {}))
-    srcs = v.c("/sources") or {}
     pending = sorted({str(h["source"]) for h in hits if str(h["source"]) not in qs
                       and (srcs.get(str(h["source"])) or {}).get("status") != "quarantined"
                       and not (srcs.get(str(h["source"])) or {}).get("leak_kept_by")})
@@ -685,13 +861,22 @@ def d28(v):
     # holds TRAIN now; L24 runs once the stream ledger shows init (an earlier L24
     # exits 1 and, twice, holds the STOP lane on a stop-loss for good).
     inited = any(e.get("event") == "init" for e in v.stream_ledger())
-    return _diag("D28", True, "crit", "source leak: %s -> %s and a card%s" % (", ".join(
-        "%s (%s)" % (h["source"], "; ".join((h.get("verdict") or {}).get("why") or [])
-                     or "%.1f %% base copies" % (100 * (h.get("base_copy_share") or 0.0))) for h in hits),
-        "L24" if inited else "L24 once the stream exists",
-        "; TRAIN holds until %s is quarantined or kept by a person" % ", ".join(pending) if pending else ""),
+
+    def why(h):
+        vd = h.get("verdict") or {}
+        dv = vd.get("dhash") or {}
+        parts = ([EH.describe(dv)] if dv.get("hits") else []) + list(vd.get("why") or [])
+        parts += ["its %s dHash hits alone: %s" % (o["path"], EH.describe(o["dhash"]))
+                  for o in h.get("dhash_elsewhere") or ()]
+        if (h.get("base_copy_share") or 0.0) >= bc - EPS:
+            parts.append("%.1f %% base copies" % (100 * h["base_copy_share"]))
+        return "; ".join(parts)
+    return _diag("D28", True, "crit", "source leak: %s -> %s and a card%s%s" % (
+        ", ".join("%s (%s)" % (h["source"], why(h)) for h in hits), "L24" if inited else "L24 once the stream exists",
+        "; TRAIN holds until %s is quarantined or kept by a person" % ", ".join(pending) if pending else "", judged),
         cites, ["L24", "OP_CARD"], None, {"leaks": hits, "pending": pending, "hold": "TRAIN" if pending else None,
-                                          "stream_exists": inited,
+                                          "stream_exists": inited, "cleared": cleared,
+                                          "cleared_quarantined": requeued,
                                           "propose": [{"lever": "L24", "source": h["source"], "cite": "D28"}
                                                       for h in hits] if inited else []})
 
@@ -1282,6 +1467,50 @@ def _stream_state(v):
             "stage_c_read": any(e.get("phase") == "read" for e in fz)}
 
 
+def _eval_hits_due(v):
+    """([batch], cites) whose dHash hits on evaluation images no record weighs
+    and for which no sidecar has been made (D28-v2): Step 1's
+    (status.json eval_hits.due, written by step1_stream's write_status) and
+    the intake batches' (a summary whose eval_hits weighs fewer hits than its
+    guard counted, without intake/<batch>/eval_hits.json in the snapshot).
+    step1_stream eval-hits (L17) makes them, one attempt per batch: a batch
+    it cannot give a sidecar fails the job."""
+    due, cites = [], []
+    st = v.ev.json("step1_stream/status.json") or {}
+    if isinstance(st.get("eval_hits"), dict):
+        for b in st["eval_hits"].get("due") or []:
+            due.append("Step 1 batch %s" % b)
+        if due:
+            cites.append(v.cite("step1_stream/status.json", "/eval_hits/due"))
+    else:
+        # a status.json written before the sidecars existed lists no batch: a source row with more dHash hits
+        # than pair cosines says a batch needs one (eval-hits finds which, and rewrites status.json)
+        for src, row in sorted((st.get("per_source") or {}).items()):
+            row = row or {}
+            dh = sum(int(_num(row.get("decision:%s" % k)) or 0) for k in D28_DHASH_REASONS)
+            if dh > len(_d28_pair_cos(row.get("eval_hit_pair_cos")) or []):
+                due.append("Step 1 (source %s; status.json predates the sidecars)" % src)
+                cites.append(v.cite("step1_stream/status.json", E.pointer("per_source", src, "decision:%s" % next(
+                    k for k in D28_DHASH_REASONS if int(_num(row.get("decision:%s" % k)) or 0)))))
+                break
+    for name in sorted(v.ev.artifacts):
+        if not (name.startswith("intake/") and name.endswith("/summary.json")):
+            continue
+        s = v.ev.json(name) or {}
+        _n, dh, _emb, counted = _d28_counts(s)
+        if not (counted and dh):
+            continue
+        cos, _t, _used = _d28_batch_cos(v, name, s, str(s.get("source")), dh, counted)
+        if (cos is None or len(cos) < dh) and v.ev.json(name[:-len("summary.json")] + "eval_hits.json") is None:
+            due.append("intake batch %s" % name.split("/")[1])
+            for k in D28_DHASH_REASONS:
+                try:
+                    cites.append(v.cite(name, "/guard/%s" % k))
+                except KeyError:
+                    pass
+    return due, cites
+
+
 def r0(v):
     """DR0: the rollout's prerequisites (contract 10 R0, R0b, R1, R2), each
     proposed once in its lane when due, in order: MAINT -- the splits build
@@ -1293,7 +1522,8 @@ def r0(v):
     R0 complete, the measurement arms (L23B, baselines marked measure), and
     once one is done, its native-resolution rescore (L23N, once). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
-    bootstrap, knowntruth, backfill)."""
+    bootstrap, knowntruth, backfill), then D28-v2's sidecars for batches
+    committed before the amendment (L17 eval-hits, _eval_hits_due)."""
     st = v.c("/stage") or {}
     out = {"MAINT": None, "DATA": None}
     cites = [v.ccite("/stage")]
@@ -1349,6 +1579,15 @@ def r0(v):
             if not s1.get(verb):
                 out["DATA"] = {"lever": "L17", "verb": verb, "why": "step1_stream %s has not run" % verb}
                 break
+        else:
+            # D28-v2 (amendment 2026-10-03): batches committed before the amendment are weighed again into
+            # sidecars, once each; until then D28 reads their dHash hits by the one-hit rule (fail closed)
+            due, dcites = _eval_hits_due(v)
+            if due:
+                out["DATA"] = {"lever": "L17", "verb": "eval-hits",
+                               "why": "D28-v2: %s count%s dHash hits on evaluation images that no record weighs and "
+                                      "no sidecar has weighed yet" % (", ".join(due), "s" if len(due) == 1 else "")}
+                cites += dcites
     # the measurement arms (baselines marked measure, 2026-09-30): proposed only
     # once R0 is complete (the stream's arm adopted, Stage C read) and nothing
     # else of it is due, so R0 READY never waits for them (they share the

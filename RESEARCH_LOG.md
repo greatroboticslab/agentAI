@@ -19,6 +19,8 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 **The box-quality arms are decided (pre-registered native rule, dev, 3 seeds each): none qualifies.** YOLO26l +0.0052 (2 pooled sd 0.0095), YOLO26m +0.0062 (above 2 pooled sd 0.0053 but under SE 0.0070), YOLO11l +0.0053 (= 2 pooled sd). With m832 (+0.0042) and s1024 (−0.0137), five larger or newer detectors give at most about +0.005 on dev and no gain in class-agnostic box quality. On a 6.8K-image base the detector is not the limit; the next lever is data.
 
+**Leak rule (D28-v2).** The 12 quarantined sources were all dHash false positives (pair cosine to the matched evaluation image at most 0.744; real copies >= 0.896). D28 now needs cosine confirmation, sums a source's batches, and fails closed without a cosine record; legacy batches are re-scored by sidecar so the 12 can be re-judged.
+
 **Data lane.** The SIU Weed Growth Stage zip (zenodo_15808623, 49.7 GB, 203,567 images) broke off after 9.1 GB; the collector could not resume, the partial file was deleted, and the second failed fetch in a row held the DATA lane from 2026-10-02 08:34Z. Fixed: resumable downloads and a lab fetch wall clock sized from bytes (CHANGELOG). The fetch restarts after deploy.
 
 ## 2026-10-01 (evening) — The boxes, not the species call, cap YOLO11m at about 0.89; three box-quality arms are pre-registered

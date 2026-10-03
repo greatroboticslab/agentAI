@@ -15,14 +15,15 @@
 #   python -u -m weed_optimizer_framework.tools.inc2.step1_stream VERB [options]
 #
 # VERB is one of bootstrap, admit, backfill, knowntruth, rejoin, serve-holds
-# (also accepted as scan-holds, the name the autopilot submits), status,
-# verify. The platform submits, for example:
+# (also accepted as scan-holds, the name the autopilot submits), eval-hits,
+# status, verify. The platform submits, for example:
 #
 #   sbatch -p GPU-shared run_inc2_stream.sh admit --intake <batch>
 #   sbatch -p GPU-shared run_inc2_stream.sh admit --registry
 #   sbatch -p GPU-shared run_inc2_stream.sh backfill           # batch b0000, once
 #   sbatch -p GPU-shared run_inc2_stream.sh knowntruth --sets tsw22,tsw23
 #   sbatch -p GPU-shared run_inc2_stream.sh scan-holds --hold h6_scan
+#   sbatch -p GPU-shared run_inc2_stream.sh eval-hits                 # D28-v2 sidecars
 #
 # Log. Slurm opens the --output file before this script runs, and a job whose
 # log directory does not exist fails without a log. The log goes to
@@ -33,8 +34,10 @@
 # Partition. Every verb runs on GPU-shared with one V100: the allocation
 # refuses RM-shared ("Invalid qos", FUNNEL_AUDIT_RUNNER.md note 33). admit and
 # knowntruth embed crops with BioCLIP-2; backfill, rejoin and serve-holds run
-# the DINOv2 copy scan when a passed calibration exists; the others leave the
-# GPU idle.
+# the DINOv2 copy scan when a passed calibration exists, and eval-hits (D28-v2,
+# docs/CONTINUOUS_LOOP.md amendment 2026-10-03) describes the dHash hits of
+# batches committed before the amendment with the same DINOv2; the others
+# leave the GPU idle.
 #
 # What the job checks before the verb runs (a refusal exits 2, an
 # environment failure exits 1, the verb's own exit code is the job's otherwise):
@@ -51,7 +54,9 @@
 #     import the outer copy, and a drift between the two (the stale
 #     model_router.py of 2026-09-27) would let two jobs judge with different
 #     code. The inc2 modules and the other modules it imports are hashed into
-#     the log, and refused when an outer copy exists and differs. This job
+#     the log, and refused when an outer copy exists and differs; eval-hits
+#     adds every file of the collector package (it re-derives an intake
+#     batch's hit images through collect.intake.rescore_eval_hits). This job
 #     never rewrites either copy: it only compares them;
 #   * the imports the verb needs.
 #
@@ -78,13 +83,13 @@ export HF_HUB_OFFLINE=1
 
 usage() {
     echo "usage: sbatch run_inc2_stream.sh VERB [options]" >&2
-    echo "  VERB: bootstrap admit backfill knowntruth rejoin serve-holds scan-holds status verify" >&2
+    echo "  VERB: bootstrap admit backfill knowntruth rejoin serve-holds scan-holds eval-hits status verify" >&2
     exit 2
 }
 
 VERB="${1:-}"
 case "$VERB" in
-    bootstrap|admit|backfill|knowntruth|rejoin|serve-holds|scan-holds|status|verify) shift ;;
+    bootstrap|admit|backfill|knowntruth|rejoin|serve-holds|scan-holds|eval-hits|status|verify) shift ;;
     *) usage ;;
 esac
 ARGS=("$@")
@@ -144,6 +149,11 @@ for m in "${PINNED[@]}"; do
 done
 # The stream's own modules and the rest it imports: logged; an outer copy that exists must agree.
 OWN="$(cd "$NESTED" && find tools/inc2 -maxdepth 1 -type f -name '*.py' | LC_ALL=C sort)"
+if [ "$VERB" = eval-hits ]; then
+    # collect.intake.rescore_eval_hits re-derives an intake batch's hit images: the whole collector package
+    OWN="$OWN $(cd "$NESTED" && find tools/collect -type f \( -name '*.py' -o -name '*.json' \) \
+                ! -path '*/__pycache__/*' | LC_ALL=C sort)"
+fi
 for m in $OWN tools/inc/__init__.py tools/inc/common.py tools/funnel/__init__.py tools/funnel/embed.py \
          tools/funnel/domain.py tools/funnel/qualify.py tools/dataset_discovery.py tools/registry_lock.py \
          tools/collect/__init__.py tools/collect/licence.py; do
@@ -165,7 +175,7 @@ fi
 IMPORTS="numpy, sklearn, joblib, PIL"
 case "$VERB" in
     admit|knowntruth) IMPORTS="$IMPORTS, torch, open_clip" ;;
-    backfill|rejoin|serve-holds|scan-holds) IMPORTS="$IMPORTS, torch, transformers" ;;
+    backfill|rejoin|serve-holds|scan-holds|eval-hits) IMPORTS="$IMPORTS, torch, transformers" ;;
 esac
 python -u -c "import $IMPORTS; print('imports: $IMPORTS')" || { echo "FATAL: the bench env lacks one of: $IMPORTS" >&2; exit 1; }
 

@@ -38,6 +38,21 @@ guard loads:
      this batch -> rejected; the guard's first refusing check -> rejected
      (the copy removed); else its label written to labels/<key>.txt and a
      manifest row;
+  6b. D28-v2 (amendment 2026-10-03): each image refused as a dHash copy of an
+     evaluation image (near_eval_v2, near_eval_variant) is weighed before its
+     copy is removed: its pair cosine with the evaluation image the guard
+     matched, both described by the v2 calibration's embedder
+     (score_eval_hits, inc2.eval_hits). It goes into its decision
+     (pair_cos) and summary.json (eval_hits), which the autopilot's D28
+     reads. Each hit is weighed against the guard's match and every other
+     evaluation image within the never-train radius, and keeps the highest.
+     Only a batch with such a hit loads the embedder; a hit that cannot be
+     weighed is recorded so, and D28 reads it as a leak (fail closed). The
+     copies are removed in a finally around the whole per-image loop, so a
+     failure anywhere in it never leaves one in the batch directory. A batch
+     committed before the amendment is weighed again into a sidecar,
+     intake/<batch>/eval_hits.json (rescore_eval_hits, which step1_stream
+     eval-hits runs), from its decisions and its staging blobs;
   7. the batch files: decisions.jsonl (every source, class, file and image
      decision, kept or rejected, with its reason), manifest.jsonl,
      guard.json (counts per reason, the indexes' shas), sources.json and,
@@ -84,6 +99,7 @@ ARCHIVE_EXTS = (".zip", ".tar", ".tgz", ".tar.gz", ".tar.xz", ".tar.bz2")
 SOURCE_LEAK_EVAL_SHARE = 0.05       # D28: >= 5 % refused by the never-train guard
 SOURCE_LEAK_BASE_SHARE = 0.20       # D28: >= 20 % base copies
 EVAL_REASONS = ("near_eval_v2", "near_eval_variant", "near_eval_embed")
+DHASH_EVAL_REASONS = ("near_eval_v2", "near_eval_variant")    # inc2.eval_hits.DHASH_HIT_REASONS (a test checks)
 
 
 # ------------------------------------------------------------------ guard
@@ -182,6 +198,72 @@ def l5_hit(l5, sha, variants):
         if m is not None and (best is None or m[1] < best[1]):
             best = m
     return best
+
+
+def _eval_matches(g, variants):
+    """inc2.eval_hits.eval_matches(g, variants): every evaluation image within
+    the never-train radius of a refused image, or None (a stand-in guard)."""
+    try:
+        from ..inc2 import eval_hits as EH
+        return EH.eval_matches(g, variants)
+    except Exception:  # noqa: BLE001 - without the list the guard's own match is weighed alone
+        return None
+
+
+def score_eval_hits(hits, copy_scan, lock_path=None, embedder=None, eval_desc=None):
+    """D28-v2's evidence for this batch (inc2.eval_hits; docs/CONTINUOUS_LOOP.md,
+    amendment 2026-10-03): the pair cosine of every image the guard refused as
+    a dHash copy of an evaluation image (near_eval_v2, near_eval_variant), with
+    the evaluation image its match names. It is computed here because the
+    guard drops those images and nothing after intake can describe them. Both
+    images are described as the copy scan describes them, by the embedder the
+    v2 calibration bound to this intake names (copy_scan, from LOCK v2); the
+    evaluation image comes from the evaluation manifests LOCK v2 records. Only
+    the refused hits are described, so a batch without one loads no model.
+
+    Each hit is weighed against the guard's match and every other evaluation
+    image within the never-train radius ("also", _eval_matches); its pair
+    cosine is the highest. eval_desc(split, key): the copy scan's own
+    evaluation descriptors, when the caller holds them (rescore_eval_hits run
+    by step1_stream eval-hits); the others are described from the manifests.
+
+    Returns (record, {hit key: result}); the record goes into summary.json as
+    "eval_hits" (inc2.eval_hits.record). Without a bound calibration (a testing
+    LOCK, a stand-in guard), or when anything fails, the hits are recorded
+    unscored with the reason, and D28 reads them by its one-hit rule (fail
+    closed). Never raises: the guard has already refused the images, this only
+    weighs them."""
+    try:
+        from ..inc2 import eval_hits as EH
+    except ImportError as e:
+        return {"hits": len(hits), "scored": 0, "why": "inc2.eval_hits is not installed (%s)" % e}, {}
+    if not hits:
+        return EH.record([], {}), {}
+    if copy_scan is None:
+        return EH.record(hits, {}, why="no v2 embedding calibration is bound to this intake: the hits are not "
+                                       "weighed"), {}
+    name = copy_scan.get("embedder")
+    kw = {"embedder_name": name, "copy_threshold": copy_scan.get("cos_threshold"),
+          "calibration": {"path": (copy_scan.get("file") or {}).get("path"),
+                          "sha256": (copy_scan.get("file") or {}).get("sha256"), "format": copy_scan.get("format")}}
+    try:
+        from ..inc2 import guard as G2
+        if embedder is None:
+            from ..funnel import embed as FE
+            model, _, pooling = str(name).rpartition(":")
+            embedder = FE.LazyEmbedder(model, pooling or "cls")
+        if embedder.name != name:
+            return EH.record(hits, {}, why="the embedder %s is not the calibration's %s" % (embedder.name, name),
+                             **kw), {}
+        paths = {(str(s), str(r["key"])): r["image"] for s, rows in G2.v2_eval_rows(lock_path).items() for r in rows}
+    except Exception as e:  # noqa: BLE001 - no embedder or no evaluation rows: unscored, read fail closed
+        return EH.record(hits, {}, why="the hits cannot be weighed (%s: %s)" % (type(e).__name__, str(e)[:200]),
+                         **kw), {}
+    items = [dict(h, eval_image=paths.get((str(h.get("split")), str(h.get("eval_key")))),
+                  also=[dict(a, eval_image=paths.get((str(a.get("split")), str(a.get("eval_key")))))
+                        for a in h.get("also") or () if isinstance(a, dict)]) for h in hits]
+    scored = EH.pair_cosines(items, embedder, eval_desc=eval_desc)
+    return EH.record(hits, scored, **kw), scored
 
 
 # ------------------------------------------------------------------ keys
@@ -299,6 +381,18 @@ def materialise(sdir, fetch_doc, root):
 
 
 # ------------------------------------------------------------------ helpers
+def _read_options(cfg, fetch_doc):
+    """normalize.read's options for a fetch: its known item's format and
+    format options, else the class names the fetch declares."""
+    ki = cfg.known_item(fetch_doc["known_item"]) if fetch_doc.get("known_item") else None
+    opts = dict((ki or {}).get("format_options") or {})
+    if (ki or {}).get("format"):
+        opts["format"] = ki["format"]
+    if not opts.get("class_names") and fetch_doc.get("classes"):
+        opts["class_names"] = [c.get("name") for c in fetch_doc["classes"]]
+    return opts
+
+
 def verify_staging(sdir):
     """fetch.json and every blob it lists, checked (StaleInput on the first
     that is missing or changed)."""
@@ -396,11 +490,13 @@ def _register(cfg, source_id, fetch_doc, bdir, batch, n_rows, class_names, lic, 
 
 # ------------------------------------------------------------------ intake
 def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testing=False, registry_path=None,
-           lock_path=None, now=None, keep_work=False):
+           lock_path=None, now=None, keep_work=False, embedder=None):
     """Intake one fetched source (module docstring). Returns the result
     record; a refusal raises (Refusal, NamesPending, GuardUnavailable,
     StaleInput) after recording a held or closed event where the state
-    changes."""
+    changes. embedder: what describes the dHash hits for D28-v2
+    (score_eval_hits); None makes the v2 calibration's own embedder when a
+    batch has a hit."""
     from . import names as NM
     from .targets import Targets
     t0 = time.time()
@@ -461,14 +557,9 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
             S.append(inc, source_id, "closed", reason="archive_escape", codes=["archive_escape"], stage="intake",
                      detail=str(e)[:500])
             raise Refusal("archive_escape", str(e), action="close")
-        ki = cfg.known_item(fetch_doc["known_item"]) if fetch_doc.get("known_item") else None
-        opts = dict((ki or {}).get("format_options") or {})
-        if (ki or {}).get("format"):
-            opts["format"] = ki["format"]
-        if not opts.get("class_names") and fetch_doc.get("classes"):
-            opts["class_names"] = [c.get("name") for c in fetch_doc["classes"]]
         try:
-            tree, res = NZ.read(root, opts, out_images=work / fetch_sha[:12] / "parquet_images")
+            tree, res = NZ.read(root, _read_options(cfg, fetch_doc),
+                                out_images=work / fetch_sha[:12] / "parquet_images")
         except NormaliseError as e:
             S.append(inc, source_id, "held", reason="normalise_failed", codes=["normalise_failed"], risk="R3",
                      stage="intake", detail=str(e)[:500])
@@ -523,6 +614,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         n_targets = len(cfg.targets)
         keys = Keys(used=(r.get("key") for r in earlier if r.get("key")), salt=fetch_sha)
         decisions, manifest = [], []
+        eval_copies = []                   # dHash copies of evaluation images, kept until they are weighed (D28-v2)
         seen_sha = {}
         reasons = {}
         per_id = {}
@@ -550,70 +642,96 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         if res.rows_without_images:
             decisions.append({"kind": "table_rows", "source": source_id, "decision": "rejected",
                               "reason": "image_not_fetched", "count": res.rows_without_images})
-        for it in sorted(res.items, key=lambda x: x["rel"]):
-            rel = it["rel"]
-            # a box whose source class is not in the class list (normalize.NO_CLASS, or an id the list lacks)
-            # is a plant of unknown class: it keeps its place with the unmapped id, so per-box admission masks
-            # it, never dropped (a dropped box leaves an unlabelled plant in a kept image, §3.2)
-            boxes = [(cmap["by_src"].get(b[0], cfg.unmapped_id),) + tuple(b[1:]) for b in it["boxes"]]
-            unlisted = sum(1 for b in it["boxes"] if b[0] not in cmap["by_src"])
-            if not boxes:
-                why = "no_box"
-                decisions.append({"kind": "image", "source": source_id, "rel": rel, "decision": "rejected",
-                                  "reason": why, "bad_boxes": it["bad"]})
-                reasons[why] = reasons.get(why, 0) + 1
-                continue
-            key = keys.make(source_id, rel)
-            ext = os.path.splitext(rel)[1].lower() or ".jpg"
-            img = bdir / "images" / (key + ext)
-            _link_or_copy(Path(it["path"]), img)
-            sha = sha256_file(img)
-            if sha in seen_sha:
-                os.unlink(img)
-                decisions.append({"kind": "image", "source": source_id, "rel": rel, "key": key, "decision": "rejected",
-                                  "reason": "exact_dup_intake", "twin": seen_sha[sha]})
-                reasons["exact_dup_intake"] = reasons.get("exact_dup_intake", 0) + 1
-                continue
-            reason, match, (dh, _var) = g.check_path(img)
-            if not reason and l5 is not None:
-                hit = l5_hit(l5, sha, _var)
-                if hit is not None:
-                    reason, match = L5_REASON, {"key": hit[0], "bits": hit[1], "why": "decision L-5 drops these "
-                                                "images from training outright"}
-            if reason:
-                os.unlink(img)
-                decisions.append({"kind": "image", "source": source_id, "rel": rel, "key": key, "decision": "rejected",
-                                  "reason": reason, "match": match, "sha256": sha})
-                reasons[reason] = reasons.get(reason, 0) + 1
-                continue
-            seen_sha[sha] = key
-            text = _label_text(boxes)
-            lab = bdir / "labels" / (key + ".txt")
-            lab.write_text(text)
-            for b in it["boxes"]:
-                nm = cmap_names.get(b[0], "(unlisted class %s)" % b[0])
-                per_src[nm] = per_src.get(nm, 0) + 1
-            counts = {}
-            for b in boxes:
-                counts[b[0]] = counts.get(b[0], 0) + 1
-                per_id[b[0]] = per_id.get(b[0], 0) + 1
-            tb = sum(v for k, v in counts.items() if 0 <= k < n_targets)
-            wh = it.get("wh") or (None, None)
-            row = {"key": key, "image": str(img), "sha256": sha, "label": str(lab), "label_sha256": sha256_text(text),
-                   "source": source_id, "session": it["group"], "capture_group": it["group"],
-                   "capture_group_basis": it["group_basis"], "licence": lic.get("id"), "licence_class": lic.get("class"),
-                   "research_only": research_only, "licence_override": person_licence, "lab_group": lab_group,
-                   "dhash": int(dh),
-                   "batch": batch, "hold_until": hold, "holds": holds, "provenance_cleared": cleared, "exhaustive_labels": exhaustive,
-                   "boxes": len(boxes), "target_boxes": tb, "unmapped_boxes": counts.get(cfg.unmapped_id, 0),
-                   "class_ids": sorted(counts), "width": wh[0], "height": wh[1], "rel": rel, "intake_utc": now_s,
-                   "bad_boxes": it["bad"], "unlisted_class_boxes": unlisted, "clipped_boxes": it["clipped"]}
-            if "h6_scan" in holds and copy_scan is not None:
-                row["copy_scan_calibration"] = {"file": copy_scan["file"]["path"], "sha256": copy_scan["file"]["sha256"],
-                                                "cos_threshold": copy_scan["cos_threshold"]}
-            manifest.append(row)
-            decisions.append({"kind": "image", "source": source_id, "rel": rel, "key": key, "decision": "kept",
-                              "reason": "kept", "target_boxes": tb, "boxes": len(boxes)})
+        try:
+            for it in sorted(res.items, key=lambda x: x["rel"]):
+                rel = it["rel"]
+                # a box whose source class is not in the class list (normalize.NO_CLASS, or an id the list lacks)
+                # is a plant of unknown class: it keeps its place with the unmapped id, so per-box admission masks
+                # it, never dropped (a dropped box leaves an unlabelled plant in a kept image, §3.2)
+                boxes = [(cmap["by_src"].get(b[0], cfg.unmapped_id),) + tuple(b[1:]) for b in it["boxes"]]
+                unlisted = sum(1 for b in it["boxes"] if b[0] not in cmap["by_src"])
+                if not boxes:
+                    why = "no_box"
+                    decisions.append({"kind": "image", "source": source_id, "rel": rel, "decision": "rejected",
+                                      "reason": why, "bad_boxes": it["bad"]})
+                    reasons[why] = reasons.get(why, 0) + 1
+                    continue
+                key = keys.make(source_id, rel)
+                ext = os.path.splitext(rel)[1].lower() or ".jpg"
+                img = bdir / "images" / (key + ext)
+                _link_or_copy(Path(it["path"]), img)
+                sha = sha256_file(img)
+                if sha in seen_sha:
+                    os.unlink(img)
+                    decisions.append({"kind": "image", "source": source_id, "rel": rel, "key": key,
+                                      "decision": "rejected", "reason": "exact_dup_intake", "twin": seen_sha[sha]})
+                    reasons["exact_dup_intake"] = reasons.get("exact_dup_intake", 0) + 1
+                    continue
+                reason, match, (dh, _var) = g.check_path(img)
+                if not reason and l5 is not None:
+                    hit = l5_hit(l5, sha, _var)
+                    if hit is not None:
+                        reason, match = L5_REASON, {"key": hit[0], "bits": hit[1], "why": "decision L-5 drops these "
+                                                    "images from training outright"}
+                if reason:
+                    dec = {"kind": "image", "source": source_id, "rel": rel, "key": key, "decision": "rejected",
+                           "reason": reason, "match": match, "sha256": sha}
+                    decisions.append(dec)
+                    reasons[reason] = reasons.get(reason, 0) + 1
+                    if reason in DHASH_EVAL_REASONS:
+                        # refused like any other; the file is removed once its pair cosine is taken (below)
+                        m = match if isinstance(match, dict) else {}
+                        eval_copies.append({"key": key, "source": source_id, "image": str(img), "split": m.get("split"),
+                                            "eval_key": m.get("key"), "also": _eval_matches(g, _var), "decision": dec})
+                    else:
+                        os.unlink(img)
+                    continue
+                seen_sha[sha] = key
+                text = _label_text(boxes)
+                lab = bdir / "labels" / (key + ".txt")
+                lab.write_text(text)
+                for b in it["boxes"]:
+                    nm = cmap_names.get(b[0], "(unlisted class %s)" % b[0])
+                    per_src[nm] = per_src.get(nm, 0) + 1
+                counts = {}
+                for b in boxes:
+                    counts[b[0]] = counts.get(b[0], 0) + 1
+                    per_id[b[0]] = per_id.get(b[0], 0) + 1
+                tb = sum(v for k, v in counts.items() if 0 <= k < n_targets)
+                wh = it.get("wh") or (None, None)
+                row = {"key": key, "image": str(img), "sha256": sha, "label": str(lab),
+                       "label_sha256": sha256_text(text), "source": source_id, "session": it["group"],
+                       "capture_group": it["group"], "capture_group_basis": it["group_basis"], "licence": lic.get("id"),
+                       "licence_class": lic.get("class"), "research_only": research_only,
+                       "licence_override": person_licence, "lab_group": lab_group, "dhash": int(dh),
+                       "batch": batch, "hold_until": hold, "holds": holds, "provenance_cleared": cleared,
+                       "exhaustive_labels": exhaustive,
+                       "boxes": len(boxes), "target_boxes": tb, "unmapped_boxes": counts.get(cfg.unmapped_id, 0),
+                       "class_ids": sorted(counts), "width": wh[0], "height": wh[1], "rel": rel, "intake_utc": now_s,
+                       "bad_boxes": it["bad"], "unlisted_class_boxes": unlisted, "clipped_boxes": it["clipped"]}
+                if "h6_scan" in holds and copy_scan is not None:
+                    row["copy_scan_calibration"] = {"file": copy_scan["file"]["path"],
+                                                    "sha256": copy_scan["file"]["sha256"],
+                                                    "cos_threshold": copy_scan["cos_threshold"]}
+                manifest.append(row)
+                decisions.append({"kind": "image", "source": source_id, "rel": rel, "key": key, "decision": "kept",
+                                  "reason": "kept", "target_boxes": tb, "boxes": len(boxes)})
+            # D28-v2: weigh each dHash copy of an evaluation image by its pair cosine
+            eval_rec, scored = score_eval_hits([{k: v for k, v in h.items() if k != "decision"}
+                                                for h in eval_copies], copy_scan, lock_path, embedder)
+        finally:
+            # the copies of evaluation images never outlive this block, whatever fails in it (an unreadable
+            # image, a full disk, the embedder): they are removed here, before anything else is written
+            for h in eval_copies:
+                if os.path.exists(h["image"]):
+                    os.unlink(h["image"])
+        for h in eval_copies:
+            got = scored.get(h["key"]) or {}
+            h["decision"]["pair_cos"] = got.get("pair_cos")
+            if got.get("pair_cos") is None:
+                h["decision"]["pair_cos_why"] = got.get("why") or eval_rec.get("why")
+            elif got.get("best") and got.get("weighed", 0) > 1:
+                h["decision"]["pair_cos_best"] = got["best"]
         manifest.sort(key=lambda r: r["key"])
         # 7. the batch files, summary last
         m_sha = write_jsonl_atomic(bdir / "manifest.jsonl", manifest)
@@ -670,6 +788,8 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                      "images": checked, "guard": {k: reasons.get(k, 0) for k in guard_reasons},
                      "decisions": {"by_reason": by_reason, "file": "decisions.jsonl", "sha256": d_sha},
                      "yield": yld, "source_leak": leak,
+                     # D28-v2: the pair cosines of the dHash copies of evaluation images (inc2.eval_hits.record)
+                     "eval_hits": eval_rec,
                      "zero_yield": kept_tb == 0, "zero_yield_reasons": dict(sorted(reasons.items())) if kept_tb == 0
                      else None, "hold_until": hold, "lab_group": lab_group, "research_only": research_only,
                      "licence_override": person_licence,
@@ -686,6 +806,181 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
     return {"status": "intaken", "source": source_id, "batch": batch, "rows": len(manifest),
             "target_boxes": kept_tb, "rejected": dict(sorted(reasons.items())), "source_leak": leak,
             "zero_yield": kept_tb == 0, "dir": str(bdir)}
+
+
+# ------------------------------------------------------------------ D28-v2 sidecar
+EVAL_HITS_NAME = "eval_hits.json"
+
+
+def _dhash_hits(summary):
+    """The dHash copies of evaluation images an intake summary counts (its
+    guard's near_eval_v2 + near_eval_variant)."""
+    g = summary.get("guard") if isinstance(summary.get("guard"), dict) else {}
+    return sum(int(g.get(k) or 0) for k in DHASH_EVAL_REASONS)
+
+
+def eval_hits_needed(summary):
+    """True when an intake summary counts dHash copies of evaluation images
+    that its own record (eval_hits) does not weigh in full: a batch committed
+    before D28-v2, or one whose hits could not be weighed."""
+    n = _dhash_hits(summary)
+    if n <= 0:
+        return False
+    eh = summary.get("eval_hits") if isinstance(summary.get("eval_hits"), dict) else {}
+    row = ((eh.get("per_source") or {}) if isinstance(eh.get("per_source"), dict) else {}).get(
+        str(summary.get("source")))
+    cos = (row or {}).get("pair_cos") if isinstance(row, dict) else None
+    return not (isinstance(cos, list) and len([c for c in cos if c is not None]) >= n)
+
+
+def rescore_eval_hits(cfg, batch, inc=None, lock_path=None, embedder=None, eval_desc=None, guard=None,
+                      testing=False, force=False):
+    """D28-v2's sidecar of an intake batch (docs/CONTINUOUS_LOOP.md, amendment
+    2026-10-03): intake/<batch>/eval_hits.json, the pair cosines of the images
+    its guard refused as dHash copies of evaluation images, for a batch whose
+    summary.json does not weigh them (committed before the amendment, or a
+    weighing that failed). The batch's own files are never rewritten.
+
+    Deterministic, from the files the batch was judged on: decisions.jsonl
+    (checked against the sha256 summary.json records) names each hit's rel,
+    key, sha256 and the guard's match; the fetch it was intaken from
+    (summary.json's fetch sha256; the staging record and blobs checked by
+    verify_staging) is materialised and normalised again in a work directory
+    of its own, removed at the end whatever happens; each hit image is the
+    file at its rel, which must hash to the decision's sha256 and be refused
+    again by GuardV2 (LOCK v2) with the same reason and match. It is then
+    weighed as intake weighs a hit (score_eval_hits: the v2 calibration's
+    embedder, the guard's match and every evaluation image within the
+    radius; eval_desc, the copy scan's evaluation descriptors, when the
+    caller holds them). A hit that cannot be re-derived or weighed is
+    recorded unweighed with the reason, and D28 reads it by the one-hit rule
+    (fail closed). The sidecar, which the snapshot ships, holds the record
+    (inc2.eval_hits.record), the hit keys, their reasons and pair cosines:
+    no pixels, no evaluation paths and no evaluation keys (decisions.jsonl
+    names each hit's match).
+
+    Returns {"status": "written" | "not_needed" | "exists", "batch", "path",
+    "hits", "scored"}. Raises CollectError when the batch is not committed or
+    its decisions do not hash as its summary records, GuardUnavailable when
+    GuardV2 or the v2 calibration cannot be loaded, CollectError when hits
+    were re-derived but none could be weighed (the embedder, not the batch),
+    and LockHeld while another intake writes: no sidecar then, so the batch
+    is tried again."""
+    from ..inc2 import eval_hits as EH
+    t0 = time.time()
+    bdir = intake_dir(inc) / safe_name(batch)
+    if safe_name(batch) != str(batch) or not (bdir / "summary.json").is_file():
+        raise CollectError("intake batch %r is not committed (no %s)" % (batch, bdir / "summary.json"))
+    summ = read_json(bdir / "summary.json", "intake summary")
+    side = bdir / EVAL_HITS_NAME
+    n = _dhash_hits(summ)
+    out = {"batch": batch, "path": str(side), "hits": n, "scored": None}
+    if n <= 0 or (not eval_hits_needed(summ) and not force):
+        return dict(out, status="not_needed")
+    if side.is_file() and not force:
+        return dict(out, status="exists")
+    dpath = bdir / "decisions.jsonl"
+    want_d = ((summ.get("decisions") or {}) if isinstance(summ.get("decisions"), dict) else {}).get("sha256")
+    if not dpath.is_file() or not want_d or sha256_file(dpath) != want_d:
+        raise CollectError("%s does not hash to the sha256 %s records" % (dpath, bdir / "summary.json"))
+    source = str(summ.get("source"))
+    hits = [d for d in read_jsonl(dpath) if d.get("kind") == "image" and d.get("decision") == "rejected"
+            and d.get("reason") in DHASH_EVAL_REASONS]
+    if len(hits) != n:
+        raise CollectError("%s lists %d dHash copies of evaluation images, its summary counts %d"
+                           % (dpath, len(hits), n))
+    want_f = (((summ.get("inputs") or {}).get("fetch") or {}) if isinstance(summ.get("inputs"), dict)
+              else {}).get("sha256")
+    failed, items = {}, []
+    with intake_lock(inc, what="collect eval-hits %s" % batch):
+        sdir = staging_dir(source, inc)
+        work = intake_dir(inc) / "work" / safe_name(source) / ("eval_hits_%s" % str(want_f or "none")[:12])
+        try:
+            why = None
+            try:
+                fetch_doc, fetch_sha = verify_staging(sdir)
+                if fetch_sha != want_f:
+                    why = "the staging of %s now holds another fetch (%s, the batch was intaken from %s)" % (
+                        source, fetch_sha[:12], str(want_f)[:12])
+            except CollectError as e:
+                fetch_doc, why = None, "the staging of %s cannot be read again (%s)" % (source, e)
+            by_rel, g, copy_scan = {}, None, None
+            if why is None:
+                try:
+                    materialise(sdir, fetch_doc, work / "x")
+                    _tree, res = NZ.read(work / "x", _read_options(cfg, fetch_doc), out_images=work / "parquet_images")
+                    by_rel = {it["rel"]: it["path"] for it in res.items}
+                except Exception as e:  # noqa: BLE001 - nothing re-derived: every hit stays unweighed (fail closed)
+                    why = "the batch's images cannot be re-derived (%s: %s)" % (type(e).__name__, str(e)[:200])
+            if why is None:
+                # the guard and the calibration are the environment, not the batch: without them this raises
+                # (GuardUnavailable), and no sidecar uses up the batch's attempt
+                g = guard if guard is not None else default_guard(lock_path)
+                copy_scan, _rec = load_copy_scan(lock_path)
+            for d in hits:
+                key, m = str(d.get("key")), d.get("match") if isinstance(d.get("match"), dict) else {}
+                if why is not None:
+                    failed[key] = why
+                    continue
+                path = by_rel.get(d.get("rel"))
+                if path is None:
+                    failed[key] = "its rel %r is not in the source read again" % d.get("rel")
+                    continue
+                try:
+                    img = work / "hits" / (key + (os.path.splitext(str(d.get("rel")))[1].lower() or ".jpg"))
+                    _link_or_copy(Path(path), img)
+                    if sha256_file(img) != d.get("sha256"):
+                        failed[key] = "the file at its rel no longer hashes to the decision's sha256"
+                        continue
+                    reason, match, (_dh, var) = g.check_path(img)
+                except Exception as e:  # noqa: BLE001 - this hit stays unweighed (fail closed)
+                    failed[key] = "the re-derived image cannot be checked (%s: %s)" % (type(e).__name__, str(e)[:200])
+                    continue
+                mm = match if isinstance(match, dict) else {}
+                if reason != d.get("reason") or (mm.get("split"), mm.get("key")) != (m.get("split"), m.get("key")):
+                    # reasons only: this goes into the sidecar the snapshot ships, which names no evaluation image
+                    # (decisions.jsonl keeps the recorded match)
+                    failed[key] = "GuardV2 judges the re-derived image otherwise (%s, recorded %s%s)" % (
+                        reason, d.get("reason"), "" if reason != d.get("reason")
+                        else "; another evaluation image than the recorded match")
+                    continue
+                items.append({"key": key, "source": source, "image": str(img), "split": m.get("split"),
+                              "eval_key": m.get("key"), "also": _eval_matches(g, var)})
+            rec0, scored = score_eval_hits(items, copy_scan, lock_path, embedder, eval_desc) if items else ({}, {})
+            if items and not any((scored.get(it["key"]) or {}).get("pair_cos") is not None for it in items):
+                # re-derived but not one weighed: the calibration, the embedder or the evaluation images failed,
+                # not the batch; a sidecar now would use up its attempt, so none is written and the job fails
+                raise CollectError("the re-derived hits of %s could not be weighed (%s): no sidecar is written"
+                                   % (batch, rec0.get("why") or sorted({(scored.get(it["key"]) or {}).get("why")
+                                                                        for it in items} - {None})[:2]))
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+    merged = {}
+    for d in hits:
+        key = str(d.get("key"))
+        got = scored.get(key) or {}
+        if key in failed:
+            merged[key] = {"pair_cos": None, "why": failed[key]}
+        elif got.get("pair_cos") is not None:
+            merged[key] = got
+        else:
+            merged[key] = {"pair_cos": None, "why": got.get("why") or rec0.get("why") or "not weighed"}
+    rec = EH.record([{"key": str(d.get("key")), "source": source} for d in hits], merged,
+                    embedder_name=rec0.get("embedder") or (copy_scan or {}).get("embedder"),
+                    copy_threshold=rec0.get("copy_threshold") if rec0 else (copy_scan or {}).get("cos_threshold"),
+                    calibration=rec0.get("calibration"))
+    pairs = EH.sidecar_pairs([{"key": str(d.get("key")), "source": source, "reason": d.get("reason"),
+                               "match": d.get("match")} for d in hits], merged, eval_keys=False)
+    doc = header("eval_hits", cfg, inputs={"summary": {"path": str(bdir / "summary.json"),
+                                                       "sha256": sha256_file(bdir / "summary.json")},
+                                           "decisions": {"path": str(dpath), "sha256": want_d},
+                                           "fetch": {"path": str(staging_dir(source, inc) / "fetch.json"),
+                                                     "sha256": want_f}}, testing=testing)
+    doc.update(EH.sidecar(batch, rec, pairs, "intake", source=source, seconds=round(time.time() - t0, 3)))
+    write_json_atomic(side, doc)
+    return dict(out, status="written", scored=rec["scored"],
+                max_pair_cos=max((c for v in rec["per_source"].values() for c in v["pair_cos"]), default=None),
+                why=sorted(set(failed.values()))[:5] or None)
 
 
 def _class_name(cfg, cid):

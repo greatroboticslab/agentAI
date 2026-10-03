@@ -169,8 +169,14 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # on the list), and the measurement arms' native-resolution records, which
 # read dev only (inc2.baseline's capacity/native_v1.json and
 # <exp>/native_rescore.json; native_v1_report.* holds a non-decision exam and
-# is not on the list). A stream ledger has no experiment: it is kept as a JSON list
-# artifact, not under Evidence.ledgers.
+# is not on the list), and D28-v2's intake sidecars, intake/<batch>/eval_hits.json,
+# which weigh again the dHash hits of an intake batch committed before the
+# amendment and which the snapshot ships for D28 (pair cosines and hit keys,
+# no evaluation key, no pixels). A Step 1 sidecar,
+# step1_stream/eval_hits/<batch>.json, is not on the list: status.json carries
+# its fold, and the sidecar names each hit's matched evaluation key. A stream
+# ledger has no experiment: it is kept as a JSON list artifact, not under
+# Evidence.ledgers.
 BATCH_RE = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}"
 STREAM_FILES = ("queue_summary.json", "ledger.jsonl", "dev_scores.json")
 ALLOWED = tuple(re.compile(p) for p in (
@@ -180,7 +186,7 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"funnel/(?P<file>%s)\Z" % "|".join(re.escape(f) for f in FUNNEL_FILES),
     r"stream/(?P<sid>%s)/(?P<file>%s)\Z" % (EXP_RE, "|".join(re.escape(f) for f in STREAM_FILES)),
     r"step1_stream/status\.json\Z",
-    r"intake/(?P<batch>%s)/summary\.json\Z" % BATCH_RE,
+    r"intake/(?P<batch>%s)/(?:summary|eval_hits)\.json\Z" % BATCH_RE,
     r"intake/(?P<file>sources|placement)\.json\Z",
     r"splits/(?P<ver>v[0-9]{1,3})/lock_status\.json\Z",
     r"capacity/(?:capacity|native)_v1\.json\Z",

@@ -607,9 +607,20 @@ class World(object):
         self._w("step1_stream/status.json", st)
 
     # -- group D: the intake batch summary, the source ledger, the probe
-    def intake(self, batch, source, images=100, eval_share=0.0, base_share=0.0, target_boxes=None, reasons=None):
+    def intake(self, batch, source, images=100, eval_share=0.0, base_share=0.0, target_boxes=None, reasons=None,
+               pair_cos=None, copy_threshold=0.946384):
+        """pair_cos: the pair cosines collect intake records for the batch's
+        dHash hits (summary.json eval_hits, D28-v2); None writes no record."""
         tb = images * 2 if target_boxes is None else target_boxes
-        self._w("intake/%s/summary.json" % batch, {
+        extra = {}
+        if pair_cos is not None:
+            hits = sum(int((reasons or {}).get(k, 0)) for k in ("near_eval_v2", "near_eval_variant"))
+            cos = sorted((float(c) for c in pair_cos), reverse=True)
+            extra["eval_hits"] = {"format": "inc2-eval-hit-cosines/1", "copy_threshold": copy_threshold,
+                                  "hits": hits, "scored": len(cos), "why": None,
+                                  "per_source": {source: {"hits": hits, "scored": len(cos), "pair_cos": cos,
+                                                          "max_pair_cos": cos[0] if cos else None}}}
+        self._w("intake/%s/summary.json" % batch, dict(extra, **{
             "format": "collect-summary/1", "source": source, "batch": batch, "rows": images,
             # the flat fields collect.intake writes for D28: the images the guard checked and its refusals
             "images": images + sum((reasons or {}).values()), "guard": dict(reasons or {}),
@@ -617,7 +628,7 @@ class World(object):
                       "target_images": images if tb else 0, "target_boxes": tb, "rejected": reasons or {}},
             "source_leak": {"eval_share": eval_share, "base_share": base_share,
                             "fires": eval_share >= 0.05 or base_share >= 0.2},
-            "zero_yield": tb == 0, "zero_yield_reasons": (reasons or {}) if tb == 0 else None})
+            "zero_yield": tb == 0, "zero_yield_reasons": (reasons or {}) if tb == 0 else None}))
 
     def sources(self, rows):
         """Events of the collector's source ledger (collect.state: source,
