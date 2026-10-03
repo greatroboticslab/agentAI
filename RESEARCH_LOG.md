@@ -77,6 +77,8 @@ The intake now takes a balanced 40,000 of its frames, the base v3.1 design's cap
 
 To pass 30,000, base v3 revision 2 (pre-registered before any build) adds SIU's intake batch as a family capped at 35 % of the base, like the dock family. One greenhouse of potted plants should not be most of the training set; uncapped it would be about 63 %. Expected arm B: about 35K images.
 
+SIU's first intake stopped on 19 unresolved class names, as designed (the names round, not a failure). Eleven of them were `AMATA_week_<n>`: the record calls the species AMATU (waterhemp), but the files use AMATA, which EPPO reads as A. x tamariscinus. A source card now maps them to waterhemp, a cwd12 target, so the re-intake keeps those boxes.
+
 ## 2026-10-01 (evening) — The boxes, not the species call, cap YOLO11m at about 0.89; three box-quality arms are pre-registered
 
 **Accuracy.** Best sealed test is unchanged: 0.8786 ± 0.0018 (YOLO11m on base_v2), gap to 0.90 = 0.021. The committed incumbent reads dev 0.8606; test is read at the next milestone.

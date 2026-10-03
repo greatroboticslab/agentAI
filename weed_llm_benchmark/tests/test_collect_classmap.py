@@ -97,6 +97,11 @@ def test_map():
           CM.eppo_prefix_binomial(cfg, "WEEDS_1") is None and CM.eppo_prefix_binomial(cfg, "amapa_week_5") is None
           and CM.eppo_prefix_binomial(cfg, "AMAPAX_1") is None and CM.eppo_prefix_binomial(cfg, None) is None
           and CM.eppo_prefix_binomial(cfg, "SETFA_week_3") == "Setaria faberi")
+    sc = {c["name"]: c for c in CM.build("zenodo_15808623", cls(["AMATA_week_5", "AMAPA_week_5"]), cfg, nm,
+                                          tg)["classes"]}
+    check("  the source's card maps its AMATA_week_<n> classes (the record's 'AMATU (waterhemp)') to Waterhemp; "
+          "the other codes still map by prefix", sc["AMATA_week_5"]["inc_id"] == ids["Waterhemp"]
+          and sc["AMATA_week_5"]["basis"] == "card" and sc["AMAPA_week_5"]["basis"] == "eppo_prefix", sc)
     hb = CM.build("zenodo_15808623", cls(["AMAPA_x"], hints={"AMAPA_x": ["CHEAL"]}), cfg, nm, tg)["classes"][0]
     check("  a hint the format carries outranks a code read off the name's first token",
           hb["basis"] == "hint" and hb["inc_id"] == cfg.other_id, hb)

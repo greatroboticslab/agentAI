@@ -518,6 +518,57 @@
    },
    "table_source": "the annotation index's upload record of PAGS8 (api/upload_info, category_statistics), read 2026-09-28: eight growth-stage categories of one species",
    "pinned_by": "group D build 2026-09-28, pending the owner's acceptance (section 10, item 5)"
+  },
+  "zenodo_15808623": {
+   "by_name": {
+    "AMATA_week_1": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_2": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_3": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_4": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_5": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_6": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_7": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_8": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_9": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_10": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_11": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_12": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_13": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_14": {
+     "taxon": "Amaranthus tuberculatus"
+    },
+    "AMATA_week_15": {
+     "taxon": "Amaranthus tuberculatus"
+    }
+   },
+   "table_source": "Zenodo record 15808623 (SIU Weed Growth Stage), its description: the 16 species include 'AMATU (waterhemp)'; its Pascal VOC files name that species 'AMATA_week_<n>' (the 2026-10-03 intake's names_pending list: AMATA_week_1 ... AMATA_week_11, no AMATU). EPPO's AMATA is Amaranthus x tamariscinus (gd.eppo.int, checked 2026-10-03); the record's own species list decides, as a card does (FUNNEL_AUDIT H3a). Weeks 12-15 are listed in case of more weeks.",
+   "pinned_by": "human:harry567566@gmail.com under the 2026-09-30 grant, 2026-10-03"
   }
  },
  "known_items_why": "section 7.3: an audit of discovery recall (S1b), not a seed list; each stays fetchable after a recorded miss",
