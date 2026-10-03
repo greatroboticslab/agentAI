@@ -75,6 +75,7 @@ labels.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -413,6 +414,50 @@ def verify_staging(sdir):
     return doc, sha256_file(p)
 
 
+def cap_items(items, cap, seed):
+    """(rels taken, record) when more than `cap` items carry a box (config
+    budgets.intake_max_images), else (None, None). The taken items are drawn
+    round-robin over class sets (the image's source class ids), inside one
+    class set round-robin over capture groups, inside a group in an order
+    seeded by `seed` (the fetch record's sha256): every class set, then every
+    group (a video's frames), is reached before any gets a second image, and
+    the same fetch takes the same images on every run. The rest are deferred,
+    not judged, and recorded as such (decision 'deferred'): no later batch
+    takes them yet, since an intake of a fetch already committed is a no-op."""
+    boxed = [it for it in items if it["boxes"]]
+    if not cap or len(boxed) <= int(cap):
+        return None, None
+    cap = int(cap)
+
+    def h(*xs):
+        return hashlib.sha256("\0".join([str(seed)] + [str(x) for x in xs]).encode()).hexdigest()
+
+    by_cls = {}
+    for it in boxed:
+        ck = ",".join(sorted({str(b[0]) for b in it["boxes"]}))
+        by_cls.setdefault(ck, {}).setdefault(str(it.get("group") or it["rel"]), []).append(it)
+    queues = {}
+    for ck, groups in by_cls.items():
+        lists = [sorted(v, key=lambda x: h("item", x["rel"]))
+                 for _g, v in sorted(groups.items(), key=lambda kv: h("group", ck, kv[0]))]
+        q = []
+        for j in range(max(len(l) for l in lists)):
+            q.extend(l[j] for l in lists if j < len(l))
+        queues[ck] = q
+    order = sorted(queues, key=lambda ck: h("class", ck))
+    taken, j = [], 0
+    while len(taken) < cap:
+        for ck in order:
+            if j < len(queues[ck]):
+                taken.append(queues[ck][j]["rel"])
+                if len(taken) == cap:
+                    break
+        j += 1
+    return set(taken), {"cap": cap, "eligible": len(boxed), "taken": len(taken), "deferred": len(boxed) - len(taken),
+                        "class_sets": len(by_cls), "groups": sum(len(g) for g in by_cls.values()),
+                        "seed": str(seed)[:12], "basis": "round-robin: class sets, capture groups, seeded order"}
+
+
 def _earlier_manifests(inc):
     out = []
     for b in read_jsonl(batches_ledger(inc), missing_ok=True):
@@ -585,7 +630,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                                    names=cmap["pending"], classes=[{"id": c["id"], "name": c["name"],
                                                                     "hints": c.get("hints")} for c in res.classes]))
             S.append(inc, source_id, "held", reason="names_pending", codes=["names_pending"], stage="intake",
-                     names=cmap["pending"][:50])
+                     names=cmap["pending"][:200])
             raise NamesPending(source_id, cmap["pending"])
         # 6. the batch
         batches = read_jsonl(batches_ledger(inc), missing_ok=True)
@@ -642,9 +687,28 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         if res.rows_without_images:
             decisions.append({"kind": "table_rows", "source": source_id, "decision": "rejected",
                               "reason": "image_not_fetched", "count": res.rows_without_images})
+        items = sorted(res.items, key=lambda x: x["rel"])
+        taken, cap_rec = cap_items(items, cfg.intake_max_images(), fetch_sha)
+        t_budget = cfg.intake_max_seconds()
+        time_deferred = 0
+        if taken is not None:
+            for it in items:
+                if it["boxes"] and it["rel"] not in taken:
+                    decisions.append({"kind": "image", "source": source_id, "rel": it["rel"], "decision": "deferred",
+                                      "reason": "over_intake_cap"})
+            items = [it for it in items if not it["boxes"] or it["rel"] in taken]
         try:
-            for it in sorted(res.items, key=lambda x: x["rel"]):
+            for idx, it in enumerate(items):
                 rel = it["rel"]
+                if t_budget and it["boxes"] and time.time() - t0 > t_budget:
+                    # the job's wall clock (budgets.intake_max_seconds): the rest is deferred, not judged, so
+                    # the batch commits inside the job's limit instead of timing out with nothing
+                    late = [x for x in items[idx:] if x["boxes"]]
+                    for x in late:
+                        decisions.append({"kind": "image", "source": source_id, "rel": x["rel"],
+                                          "decision": "deferred", "reason": "over_intake_time"})
+                    time_deferred = len(late)
+                    break
                 # a box whose source class is not in the class list (normalize.NO_CLASS, or an id the list lacks)
                 # is a plant of unknown class: it keeps its place with the unmapped id, so per-box admission masks
                 # it, never dropped (a dropped box leaves an unlabelled plant in a kept image, §3.2)
@@ -759,7 +823,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         _register(cfg, source_id, fetch_doc, bdir, batch, len(manifest), [c["name"] for c in res.classes], lic,
                   registry_path=registry_path, research_only=research_only, override=person_licence)
         kept_tb = sum(r["target_boxes"] for r in manifest)
-        seen_imgs = len(res.items) + len(res.images_without_labels)
+        seen_imgs = len(items) - time_deferred + len(res.images_without_labels)
         eval_hits = sum(reasons.get(k, 0) for k in EVAL_REASONS)
         base_hits = reasons.get("base_copy", 0) + reasons.get(L5_REASON, 0)
         checked = len(manifest) + sum(reasons.get(k, 0) for k in ("unhashable",) + EVAL_REASONS + (
@@ -774,6 +838,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
             "boxes_by_class": {_class_name(cfg, k): v for k, v in sorted(per_id.items())},
             "boxes_by_source_class": dict(sorted(per_src.items())),
             "rejected": dict(sorted(reasons.items())), "bytes": fetch_doc.get("bytes"),
+            "images_deferred": (cap_rec or {}).get("deferred", 0) + time_deferred,
             "target_boxes_per_gb": round(kept_tb / gb, 3) if gb > 0 else None}
         summ = header("summary", cfg, inputs={"manifest": {"path": str(bdir / "manifest.jsonl"), "sha256": m_sha},
                                               "decisions": {"path": str(bdir / "decisions.jsonl"), "sha256": d_sha},
@@ -793,7 +858,8 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                      "zero_yield": kept_tb == 0, "zero_yield_reasons": dict(sorted(reasons.items())) if kept_tb == 0
                      else None, "hold_until": hold, "lab_group": lab_group, "research_only": research_only,
                      "licence_override": person_licence,
-                     "format": res.format, "copy_scan": copy_scan_rec,
+                     "format": res.format, "copy_scan": copy_scan_rec, "intake_cap": cap_rec,
+                     "intake_time": {"budget_s": t_budget, "deferred": time_deferred},
                      "seconds": round(time.time() - t0, 3)})
         write_json_atomic(bdir / "summary.json", summ)
         append_chained(batches_ledger(inc), {"format": FORMATS["batch"], "ts": utc(), "batch": batch,

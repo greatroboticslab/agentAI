@@ -379,13 +379,21 @@ def _fold_sources(rows, facts=True):
     does not keep; None when no fetched event says. With the collector's
     fold, and `facts` (the whole ledger was read), each source also carries
     `fetched_events` and `open_fetches` (fetch_facts), which the autopilot's
-    byte limits count; with any of these missing, no source carries them."""
+    byte limits count; with any of these missing, no source carries them.
+    Each source also carries `pending_names` and `pending_ts`: the class names
+    and time of its last `held` event for names_pending at intake (collect.intake: the
+    names the offline resolver lacked, lever L26), None once a later event
+    of the source supersedes that hold."""
     rows = [r for r in rows if isinstance(r, dict) and r.get("source")]
     rows = sorted(rows, key=lambda r: (str(r.get("ts") or ""), str(r.get("source") or "")))
-    last_fetch = {}
+    last_fetch, pending = {}, {}
     for r in rows:
         if r.get("event") == "fetched" and isinstance(r.get("complete"), bool):
             last_fetch[str(r["source"])] = (r["complete"], r.get("remaining"))
+        if r.get("event") == "held" and r.get("reason") == "names_pending" and r.get("stage") == "intake":
+            pending[str(r["source"])] = ([str(n) for n in (r.get("names") or [])][:200], r.get("ts"))
+        elif r.get("event") in ("held", "closed", "released", "intaken"):
+            pending.pop(str(r["source"]), None)
     try:
         from ..collect import state as CS
         out = {str(k): v for k, v in CS.fold(rows).items()}
@@ -401,6 +409,7 @@ def _fold_sources(rows, facts=True):
         if isinstance(row, dict):
             done, left = last_fetch.get(src, (None, None))
             row["fetch_complete"], row["fetch_remaining"] = done, left
+            row["pending_names"], row["pending_ts"] = pending.get(src, (None, None))
     return out
 
 

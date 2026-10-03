@@ -387,7 +387,7 @@ def precheck(v, cand):
     # a source mid-pipeline (being fetched, fetched, intaken) takes its next
     # pipeline step first; an admitted one is collected again only when its
     # last fetch stopped at a byte cap (partial: the next shard)
-    if cand.get("status") in ("quarantined", "closed", "held", "fetching", "fetched", "intaken") or (
+    if cand.get("status") in ("quarantined", "closed", "held", "fetching", "fetched", "names_pending", "intaken") or (
             cand.get("status") == "admitted" and not cand.get("partial")):
         refuse.append("source status %s" % cand.get("status"))
     lic = str(cand.get("licence") or "").strip().lower()
@@ -1666,12 +1666,21 @@ def compare_due(v):
 
 def pipeline(v):
     """DPIPE: a source part-way through the DATA pipeline takes its next step
-    (fetched on the lab -> sync; fetched -> intake; intaken -> admit its batch)."""
+    (fetched on the lab -> sync; fetched -> intake; intaken -> admit its batch;
+    an intake refused for class names -> L26 on the lab, then L16S of the
+    names layer, after which the stream makes it fetched again)."""
     srcs = v.c("/sources") or {}
     for s in sorted(srcs):
         r = srcs[s] or {}
         nxt = None
-        if r.get("status") == "fetched" and r.get("placement") == "lab" and not r.get("synced"):
+        if r.get("status") == "names_pending":
+            if not r.get("pending_names"):
+                continue                     # the round waits for the fold's names (a refusal line came first)
+            if not r.get("names_resolved"):
+                nxt = {"lever": "L26", "source": s}
+            elif not r.get("names_synced"):
+                nxt = {"lever": "L16S", "source": s, "names": 1}
+        elif r.get("status") == "fetched" and r.get("placement") == "lab" and not r.get("synced"):
             nxt = {"lever": "L16S", "source": s}
         elif r.get("status") == "fetched":
             nxt = {"lever": "L16I", "source": s}

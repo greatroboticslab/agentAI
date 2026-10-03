@@ -425,6 +425,57 @@ def test_licence_override(cfg):
           and e.code == "licence_refused" and e.action == "close", e)
 
 
+def test_intake_cap(cfg):
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.collect.config import CollectConfig
+    print("an intake past budgets.intake_max_images takes a balanced, seeded subset and defers the rest")
+    ref = "cacacaca-0000-0000-0000-000000000012"
+    sid = "weedai_" + ref
+    cats = [{"id": 1, "name": "weed: amaranthus palmeri"}, {"id": 2, "name": "weed: chenopodium album"}]
+    names = ["clipA.mp4_%d.jpg" % i for i in range(4)] + ["clipB.mp4_%d.jpg" % i for i in range(4)] + \
+        ["clipC.mp4_%d.jpg" % i for i in range(2)]
+    imgs = {n: W.img_bytes(700 + i) for i, n in enumerate(names)}
+    order = sorted(imgs)
+    anns = [{"id": i + 1, "image_id": i, "category_id": 2 if n.startswith("clipC") else 1, "bbox": [10, 20, 40, 40]}
+            for i, n in enumerate(order)]
+    raw = json.loads(json.dumps(cfg.raw))
+    raw["budgets"]["intake_max_images"] = 4
+    cfg2 = CollectConfig(raw, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    fetch_simple(cfg2, ref, coco_files(imgs, cats, anns), cats=("weed: amaranthus palmeri", "weed: chenopodium album"))
+    r = I.intake(cfg2, sid, guard=W.FakeGuard())
+    bdir = pathlib.Path(r["dir"])
+    sm = json.loads((bdir / "summary.json").read_text())
+    rows = [json.loads(l) for l in (bdir / "manifest.jsonl").read_text().splitlines()]
+    dec = [json.loads(l) for l in (bdir / "decisions.jsonl").read_text().splitlines()]
+    deferred = [d for d in dec if d.get("decision") == "deferred"]
+    kept = sorted(row["rel"].rsplit("/", 1)[-1] for row in rows)
+    check("4 of 10 images taken, 6 deferred (decision 'deferred', over_intake_cap), not judged",
+          len(rows) == 4 and len(deferred) == 6 and all(d["reason"] == "over_intake_cap" for d in deferred)
+          and sm["intake_cap"]["taken"] == 4 and sm["intake_cap"]["deferred"] == 6
+          and sm["yield"]["images_deferred"] == 6 and sm["yield"]["images_seen"] == 4
+          and len(list((bdir / "images").iterdir())) == 4, (kept, sm.get("intake_cap"), sm["yield"]))
+    check("  both class sets are reached, and the Palmer set alternates its two videos",
+          sum(k.startswith("clipC") for k in kept) == 2 and sum(k.startswith("clipA") for k in kept) == 1
+          and sum(k.startswith("clipB") for k in kept) == 1 and sm["intake_cap"]["class_sets"] == 2
+          and sm["intake_cap"]["groups"] == 3, kept)
+    raw3 = json.loads(json.dumps(cfg.raw))
+    raw3["budgets"]["intake_max_seconds"] = 1e-9
+    cfg3 = CollectConfig(raw3, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    ref3 = "cacacaca-0000-0000-0000-000000000013"
+    fetch_simple(cfg3, ref3, coco_files(imgs, cats, anns), cats=("weed: amaranthus palmeri", "weed: chenopodium album"))
+    r3 = I.intake(cfg3, "weedai_" + ref3, guard=W.FakeGuard())
+    sm3 = json.loads((pathlib.Path(r3["dir"]) / "summary.json").read_text())
+    dec3 = [json.loads(l) for l in (pathlib.Path(r3["dir"]) / "decisions.jsonl").read_text().splitlines()]
+    check("past budgets.intake_max_seconds the images not yet judged are deferred (over_intake_time) and the batch "
+          "commits", sm3["intake_time"]["deferred"] == 10 and sm3["rows"] == 0
+          and sum(d.get("reason") == "over_intake_time" for d in dec3) == 10 and sm3["yield"]["images_deferred"] == 10
+          and sm3["yield"]["images_seen"] == 0, (sm3.get("intake_time"), sm3["yield"]))
+    again, rec = I.cap_items([{"rel": n, "group": n.split(".mp4")[0], "boxes": [(1,)]} for n in order], 4, "s")
+    check("  the same seed takes the same images; under the cap nothing is deferred",
+          again == I.cap_items([{"rel": n, "group": n.split(".mp4")[0], "boxes": [(1,)]} for n in order], 4, "s")[0]
+          and I.cap_items([{"rel": "a", "group": "a", "boxes": [(1,)]}], 4, "s") == (None, None), rec)
+
+
 def fetch_simple(cfg, ref, files, cats=("weed: amaranthus palmeri",), licence="https://creativecommons.org/licenses/by/4.0/"):
     """Fetch a one-archive annotation-index source of the given files; returns its source id."""
     from weed_optimizer_framework.tools.collect import fetch as F
@@ -1253,6 +1304,7 @@ def main():
         test_pending_and_licence(cfg)
         test_research_only(cfg)
         test_licence_override(cfg)
+        test_intake_cap(cfg)
         test_ftp_box_table(cfg)
         test_unlisted_and_clearance(cfg)
         test_copy_rule_and_keys(cfg)

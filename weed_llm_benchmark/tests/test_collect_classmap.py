@@ -85,6 +85,25 @@ def test_map():
           and b["weed: amaranthus palmeri (BBCH10-12)"]["basis"] == "hint")
     check("a vernacular relative is unmapped (a common name never maps)", b["Redroot Pigweed"]["inc_id"] == 13
           and b["Redroot Pigweed"]["via"] == "vernacular", b["Redroot Pigweed"])
+    # zenodo_15808623 (SIU Weed Growth Stage) names its 174 classes "<EPPO>_week_<n>"
+    siu = CM.build("zenodo_15808623", cls(["AMAPA_week_5", "CHEAL_week_11", "AMAPA week 2"]), cfg, nm, tg)
+    sb = {c["name"]: c for c in siu["classes"]}
+    check("an EPPO code leading a name maps by its binomial: AMAPA_week_5 -> PalmerAmaranth (basis eppo_prefix)",
+          sb["AMAPA_week_5"]["inc_id"] == ids["PalmerAmaranth"] and sb["AMAPA_week_5"]["basis"] == "eppo_prefix"
+          and sb["AMAPA week 2"]["inc_id"] == ids["PalmerAmaranth"], sb["AMAPA_week_5"])
+    check("  CHEAL_week_11 -> the reject class (Chenopodium album)", sb["CHEAL_week_11"]["inc_id"] == cfg.other_id
+          and sb["CHEAL_week_11"]["taxon"] == "Chenopodium album" and not siu["pending"], sb["CHEAL_week_11"])
+    check("  a leading token the EPPO table lacks, a lower-case code or a code without a separator is no EPPO prefix",
+          CM.eppo_prefix_binomial(cfg, "WEEDS_1") is None and CM.eppo_prefix_binomial(cfg, "amapa_week_5") is None
+          and CM.eppo_prefix_binomial(cfg, "AMAPAX_1") is None and CM.eppo_prefix_binomial(cfg, None) is None
+          and CM.eppo_prefix_binomial(cfg, "SETFA_week_3") == "Setaria faberi")
+    hb = CM.build("zenodo_15808623", cls(["AMAPA_x"], hints={"AMAPA_x": ["CHEAL"]}), cfg, nm, tg)["classes"][0]
+    check("  a hint the format carries outranks a code read off the name's first token",
+          hb["basis"] == "hint" and hb["inc_id"] == cfg.other_id, hb)
+    check("  the EPPO table v2 holds the five SIU codes v1 lacked",
+          [cfg.eppo_binomial(c) for c in ("ABUTH", "PANDI", "SETFA", "SETPU", "SORHA")]
+          == ["Abutilon theophrasti", "Panicum dichotomiflorum", "Setaria faberi", "Setaria pumila",
+              "Sorghum halepense"] and cfg.eppo_record["version"] == "v2")
     pags = CM.build(PAGS, cls(["weed: amaranthus palmeri (BBCH60-69 - bushy)", "weed: amaranthus palmeri (BBCH10-12)"]),
                     cfg, nm, tg)
     check("the PAGS8 card table maps its growth stages to Palmer amaranth",

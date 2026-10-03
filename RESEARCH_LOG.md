@@ -27,6 +27,13 @@ The restarted fetch was then killed by the next deploy's dashboard restart (the 
 
 **First out-of-domain verifier reading.** The verifier passed 284 of 284 known-truth boxes outside the cwd12 capture domain (batch b0001, 3SeasonWeedDet10 copies). The refit trigger fired anyway, because a Wilson lower bound with no error stays under 0.99 below 381 boxes. The trigger is now a binomial test against 0.99 and stays silent on this batch.
 
+**The largest source so far is checked before it lands.** SIU Weed Growth Stage (zenodo_15808623, 49.7 GB, 203,567 images, 16 species x 11 weeks, CC BY-NC-SA, research-only) is downloading at about 2.8 MB/s. A rehearsal of its intake path found three stops, each fixed before the fetch ended:
+- class names `<EPPO>_week_<n>` that did not map;
+- a names refusal that would have held the DATA lane;
+- an intake time of 8.5–37 h against an 8 h job.
+
+The intake now takes a balanced 40,000 of its frames, the base v3.1 design's cap, and defers the rest. Its four cwd12 species (Palmer amaranth, waterhemp, ragweed, prickly sida) map to targets; the twelve others become non-target weeds through L26.
+
 ## 2026-10-01 (evening) — The boxes, not the species call, cap YOLO11m at about 0.89; three box-quality arms are pre-registered
 
 **Accuracy.** Best sealed test is unchanged: 0.8786 ± 0.0018 (YOLO11m on base_v2), gap to 0.90 = 0.021. The committed incumbent reads dev 0.8606; test is read at the next milestone.

@@ -214,8 +214,9 @@ def source_names(cfg, source_id, inc=None, candidates=None):
         for v in list(card[0]["by_id"].values()) + list(card[0]["by_name"].values()):
             if v.get("taxon"):
                 names.append(v["taxon"])
+    from .classmap import eppo_prefix_binomial
     for n in list(names):
-        b = cfg.eppo_binomial(n)
+        b = cfg.eppo_binomial(n) or eppo_prefix_binomial(cfg, n)
         if b:
             names.append(b)
     out, seen = [], set()

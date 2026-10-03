@@ -287,10 +287,12 @@
   "bytes_daily": 50000000000.0,
   "bytes_envelope": 200000000000.0,
   "attempts_per_source": 3,
+  "intake_max_images": 40000,
+  "intake_max_seconds": 21600,
   "approved_bytes": {},
   "floor_gb": null,
   "floor_su": null,
-  "why": "section 6.6 limits (50 GB per source unless a person approves, 50 GB a day, the 200 GB proposal); a fetch keeps 20 GB free on its filesystem (the /ocean project quota itself is read by the autopilot, D27); floor_gb and floor_su are set by a person from the first wave (section 7.4)",
+  "why": "section 6.6 limits (50 GB per source unless a person approves, 50 GB a day, the 200 GB proposal); a fetch keeps 20 GB free on its filesystem (the /ocean project quota itself is read by the autopilot, D27); floor_gb and floor_su are set by a person from the first wave (section 7.4); intake_max_images (2026-10-03): one intake batch takes at most 40,000 images with a box, drawn round-robin over class sets, then capture groups, then images in a seeded order; the rest are deferred (decision 'deferred', over_intake_cap). Measured intake time is 0.15-0.66 s per image (PAGS8 614 images in 2 min 40 s, CottonWeedDet3 795 in 8 min 48 s), so the 203,567 images of zenodo_15808623 would take 8.5-37 h against the job's 8 h; its images are frames of 360-degree videos, so a balanced 40,000 keeps most of what it shows; intake_max_seconds (2026-10-03): past 6 h of an intake job's 8 h the images not yet judged are deferred (over_intake_time), so a slow source commits what it judged instead of timing out with nothing (40,000 at the slowest measured 0.66 s per image is 7.3 h)",
   "disk_margin_bytes": 20000000000.0
  },
  "estimates": {
@@ -483,8 +485,8 @@
   "deadline_days": 21
  },
  "eppo": {
-  "path": "collect/domains/eppo_codes_v1.json",
-  "sha256": "457d46ce5a2401577ed3bd1816c840f6d62a1245237757a2b3397e1227cec238"
+  "path": "collect/domains/eppo_codes_v2.json",
+  "sha256": "dd273df308ecb9000433e67a66186d1f7841e763ed6cc7db0c20e3406c91c7ec"
  },
  "card_class_tables": {
   "weedai_5c78d067-8750-4803-9cbe-57df8fae55e4": {

@@ -171,6 +171,12 @@ def validate(raw):
         for k in ("bytes_per_source", "bytes_daily", "bytes_envelope", "attempts_per_source"):
             if not _is_num(bu.get(k)) or bu.get(k) <= 0:
                 p.append("budgets.%s: a positive number" % k)
+        im = bu.get("intake_max_images")
+        if im is not None and not (isinstance(im, int) and not isinstance(im, bool) and im > 0):
+            p.append("budgets.intake_max_images: null or a positive integer")
+        ms = bu.get("intake_max_seconds")
+        if ms is not None and not (_is_num(ms) and ms > 0):
+            p.append("budgets.intake_max_seconds: null or a positive number")
         for k in ("floor_gb", "floor_su"):
             v = bu.get(k)
             if v is not None and not (isinstance(v, dict) and _is_num(v.get("value")) and v.get("set_by")):
@@ -459,6 +465,18 @@ class CollectConfig(object):
         person sets it from the first wave (§7.4)."""
         bu = self.raw["budgets"]
         return {k: (bu.get(k) or {}).get("value") if bu.get(k) else None for k in ("floor_gb", "floor_su")}
+
+    def intake_max_images(self):
+        """The most images with a box one intake batch takes (budgets), or
+        None: no cap."""
+        v = self.raw["budgets"].get("intake_max_images")
+        return int(v) if v else None
+
+    def intake_max_seconds(self):
+        """The wall clock after which an intake defers the images it has not
+        judged yet (budgets), or None: no limit."""
+        v = self.raw["budgets"].get("intake_max_seconds")
+        return float(v) if v else None
 
     def hold_deadline_days(self):
         return int(((self.raw.get("hold") or {}).get("deadline_days")) or 21)

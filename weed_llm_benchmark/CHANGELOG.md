@@ -10787,3 +10787,11 @@ Every result sat near test 0.85, against the 0.90 goal.
   - Live: X11 was raised for batch b0001, 284 of 284 known-truth boxes correct, because its Wilson lower bound (0.9867) was under 0.99. With no error, that bound stays under 0.99 below 381 boxes.
   - DKT (`diagnose_stream.known_truth`) and `step1_stream`'s `refit_triggers` now fire only when the precision is shown under 0.99: P(Binom(n, 0.01) >= errors) < 0.01 (thresholds `known_truth.min_precision` and `known_truth.alpha`; `refit_triggers.precision_below` replaces `precision_lb_below`).
   - Tests in `test_stream_ap_units.py` and `test_inc2_step1_stream.py`.
+- **zenodo_15808623 can reach the queue: EPPO-prefixed class names, the names round, an intake cap (2026-10-03).**
+  - Found before the 49.7 GB fetch ended: its `<EPPO>_week_<n>` classes would not map (exact EPPO lookup only, 5 codes missing). The intake's names_pending would have ended as charged failures (stop-loss on the second) with no L26 proposed, and its 203,567 images would take 8.5–37 h against the intake job's 8 h.
+  - `collect.classmap`: basis `eppo_prefix`. EPPO table v2 adds 5 codes, checked at gd.eppo.int.
+  - Stream: the names round. The source becomes `names_pending` and goes through L26 (pending names written for the lab), `L16S --names`, then L16I again. It is not a failure, and after 1 round it goes to a person.
+  - `collect.intake`:
+    - `budgets.intake_max_images` 40,000, drawn round-robin over class sets, capture groups and a seeded order. The rest are `deferred`; no later batch takes them yet.
+    - `budgets.intake_max_seconds` 6 h: past it, the unjudged images are deferred and the batch commits.
+  - Tests: `test_stream_ap_names_round.py` (new), `test_collect_intake.py`, `test_collect_classmap.py`.

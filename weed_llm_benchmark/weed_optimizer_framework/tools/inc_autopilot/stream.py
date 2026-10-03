@@ -109,6 +109,18 @@ REVIEW_LEVERS = ("L16R", "L16RL")
 STALE_TO_PAUSE = 2
 BUILD_LOST_SNAPSHOTS = 3
 LOST_RUNS_MAX = 3            # a step killed from outside this many times in a row counts as failed
+# An intake the offline resolver refused for class names (collect.intake:
+# names_pending) is no failure: L26 resolves the names on the lab, L16S pushes
+# the names layer, and the intake runs again. A source still pending after
+# this many L26 rounds goes to a person (a card), never round again.
+NAMES_ROUNDS_MAX = 1
+# An L26 of a round that resolved only part of its names (an authority error,
+# `collect names` status partial) runs again, this many times, before the
+# round counts anyway.
+NAMES_PARTIAL_MAX = 2
+# The refusal line an intake refused for class names leaves in its job log
+# (collect.NamesPending: "... run `collect names --source S` (lever L26) first").
+NAMES_REFUSAL = "(lever L26)"
 WAIT_REFUSALS = ("today's cap", "this month's window", "of the domain's", "the cluster is not reachable",
                  "Mongo's health", "the execution log", "no slurm_sh hook", "could not be locked",
                  "collides with another request", "could not be filed", "one ssh per tick")
@@ -753,6 +765,16 @@ class StreamRun(object):
         for src, rec in sorted(ro.items()):
             rec = rec or {}
             s = srcs.get(src)
+            if s and s.get("status") == "held" and s.get("names_held") and rec.get("utc") \
+                    and not (s.get("reopened_utc") and str(s["reopened_utc"]) >= str(rec["utc"])):
+                # held after its names rounds: a person mapped the names (a card table, the names layer), so
+                # the intake runs again with its rounds reset
+                prev = {k: s.get(k) for k in ("status", "held_reason", "names_rounds", "pending_names")}
+                s.update(status="fetched", held_by=None, held_reason=None, names_held=None, names_rounds=0,
+                         reopened_utc=rec["utc"], reopened_by=rec.get("by"))
+                self._ledger("source_reopened", source=src, decided_by=rec.get("by") or "human",
+                             reasons=[_short(rec.get("why") or "", 300)], before=prev)
+                continue
             if not s or s.get("status") != "closed" or not rec.get("utc"):
                 continue
             if s.get("reopened_utc") and str(s["reopened_utc"]) >= str(rec["utc"]):
@@ -1236,7 +1258,7 @@ class StreamRun(object):
             dl = {"error": "%s: %s" % (type(e).__name__, _short(e, 200))}
         qu = dict((payload or {}).get("quota") or {})
         qu["staging_gb"] = sum((_num(s.get("bytes")) or 0.0) for s in (st.get("sources") or {}).values()
-                               if s.get("status") in ("fetched", "intaken")) / 1e9
+                               if s.get("status") in ("fetched", "names_pending", "intaken")) / 1e9
         lanes = {}
         for ln in LANES:
             lane = st["lanes"][ln]
@@ -1650,7 +1672,7 @@ class StreamRun(object):
         elif lever == "L16":
             src = pr["source"]
             s = st["sources"].get(src) or {}
-            if s.get("status") in ("closed", "quarantined", "held"):
+            if s.get("status") in ("closed", "quarantined", "held", "names_pending"):
                 return None                       # closed this tick (D21, D28, a retry-false refusal)
             if int(s.get("attempts") or 0) >= int((LS.limits("L16") or {}).get("attempts_per_source") or 3):
                 # a 4th attempt on one source is a loop, not a retry (S15)
@@ -1679,6 +1701,8 @@ class StreamRun(object):
             params = {"source": pr["source"], "out": str(self.paths.names_dir()) + "/"}
         elif lever == "L16S":
             params = {"source": pr["source"]}
+            if pr.get("names"):
+                params["names"] = 1
         elif lever == "L16I":
             params = {"source": pr["source"]}
         elif lever == "L17":
@@ -1954,6 +1978,8 @@ class StreamRun(object):
                     argv = sync_argv(self.paths.lab_inc, params["source"], target, M.CLUSTER_DATA_SSH,
                                      names=bool(params.get("names")))
                 else:
+                    if kind == "names":
+                        self._write_pending_names(params.get("source"))
                     verb = {"discover": "plan", "names": "names", "fetch": "fetch"}[kind]
                     # the lab's INC tree, named: the ticker's environment sets no INC_DIR, and inc.common's
                     # default is the cluster's /ocean path (2026-09-29: two L15 plans failed at intake_lock
@@ -2482,7 +2508,13 @@ class StreamRun(object):
                 got = self._collect_result(payload)
                 self._fetch_completeness(params["source"], got.get("complete"), got.get("remaining"), "lab fetch")
         elif lever == "L16S" and params.get("names"):
-            st["sources"].setdefault(params["source"], {})["names_synced"] = self.utc
+            s = st["sources"].setdefault(params["source"], {})
+            s["names_synced"] = self.utc
+            if s.get("status") == "names_pending":
+                # the names layer is on the cluster: the intake runs again (its extracted tree is reused)
+                s["status"] = "fetched"
+                self._ledger("source_status", source=params["source"], status="fetched", by="stream",
+                             reasons=["class names resolved on the lab (L26) and pushed (L16S): intake again"])
         elif lever == "L16S" and params.get("candidate"):
             st["sources"].setdefault(params["source"], {})["candidate_synced"] = LS.inc_path(
                 self.paths.cand_rel(params["source"]))
@@ -2530,7 +2562,22 @@ class StreamRun(object):
             key = p.get("verdict_key") or params.get("exp") or params.get("verb")
             st["stage"]["r0"].setdefault("verdicts", {})[key] = self.utc
         elif lever == "L26":
-            st["sources"].setdefault(params["source"], {})["names_resolved"] = self.utc
+            s = st["sources"].setdefault(params["source"], {})
+            got = self._collect_result(payload)
+            if s.get("status") == "names_pending" and (got.get("status") == "partial" or int(got.get("errors") or 0)) \
+                    and int(s.get("names_partial") or 0) < NAMES_PARTIAL_MAX:
+                # the authority failed on some names: L26 again (a new id), the round not yet counted
+                s["names_partial"] = int(s.get("names_partial") or 0) + 1
+                self._bump_attempts("L26", params)
+                dk.pop(_sha([lever, params])[:16], None)      # not done: its rerun is not 'the same work again'
+                self._ledger("names_partial", source=params["source"], errors=got.get("errors"),
+                             names=got.get("names"), runs=s["names_partial"])
+                self._clear(ln)
+                return
+            s["names_resolved"] = self.utc
+            if s.get("status") == "names_pending":
+                s["names_rounds"] = int(s.get("names_rounds") or 0) + 1
+                s["names_synced"] = None
         elif lever == "L22":
             st["doublings"] = int(st.get("doublings") or 0) + 1
             st["fork_pending"] = self.utc
@@ -2670,6 +2717,82 @@ class StreamRun(object):
         if s["partial"] != was:
             self._ledger("source_partial" if s["partial"] else "source_complete", source=src,
                          remaining=remaining, basis=basis)
+
+    def _names_pending(self, src, s, row):
+        """The collector held `src` for class names the offline resolver lacks
+        (an intake's names_pending): the source enters the names round (DPIPE:
+        L26, then L16S of the names layer, then L16I again). After
+        NAMES_ROUNDS_MAX rounds it is held for a person with a card."""
+        names = [str(n) for n in (row.get("pending_names") or [])][:200]
+        s["names_pending_ts"] = row.get("pending_ts")
+        s["pending_names"] = names
+        if int(s.get("names_rounds") or 0) >= NAMES_ROUNDS_MAX:
+            why = ("%d class name(s) still unresolved after %d L26 round(s): %s"
+                   % (len(names), int(s.get("names_rounds") or 0), ", ".join(names[:10])))
+            s.update(status="held", held_by="collector", held_reason=_short(why, 300), names_held=True)
+            self._ledger("source_status", source=src, status="held", by="collector", reasons=[_short(why, 300)])
+            self._card("data", "Source %s: class names unresolved after L26" % src,
+                       "%s; a card table (collect config card_class_tables) or a person's names decision "
+                       "maps them" % why, trigger=["DPIPE"])
+            return
+        s.update(status="names_pending", held_by=None, held_reason=None, names_resolved=None, names_synced=None,
+                 names_held=None, names_partial=0)
+        # the round's L26 and `L16S --names` have the params of the source's earlier ones (a pre-fetch L26, an
+        # earlier round): a fresh attempt count gives them new ids, or the executor would refuse them as run
+        self._bump_attempts("L26", {"source": src, "out": str(self.paths.names_dir()) + "/"})
+        self._bump_attempts("L16S", {"source": src, "names": 1})
+        self._ledger("source_status", source=src, status="names_pending", by="collector",
+                     reasons=["the intake's class map lacks %d name(s) (L26 resolves them): %s"
+                              % (len(names), _short(", ".join(names[:20]), 300))])
+
+    def _bump_attempts(self, lever, params):
+        key = step_key(lever, LS.policy_params(lever, params))
+        att = self.st.setdefault("attempts", {})
+        att[key] = int(att.get(key) or 0) + 1
+
+    def _intake_names_pending(self, ln, it, ids, states):
+        """An L16I job that ended on names_pending (the collector's ledger,
+        folded this tick, holds the source for its class names): neither a
+        failure of the source nor a step toward the lane's stop-loss. The lane
+        is freed and the intake's id retired, so the intake after the names
+        round runs under a new id; a source past its names rounds stays held
+        for a person."""
+        st, p = self.st, it["proposal"]
+        params = p.get("params") or {}
+        key = step_key(it["lever"], params)
+        att = st.setdefault("attempts", {})
+        att[key] = int(att.get(key) or 0) + 1
+        st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+        src = st["sources"].setdefault(params.get("source"), {})
+        if src.get("status") not in ("names_pending", "held"):
+            # the job's refusal line says names_pending before the collector's ledger was folded (read before
+            # the job ended, or not shipped): the source waits in the round for the fold, whose new hold time
+            # brings its names (DPIPE proposes nothing for a round without names)
+            src.update(status="names_pending", pending_names=[], names_resolved=None, names_synced=None)
+        self._ledger("intake_names_pending", lane=ln, lever=it["lever"], proposal_id=p["id"],
+                     source=params.get("source"), job_ids=list(ids), states=list(states),
+                     names=list(src.get("pending_names") or [])[:50],
+                     reasons=["the intake's class names are not in the offline resolver: L26 first, not a failure"])
+        self._clear(ln)
+
+    def _write_pending_names(self, src):
+        """The class names a names round resolves (the cluster intake's held
+        event, folded by the snapshot) as the lab's
+        intake/work/<source>/pending_names.json, which `collect names` reads
+        (collect.names.source_names): the cluster's own file never reaches the
+        lab."""
+        s = (self.st.get("sources") or {}).get(src) or {}
+        names = s.get("pending_names") or []
+        if s.get("status") != "names_pending" or not names:
+            return None
+        from ..collect import safe_name
+        path = self.paths.lab_inc / "intake" / "work" / safe_name(src) / "pending_names.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        from ..collect import FORMATS as CF
+        _write_json(path, {"format": CF["pending_names"], "source": src, "names": list(names),
+                           "from": "the cluster intake's held event (names_pending, %s), via the snapshot"
+                                   % s.get("names_pending_ts"), "written_utc": self.utc})
+        return str(path)
 
     @staticmethod
     def _collect_result(res):
@@ -2864,6 +2987,13 @@ class StreamRun(object):
             self._fetch_completeness(src, row.get("fetch_complete"), row.get("fetch_remaining"), "collector ledger")
             rst = row.get("status")
             ov = None
+            if rst == "held" and row.get("reason") == "names_pending" and row.get("pending_ts") \
+                    and s.get("status") not in ("closed", "quarantined"):
+                # an intake refused for class names: the names round, not a hold for a person; a hold
+                # already taken up (the same pending_ts) leaves the source where the round has it
+                if s.get("names_pending_ts") != row["pending_ts"]:
+                    self._names_pending(src, s, row)
+                continue
             if rst == "held" and isinstance(overrides.get(src), dict) and (
                     "licence_unresolved" in (row.get("holds") or []) or row.get("reason") == "licence_unresolved"):
                 # a person's licence override (the collect config's licence_overrides) lifts the collector's
@@ -2871,6 +3001,7 @@ class StreamRun(object):
                 # so a hold in this ledger is read as released here (the next fetch checks the source anew)
                 rst, ov = "candidate", overrides[src]
             if rst in ("held", "closed", "quarantined") and s.get("status") not in ("closed", "quarantined"):
+                s.pop("names_held", None)          # held now for the collector's own reason, not the names round
                 if s.get("status") != rst:
                     self._ledger("source_status", source=src, status=rst, by="collector",
                                  reasons=[_short(row.get("reason") or "", 300)])
@@ -2881,7 +3012,7 @@ class StreamRun(object):
             elif s.get("status") == "held" and s.get("held_by") == "collector" \
                     and rst in ("candidate", "fetched", "intaken"):
                 # the collector released its hold (licence, credentials, the copy scan): collectable again
-                s.update(status=rst, held_by=None, held_reason=None)
+                s.update(status=rst, held_by=None, held_reason=None, names_held=None)
                 if ov is not None:
                     # the release is the person's decision the collect config records, not the collector's
                     self._ledger("source_released", source=src, status=s["status"], by="licence_overrides",
@@ -2958,6 +3089,11 @@ class StreamRun(object):
                         if sacct.get(j):
                             B.record_job_spend(j, self.name, sacct[j], p["policy_action"], domain=self.domain,
                                                base_dir=self.xctx.su_base_dir, ts=self.utc)
+                s_ = st["sources"].get((p.get("params") or {}).get("source")) or {}
+                if not ok and it["lever"] == "L16I" and (s_.get("status") == "names_pending" or (
+                        s_.get("status") == "held" and s_.get("names_held")) or NAMES_REFUSAL in refusal):
+                    self._intake_names_pending(ln, it, ids, states)
+                    continue
                 if ok:
                     self._done(ln, it)
                 else:

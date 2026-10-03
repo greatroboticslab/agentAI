@@ -6,9 +6,13 @@ For each source class (id, name, hints) the names tried, in order:
          funnel domain's card resolver, read only), by class id then by name:
          its taxon decides, whatever the name says (a card is how a numeric or
          unresolvable name becomes a target, FUNNEL_AUDIT H3a);
-  eppo   the binomial of an EPPO code (the config's pinned EPPO table);
+  eppo   the binomial of an EPPO code (the config's pinned EPPO table), the
+         whole name;
   hint   a taxon the annotation format carries (e.g. a category's "taxon"
          field, or "<role>: <taxon> (<qualifier>)" names);
+  eppo_prefix  an EPPO code leading the name before a separator
+         ("<EPPO>_week_<n>", a species-and-week class name), only when the
+         table holds that code;
   name   the class name itself.
 Each is judged by funnel.names.status_v2 through the offline resolver
 (names.Names), with the project's alias table as the join (status "target",
@@ -35,6 +39,8 @@ INFORMATIVE = ("target", "target_synonym", "taxon_resolved", "target_related", "
 SPECIES_RANKS = ("species", "subspecies", "variety", "subvariety", "form", "subform", "infraspecific_name",
                  "cultivar", "cultivar_group")
 _ROLE_TAXON = re.compile(r"^\s*[A-Za-z_ -]{1,20}:\s*(?P<taxon>[^()]+?)\s*(\(.*\))?\s*$")
+# an EPPO code (5 or 6 upper-case letters or digits) leading a class name before a separator
+_EPPO_PREFIX = re.compile(r"^\s*(?P<code>[A-Z0-9]{5,6})[\s_.:/(-]")
 
 
 def role_taxon_hint(name):
@@ -45,6 +51,14 @@ def role_taxon_hint(name):
         return None
     t = m.group("taxon").strip()
     return t or None
+
+
+def eppo_prefix_binomial(cfg, name):
+    """The binomial of the EPPO code leading `name` before a separator
+    ("<EPPO>_week_<n>" -> the code's binomial) when the pinned table holds
+    that code, else None."""
+    m = _EPPO_PREFIX.match(name) if isinstance(name, str) else None
+    return cfg.eppo_binomial(m.group("code")) if m else None
 
 
 def _key(name):
@@ -73,6 +87,10 @@ def queries_for(cl, cfg, card):
         hints.append(rt)
     for h in hints:
         out.append(("hint", cfg.eppo_binomial(h) or h))
+    # after the hints: a taxon the format carries outranks a code read off the name's first token
+    pb = None if b else eppo_prefix_binomial(cfg, name)
+    if pb:
+        out.append(("eppo_prefix", pb))
     out.append(("name", name))
     return out
 
