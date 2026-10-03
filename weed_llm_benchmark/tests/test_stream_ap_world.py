@@ -598,7 +598,7 @@ class World(object):
               "versions": {"verifier": "v1", "reference": "v1", "splits_lock_sha256": "l" * 64, "embedder": "bioclip2"},
               "pending": {"intake_batches": {}}, "batches": {"committed": [], "in_progress": [], "by_kind": {}},
               "queue": {"rows": 0}, "admission": {}, "holds": {}, "holds_past_deadline": {}, "refused": {},
-              "knowntruth": {}, "refit_triggers": {"precision_lb_below": [], "species_unknown_share": [],
+              "knowntruth": {}, "refit_triggers": {"precision_below": [], "species_unknown_share": [],
                                                    "fired": False},
               "human_queue": {"rows": 0},
               "per_source": {k: dict({"images_seen": 0, "near_eval_embed": 0, "target_boxes_admitted": 0}, **v)

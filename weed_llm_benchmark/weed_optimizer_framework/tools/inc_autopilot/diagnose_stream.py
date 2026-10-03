@@ -33,7 +33,6 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
-import math
 from pathlib import Path
 
 from . import evidence as E
@@ -1746,38 +1745,34 @@ def bisect(v):
                                     "n_suspect": len(last.get("suspect") or [])}})
 
 
-def wilson_lower(k, n, z=1.959963984540054):
-    """The Wilson score interval's lower bound of k successes in n."""
-    if n <= 0:
-        return None
-    p = k / float(n)
-    d = 1 + z * z / n
-    c = p + z * z / (2 * n)
-    r = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
-    return (c - r) / d
-
-
 def known_truth(v):
     """DKT: the verifier refit triggers of 3.3 (proposed there, pre-registered
-    here): a batch's known-truth verified precision with a Wilson lower bound
-    under known_truth.min_lower_bound on at least known_truth.min_matched
-    matched verified boxes (recomputed here from step1_stream's counts), or a
-    species step1_stream lists with at least min_new_boxes new target boxes of
-    which at least max_unknown_share are 'unknown' -> card X11 (a verifier
-    refit is a versioned event, R4)."""
+    here): a batch whose known-truth verified precision is shown under
+    known_truth.min_precision, P(Binom(n, 1 - min_precision) >= errors) <
+    known_truth.alpha, on at least known_truth.min_matched matched verified
+    boxes (recomputed here from step1_stream's counts), or a species
+    step1_stream lists with at least min_new_boxes new target boxes of which at
+    least max_unknown_share are 'unknown' -> card X11 (a verifier refit is a
+    versioned event, R4). A batch with no error never fires: the Wilson lower
+    bound this rule replaced stays under 0.99 for a perfect batch below 381
+    boxes."""
+    from ..funnel import estimate as ES
     name = "step1_stream/status.json"
     st = v.ev.json(name) or {}
-    lb_min = float(_t(v.th, "known_truth", "min_lower_bound"))
+    p_min = float(_t(v.th, "known_truth", "min_precision"))
+    alpha = float(_t(v.th, "known_truth", "alpha"))
     n_min = int(_t(v.th, "known_truth", "min_matched"))
     hits, cites = [], []
     for batch, b in sorted((st.get("knowntruth") or {}).items()):
         n, k = _num((b or {}).get("matched_verified")), _num((b or {}).get("verified_correct"))
-        if n is None or k is None or n < n_min:
+        if n is None or k is None or n < n_min or k > n:
             continue
-        lb = wilson_lower(k, n)
-        if lb is not None and lb < lb_min:
-            hits.append("batch %s: %d of %d verified boxes correct, Wilson lower bound %.4f < %g"
-                        % (batch, k, n, lb, lb_min))
+        errors = n - k
+        pv = float(ES.binom_upper_tail(errors, n, 1.0 - p_min)) if errors > 0 else 1.0
+        if pv < alpha:
+            hits.append("batch %s: %d of %d verified boxes correct (%.4f), P(Binom(%d, %g) >= %d) = %.2g < %g, "
+                        "precision under %g" % (batch, k, n, k / float(n), n, 1.0 - p_min, errors, pv, alpha,
+                                                p_min))
             cites += [v.cite(name, E.pointer("knowntruth", batch, "matched_verified")),
                       v.cite(name, E.pointer("knowntruth", batch, "verified_correct"))]
     trig = (st.get("refit_triggers") or {}).get("species_unknown_share") or []

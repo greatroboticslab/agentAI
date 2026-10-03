@@ -10783,3 +10783,7 @@ Every result sat near test 0.85, against the 0.90 goal.
   - A lab job lost to an outside kill frees its lane and is proposed again under a new id without counting as the source's failure, the lane's stop-loss step or a collection attempt (S15); three losses of the same step in a row count as a failure.
   - New `inc_autopilot.stream reopen --name --source --by --why`: a config stamp the next tick applies (candidate, failures and attempts reset, ledger `source_reopened`).
   - Tests in `tests/test_stream_ap_lab_lost.py`.
+- **The verifier-refit trigger no longer fires on a perfect batch (2026-10-03).**
+  - Live: X11 was raised for batch b0001, 284 of 284 known-truth boxes correct, because its Wilson lower bound (0.9867) was under 0.99. With no error, that bound stays under 0.99 below 381 boxes.
+  - DKT (`diagnose_stream.known_truth`) and `step1_stream`'s `refit_triggers` now fire only when the precision is shown under 0.99: P(Binom(n, 0.01) >= errors) < 0.01 (thresholds `known_truth.min_precision` and `known_truth.alpha`; `refit_triggers.precision_below` replaces `precision_lb_below`).
+  - Tests in `test_stream_ap_units.py` and `test_inc2_step1_stream.py`.

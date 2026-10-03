@@ -973,16 +973,36 @@ def t_formats():
     check("the never-train slugs are parsed from the trainer's source, never imported",
           nt and "cottonweeddet12" in nt and "weed_optimizer_framework.tools.mega_trainer" not in sys.modules, (why,))
     # group C's status.json: known truth and the holds past their deadline
-    w.step1_status(extra={"knowntruth": {"b0003": {"matched_verified": 60, "verified_correct": 58,
-                                                   "verified_precision_wilson_lb": 0.887}},
-                          "refit_triggers": {"precision_lb_below": ["b0003"], "species_unknown_share": ["Eclipta"],
+    # live 2026-10-03: b0001, 284 of 284 correct, raised X11 under the Wilson-lower-bound rule
+    w.step1_status(extra={"knowntruth": {"b0001": {"matched_verified": 284, "verified_correct": 284},
+                                         "b0002": {"matched_verified": 60, "verified_correct": 58},
+                                         "b0003": {"matched_verified": 284, "verified_correct": 276},
+                                         "b0004": {"matched_verified": 284, "verified_correct": 277},
+                                         "b0005": {"matched_verified": 29, "verified_correct": 20}},
+                          "refit_triggers": {"precision_below": ["b0003"], "species_unknown_share": ["Eclipta"],
                                              "fired": True},
                           "holds_past_deadline": {"funnel_F9": 12}})
     ev = E.from_texts({"step1_stream/status.json": (w.inc / "step1_stream" / "status.json").read_text()}, "x",
                       context={"sid": "none"})
     by = DS.by_id(DS.detect(ev, run.dom, run.th, only=("DKT", "DHOLD")))
-    check("DKT: 58 of 60 verified correct, Wilson lower bound under 0.99 -> card X11; and the species trigger",
-          by["DKT"]["fired"] and "X11" in by["DKT"]["levers"] and "Eclipta" in by["DKT"]["summary"], by["DKT"]["summary"])
+    s_kt = by["DKT"]["summary"]
+    check("DKT: 276 of 284 correct (P = 0.0084 < 0.01) -> card X11; and the species trigger",
+          by["DKT"]["fired"] and "X11" in by["DKT"]["levers"] and "batch b0003" in s_kt and "Eclipta" in s_kt, s_kt)
+    check("  284 of 284 (no error), 58 of 60 (P = 0.12), 277 of 284 (P = 0.025) and 29 matched boxes do not fire",
+          not any("batch %s" % b in s_kt for b in ("b0001", "b0002", "b0004", "b0005")), s_kt)
+    w.step1_status(extra={"knowntruth": {"b0001": {"matched_verified": 284, "verified_correct": 284}},
+                          "refit_triggers": {"precision_below": [], "species_unknown_share": [], "fired": False}})
+    ev = E.from_texts({"step1_stream/status.json": (w.inc / "step1_stream" / "status.json").read_text()}, "x",
+                      context={"sid": "none"})
+    by = DS.by_id(DS.detect(ev, run.dom, run.th, only=("DKT",)))
+    check("  a perfect batch alone is silent", not by["DKT"]["fired"], by["DKT"]["summary"])
+    w.step1_status(extra={"knowntruth": {"b0003": {"matched_verified": 284, "verified_correct": 276}},
+                          "refit_triggers": {"precision_below": ["b0003"], "species_unknown_share": ["Eclipta"],
+                                             "fired": True},
+                          "holds_past_deadline": {"funnel_F9": 12}})
+    ev = E.from_texts({"step1_stream/status.json": (w.inc / "step1_stream" / "status.json").read_text()}, "x",
+                      context={"sid": "none"})
+    by = DS.by_id(DS.detect(ev, run.dom, run.th, only=("DKT", "DHOLD")))
     check("DHOLD reads step1_stream's holds past their deadline when no stream summary states them",
           by["DHOLD"]["fired"] and by["DHOLD"]["detail"]["holds"][0]["hold"] == "funnel_F9", by["DHOLD"]["summary"])
     # group D's intake summary and source ledger

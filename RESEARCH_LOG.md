@@ -25,6 +25,8 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 The restarted fetch was then killed by the next deploy's dashboard restart (the unit killed its whole control group). The lane detected the dead job but counted it as SIU's third failed attempt, after the earlier cap refusal and the no-resume drop, and closed the source. Fixed: lab jobs survive restarts (KillMode=process); a job lost to an outside kill is proposed again without counting against the source, the lane's stop-loss or the attempt-pause (three losses of one step in a row still count); a person can reopen a closed source with a recorded reason.
 
+**First out-of-domain verifier reading.** The verifier passed 284 of 284 known-truth boxes outside the cwd12 capture domain (batch b0001, 3SeasonWeedDet10 copies). The refit trigger fired anyway, because a Wilson lower bound with no error stays under 0.99 below 381 boxes. The trigger is now a binomial test against 0.99 and stays silent on this batch.
+
 ## 2026-10-01 (evening) — The boxes, not the species call, cap YOLO11m at about 0.89; three box-quality arms are pre-registered
 
 **Accuracy.** Best sealed test is unchanged: 0.8786 ± 0.0018 (YOLO11m on base_v2), gap to 0.90 = 0.021. The committed incumbent reads dev 0.8606; test is read at the next milestone.

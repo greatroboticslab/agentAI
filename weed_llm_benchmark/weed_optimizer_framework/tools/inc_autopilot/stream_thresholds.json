@@ -241,9 +241,13 @@
   }
  },
  "known_truth": {
-  "min_lower_bound": {
+  "min_precision": {
    "value": 0.99,
-   "why": "Contract 3.3 (a proposed verifier-refit trigger, pre-registered here): a batch's known-truth verified precision whose Wilson lower bound falls under 0.99 (the in-domain precision was 99.96-100 %) raises card X11."
+   "why": "Contract 3.3 (a proposed verifier-refit trigger, pre-registered here): card X11 is raised when a batch's known-truth verified precision is shown to be under 0.99 (the in-domain precision was 99.96-100 %). Amended 2026-10-03 from 'Wilson lower bound under 0.99': with no error that bound stays under 0.99 below 381 boxes, so the first batch outside the cwd12 domain, 284 of 284 correct, raised the card."
+  },
+  "alpha": {
+   "value": 0.01,
+   "why": "Amended 2026-10-03: the precision is shown under min_precision when P(Binom(n, 1 - min_precision) >= errors) < alpha, the exact one-sided test of H0 'precision >= min_precision' (the binomial form D28 uses). 0.01 because every batch is tested. 0 errors never fire; on 284 boxes 7 errors (97.5 %) do not and 8 (97.2 %) do."
   },
   "min_matched": {
    "value": 30,

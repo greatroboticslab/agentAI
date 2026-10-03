@@ -336,7 +336,7 @@ Batching: collect until 2,000 images or 24 h, and cap a batch at 50,000 images (
 **Versioned events** (never per batch):
 - **`rejoin --slug`.** Uses overrides from recorded resolutions only: funnel `name_status_v2.json` entries with `status_v2 = target_synonym`, and accepted maps in `class_maps.json`. MH-Weed16 ids 5 and 12 are the case in hand. No new embeddings are needed.
 - **Verifier refit (verifier v2).** R4 (card X11). Proposed triggers, to be pre-registered in thresholds.json:
-  - a batch's known-truth `verified_precision` has a Wilson lower bound < 0.99 on ≥ 30 matched verified boxes; or
+  - a batch's known-truth `verified_precision` is shown under 0.99 on ≥ 30 matched verified boxes: P(Binom(n, 0.01) ≥ errors) < 0.01 (`known_truth.min_precision`, `known_truth.alpha`). Amended 2026-10-03 from "a Wilson lower bound < 0.99": with no error that bound stays under 0.99 below 381 boxes, so batch b0001 of the first out-of-domain reading, 284 of 284 correct, raised X11. A batch with no error never fires; on 284 boxes 8 errors (97.2 %) fire and 7 do not; or
   - a species has ≥ 100 new target-labelled boxes with an unknown share ≥ 0.5.
 
   After a refit, every unconsumed queue row is re-judged from its stored embeddings.

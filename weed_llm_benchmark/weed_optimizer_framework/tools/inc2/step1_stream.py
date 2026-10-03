@@ -134,7 +134,8 @@ L5_DROPPED_SOURCES = ("rf_karthikeya-c8pvy__weed-detection-cwp10", "rf_zig-zag-l
 V2_EVAL_SPLITS = ("dev", "test", "imageweeds")
 WILSON_Z = 1.96
 NEVER_TRAIN_REASONS = ("near_eval_v2", "near_eval_variant", "near_eval_embed")
-REFIT_PRECISION_LB = 0.99           # proposed trigger (§3.3), for card X11; thresholds.json pre-registers it
+REFIT_MIN_PRECISION = 0.99          # proposed trigger (§3.3), for card X11; thresholds.json pre-registers it
+REFIT_ALPHA = 0.01                  # shown under it: P(Binom(n, 1 - REFIT_MIN_PRECISION) >= errors) < REFIT_ALPHA
 REFIT_MIN_MATCHED_VERIFIED = 30
 REFIT_SPECIES_NEW_BOXES = 100
 REFIT_SPECIES_UNKNOWN_SHARE = 0.5
@@ -323,6 +324,16 @@ def _module_hashes():
         p = PKG_DIR / m
         out[m] = _sha_file(p) if p.is_file() else None
     return out
+
+
+def refit_precision_p(k, n):
+    """P(Binom(n, 1 - REFIT_MIN_PRECISION) >= n - k): how improbable k correct
+    of n is if the verifier's precision were REFIT_MIN_PRECISION; 1.0 with no
+    error or no count."""
+    from ..funnel import estimate as ES
+    if k is None or not n or k >= n:
+        return 1.0
+    return float(ES.binom_upper_tail(n - k, n, 1.0 - REFIT_MIN_PRECISION))
 
 
 def wilson_lb(k, n, z=WILSON_Z):
@@ -3705,8 +3716,7 @@ def write_status(layout):
     kt = {b: d["knowntruth"]["overall"] for b, d in docs.items()
           if isinstance(d.get("knowntruth"), dict) and d["knowntruth"].get("overall", {}).get("boxes")}
     trig_prec = [b for b, m in kt.items() if (m.get("matched_verified") or 0) >= REFIT_MIN_MATCHED_VERIFIED
-                 and m.get("verified_precision_wilson_lb") is not None
-                 and m["verified_precision_wilson_lb"] < REFIT_PRECISION_LB]
+                 and refit_precision_p(m.get("verified_correct"), m["matched_verified"]) < REFIT_ALPHA]
     sp_new, sp_unknown = collections.Counter(), collections.Counter()
     for d in docs.values():
         for sp, vv in (d.get("species_verdicts") or {}).items():
@@ -3750,12 +3760,13 @@ def write_status(layout):
            "holds": dict(sorted(holds.items())), "holds_past_deadline": dict(sorted(past.items())),
            "refused": dict(collections.Counter(r["refused"] for r in q if r["refused"])),
            "knowntruth": kt,
-           "refit_triggers": {"precision_lb_below": trig_prec, "species_unknown_share": trig_sp,
-                              "rule": "Wilson lb of known-truth verified precision < %.2f on >= %d matched verified "
-                                      "boxes; or a species with >= %d new target-labelled boxes, unknown share >= "
-                                      "%.1f (proposed, card X11)" % (REFIT_PRECISION_LB, REFIT_MIN_MATCHED_VERIFIED,
-                                                                     REFIT_SPECIES_NEW_BOXES,
-                                                                     REFIT_SPECIES_UNKNOWN_SHARE),
+           "refit_triggers": {"precision_below": trig_prec, "species_unknown_share": trig_sp,
+                              "rule": "known-truth verified precision shown under %.2f (P(Binom(n, %.2f) >= errors) "
+                                      "< %g) on >= %d matched verified boxes; or a species with >= %d new "
+                                      "target-labelled boxes, unknown share >= %.1f (proposed, card X11)"
+                                      % (REFIT_MIN_PRECISION, 1 - REFIT_MIN_PRECISION, REFIT_ALPHA,
+                                         REFIT_MIN_MATCHED_VERIFIED, REFIT_SPECIES_NEW_BOXES,
+                                         REFIT_SPECIES_UNKNOWN_SHARE),
                               "fired": bool(trig_prec or trig_sp)},
            "human_queue": {"rows": len(_read_jsonl(layout.human))}, "eval_hits": eh_status,
            "per_source": {s: dict({"images_seen": 0, "near_eval_embed": 0, "target_boxes_admitted": 0}, **v)

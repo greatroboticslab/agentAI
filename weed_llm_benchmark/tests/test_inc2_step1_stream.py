@@ -1388,10 +1388,15 @@ def test_knowntruth(lay, guards):
     check("a rerun measures nothing new", SS.run_knowntruth(lay, TV.FakeEmbedder(), guards, sets=("tsw22",)) is None)
     st = SS.write_status(lay)
     check("status carries the reading per batch; fewer than 30 matched verified boxes never fire the refit trigger",
-          doc["batch"] in st["knowntruth"] and st["refit_triggers"]["precision_lb_below"] == [], st["refit_triggers"])
+          doc["batch"] in st["knowntruth"] and st["refit_triggers"]["precision_below"] == [], st["refit_triggers"])
     lbs = [SS.wilson_lb(k, n) for k, n in ((30, 30), (100, 100), (99, 100), (0, 0))]
     check("Wilson lower bound (z 1.96): 30/30 -> 0.8865, 100/100 -> 0.9630, 99/100 -> 0.9455, none without boxes",
           lbs[:3] == [0.886483, 0.963005, 0.945512] and lbs[3] is None, lbs)
+    ps = [SS.refit_precision_p(k, n) for k, n in ((284, 284), (277, 284), (276, 284), (None, 50), (5, 0))]
+    check("refit trigger is a binomial test against 0.99: 284/284 and missing counts -> 1.0, 7 errors in 284 -> "
+          "0.025 (silent), 8 -> 0.0084 (fires)",
+          ps[0] == 1.0 and ps[3] == 1.0 and ps[4] == 1.0 and ps[1] > SS.REFIT_ALPHA > ps[2]
+          and abs(ps[2] - 0.008444) < 1e-5, ps)
 
 
 def test_empty_batch(lay, guards):
