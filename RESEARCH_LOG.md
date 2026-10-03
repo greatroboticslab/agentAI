@@ -13,6 +13,17 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-03 (night, later) — Base v3: review fixes before the build
+
+**Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap to 0.90 = 0.021. Training set 7,493 images (P_1); base v3 (about 35K planned) is not built yet.
+
+**Fixed before any build (docs/CONTINUOUS_LOOP.md, "Review fixes to revision 3"):**
+- A segment cut while base v3 builds can no longer put test v1 images in a pool: the build re-reads the stream twice (and refuses on a late conflict), and the platform never runs the cut and the build blind to each other.
+- Frames of a held-out SIU video that the build drops are listed as never-train companions, so the stream never cuts them.
+- The wait for a person to lift cleared quarantines is truly bounded at 12 h and fails closed when D28 cannot judge; the base v3 build is priced at its 12 h limit.
+
+**Open.** If s002 is cut before base v3, SIU's share of test v1 may fall to about none; building base v3 first avoids that.
+
 ## 2026-10-03 (night) — Base v3's pre-build fixes: SIU by video, in-flight rows, a 12 h build, a bounded wait for lifted quarantines
 
 **Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap to 0.90 = 0.021. Training set 7,493 images (P_1); base v3 (about 35K planned) is not built yet.

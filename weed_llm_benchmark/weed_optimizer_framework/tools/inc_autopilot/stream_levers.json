@@ -503,7 +503,7 @@
    "control": "base_v2 (LOCK v2, by sha256): arm A is base_v2 whole, every box class 12, byte-identical inside arm B.",
    "success": "INC_DIR/splits/v3/summary.json complete: both arms' manifests by sha256, per-source counts, the holdout lists.",
    "falsifier": "inc2.train's check_manifest and guard_rows refuse a manifest; or arm B is not larger than arm A.",
-   "estimator": "zero_job",
+   "estimator": "base3_job",
    "note": "E1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-03, pre-registered). Record only: proposed once, in MAINT, once R0 is complete and an E1 arm that requires it is next; a failure is a person's card, never a failed step, and it is not proposed again."
   },
   "L23E": {

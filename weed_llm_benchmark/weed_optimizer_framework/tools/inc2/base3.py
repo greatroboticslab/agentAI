@@ -43,13 +43,19 @@ Inputs (all recorded by sha256 in summary.json):
     after the holdout (below), so test v1 does not depend on it. The same
     fold gives the rows the stream has trained on or may still pool: every
     pool's rows and every row of an increment in flight (cut, suspect, or
-    any status that has not released its rows);
+    any status that has not released its rows), a masked row also by its
+    original's path and sha256. The build reads the fold again once its
+    selection is made (a segment the stream cut while the job ran: marked,
+    and the selection made again) and once more, holding the stream's
+    lease, after the test lists are written (a listed row now in a pool or
+    in flight refuses the build);
   * the evaluation groups' images (config "evaluation_groups": test v1's
     groups and the OOD-dev groups, every slug excluded): their 8-variant
     dHashes from the v1 Step 1 pool, else hashed from the registry's
     local_path (build and count alike);
   * every test list an earlier build wrote (INC_DIR/splits/*/test_v1/
-    *.jsonl, whatever its directory is now called): never trained.
+    *.jsonl, whatever its directory is now called) and its companions
+    (splits/*/test_v1_companions/*.jsonl): never trained.
 
 The rules (pre-registered; the config's "rules"). base_v2 rows are exempt
 from every box, image and source rule: arm A is base_v2 whole.
@@ -101,8 +107,9 @@ from every box, image and source rule: arm A is base_v2 whole.
     bits under the 8 variants (both directions), their copy edges, the same
     Roboflow export stem (across a family), the intake capture group and a
     source's group_regex session (a registry source's on its file names, an
-    intake source's on its rows' original file names: SIU's video). A group
-    is named by its own content (the
+    intake source's on its rows' original file names: SIU's video; an
+    intake row its group_regex does not match is dropped, group_unmatched).
+    A group is named by its own content (the
     sha256 of its members' sorted sha256s), never by row positions. From
     each included external source (quarantined or not), whole groups it
     owns are held out in the order stable_int("inc2/base3/test_v1/<source>/
@@ -112,11 +119,16 @@ from every box, image and source rule: arm A is base_v2 whole.
     group is taken only while every source with rows in it stays at or
     under 400. A group touching base_v2 or a row of the stream's pools (an
     image a current model trained on) or of an increment in flight (one a
-    pool may still take), or larger than 400 images, is never held out
-    (summary.json counts each source's rows in such groups by reason).
-    Held-out rows never train and are listed in
+    pool may still take) -- also through a capture relation it shares with
+    such a row that a rule dropped before the grouping --, or larger than
+    400 images, is never held out (summary.json counts each source's rows
+    in such groups by reason). Held-out rows never train and are listed in
     splits/v3/test_v1/<source>.jsonl (with their capture relations) for a
-    later never-train index v3 and for every later build.
+    later never-train index v3 and for every later build; every other row
+    sharing a capture relation with a held-out row (dropped before the
+    grouping, or a duplicate in a held-out group) is listed in
+    splits/v3/test_v1_companions/<source>.jsonl: never trained, and never
+    cut by the stream (Step 1's queue reads both, step1_stream.test_v1_rows).
   * The quarantine: a quarantined source's rows that are not held out
     leave arm B (quarantined); a copy group whose kept row is quarantined
     keeps its best copy from a source that is not.
@@ -146,6 +158,9 @@ bytes, and summary.json is written last):
                          group, licence
   test_v1/<source>.jsonl the held-out rows of each source (original and
                          written file, dHash and variants)
+  test_v1_companions/<source>.jsonl
+                         rows sharing a held-out row's capture relation,
+                         never test rows (never trained, never cut)
   dropped_v1.jsonl       every row not admitted, with its reason
   summary.json           status complete; the arms (manifest path, sha256,
                          images, boxes, distinct photos); per source: seen,
@@ -189,6 +204,10 @@ SUMMARY = "summary.json"
 PROVENANCE = "provenance_v1.jsonl"
 DROPPED = "dropped_v1.jsonl"
 HOLDOUT_DIR = "test_v1"
+# rows that share a capture relation with a held-out row but are not test rows themselves (dropped before the
+# grouping, or a held group's duplicates): never trained, never cut (prior_test_lists reads them with the test lists)
+COMPANION_DIR = "test_v1_companions"
+STREAM_LEASE_WAIT_S = 1800              # build: how long the last pool check waits for the stream's lease
 IMGSZ = 640
 WEED_ID = 12
 VARIANTS = ("id", "hflip", "vflip", "rot90", "rot180", "rot270", "transpose", "transverse")
@@ -774,7 +793,10 @@ def intake_rows(conf, holds_view=None):
     rows have it (group_key '<source>|<group 1>'), matched on the row's
     original file name (its 'rel' in the source, else its image's name): the
     intake's own capture group may be the single image (SIU's frames), and
-    the session joins every frame of a video into one capture group."""
+    the session joins every frame of a video into one capture group. A row
+    whose name the pattern does not match cannot be placed with its video,
+    in test v1 or in arm B, so it is dropped (group_unmatched); each batch's
+    record counts the matched and unmatched rows per source."""
     idir = Path(C.INC_DIR) / "intake"
     rxs = {s: _group_regex(s, e) for s, e in conf["intake"].items()}
     out, rec = [], {}
@@ -790,15 +812,20 @@ def intake_rows(conf, holds_view=None):
         if not mine:
             continue
         rec[b] = {"manifest_sha256": C.sha256_file(mp), "rows": len(mine), "sources": sorted(s for s in srcs if s)}
+        grx = {}
         for r in mine:
             src = r["source"]
             row = _new_row(src, INTAKE_KIND, conf["intake"][src], r["image"], r["label"], r["key"],
                            family=conf["intake"][src].get("family"), tier=conf["intake"][src].get("tier", 1))
             row["sha256"], row["session"] = r.get("sha256"), str(r.get("session") or r.get("capture_group") or "")
             row["capture"] = "%s|%s" % (src, r.get("capture_group")) if r.get("capture_group") else None
+            unmatched = False
             if rxs.get(src) is not None:
                 m = rxs[src].search(os.path.basename(str(r.get("rel") or r["image"])))
                 row["group_key"] = "%s|%s" % (src, m.group(1)) if m else None
+                unmatched = m is None
+                g = grx.setdefault(src, {"pattern": rxs[src].pattern, "matched": 0, "unmatched": 0})
+                g["unmatched" if unmatched else "matched"] += 1
             row["W"], row["H"] = r.get("width"), r.get("height")
             row["dhash"] = int(r["dhash"]) if r.get("dhash") is not None else None
             row["licence"], row["research_only"] = r.get("licence"), r.get("research_only")
@@ -810,7 +837,11 @@ def intake_rows(conf, holds_view=None):
                 row["intake_holds"] = holds
                 if left is None or left:
                     row["drop"] = "intake_hold"
+            if unmatched and row["drop"] is None:
+                row["drop"] = "group_unmatched"     # its video is unknown: neither test v1 nor arm B can take it
             out.append(row)
+        if grx:
+            rec[b]["group_regex"] = grx
     return out, rec
 
 
@@ -854,6 +885,8 @@ def registry_rows(conf, registry, sources=None):
         rec[slug]["images"] = len(imgs)
         log("registry %s: %d images listed in %.0fs" % (slug, len(imgs), time.time() - t0))
         rx = _group_regex(slug, sc)
+        if rx is not None:
+            rec[slug]["group_regex"] = {"pattern": rx.pattern, "matched": 0, "unmatched": 0}
         seen_keys = set()
         for p in imgs:
             rel = str(p.relative_to(root))
@@ -870,6 +903,7 @@ def registry_rows(conf, registry, sources=None):
             if rx is not None:
                 m = rx.search(p.name)
                 row["group_key"] = "%s|%s" % (slug, m.group(1)) if m else None
+                rec[slug]["group_regex"]["matched" if m else "unmatched"] += 1
             row["licence"] = rec[slug]["licence"]
             out.append(row)
     return out, rec
@@ -1168,11 +1202,14 @@ def merge_eval_records(hashed, guarded):
 # ------------------------------------------------------ earlier test lists
 def prior_test_lists(splits_dir=None):
     """(rows, record) of every test list an earlier base build wrote
-    (<splits>/*/test_v1/*.jsonl, whatever the directory is now called): the
-    rows never train in a later build (mark_prior, select)."""
+    (<splits>/*/test_v1/*.jsonl, whatever the directory is now called) and
+    of its companions (<splits>/*/test_v1_companions/*.jsonl: rows sharing a
+    capture relation with a held-out row, never test rows themselves): the
+    rows never train in a later build (mark_prior, select), and Step 1's
+    queue never offers them to the cutter (step1_stream.test_v1_rows)."""
     root = Path(splits_dir or (Path(C.INC_DIR) / "splits"))
     rows, files = [], []
-    for f in sorted(root.glob("*/%s/*.jsonl" % HOLDOUT_DIR)):
+    for f in sorted(list(root.glob("*/%s/*.jsonl" % HOLDOUT_DIR)) + list(root.glob("*/%s/*.jsonl" % COMPANION_DIR))):
         try:
             got = C.read_manifest(f)
         except Exception as e:  # noqa: BLE001 - an unreadable test list cannot be honoured: refuse
@@ -1530,9 +1567,11 @@ def select(rows, conf, quarantine=(), seed_text=None):
     family caps over the rows still standing (drop None). Every step up to
     the holdout ignores the quarantine, so test v1 is the same whichever
     sources are quarantined; a quarantined source's rows then stay out of
-    arm B (its held rows stay in test v1). Sets drop (duplicate, dup_of_base,
-    holdout_v1, prior_test_v1, quarantined, family_cap), dup_of and group;
-    returns the record."""
+    arm B (its held rows stay in test v1). A group is a pool's group when a
+    member is in a pool or in flight, or shares a capture relation with a
+    pool row a rule dropped before the grouping (`rows` holds every row).
+    Sets drop (duplicate, dup_of_base, holdout_v1, prior_test_v1,
+    quarantined, family_cap), dup_of and group; returns the record."""
     rules = conf["rules"]
     dd, ho = rules["dedupe"], rules["holdout"]
     seed_text = seed_text or ho["seed_text"]
@@ -1561,6 +1600,10 @@ def select(rows, conf, quarantine=(), seed_text=None):
 
     def ext(i):
         return live[i]["kind"] != BASE_KIND and live[i]["drop"] is None
+    # a pool row that a rule dropped before the grouping still shares its capture relations (its video, its
+    # export stem): a group holding another frame of it is a pool's group too, never held out
+    pool_caps = {k for r in rows if r.get("in_pool") and r["kind"] != BASE_KIND and r["drop"] is not None
+                 for k in capture_keys(r)}
     owner, eligible, why_not, rows_of, prior_in = {}, {}, {}, {}, {}
     for g, mem in members.items():
         cnt = collections.Counter(live[i]["source"] for i in mem if ext(i))
@@ -1568,7 +1611,8 @@ def select(rows, conf, quarantine=(), seed_text=None):
         if cnt:
             tier = {live[i]["source"]: live[i]["tier"] for i in mem}
             owner[g] = sorted(cnt, key=lambda s: (-cnt[s], tier[s], s))[0]
-        touch = any(live[i]["kind"] == BASE_KIND or live[i].get("in_pool") for i in mem)
+        touch = any(live[i]["kind"] == BASE_KIND or live[i].get("in_pool") for i in mem) or (
+            bool(pool_caps) and any(k in pool_caps for i in mem for k in capture_keys(live[i])))
         why_not[g] = "base_or_pool" if touch else ("over_max_group" if len(mem) > ho["max_group"] else None)
         eligible[g] = why_not[g] is None
         prior_in[g] = any(live[i].get("prior_test") for i in mem)
@@ -1698,21 +1742,27 @@ def released_status(status):
 
 
 def quarantined_sources(sid):
-    """({source: record}, ledger record, (pool keys, pool image sha256s)) of
-    the stream: its quarantined sources, and the rows of every pool it has
-    trained on and of every increment in flight, through inc2.stream's
-    ledger fold (fail closed: no stream, no build). Such a row never enters
-    the main-test holdout (select). An increment in flight is one whose
-    status has not released its rows (released_status): a segment cut
-    before this build trains on rows no accepted pool holds yet, and its
-    commit may accept them into the next pool, so they count as pool rows
-    exactly as an accepted pool's do. The record counts both (pool_rows;
-    in_flight: per increment its status and rows, and the rows in all)."""
+    """({source: record}, ledger record, (pool keys, pool image sha256s,
+    pool original paths)) of the stream: its quarantined sources, and the
+    rows of every pool it has trained on and of every increment in flight,
+    through inc2.stream's ledger fold (fail closed: no stream, no build).
+    Such a row never enters the main-test holdout (select). An increment in
+    flight is one whose status has not released its rows (released_status):
+    a segment cut before this build trains on rows no accepted pool holds
+    yet, and its commit may accept them into the next pool, so they count
+    as pool rows exactly as an accepted pool's do. A masked row trains on a
+    masked copy, whose sha256 is not its original's: for every masked row
+    of an accepted or in-flight increment, its original's path
+    (unmasked_image) and that file's sha256 count too, so the candidate row
+    of the original is marked (a Step 1 key need not equal this builder's
+    key). The record counts them (pool_rows; in_flight: per increment its
+    status and rows, and the rows in all; masked_originals: hashed, and the
+    files that could not be read, matched by path only)."""
     from . import stream as S
     try:
         st = S.Stream(sid, quiet=True)
         f = st.load()
-        keys, shas = set(), set()
+        keys, shas, paths = set(), set(), set()
         for name in list(f.pools):
             if not (f.pools[name] or {}).get("path"):
                 continue
@@ -1721,23 +1771,39 @@ def quarantined_sources(sid):
                 shas.add(str(r.get("sha256")))
         n_pool = len(keys)
         flight, fkeys = {}, set()
-        for inc, rec in f.increments.items():
-            if rec.get("status") == S.ACCEPTED or released_status(rec.get("status")):
-                continue                     # an accepted increment's rows are its pool's (above)
+        masked = {"rows": 0}
+        hashed = {}
+        for inc, rec in sorted(f.increments.items()):
+            accepted = rec.get("status") == S.ACCEPTED
+            if not accepted and released_status(rec.get("status")):
+                continue
             rows = f.inc_rows(inc)
-            flight[inc] = {"status": rec.get("status"), "segment": rec.get("segment"), "rows": len(rows)}
+            if not accepted:                 # an accepted increment's keys are its pool's (above)
+                flight[inc] = {"status": rec.get("status"), "segment": rec.get("segment"), "rows": len(rows)}
             for k, r in rows.items():
-                fkeys.add(str(k))
-                keys.add(str(k))
-                if r.get("sha256"):
-                    shas.add(str(r["sha256"]))
+                if not accepted:
+                    fkeys.add(str(k))
+                    keys.add(str(k))
+                    if r.get("sha256"):
+                        shas.add(str(r["sha256"]))
+                orig = r.get("unmasked_image")
+                if orig and str(orig) != str(r.get("image")):
+                    masked["rows"] += 1
+                    paths.add(str(orig))
+                    if str(orig) not in hashed:
+                        hashed[str(orig)] = _sha_file(orig)
+                    if hashed[str(orig)]:
+                        shas.add(hashed[str(orig)])
+        bad = sorted(p for p, v in hashed.items() if not v)
+        masked.update(hashed=sum(1 for v in hashed.values() if v), unreadable=len(bad), unreadable_first=bad[:20])
     except Exception as e:  # noqa: BLE001 - an unreadable ledger is no quarantine record: refuse
         raise Base3Error("the stream %s's ledger, pools or increments cannot be read (%s: %s): the quarantine "
                          "and the rows it trains on are unknown" % (sid, type(e).__name__, e))
     return dict(f.q_sources), {"sid": sid, "ledger": str(st.p.ledger), "head_sha256": f.head,
                                "events": f.events, "quarantined_sources": sorted(f.q_sources),
                                "pools": sorted(f.pools), "pool_rows": n_pool,
-                               "in_flight": {"increments": flight, "rows": len(fkeys)}}, (keys, shas)
+                               "in_flight": {"increments": flight, "rows": len(fkeys)},
+                               "masked_originals": masked}, (keys, shas, paths)
 
 
 def queue_holds():
@@ -1758,7 +1824,7 @@ def gather(conf, sid, registry=None, testing=False):
     per-source records, quarantine). The stream's quarantine is returned,
     never applied here: select applies it after the holdout, so every step
     before it is the same whichever sources are quarantined."""
-    q_sources, q_rec, (pool_keys, pool_shas) = quarantined_sources(sid)
+    q_sources, q_rec, pool = quarantined_sources(sid)
     holds, h_rec = queue_holds()
     reg_path = registry_path()
     if registry is None:
@@ -1804,28 +1870,134 @@ def gather(conf, sid, registry=None, testing=False):
                 r["drop"] = r["drop"] or "convention"
     for r in rows:
         image_rules(r, conf["rules"])
-    mark_pool(rows, (pool_keys, pool_shas))
+    mark_pool(rows, pool)
     inputs = {"registry": reg_rec, "base_v2": b_rec, "intake": i_rec,
               "stream": q_rec, "step1_queue": h_rec, "lock_v2": {"path": str(C2.LOCK_PATH),
                                                                   "sha256": _sha_file(C2.LOCK_PATH)}}
     not_read = {s: v["error"] for s, v in sorted(r_rec.items()) if v.get("error")}
-    return rows, inputs, {"registry": r_rec, "convention": conv, "pool": (pool_keys, pool_shas),
+    return rows, inputs, {"registry": r_rec, "convention": conv, "pool": pool,
                           "registry_doc": registry, "not_read": not_read}, q_sources
 
 
 def mark_pool(rows, pool):
     """in_pool on every row the stream has trained on or may still pool (its
     pools: base_v2 and every accepted increment; every increment in flight,
-    quarantined_sources), by key or by the original's sha256: such a row
-    never enters the main-test holdout, whatever its source (select). Called
-    again once the originals' sha256s are known. Returns the number of
-    candidate rows marked besides base_v2's."""
-    keys, shas = pool
+    quarantined_sources), by key, by the original's sha256 or by the
+    original's path (a masked row's unmasked_image): such a row never enters
+    the main-test holdout, nor does any row sharing a capture relation with
+    it, whatever its source (select). Called again once the originals'
+    sha256s are known. Returns the number of candidate rows marked besides
+    base_v2's."""
+    keys, shas = pool[0], pool[1]
+    paths = pool[2] if len(pool) > 2 else ()
     n = 0
     for r in rows:
-        r["in_pool"] = r["kind"] == BASE_KIND or r["key"] in keys or (r["sha256"] or "") in shas
+        r["in_pool"] = r["kind"] == BASE_KIND or r["key"] in keys or (r["sha256"] or "") in shas \
+            or str(r["image"]) in paths
         n += 1 if r["in_pool"] and r["kind"] != BASE_KIND else 0
     return n
+
+
+def _selection_state(rows):
+    """What select sets on each row (drop, dup_of), to select again."""
+    return [(r["drop"], "dup_of" in r, r.get("dup_of")) for r in rows]
+
+
+def _restore_selection(rows, state):
+    for r, (drop, had, dup_of) in zip(rows, state):
+        r["drop"] = drop
+        if had:
+            r["dup_of"] = dup_of
+        else:
+            r.pop("dup_of", None)
+        r.pop("group", None)
+        r.pop("holdout_owner", None)
+
+
+def _pool_changed(a, b):
+    return any(set(x) != set(y) for x, y in zip(tuple(a) + ((),) * (3 - len(a)), tuple(b) + ((),) * (3 - len(b))))
+
+
+def recheck_pool(sid, rows, pool, conf, quarantine, state, sel, events_before=None):
+    """build: the stream's fold read again once the selection is made, before
+    any output is written. gather read it when the job started, and the
+    stream may have cut a segment since (the job runs for hours): when its
+    pools or in-flight rows changed, the rows are marked again and selected
+    again from the state before the first selection (`state`). Returns
+    (selection record, pool, record)."""
+    _q, now, pool2 = quarantined_sources(sid)
+    rec = {"head_sha256": now["head_sha256"], "events_before": events_before, "events": now["events"],
+           "in_flight": now["in_flight"], "quarantined_sources_now": now["quarantined_sources"],
+           "changed": _pool_changed(pool, pool2)}
+    if rec["changed"]:
+        rec["pool_marked_rows"] = mark_pool(rows, pool2)
+        _restore_selection(rows, state)
+        sel = select(rows, conf, quarantine=quarantine)
+        rec["reselected"] = True
+        log("the stream's pools or in-flight rows changed while the job ran (ledger events %s -> %s): selected "
+            "again" % (events_before, now["events"]))
+    return sel, (pool2 if rec["changed"] else pool), rec
+
+
+def companion_rows(rows):
+    """{source: [row]}: every row that is not a test row but shares a capture
+    relation (export stem, intake capture group, file-name session: SIU's
+    video) with a held-out row, or lies in a held-out group (its duplicates):
+    rows a rule dropped before the grouping (an intake hold, a box or image
+    rule, an evaluation group) are in no group, and Step 1's queue may still
+    offer them to the stream's cutter, which matches a test list by bytes,
+    key and dHash only. Listed beside the test lists, they never train and
+    are never cut (prior_test_lists)."""
+    held = [r for r in rows if r["drop"] == "holdout_v1"]
+    caps = {k for r in held for k in capture_keys(r)}
+    groups = {r.get("group") for r in held if r.get("group")}
+    out = collections.defaultdict(list)
+    for r in rows:
+        if r["kind"] == BASE_KIND or r["drop"] in (None, "holdout_v1", "prior_test_v1"):
+            continue
+        if (r.get("group") and r["group"] in groups) or any(k in caps for k in capture_keys(r)):
+            out[r["source"]].append(r)
+    return out
+
+
+def final_pool_check(sid, rows, companions, wait_s=None):
+    """build, after the test lists and their companions are written: the
+    stream's fold read once more while this job holds the stream's lease
+    (inc2.stream's writers hold it to cut and build a segment). A cut that
+    began before the lists existed has written its ledger lines by then; a
+    cut after it reads them (step1_stream.test_v1_rows) and never takes a
+    listed row. Raises Base3Error when a listed row, or a row sharing a
+    capture relation with a held-out row, is now in a pool or in flight:
+    summary.json is then never written. Returns the record."""
+    from ..inc import driver as D
+    from . import stream as S
+    lease = D.Lease(S.StreamPaths(sid).lease)
+    t0, wait_s = time.time(), STREAM_LEASE_WAIT_S if wait_s is None else wait_s
+    while not lease.acquire():
+        if time.time() - t0 >= wait_s:
+            raise Base3Error("the stream %s's lease was held for %.0f s: the last check of the rows it trains on "
+                             "could not run (fail closed; the test lists stay as never-train)" % (sid, wait_s))
+        time.sleep(10)
+    try:
+        _q, now, (keys, shas, paths) = quarantined_sources(sid)
+    finally:
+        lease.release()
+
+    def pooled(r):
+        return r["key"] in keys or (r["sha256"] or "") in shas or str(r["image"]) in paths
+    held = [r for r in rows if r["drop"] == "holdout_v1"]
+    caps = {k for r in held for k in capture_keys(r)}
+    listed = held + [r for rs in companions.values() for r in rs]
+    hits = sorted({r["key"] for r in listed if pooled(r)} | {
+        r["key"] for r in rows if r["kind"] != BASE_KIND and pooled(r) and any(k in caps for k in capture_keys(r))})
+    rec = {"head_sha256": now["head_sha256"], "events": now["events"], "in_flight": now["in_flight"],
+           "lease_wait_s": round(time.time() - t0, 1), "conflicts": len(hits)}
+    if hits:
+        raise Base3Error("%d row(s) of test v1 or of its companions, or sharing a held-out row's capture relation, "
+                         "are now in a pool of the stream %s or in an increment in flight (cut while this job ran; "
+                         "e.g. %s): summary.json is not written; the test lists stay as never-train; move %s aside "
+                         "and build again" % (len(hits), sid, ", ".join(hits[:5]), out_dir()))
+    return rec
 
 
 def per_source(rows, recs, quarantine, lifted=()):
@@ -1860,7 +2032,7 @@ def per_source(rows, recs, quarantine, lifted=()):
         v["convention"] = recs["convention"].get(s)
         if s in recs["registry"]:
             v["registry"] = {k: recs["registry"][s].get(k) for k in ("names_basis", "error", "registry_status",
-                                                                   "licence")}
+                                                                   "licence", "group_regex")}
     return out
 
 
@@ -2010,9 +2182,10 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
     root = out_dir()
     if (root / SUMMARY).is_file():
         raise Base3Error("%s exists: base v3 is built once (a rebuild is a new version)" % (root / SUMMARY))
-    if (root / HOLDOUT_DIR).exists():
-        raise Base3Error("%s holds the test lists of a build that did not finish: move %s aside inside %s first "
-                         "(its test lists are then read as never-train)" % (root / HOLDOUT_DIR, root, root.parent))
+    for d in (HOLDOUT_DIR, COMPANION_DIR):
+        if (root / d).exists():
+            raise Base3Error("%s holds the test lists of a build that did not finish: move %s aside inside %s first "
+                             "(its test lists are then read as never-train)" % (root / d, root, root.parent))
     prior, prior_rec = prior_test_lists()
     rows, inputs, recs, quarantine = gather(conf, sid, registry=registry, testing=bool(testing))
     todo = [r for r in rows if not r["drop"]]
@@ -2060,7 +2233,12 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
         % ({g: v["hashes"] for g, v in eg_rec["groups"].items()}, eg_rec["dropped"], eg_rec["bits"],
            time.time() - te))
     prior_rec["marked"] = mark_prior(rows, prior, conf["rules"]["holdout"]["group_bits"])
+    state = _selection_state(rows)
     sel = select(rows, conf, quarantine=quarantine)
+    # the stream may have cut a segment since the job started (gather read its fold then): read it again, and
+    # select again over the rows it now trains on or may pool, before anything is written
+    sel, recs["pool"], inputs["stream"]["recheck"] = recheck_pool(
+        sid, rows, recs["pool"], conf, quarantine, state, sel, events_before=inputs["stream"].get("events"))
     a, b = arm_rows(rows)
     if len(a) == 0 or len(b) <= len(a):
         raise Base3Error("arm A has %d rows and arm B %d: nothing to compare" % (len(a), len(b)))
@@ -2099,6 +2277,18 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
         hold_files[s] = {"file": "%s/%s.jsonl" % (HOLDOUT_DIR, s),
                          "sha256": C2.write_jsonl_atomic(root / HOLDOUT_DIR / ("%s.jsonl" % s), hrows),
                          "images": len(hrows), "quarantined_source": s in quarantine}
+    comp = companion_rows(rows)
+    comp_files = {}
+    for s, rs in sorted(comp.items()):
+        crows = [{"key": r["key"], "source": r["source"], "kind": r["kind"], "companion": True, "reason": r["drop"],
+                  "original_image": r["image"], "original_sha256": r["sha256"], "sha256": r.get("train_sha256"),
+                  "dhash": r["dhash"], "variants": r["variants"], "group": r.get("group"),
+                  "capture_keys": [list(k) for k in capture_keys(r)]} for r in sorted(rs, key=lambda r: r["key"])]
+        comp_files[s] = {"file": "%s/%s.jsonl" % (COMPANION_DIR, s), "rows": len(crows),
+                         "sha256": C2.write_jsonl_atomic(root / COMPANION_DIR / ("%s.jsonl" % s), crows)}
+    # the lists exist now, so a later cut never takes a listed row; one that began before them is in the ledger
+    # once this job holds the stream's lease
+    inputs["stream"]["final_check"] = final_pool_check(sid, rows, comp)
     drop_rows = [{"key": r["key"], "source": r["source"], "image": r["image"], "reason": r["drop"],
                   "dup_of": r.get("dup_of"), "group": r.get("group"), "eval_group": r.get("eval_group"),
                   "prior_test": r.get("prior_test")} for r in sorted(rows, key=lambda r: r["key"])
@@ -2133,7 +2323,9 @@ def build(sid, conf_path=None, registry=None, testing=False, procs=5, embedder=N
                   "dropped": {"file": DROPPED, "sha256": drop_sha, "rows": len(drop_rows)},
                   "pngs_written": written, "pngs_removed_unused": removed},
         "holdout_v1": {"dir": HOLDOUT_DIR, "seed_text": conf["rules"]["holdout"]["seed_text"],
-                       "per_source": hold_files, "images": sum(v["images"] for v in hold_files.values())},
+                       "per_source": hold_files, "images": sum(v["images"] for v in hold_files.values()),
+                       "companions": {"dir": COMPANION_DIR, "per_source": comp_files,
+                                      "rows": sum(v["rows"] for v in comp_files.values())}},
         "quarantine": sorted(quarantine), "sources_not_read": recs["not_read"], "evaluation_groups": eg_rec,
         "prior_test": prior_rec,
         "selection": sel, "per_source": ps, "guard": {k: grec.get(k) for k in ("reasons", "checked", "refused",

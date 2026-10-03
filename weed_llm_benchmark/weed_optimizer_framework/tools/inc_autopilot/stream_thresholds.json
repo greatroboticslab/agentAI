@@ -129,7 +129,7 @@
   "lift_wait_hours": {
    "value": 12,
    "decided_by": "docs/CONTINUOUS_LOOP.md, E1, amendment 2026-10-03 (before any build): human:harry567566@gmail.com under the 2026-09-30 grant",
-   "why": "Base v3 (inc2.base3 build, L23V) reads the stream's source quarantines when its job starts, and a quarantined source never enters arm B; only a person lifts a quarantine (inc2.stream unquarantine). D28-v2's sidecars may judge a quarantined source's dHash hits chance (rf_tuf and rf_zbm50, about 5,900 arm-B images, were quarantined by the one-hit rule), so while D28 lists such sources that the stream still quarantines, DR0 defers L23V and raises one card naming them and the exact command, for at most 12 h from when the stream first saw the list: long enough for a person to read a card overnight, short enough that E1 is not held for a day; past it L23V is proposed with the quarantine as it stands."
+   "why": "Base v3 (inc2.base3 build, L23V) reads the stream's source quarantines when its job starts, and a quarantined source never enters arm B; only a person lifts a quarantine (inc2.stream unquarantine). D28-v2's sidecars may judge a quarantined source's dHash hits chance (rf_tuf and rf_zbm50, about 5,900 arm-B images, were quarantined by the one-hit rule), so while D28 lists such sources that the stream still quarantines on D28's word (or cannot judge them), DR0 defers L23V and raises one card naming them and the exact command, for at most 12 h from the first tick it deferred L23V (a tick on which D28 cannot judge neither ends nor restarts the wait; review fixes, 2026-10-03): long enough for a person to read a card overnight, short enough that E1 is not held for a day; past it L23V is proposed with the quarantine as it stands."
   }
  },
  "D29": {

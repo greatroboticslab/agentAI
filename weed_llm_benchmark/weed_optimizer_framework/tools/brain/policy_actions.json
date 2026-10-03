@@ -2318,7 +2318,7 @@
         "est_gpu_hours": {
           "type": "float",
           "min": 0.0,
-          "max": 8.0
+          "max": 12.0
         }
       },
       "risk": "R3",
@@ -2327,7 +2327,7 @@
         "gpu_type": "v100-32",
         "gpu_count": 1,
         "hours_param": "est_gpu_hours",
-        "why": "One GPU-shared build job (run_inc2_build.sh, one V100, up to its 12 h walltime) that writes splits v3 and trains nothing: est_gpu_hours is levers_stream.price's 'zero_job' estimate (the stream domain's build_job_hours, 4 GPU-h), charged to the campaign envelope and settled from sacct when the job ends."
+        "why": "One GPU-shared build job (run_inc2_build.sh, one V100, up to its 12 h walltime) that writes splits v3 and trains nothing: est_gpu_hours is levers_stream.price's 'base3_job' estimate (the stream domain's base3_job_hours, 12 GPU-h: the job's walltime), charged to the campaign envelope and settled from sacct when the job ends."
       },
       "dry_run_variant": null,
       "allowed_tiers": [

@@ -291,7 +291,8 @@
   "probe_hours": 0.5,
   "splits_hours": 4.0,
   "rescore_hours_per_run": 0.25,
-  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job is priced at 4 GPU-h, the 4 h walltime it had until 2026-10-03 (its limit is 12 h since, for the base v3 build; the price of every build job is settled from sacct when it ends), a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed. A native-resolution rescore (L23N, 2026-10-01) is one scoring pass per final run: dev and ImageWeeds are 3,825 images, at up to 210 ms per image (54.5 ms measured for n640 at 640, x 2.2 for YOLO11m measured at 640, x 1.69 for 832 px) 0.22 GPU-h, rounded up to 0.25 per run; the reference's dev pass is priced as a run too."
+  "base3_job_hours": 12.0,
+  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job is priced at 4 GPU-h, the 4 h walltime it had until 2026-10-03 (its limit is 12 h since, for the base v3 build; the other build jobs ran within 4 h), the base v3 build job (L23V) at its 12 h walltime (base3_job_hours; the upper end, so its price is never low), and the price of every build job is settled from sacct when it ends, a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed. A native-resolution rescore (L23N, 2026-10-01) is one scoring pass per final run: dev and ImageWeeds are 3,825 images, at up to 210 ms per image (54.5 ms measured for n640 at 640, x 2.2 for YOLO11m measured at 640, x 1.69 for 832 px) 0.22 GPU-h, rounded up to 0.25 per run; the reference's dev pass is priced as a run too."
  },
  "walltime": {
   "cold_h": 8.0,

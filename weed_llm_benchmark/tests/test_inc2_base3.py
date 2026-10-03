@@ -957,6 +957,9 @@ def test_build(Wd, reg, cp, f):
     s2 = {g for k, g in ses.items() if "_s2_" in k}
     check("src_session's file-name session (group_regex ^(s\\d)_) joins s1_* into one group and s2_* into another",
           len(ses) == 6 and len(s1) == 1 and len(s2) == 1 and s1 != s2, ses)
+    check("  summary.json counts the names a registry source's group_regex matched (src_session: 6 of 6)",
+          (summ["per_source"]["src_session"].get("registry") or {}).get("group_regex")
+          == {"pattern": "^(s\\d)_", "matched": 6, "unmatched": 0}, summ["per_source"]["src_session"].get("registry"))
     hrow = next(json.loads(ln) for f in sorted((root / B3.HOLDOUT_DIR).glob("*.jsonl"))
                 for ln in f.read_text().splitlines())
     check("a test list row carries its capture relations and whether its source is quarantined",
@@ -1216,18 +1219,21 @@ def test_prior_lists(Wd, reg, cp):
         return held, {r["key"] for r in C.read_manifest(root / ("%s.jsonl" % B3.ARM_B))}
     make_stream(SID, [QUAR])
     with holds({"int_src__00": []}):
-        B3.build(SID, conf_path=cp, registry=reg, testing=True, procs=2, loader=LOADER)
+        s1 = B3.build(SID, conf_path=cp, registry=reg, testing=True, procs=2, loader=LOADER)
     held1, b1 = keys_of(B3.out_dir())
+    comp1 = s1["holdout_v1"]["companions"]
     os.rename(B3.out_dir(), splits / "v3_prev1")
     make_stream(SID, [QUAR, {"event": "unquarantine", "source": "src_quar", "by": "human:x"}])
     with holds({"int_src__00": []}):
         s2 = B3.build(SID, conf_path=cp, registry=reg, testing=True, procs=2, loader=LOADER)
     held2, b2 = keys_of(B3.out_dir())
-    check("rebuilt with src_quar's quarantine lifted, the first build's test lists read as never-train (%s): the same "
-          "test v1 (%d), none of it in arm B, arm B gains src_quar's other 3 rows"
-          % ([f["file"].split("/splits/")[-1] for f in s2["prior_test"]["files"]], len(held2)),
+    check("rebuilt with src_quar's quarantine lifted, the first build's test lists and their companions (%d rows) "
+          "read as never-train (%s): the same test v1 (%d), none of it in arm B, arm B gains src_quar's other 3 rows"
+          % (comp1["rows"], [f["file"].split("/splits/")[-1] for f in s2["prior_test"]["files"]], len(held2)),
           held2 == held1 and not (held1 & b2) and b2 - b1 == {k for k in b2 if k.startswith("src_quar__")}
-          and len(b2 - b1) == 3 and s2["prior_test"]["rows"] == len(held1) and s2["prior_test"]["marked"] >= len(held1),
+          and len(b2 - b1) == 3 and s2["prior_test"]["rows"] == len(held1) + comp1["rows"]
+          and s2["prior_test"]["marked"] >= len(held1)
+          and len(s2["prior_test"]["files"]) == len(s1["holdout_v1"]["per_source"]) + len(comp1["per_source"]),
           (sorted(held1 ^ held2), s2["prior_test"]))
     os.rename(B3.out_dir(), splits / "v3_prev2")
     with holds({"int_src__00": [], "int_src__01": []}):
@@ -1236,7 +1242,8 @@ def test_prior_lists(Wd, reg, cp):
     check("rebuilt once more with a new row (int_src__01's hold released, joining tray0): every earlier test row is "
           "held again or never trained (%d earlier lists)" % len(s3["prior_test"]["files"]),
           held1 <= held3 and not (held1 & b3) and "int_src__01" in (held3 | b3)
-          and len(s3["prior_test"]["files"]) == 2 * len(s2["holdout_v1"]["per_source"]),
+          and len(s3["prior_test"]["files"]) == 2 * (len(s2["holdout_v1"]["per_source"])
+                                                     + len(s2["holdout_v1"]["companions"]["per_source"])),
           (sorted(held1 - held3), s3["selection"]["holdout"].get("int_src"),
            [json.loads(x) for x in (B3.out_dir() / B3.DROPPED).read_text().splitlines() if "int_src" in x]))
     os.rename(B3.out_dir(), splits / "v3_prev3")
@@ -1297,7 +1304,7 @@ def test_in_flight(Wd, reg, cp, f):
               {"event": "rollback", "to": "P_0", "from": "P_1", "suspect": ["inc0004"], "by": "platform"},
               QUAR]
     make_stream(SID, events)
-    q, rec, (keys, shas) = B3.quarantined_sources(SID)
+    q, rec, (keys, shas, _paths) = B3.quarantined_sources(SID)
     fl = rec["in_flight"]
     check("quarantined_sources: in flight are inc0001 (in_segment, 4 rows) and inc0004 (suspect, 1 row); the "
           "withdrawn inc0002 and the 'data' inc0003 are not; the record counts 5 rows",
@@ -1313,7 +1320,7 @@ def test_in_flight(Wd, reg, cp, f):
         self.increments["inc0004"]["status"] = "brand_new"
     S.Fold._ev_commit = odd
     try:
-        _q, rec2, (keys2, _s) = B3.quarantined_sources(SID)
+        _q, rec2, (keys2, _s, _p) = B3.quarantined_sources(SID)
     finally:
         S.Fold._ev_commit = orig
     check("  an increment of a status the builder does not know counts as in flight (fail closed)",
@@ -1343,6 +1350,170 @@ def test_in_flight(Wd, reg, cp, f):
           not ({r["key"] for r in rows[2:]} & held) and it["in_B"] >= 4
           and stv["in_flight"]["rows"] == 4 and stv["in_flight"]["increments"]["inc0001"]["status"] == "in_segment"
           and stv["pool_rows"] == 0 and stv["pool_marked_rows"] >= 4, (sorted(held), it, stv.get("in_flight")))
+    clear_v3()
+    make_stream(SID, [QUAR])
+
+
+def _cut_side(sid, inc, seg, side):
+    """A cut line whose rows sidecar holds the given rows as they are (inc2.stream writes key, sha256 of the file
+    trained on, image, unmasked_image, hashes)."""
+    p = S.StreamPaths(sid)
+    path = TMP / "sidecars" / sid / ("%s.rows.jsonl" % inc)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(dict({"hashes": {}}, **r), sort_keys=True) + "\n" for r in side))
+    return {"event": "cut", "increment": inc, "segment": seg, "step": 1,
+            "manifest": {"path": str(p.inc_manifest(inc)), "sha256": "0" * 64, "n_images": len(side)},
+            "rows": {"path": str(path), "sha256": C.sha256_file(path)}, "meta": {"path": str(p.inc_meta(inc))},
+            "sources": sorted({r["source"] for r in side}), "by": "platform"}
+
+
+def _all_conf(cp, name):
+    conf = json.loads(cp.read_text())
+    conf["rules"]["holdout"].update(min_images=6, max_images=6, share=1.0)
+    allp = TMP / name
+    allp.write_text(json.dumps(conf))
+    return allp
+
+
+def _held_keys():
+    return {json.loads(x)["key"] for x in (B3.out_dir() / B3.PROVENANCE).read_text().splitlines()
+            if json.loads(x)["holdout_v1"]}
+
+
+def test_build_race(Wd, reg, cp, f):
+    print("a segment the stream cuts while the build runs: selected again, or the build refuses")
+    rows = f["intake_rows"]
+    allp = _all_conf(cp, "base3_race.json")
+    cut = {r["key"] for r in rows[2:]}
+    # 1. cut after the job read the fold (gather) and before the selection's re-check: selected again
+    clear_v3()
+    make_stream(SID, [QUAR])
+    orig = B3.gather
+
+    def gather_then_cut(*a, **kw):
+        out = orig(*a, **kw)
+        make_stream(SID, [QUAR, _cut(SID, "inc0001", 2, rows[2:])])
+        return out
+    B3.gather = gather_then_cut
+    try:
+        with holds({"int_src__00": []}):
+            summ = B3.build(SID, conf_path=allp, registry=reg, testing=True, procs=2, loader=LOADER)
+    finally:
+        B3.gather = orig
+    st = summ["inputs"]["stream"]
+    check("cut while the job runs (after it read the fold): the build reads the fold again, selects again, and none "
+          "of the 4 cut rows is held out to test v1 (it held them before the fix); the summary records both reads and "
+          "the last check under the stream's lease",
+          summ["status"] == "complete" and not (cut & _held_keys()) and st["in_flight"]["rows"] == 0
+          and st["recheck"]["changed"] and st["recheck"].get("reselected") and st["recheck"]["in_flight"]["rows"] == 4
+          and st["final_check"]["conflicts"] == 0 and st["final_check"]["in_flight"]["rows"] == 4,
+          (sorted(cut & _held_keys()), st.get("recheck"), st.get("final_check")))
+    clear_v3()
+    make_stream(SID, [QUAR])
+    with holds({"int_src__00": []}):
+        same = B3.build(SID, conf_path=allp, registry=reg, testing=True, procs=2, loader=LOADER)
+    check("  (control: the fold unchanged, the re-check changes nothing and selects nothing again)",
+          same["inputs"]["stream"]["recheck"]["changed"] is False
+          and not same["inputs"]["stream"]["recheck"].get("reselected"), same["inputs"]["stream"]["recheck"])
+    # 2. cut after the re-check, before the last check: the build refuses, summary.json is never written
+    clear_v3()
+    make_stream(SID, [QUAR])
+    orig_rc = B3.recheck_pool
+    took = []
+
+    def recheck_then_cut(sid, rws, *a, **kw):
+        out = orig_rc(sid, rws, *a, **kw)
+        held = [r for r in rws if r["drop"] == "holdout_v1" and r["kind"] == B3.INTAKE_KIND]
+        took.extend(r["key"] for r in held)
+        make_stream(SID, [QUAR, _cut(SID, "inc0001", 2, [{"key": r["key"], "sha256": r["sha256"],
+                                                          "source": r["source"]} for r in held])])
+        return out
+    B3.recheck_pool = recheck_then_cut
+    try:
+        with holds({"int_src__00": []}):
+            e = refused(B3.build, SID, conf_path=allp, registry=reg, testing=True, procs=2, loader=LOADER)
+    finally:
+        B3.recheck_pool = orig_rc
+    check("cut after the selection's re-check (it took %d held-out rows): the last check, under the stream's lease, "
+          "refuses the build; no summary.json, the test lists stay as never-train" % len(took),
+          took and e is not None and "now in a pool" in str(e) and not (B3.out_dir() / B3.SUMMARY).exists()
+          and (B3.out_dir() / B3.HOLDOUT_DIR).is_dir(), (e, took))
+    # 3. the last check waits for the stream's lease and refuses when it never comes
+    clear_v3()
+    make_stream(SID, [QUAR])
+    lease = D.Lease(S.StreamPaths(SID).lease)
+    check("  the stream's lease is free: the last check takes it, reads the fold and releases it",
+          B3.final_pool_check(SID, [], {}, wait_s=0)["conflicts"] == 0 and lease.acquire())
+    e = refused(B3.final_pool_check, SID, [], {}, wait_s=0)
+    lease.release()
+    check("  another writer holds the stream's lease past the wait: the last check refuses (fail closed)",
+          e is not None and "lease" in str(e), e)
+    make_stream(SID, [QUAR])
+
+
+def test_companions_and_masked(Wd, reg, cp, f):
+    print("companions of test v1: rows sharing a held-out row's capture relation are never cut; masked pool rows")
+    from weed_optimizer_framework.tools.inc2 import step1_stream as S1
+    import types
+    rows = f["intake_rows"]
+    clear_v3()
+    make_stream(SID, [QUAR])
+    with holds({"int_src__00": []}):
+        summ = B3.build(SID, conf_path=cp, registry=reg, testing=True, procs=2, loader=LOADER)
+    held = _held_keys()
+    comp = summ["holdout_v1"]["companions"]
+    crow = {}
+    for p in (B3.out_dir() / B3.COMPANION_DIR).glob("*.jsonl"):
+        for ln in p.read_text().splitlines():
+            crow[json.loads(ln)["key"]] = json.loads(ln)
+    check("int_src__00 (tray0) is held out and int_src__01 (tray0, its h6_scan hold not released: dropped before "
+          "the grouping) is not a test row: it is listed as a companion with its capture relation (%d companions)"
+          % comp["rows"], "int_src__00" in held and "int_src__01" not in held
+          and crow.get("int_src__01", {}).get("reason") == "intake_hold"
+          and crow["int_src__01"]["capture_keys"] == [["capture", "int_src|tray0"]]
+          and comp["per_source"]["int_src"]["rows"] >= 1, (sorted(held), sorted(crow)))
+    check("  a held group's duplicates are companions too (src_dock_b's copies of held dock stems)",
+          any(c["reason"] == "duplicate" and c["source"] == "src_dock_b" for c in crow.values()), sorted(crow))
+    prior, prec = B3.prior_test_lists()
+    queue = [{"key": "int_src__01", "sha256": "0" * 64, "dhash": None},
+             {"key": "int_src__04", "sha256": "1" * 64, "dhash": None}]
+    n = S1.test_v1_rows(types.SimpleNamespace(inc_dir=C.INC_DIR), queue)
+    check("Step 1's queue (step1_stream.test_v1_rows, unchanged) reads the companions with the test lists: "
+          "int_src__01 is never cut (by key); a row of no held-out capture group stays cuttable",
+          any(r.get("companion") for r in prior) and queue[0].get("test_v1") == "key"
+          and not queue[1].get("test_v1") and n >= 1, (queue, prec))
+    # a pool row a rule dropped before the grouping keeps its group out of test v1 (synthetic rows)
+    conf = unit_conf(share=1.0, min_images=1, max_images=10, max_group=400)
+    sel = [srow("v_%d" % i, source="s_v", group_key="s_v|V1") for i in range(3)]
+    gone = srow("v_drop", source="s_v", group_key="s_v|V1", in_pool=True)
+    gone["drop"] = "box_over_90"
+    other = [srow("w_%d" % i, source="s_v", group_key="s_v|V2") for i in range(3)]
+    B3.select(sel + [gone] + other, conf)
+    check("a frame of video V1 in a pool, dropped before the grouping (box_over_90): no frame of V1 is held out; "
+          "V2's are", not held_of(sel) and set(held_of(other)) == {r["key"] for r in other}, (held_of(sel),
+                                                                                             held_of(other)))
+    # masked rows of an increment in flight: the original's path or bytes mark the candidate row
+    clear_v3()
+    copy = TMP / "masked_orig_copy.jpg"
+    shutil.copyfile(rows[2]["image"], copy)
+    side = [{"key": "int_src__step1_style_04", "sha256": "e" * 64, "source": "int_src", "image": "/m/04.png",
+             "unmasked_image": rows[4]["image"]},
+            {"key": "int_src__step1_style_02", "sha256": "d" * 64, "source": "int_src", "image": "/m/02.png",
+             "unmasked_image": str(copy)}]
+    make_stream(SID, [QUAR, _cut_side(SID, "inc0001", 2, side)])
+    _q, rec, (keys, shas, paths) = B3.quarantined_sources(SID)
+    check("an in-flight increment's masked rows (another key, the masked copy's sha256): their originals' path and "
+          "file sha256 count as pool rows", rows[4]["image"] in paths and rows[4]["sha256"] in shas
+          and rows[2]["sha256"] in shas and rec["masked_originals"]["rows"] == 2
+          and rec["masked_originals"]["hashed"] == 2 and rec["masked_originals"]["unreadable"] == 0, rec)
+    with holds({"int_src__00": []}):
+        summ = B3.build(SID, conf_path=_all_conf(cp, "base3_masked.json"), registry=reg, testing=True, procs=2,
+                        loader=LOADER)
+    held = _held_keys()
+    check("  the build holds out none of their candidate rows, nor their capture groups' (tray1 by the original's "
+          "bytes, tray2 by its path), though the rule would take every group",
+          not ({"int_src__02", "int_src__03", "int_src__04", "int_src__05"} & held) and "int_src__00" in held,
+          sorted(held))
     clear_v3()
     make_stream(SID, [QUAR])
 
@@ -1378,15 +1549,20 @@ def test_intake_video_groups():
     try:
         conf = unit_conf(share=0.25, min_images=1, max_images=6, max_group=400)
         conf["intake"] = {"vid_src": {"tier": 1, "classes": "all_weed", "family": "siu", "group_regex": zrx}}
-        rows, _rec = B3.intake_rows(conf, holds_view={})
+        rows, irec = B3.intake_rows(conf, holds_view={})
         R = by_key(rows)
         gk = {r["rel"].rsplit("/", 1)[1]: R[r["key"]]["group_key"] for r in man}
+        odd = R[next(r["key"] for r in man if r["rel"].endswith("IMG_0001.jpeg"))]
         check("rows named like the real intake (the capture group the single image) get the video as their session "
               "(group_key '<source>|<video>'), from the original file name, whatever folder holds it; an unmatched "
-              "name gets none",
+              "name gets none and is dropped (group_unmatched: its video is unknown), and the batch's record counts "
+              "both",
               all(gk["%s_frame_%04d.jpeg" % (v, k)] == "vid_src|%s" % v for v in vids for k in (1, 49, 88, 120))
               and gk["%s_frame_0200.jpeg" % vids[0]] == "vid_src|%s" % vids[0] and gk["IMG_0001.jpeg"] is None
-              and all(R[r["key"]]["capture"] == "vid_src|%s" % r["rel"] for r in man), gk)
+              and odd["drop"] == "group_unmatched"
+              and sum(1 for r in rows if r["drop"]) == 1
+              and irec["i0009_vid_src"]["group_regex"]["vid_src"] == {"pattern": zrx, "matched": 17, "unmatched": 1}
+              and all(R[r["key"]]["capture"] == "vid_src|%s" % r["rel"] for r in man), (gk, irec))
 
         def synth(rws):
             out = []
@@ -1453,6 +1629,8 @@ def main():
     test_count_and_quarantine(Wd, reg, cp, f, built)
     test_pool_rows(Wd, reg, cp, f)
     test_in_flight(Wd, reg, cp, f)
+    test_build_race(Wd, reg, cp, f)
+    test_companions_and_masked(Wd, reg, cp, f)
     test_walltime(Wd, reg, cp)
     test_baseline_budget(Wd, reg, cp)
     test_prior_lists(Wd, reg, cp)

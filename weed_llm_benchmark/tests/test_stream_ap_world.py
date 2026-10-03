@@ -465,6 +465,7 @@ class World(object):
                               "next": "%s_m%03d" % (self.sid, es["next_ms"])},
                "boundary_check": es["boundary"],
                "rollback_pending": list(es["rollback_pending"]),
+               "quarantined_sources": {},
                "ledger": {"events": len(self.stream_ledger())}}
         doc.update(q.get("extra") or {})
         self._w("stream/%s/queue_summary.json" % self.sid, doc)

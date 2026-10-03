@@ -1881,8 +1881,12 @@ def t_e1():
           abs(est_a - want) < 1e-6 and abs(est_b - want) < 1e-6 and det["estimator"] == "budget" and old > est_b, det)
     ev, dv = LS.price("L23V", PARAMS["L23V"], dom, {})
     ee, de = LS.price("L23E", PARAMS["L23E"], dom, {"runs": 6})
-    check("L23V is one build job (%.1f GPU-h, its walltime); L23E six scoring passes (%.2f GPU-h)" % (ev, ee),
-          ev == LS.cost(dom, "build_job_hours") and ee == 1.5, (dv, de))
+    okv, badv = LS.check_params("L23V", LS.policy_params("L23V", dict(PARAMS["L23V"], est_gpu_hours=ev)))
+    check("L23V is one build job priced at its own walltime (%.1f GPU-h: run_inc2_build.sh's 12 h limit, not the other "
+          "build jobs' %.1f), which its policy row admits; L23E six scoring passes (%.2f GPU-h)"
+          % (ev, LS.cost(dom, "build_job_hours"), ee),
+          ev == LS.cost(dom, "base3_job_hours") == 12.0 and dv["estimator"] == "base3_job" and okv and ee == 1.5,
+          (dv, de, badv))
     ok, bad = LS.check_params("L23B", LS.policy_params("L23B", pa))
     back = X.params_from_argv("inc_build_baseline_v2", LS.render("L23B", LS.policy_params("L23B", pa)))
     check("the role enum admits 'baseline' (the policy row and the executor read L23B --role baseline back)",
@@ -2116,8 +2120,175 @@ def t_e1_lift_wait():
           (d4["D28"]["detail"].get("lift_pending"), d4["D28"]["summary"][:200]))
 
 
+def _l23v(w):
+    return [e for e in w.events("proposed") if e.get("lever") == "L23V"]
+
+
+def _lift_cards(w):
+    return [c for c in w.state().get("cards") or [] if c.get("kind") == "quarantine_lift"]
+
+
+def _lw(w):
+    return ((w.state().get("stage") or {}).get("r0") or {}).get("lift_wait")
+
+
+def t_e1_lift_faults():
+    section("E1 lift wait (2026-10-03, review fixes): a D28 that cannot judge never ends the wait or restarts its "
+            "clock; the clock starts when L23V is first deferred; the card keeps the alarm; only D28's quarantines")
+    real = DS.d28
+
+    def boom(v):
+        raise RuntimeError("a sidecar half written")
+    # 1. D28 raises on a tick while the wait runs: the recorded wait goes on
+    w = _lift_world("lf_unknown")
+    w.tick(3)
+    first = (_lw(w) or {}).get("first_seen_utc")
+    DS.d28 = boom
+    try:
+        w.tick(2)
+    finally:
+        DS.d28 = real
+    d = _diags(w)
+    check("D28 raises while L23V waits: no L23V; DR0 keeps waiting on the recorded sources and first deferral; one "
+          "card, no end of the wait",
+          first and not _l23v(w) and d["D28"].get("unknown") and (_lw(w) or {}).get("first_seen_utc") == first
+          and (_lw(w) or {}).get("sources") == ["src_lift"] and "waits until" in d["DR0"]["summary"]
+          and len(_lift_cards(w)) == 1 and not w.events("lift_wait_ended"),
+          (_lw(w), d["DR0"]["summary"][:300], [e.get("lever") for e in w.events("proposed")]))
+    # 2. the queue summary does not state the stream's quarantine: unknown, the wait goes on
+    w.queue(0, extra={"quarantined_sources": None})
+    w.tick(2)
+    d = _diags(w)
+    check("  the queue summary does not state quarantined_sources: D28's lift_pending is unknown (None), never an "
+          "empty list, and the wait goes on", d["D28"]["detail"].get("lift_pending") is None and not _l23v(w)
+          and (_lw(w) or {}).get("first_seen_utc") == first and not w.events("lift_wait_ended"),
+          (d["D28"]["detail"].get("lift_pending"), _lw(w)))
+    # 3. a tick whose snapshot cannot be read neither ends the wait nor restarts its clock
+    w.queue(0, extra={"quarantined_sources": {"src_lift": {"cite": "D28", "seq": 3, "utc": "2026-10-01T00:00:00Z"}}})
+    w.tick(1)
+    real_ev = E.from_snapshot
+
+    def bad(*a, **k):
+        raise E.EvidenceError("an unreadable snapshot")
+    E.from_snapshot = bad
+    try:
+        w.tick(1)
+    finally:
+        E.from_snapshot = real_ev
+    w.tick(2)
+    check("  an evidence error tick: the wait keeps its first deferral (no second wait, no second card)",
+          w.events("evidence_error") and (_lw(w) or {}).get("first_seen_utc") == first
+          and len(w.events("lift_wait")) == 1 and len(_lift_cards(w)) == 1 and not w.events("lift_wait_ended")
+          and not _l23v(w), (_lw(w), len(_lift_cards(w))))
+    # 4. 12 h after the first deferral: L23V as it stands, the wait marked expired and never started again
+    w.advance(S._secs(first) + 12 * 3600 + W.TICK - w.t[0])
+    w.tick(1)
+    pro = _l23v(w)
+    check("  12 h after the first deferral (not after the error tick): L23V is proposed with the quarantine as it "
+          "stands, the wait recorded as expired, once",
+          len(pro) == 1 and len(w.events("lift_wait_expired")) == 1, ([e.get("utc") for e in pro], _lw(w)))
+    w.tick(3)
+    check("  once base v3 runs the wait ends (base v3 is running); no second wait, no second L23V",
+          len(_l23v(w)) == 1 and not _lw(w) and len(w.events("lift_wait")) == 1
+          and [e.get("reasons") for e in w.events("lift_wait_ended")] == [["base v3 is running"]],
+          (_lw(w), [e.get("reasons") for e in w.events("lift_wait_ended")]))
+    # 5. D28 cannot judge from the first tick L23V is due: a bounded wait on the unknown, ended once D28 judges
+    w2 = _e1_world("lf_unknown_first")
+    DS.d28 = boom
+    try:
+        w2.tick(3)
+    finally:
+        DS.d28 = real
+    c2 = _lift_cards(w2)
+    check("D28 raises from the first tick L23V is due (no wait recorded): L23V waits on the unknown, bounded, with "
+          "one card saying D28 cannot judge", not _l23v(w2) and (_lw(w2) or {}).get("sources") is None
+          and (_lw(w2) or {}).get("first_seen_utc") and len(c2) == 1 and "cannot judge" in c2[0]["title"],
+          (_lw(w2), [c.get("title") for c in c2]))
+    w2.tick(2)
+    check("  D28 judges again (nothing to lift): the wait ends (lifted) and L23V is proposed",
+          len(_l23v(w2)) == 1 and len(w2.events("lift_wait_ended")) == 1 and not _lw(w2), (_lw(w2),))
+    # 6. the clock starts when L23V is first deferred, not when the list is first seen
+    w3 = _lift_world("lf_clock")
+    w3.intake("i0009_src_other", "src_other", images=500, reasons={"near_eval_variant": 1})
+    w3.tick(3)
+    w3.advance(13 * 3600)
+    w3.tick(2)
+    d = _diags(w3)
+    before = (_lw(w3), list(_lift_cards(w3)), list(_l23v(w3)))
+    w3.intake("i0009_src_other", "src_other", images=500, reasons={"near_eval_variant": 1}, pair_cos=[0.2])
+    w3.tick(2)
+    lw3 = _lw(w3) or {}
+    check("D28 lists src_lift for 13 h while DR0 has DATA work due (eval-hits): no wait and no card yet; once DATA "
+          "clears, the wait starts then (12 h from that tick) with its card, and no L23V",
+          d["D28"]["detail"].get("lift_pending") == ["src_lift"] and before == (None, [], [])
+          and lw3.get("first_seen_utc") and S._secs(lw3["first_seen_utc"]) >= W.T0 + 13 * 3600
+          and len(_lift_cards(w3)) == 1 and not _l23v(w3), (before, lw3))
+    # 7. the card keeps the alarm: an escalation the same tick stays the current card; the lift card alone warns
+    for tag, quar, extra in (("lf_alarm_leak", ("src_lift", "src_leak"), True), ("lf_alarm", ("src_lift",), False)):
+        w4 = _lift_world(tag, quarantined=quar)
+        if extra:
+            w4.intake("i0008_src_leak", "src_leak", images=900, reasons={"near_eval_variant": 1}, pair_cos=[0.97])
+        w4.tick(4)
+        st4 = w4.state()
+        want = "escalation" if extra else "quarantine_lift"
+        check("  %s: the current card is %s and the page's alarm warns" % (
+            "a leak (D28 crit) and a lift wait" if extra else "a lift wait alone", want),
+            (st4.get("card") or {}).get("kind") == want and S.summary(w4.config(), st4)["alarm"] == "warn"
+            and len(_lift_cards(w4)) == 1, ((st4.get("card") or {}).get("kind"), S.summary(w4.config(), st4)["alarm"]))
+    det = (_lift_cards(w4) or [{}])[0].get("detail") or ""
+    check("  the card says how to keep a quarantine (do nothing) and offers no keep decision nothing records",
+          "to keep a quarantine, do nothing" in det and "decides to keep" not in det, det[:300])
+    # 8. only D28's quarantines are reconsidered
+    w5 = _e1_world("lf_cite")
+    w5.intake("i0007_src_lift", "src_lift", images=900, reasons={"near_eval_variant": 1}, pair_cos=[0.31])
+    w5.queue(0, extra={"quarantined_sources": {"src_lift": {"cite": "D31", "seq": 3, "utc": "2026-10-01T00:00:00Z"}}})
+    w5.tick(3)
+    d5 = _diags(w5)
+    check("a source the stream quarantined on D31's word (not D28's), its hit now judged chance: no wait, L23V as "
+          "before", d5["D28"]["detail"].get("lift_pending") == [] and len(_l23v(w5)) == 1 and not _lift_cards(w5),
+          (d5["D28"]["detail"].get("lift_pending"), [e.get("lever") for e in w5.events("proposed")]))
+
+
+def t_e1_cut_order():
+    section("E1 (2026-10-03, review fix): a segment's cut (L18) and the base v3 build (L23V) are never submitted while "
+            "the other's outcome is unknown to it")
+    w = _e1_world("order")
+    w.queue(4 * w.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w.t[0] - 2 * 86400.0))
+    w.tick(4)
+    seg = [e for e in w.events("executed") if e.get("lever") == "L18"]
+    child = (seg[0] if seg else {}).get("child_exp")
+    waits = [e for e in w.events("waiting") if e.get("lever") == "L23V"]
+    check("both due: the segment (L18, TRAIN first) is submitted; L23V is proposed but waits while the segment's cut "
+          "is not in the evidence",
+          len(seg) == 1 and len(_l23v(w)) == 1 and not [e for e in w.events("executed") if e.get("lever") == "L23V"]
+          and waits and child in waits[0]["reasons"][0] and "not in the evidence" in waits[0]["reasons"][0],
+          ([e.get("lever") for e in w.events("executed")], [e.get("reasons") for e in waits]))
+    n = int(child.rsplit("_s", 1)[1])
+    w.segment(n, [("I1", "ACCEPT", 0.9, [], "helps", ["src_a"])], done=False)
+    w.tick(3)
+    check("  the segment's build line in the evidence: base v3 is submitted (it reads the cut rows as in flight)",
+          [e.get("lever") for e in w.events("executed") if e.get("lever") == "L23V"] == ["L23V"]
+          and w.state()["stage"]["r0"].get("base3") == "running",
+          [e.get("lever") for e in w.events("executed")])
+    w2 = _e1_world("order_rev")
+    w2.tick(3)
+    check("base v3 submitted first (nothing to cut)", w2.state()["stage"]["r0"].get("base3") == "running"
+          and [e.get("lever") for e in w2.events("executed")].count("L23V") == 1)
+    w2.queue(4 * w2.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w2.t[0] - 2 * 86400.0))
+    w2.tick(3)
+    nt = [e for e in w2.events("not_taken") if e.get("lever") == "L18" and "base v3" in str(e.get("reasons"))]
+    check("  then a segment is due: it is not taken while base v3 runs (a cut now could take rows it holds out)",
+          not [e for e in w2.events("proposed") if e.get("lever") == "L18"] and nt, [e.get("reasons") for e in nt])
+    w2.job_done("inc_build_base3_v3")
+    w2.base3_summary()
+    w2.tick(4)
+    check("  base v3 done (its test lists exist, the cutter refuses their rows): the segment is cut",
+          [e.get("lever") for e in w2.events("executed")].count("L18") == 1,
+          [e.get("lever") for e in w2.events("executed")])
+
+
 def main():
-    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_e1, t_e1_lift_wait,
+    for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_e1, t_e1_lift_wait, t_e1_lift_faults, t_e1_cut_order,
                t_formats,
                t_replay_gate,
                t_config, t_lab, t_lanes, t_d28, t_d28_v2, t_d28_v2_sources, t_d28_v2_round3):

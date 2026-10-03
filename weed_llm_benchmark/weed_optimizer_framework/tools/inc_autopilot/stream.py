@@ -1355,6 +1355,9 @@ class StreamRun(object):
                                d.get("summary"), lever="X14", trigger=[did])
                 return self._pause("%s (%s): %s" % ((d.get("detail") or {}).get("reason") or did, did,
                                                     _short(d.get("summary"), 400)))
+        # DR0's bounded wait before the base v3 build, before the fired diagnoses' cards (an escalation raised
+        # this tick then stays the current card, and the alarm with it)
+        self._lift_wait(by)
         # cards and holds
         for d in fired:
             for lv in d.get("levers") or []:
@@ -1423,7 +1426,6 @@ class StreamRun(object):
             st["lanes"][ln]["diag_hold"] = holds[ln]
             if holds[ln] != old:
                 self._ledger("lane_hold" if holds[ln] else "lane_hold_cleared", lane=ln, hold=holds[ln] or old)
-        self._lift_wait(by)
         # R0 records: Stage A, Stage C, the capacity decision
         dsa = by.get("DSA") or {}
         if dsa.get("fired") and not (st.get("stage_a") or {}).get("ready"):
@@ -1446,44 +1448,74 @@ class StreamRun(object):
     def _lift_wait(self, by):
         """DR0's bounded wait before the base v3 build (diagnose_stream.
         lift_wait). The diagnoses are recomputed every tick, so the stream
-        state keeps when D28 first listed sources it judges chance that the
-        stream still quarantines (stage.r0.lift_wait, read back as context
-        /lift_wait): the first tick that sees a non-empty list starts
-        the wait, the list's membership may change without restarting it,
-        and an empty list ends it (a D28 that could not be judged changes
-        nothing). While DR0 defers L23V, one card names the sources and the
-        exact command (deduplicated by its text, which changes only with the
-        list or the deadline)."""
+        state keeps the first tick DR0 deferred L23V (stage.r0.lift_wait,
+        read back as context /lift_wait): the bound runs from there, and a
+        card is raised from that tick on. The wait's sources follow D28's
+        judged list; a tick on which D28 cannot judge (or the evidence
+        cannot be read) changes nothing. It ends when DR0 finds the list
+        empty on a readable queue summary (lifted), or once base v3 is no
+        longer missing (running, done, failed); past the bound it is marked
+        expired and kept, so it never starts again. Called before the
+        fired diagnoses' cards, so an escalation raised the same tick stays
+        the current card."""
         st = self.st
         r0 = st.setdefault("stage", {}).setdefault("r0", {})
-        d28 = by.get("D28") or {}
-        if d28 and not d28.get("unknown"):
-            lp = sorted({str(x) for x in (d28.get("detail") or {}).get("lift_pending") or []})
-            rec = r0.get("lift_wait")
-            if lp and not (rec or {}).get("first_seen_utc"):
-                r0["lift_wait"] = {"first_seen_utc": self.utc, "sources": lp}
-                self._ledger("lift_wait", sources=lp, first_seen_utc=self.utc, trigger=["D28"],
-                             reasons=["D28 judges these sources' dHash hits chance and the stream still quarantines "
-                                      "them: base v3 (L23V) waits for a person, bounded"])
-            elif lp:
-                rec["sources"] = lp
-            elif rec:
+        rec = r0.get("lift_wait") if isinstance(r0.get("lift_wait"), dict) else None
+        if rec and r0.get("base3") not in (None, "missing"):
+            r0.pop("lift_wait", None)
+            self._ledger("lift_wait_ended", sources=rec.get("sources"), first_seen_utc=rec.get("first_seen_utc"),
+                         trigger=["DR0"], reasons=["base v3 is %s" % r0.get("base3")])
+            return
+        det = (by.get("DR0") or {}).get("detail") or {}
+        w, end = det.get("lift_wait"), det.get("lift_wait_end")
+        if isinstance(w, dict) and w.get("state") == "waiting":
+            if rec is None:
+                rec = r0["lift_wait"] = {"first_seen_utc": w.get("first_seen_utc") or self.utc,
+                                         "sources": w.get("sources")}
+                self._ledger("lift_wait", sources=w.get("sources"), first_seen_utc=rec["first_seen_utc"],
+                             until_utc=w.get("until_utc"), basis=w.get("basis"), trigger=["DR0", "D28"],
+                             reasons=["base v3 (L23V) waits for a person to lift the stream's quarantine of sources "
+                                      "D28 now judges chance, or for D28 to judge them, bounded"])
+            elif w.get("sources") is not None:
+                rec["sources"] = w["sources"]
+            self._lift_card(w)
+        elif isinstance(end, dict) and rec:
+            if end.get("state") == "lifted":
                 r0.pop("lift_wait", None)
                 self._ledger("lift_wait_ended", sources=rec.get("sources"), first_seen_utc=rec.get("first_seen_utc"),
-                             trigger=["D28"], reasons=["D28 lists no cleared source the stream still quarantines"])
-        w = ((by.get("DR0") or {}).get("detail") or {}).get("lift_wait")
-        if isinstance(w, dict) and w.get("sources"):
+                             trigger=["DR0", "D28"], reasons=["D28 lists no cleared source the stream still "
+                                                              "quarantines on its word"])
+            elif end.get("state") == "expired" and not rec.get("expired_utc"):
+                rec["expired_utc"] = self.utc
+                self._ledger("lift_wait_expired", sources=rec.get("sources"), first_seen_utc=rec.get("first_seen_utc"),
+                             until_utc=end.get("until_utc"), trigger=["DR0"],
+                             reasons=["%g h passed: L23V is proposed with the quarantine as it stands"
+                                      % float(end.get("hours") or 0)])
+
+    def _lift_card(self, w):
+        until, srcs = w.get("until_utc"), w.get("sources")
+        if srcs:
             self._card("quarantine_lift",
-                       "Base v3 (L23V) waits until %s: a person lifts the quarantine of %s, or decides to keep it"
-                       % (w.get("until_utc"), ", ".join(w["sources"])),
+                       "Base v3 (L23V) waits until %s: a person lifts the stream's quarantine of %s" % (
+                           until, ", ".join(srcs)),
                        "D28 now judges the dHash hits of %s chance, but the stream still quarantines %s, and the base "
                        "v3 build (inc2.base3 build, L23V) reads the quarantine when its job starts: a quarantined "
                        "source never enters arm B. Only a person lifts a quarantine; on the cluster, from the "
-                       "repository's root: %s. L23V is proposed once they are lifted, or at %s (%g h after the list "
-                       "was first seen, %s) with the quarantine as it stands."
-                       % (", ".join(w["sources"]), "it" if len(w["sources"]) == 1 else "them",
-                          "; ".join(w.get("commands") or []), w.get("until_utc"), float(w.get("hours") or 0),
-                          w.get("first_seen_utc")),
+                       "repository's root: %s (if inc2.stream answers that the stream is being written, run it again "
+                       "a little later). L23V is proposed once they are lifted, or at %s (%g h after L23V was first "
+                       "deferred, %s) with the quarantine as it stands: to keep a quarantine, do nothing."
+                       % (", ".join(srcs), "it" if len(srcs) == 1 else "them", "; ".join(w.get("commands") or []),
+                          until, float(w.get("hours") or 0), w.get("first_seen_utc")),
+                       trigger=["DR0", "D28"])
+        else:
+            self._card("quarantine_lift",
+                       "Base v3 (L23V) waits until %s: D28 cannot judge the quarantined sources" % until,
+                       "D28 could not be judged (a rule error or an unreadable queue summary), so whether a source "
+                       "the stream quarantines is now judged chance is unknown, and the base v3 build (L23V) reads "
+                       "the quarantine when its job starts. L23V waits for D28 to judge again, at most until %s (%g h "
+                       "after L23V was first deferred, %s), then is proposed with the quarantine as it stands; a "
+                       "person looks at D28's diagnosis." % (until, float(w.get("hours") or 0),
+                                                              w.get("first_seen_utc")),
                        trigger=["DR0", "D28"])
 
     def digest(self):
@@ -1548,6 +1580,34 @@ class StreamRun(object):
         if not stg["step1_stream"].get("bootstrap"):
             miss.append("step1_stream not bootstrapped")
         return "; ".join(miss)
+
+    def _cut_order(self, lever):
+        """Why `lever` must wait for the other of the pair L18 (a segment's
+        cut) and L23V (the base v3 build), or "". inc2.base3 reads the
+        stream's pools and in-flight rows when its job starts and again
+        before it writes (it refuses when a listed row was cut meanwhile),
+        and the cutter refuses test v1 rows only once the lists exist: a
+        segment is not submitted while base v3 is submitted and not
+        finished (stage.r0.base3 running), and base v3 is not submitted while
+        a submitted segment's cut is not yet in the evidence (the stream
+        ledger's build line of its experiment), so neither job runs while
+        the other's result is unknown to it. Proposed or filed, neither
+        holds the other: the lanes' submission order decides."""
+        st = self.st
+        if lever == "L18":
+            if ((st.get("stage") or {}).get("r0") or {}).get("base3") == "running":
+                return "base v3 (L23V) is submitted and not finished: a segment cut now could take rows it holds out"
+            return ""
+        if lever == "L23V":
+            it = st["lanes"]["TRAIN"].get("item") or {}
+            if it.get("lever") != "L18" or it.get("status") in ("proposed", "filed"):
+                return ""
+            child = (it.get("proposal") or {}).get("child_exp")
+            led = self._artifact("stream/%s/ledger.jsonl" % self.sid) or []
+            if not any(isinstance(e, dict) and e.get("event") == "build" and e.get("exp") == child for e in led):
+                return ("segment %s (L18) is submitted and its cut is not in the evidence yet: base v3 would not see "
+                        "its rows" % child)
+        return ""
 
     def _prospective_guard(self):
         """The prospective stream record of the current stream rules version
@@ -1619,6 +1679,10 @@ class StreamRun(object):
                 why = self._train_ready()
                 if why:
                     self._once("train_wait", why, "not_taken", lever="L18", reasons=["R0 not READY: " + why])
+                    continue
+                why = self._cut_order("L18")
+                if why:
+                    self._once("cut_order:L18", why, "not_taken", lever="L18", reasons=[why])
                     continue
                 self._prospective_guard()
             try:
@@ -2185,7 +2249,16 @@ class StreamRun(object):
                     # each tick once a person has set data_autonomy on, so the
                     # lane does not wait for ever on an item filed before
                     out.append((ln, it, None))
-        return out
+        # a segment's cut and the base v3 build are never submitted while the other's outcome is unknown to it
+        keep = []
+        for ln, it, appr in out:
+            why = self._cut_order(it.get("lever"))
+            if why:
+                self._once("cut_order:%s" % it.get("lever"), why, "waiting", lane=ln, lever=it.get("lever"),
+                           reasons=[why])
+                continue
+            keep.append((ln, it, appr))
+        return keep
 
     def _misplaced_review(self, it):
         """Why an approved source review in its cluster form (L16R: sbatch
@@ -3450,7 +3523,7 @@ def summary(cfg, st):
     alarm = "crit" if (cfg.get("paused_reason") or (st.get("paused") or {}).get("reason")) else \
         "off" if not cfg.get("enabled") else "warn" if (st.get("errors") or any(
             (lanes.get(ln) or {}).get("hold") for ln in LANES) or (st.get("card") or {}).get("kind") in
-            ("approval", "escalation", "cluster", "drift", "stop_loss", "platform")) else "ok"
+            ("approval", "escalation", "cluster", "drift", "stop_loss", "platform", "quarantine_lift")) else "ok"
     segs = st.get("segments") or []
     return {"mode": "stream", "enabled": bool(cfg.get("enabled")), "alarm": alarm,
             "paused_reason": cfg.get("paused_reason") or (st.get("paused") or {}).get("reason"),

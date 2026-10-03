@@ -357,6 +357,11 @@ def price(lid, params, dom, info=None):
         return 0.0, dict(detail, why="no allocation")
     if kind == "zero_job":
         return round(build, 3), dict(detail, build_job_hours=build)
+    if kind == "base3_job":
+        # the base v3 build (L23V, 2026-10-03): its own walltime, never the other build jobs' 4 GPU-h
+        h = float(cost(dom, "base3_job_hours"))
+        return round(h, 3), dict(detail, job_hours=h, why="the base v3 build job's walltime (run_inc2_build.sh, "
+                                                         "12 h): an upper bound, settled from sacct")
     if kind == "probe":
         h = float(cost(dom, "probe_hours"))
         return h, dict(detail, job_hours=h)
