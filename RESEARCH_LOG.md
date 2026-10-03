@@ -13,6 +13,14 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-03 — Model swaps exhausted; the data lane was stalled 21 h by a broken 49.7 GB download
+
+**Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap 0.021. Training set 7,493 images; nothing added since segment s001 (2026-10-01).
+
+**The box-quality arms are decided (pre-registered native rule, dev, 3 seeds each): none qualifies.** YOLO26l +0.0052 (2 pooled sd 0.0095), YOLO26m +0.0062 (above 2 pooled sd 0.0053 but under SE 0.0070), YOLO11l +0.0053 (= 2 pooled sd). With m832 (+0.0042) and s1024 (−0.0137), five larger or newer detectors give at most about +0.005 on dev and no gain in class-agnostic box quality. On a 6.8K-image base the detector is not the limit; the next lever is data.
+
+**Data lane.** The SIU Weed Growth Stage zip (zenodo_15808623, 49.7 GB, 203,567 images) broke off after 9.1 GB; the collector could not resume, the partial file was deleted, and the second failed fetch in a row held the DATA lane from 2026-10-02 08:34Z. Fixed: resumable downloads and a lab fetch wall clock sized from bytes (CHANGELOG). The fetch restarts after deploy.
+
 ## 2026-10-01 (evening) — The boxes, not the species call, cap YOLO11m at about 0.89; three box-quality arms are pre-registered
 
 **Accuracy.** Best sealed test is unchanged: 0.8786 ± 0.0018 (YOLO11m on base_v2), gap to 0.90 = 0.021. The committed incumbent reads dev 0.8606; test is read at the next milestone.

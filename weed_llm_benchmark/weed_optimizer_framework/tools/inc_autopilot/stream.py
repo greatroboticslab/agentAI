@@ -419,6 +419,30 @@ def load_state(paths, name):
 
 
 # ------------------------------------------------------------------ the lab runner
+LAB_TIMEOUT_S = 6 * 3600                  # a lab job's wall clock unless it moves bytes (below)
+LAB_FETCH_MIN_RATE = 1.0e6                # bytes/s a lab fetch is still worth waiting for
+LAB_FETCH_TIMEOUT_MAX_S = 48 * 3600
+
+
+def lab_job_timeout(kind, max_bytes):
+    """The lab runner's wall clock for one job. A fetch is sized from the bytes
+    it may move: 2 h plus max_bytes at 1 MB/s, between 6 h and 48 h. The flat
+    6 h cut a 49.7 GB single-file fetch (zenodo_15808623, about 5.8 h at the
+    2.4 MB/s the lab measured on 2026-10-02) at the limit, and a killed fetch
+    restarts from zero: the collector resumes only within its own process.
+    The collector's own deadline (base_timeout_s + size / min_rate_bytes_per_s)
+    still decides a stalled download well before this."""
+    if kind != "fetch":
+        return LAB_TIMEOUT_S
+    try:
+        b = float(max_bytes)
+    except (TypeError, ValueError):
+        return LAB_TIMEOUT_S
+    if b <= 0:
+        return LAB_TIMEOUT_S
+    return int(min(LAB_FETCH_TIMEOUT_MAX_S, max(LAB_TIMEOUT_S, 2 * 3600 + b / LAB_FETCH_MIN_RATE)))
+
+
 class LabRunner(object):
     """Detached lab processes (S22: a lab fetch never blocks the tick). launch()
     starts `python -m ...stream lab-run --spec FILE` in its own session and
@@ -427,7 +451,7 @@ class LabRunner(object):
     def __init__(self, root, cwd=None, python=None):
         self.root, self.cwd, self.python = Path(root), cwd or str(LS.CODE_ROOT), python or sys.executable
 
-    def launch(self, job, argv, timeout=6 * 3600):
+    def launch(self, job, argv, timeout=LAB_TIMEOUT_S):
         self.root.mkdir(parents=True, exist_ok=True)
         spec = {"job": job, "argv": [str(a) for a in argv], "result": str(self.root / ("%s.result.json" % job)),
                 "timeout": int(timeout), "cwd": self.cwd}
@@ -1839,7 +1863,7 @@ class StreamRun(object):
                         if params.get(k) not in (None, ""):
                             argv += [flag, str(params[k])]
                 try:
-                    got = run.launch(job, argv)
+                    got = run.launch(job, argv, timeout=lab_job_timeout(kind, params.get("max_bytes")))
                 except Exception as e:
                     return {"ok": False, "error": "%s: %s" % (type(e).__name__, _short(e, 300))}
                 return {"ok": True, "detached": True, "lab_job": got.get("job", job), "argv": argv}

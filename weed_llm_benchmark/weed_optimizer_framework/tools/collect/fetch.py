@@ -22,8 +22,9 @@ Order of work, under the intake lock (one writer):
      listed sizes fit (a file of unknown size is streamed under the cap), the
      rest recorded as remaining (the next fetch continues: shards);
   6. every file is streamed to staging/<source>/blobs/<sha256> (checked
-     against the size and checksum the provider publishes), and fetch.json
-     lists name -> sha256, bytes, checksums and the redacted URL;
+     against the size and checksum the provider publishes; a stream that
+     breaks off resumes, transport.Net.download), and fetch.json lists
+     name -> sha256, bytes, checksums, the redacted URL and the resumes;
   7. a fetched event (bytes, seconds, job id), or fetch_failed.
 A file already in staging with its recorded sha256 is not fetched again.
 """
@@ -289,10 +290,11 @@ def fetch(cfg, source_id, max_bytes=None, candidates_path=None, net=None, inc=No
                 os.replace(tmp, final)
             fetched_bytes += int(rec["bytes"])
             got[fs["name"]] = {"name": fs["name"], "sha256": sha, "bytes": int(rec["bytes"]),
-                               "checksums": {k: v for k, v in rec.items() if k not in ("bytes",)},
+                               "checksums": {k: v for k, v in rec.items() if k not in ("bytes", "resumes")},
                                "published": fs.get("checksums") or {}, "role": fs.get("role"),
                                "group": fs.get("group"), "url": redact(fs["url"]) if fs.get("url") else
-                               "ftp:%s" % fs.get("ftp_path"), "fetched_utc": _utc()}
+                               "ftp:%s" % fs.get("ftp_path"), "fetched_utc": _utc(),
+                               "resumes": int(rec.get("resumes") or 0)}     # a stream that broke off and resumed
         names_left = [f["name"] for f in chosen if f["name"] not in got]
         doc = header("fetch", cfg, testing=testing)
         doc.update({"source_id": source_id, "provider": dec["provider"], "ref": dec["ref"],

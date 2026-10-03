@@ -161,7 +161,7 @@ class FakeRunner(object):
         self.auto_sync = True
 
     def launch(self, job, argv, timeout=0):
-        self.launched.append({"job": job, "argv": list(argv)})
+        self.launched.append({"job": job, "argv": list(argv), "timeout": timeout})
         return {"job": job}
 
     def poll(self, job):
