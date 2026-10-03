@@ -73,6 +73,8 @@ The restarted fetch was then killed by the next deploy's dashboard restart (the 
 
 The intake now takes a balanced 40,000 of its frames, the base v3.1 design's cap, and defers the rest. Its four cwd12 species (Palmer amaranth, waterhemp, ragweed, prickly sida) map to targets; the twelve others become non-target weeds through L26.
 
+**E1-lean is merged.** It builds a weed-box base v3 (all weed boxes as one class) against base_v2 under one compute budget, and is reviewed and verified. A rehearsal on the real data gives arm B 23,015 images (17,886 distinct photos) as is, and 28,948 with rf_tuf and rf_zbm50 lifted; test v1 holds 2,636 images, held out by capture group. Without SIU it is under 30,000: the dock family is mostly re-exports (35,612 duplicate rows), and the convention rule removes 16,552. The stream no longer cuts a test v1 row into any training pool.
+
 ## 2026-10-01 (evening) — The boxes, not the species call, cap YOLO11m at about 0.89; three box-quality arms are pre-registered
 
 **Accuracy.** Best sealed test is unchanged: 0.8786 ± 0.0018 (YOLO11m on base_v2), gap to 0.90 = 0.021. The committed incumbent reads dev 0.8606; test is read at the next milestone.

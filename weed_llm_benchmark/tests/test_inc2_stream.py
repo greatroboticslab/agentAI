@@ -717,6 +717,47 @@ def test_cut(base, base_rows, guard, dev_paths):
           not ps["species_cap"]["applies"] and ps["species_cap"]["max_share"] == 1.0)
 
 
+def test_test_v1_never_cut(base, guard):
+    print("a row a main-test list holds (inc2.base3 splits/*/test_v1) is never cut")
+    from weed_optimizer_framework.tools.inc2 import step1_stream as S1
+    s1 = Step1World("s1_testv1")
+    rows = s1.add("srcT", "b0001", [0, 0, 1] + [0] * 9, n=12, capture_group="trayT1")
+    s1.commit()
+    same, near = rows[0], rows[1]
+    flip = int(near["dhash"]) ^ 0b11                       # 2 bits away
+    tl = pathlib.Path(C.INC_DIR) / "splits" / "v3" / "test_v1" / "srcT.jsonl"
+    tv = [dict(key="tv1_a", image="/x/a.png", label="/x/a.txt", sha256="0" * 64, label_sha256="0" * 64, source="srcT",
+               session="g", original_sha256=same["unmasked_sha256"], dhash=None, variants=None),
+          dict(key="tv1_b", image="/x/b.png", label="/x/b.txt", sha256="1" * 64, label_sha256="1" * 64, source="srcT",
+               session="g", original_sha256="2" * 64, dhash=flip, variants=[flip] * 8)]
+    try:
+        tl.parent.mkdir(parents=True, exist_ok=True)       # as inc2.base3 writes it: provenance rows, not a manifest
+        tl.write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in tv))
+        q = S1.load_queue(S1.Layout(root=s1.root, inc_dir=s1.root.parent))
+        by = {r["key"]: r for r in q}
+        check("step1_stream.load_queue marks the copy (bytes) and the near row (dHash 2 bits) test_v1, not eligible",
+              by[same["key"]].get("test_v1") == "bytes" and by[near["key"]].get("test_v1") == "dhash_2"
+              and not by[same["key"]]["eligible_step1"] and not by[near["key"]]["eligible_step1"]
+              and sum(1 for r in q if r.get("test_v1")) == 2, [(k, r.get("test_v1")) for k, r in by.items()][:4])
+        st = new_stream("testv1w", base, 4, s1, guard)
+        st.load()
+        plans, _refusal, ana = st.cut_plan(2)
+        cut = {r["key"] for p in plans for r in p["rows"]}
+        check("  the cutter never takes them (reason test_v1), and cuts the rest",
+              ana["reasons"].get("test_v1") == 2 and not ({same["key"], near["key"]} & cut) and cut,
+              (ana["reasons"], len(cut)))
+        tl.write_text("{not json\n")
+        try:
+            S1.load_queue(S1.Layout(root=s1.root, inc_dir=s1.root.parent))
+            got = None
+        except Exception as e:  # noqa: BLE001
+            got = e
+        check("  an unreadable test list refuses the queue's read (fail closed)", got is not None, got)
+    finally:
+        if tl.exists():
+            tl.unlink()
+
+
 def test_licence_release(base, guard):
     print("a licence release fails closed: research_only unless the person records the licence and says not")
     M = 4
@@ -1789,6 +1830,7 @@ def main():
     test_cut(base, base_rows, guard, dev_paths)
     test_licence_release(base, guard)
     test_guard_at_cut(base, base_rows, guard, dev_paths)
+    test_test_v1_never_cut(base, guard)
     test_deadlock(base, guard)
     test_split_units(base, guard)
     test_choose_arm(base, guard)

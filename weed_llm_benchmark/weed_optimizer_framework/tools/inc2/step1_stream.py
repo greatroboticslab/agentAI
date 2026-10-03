@@ -3232,7 +3232,31 @@ def load_queue(layout):
         row["evidenced"] = int(evidence.get(row["source"], 0)) >= 1
         row["eligible_step1"] = eligible_step1(row)
         out.append(row)
+    test_v1_rows(layout, out)
     return out
+
+
+def test_v1_rows(layout, rows):
+    """Mark the rows a main-test list holds (inc2.base3: <INC_DIR>/splits/*/
+    test_v1/*.jsonl, whatever splits directory wrote it): the same original or
+    written bytes, the same key, or a dHash within HOLDOUT_NEAR_DUP_BITS under
+    the list's 8 variants. Such a row gets `test_v1` (why) and is never
+    eligible: a test image must not reach any training pool through the
+    stream's segments. An unreadable list refuses (Base3Error), so the cutter
+    stops rather than guessing. Returns the number marked."""
+    from . import base3 as B3
+    prior, _rec = B3.prior_test_lists(layout.inc_dir / "splits")
+    if not prior:
+        return 0
+    cand = [r for r in rows if not r.get("refused")]   # held ones too: the cutter's fold may release a hold
+    shadow = [{"drop": None, "key": r["key"], "sha256": r.get("unmasked_sha256") or r.get("sha256"),
+               "train_sha256": r.get("sha256"), "dhash": r.get("dhash")} for r in cand]
+    n = B3.mark_prior(shadow, prior, HOLDOUT_NEAR_DUP_BITS)
+    for r, sh in zip(cand, shadow):
+        if sh.get("prior_test"):
+            r["test_v1"] = sh["prior_test"]
+            r["eligible_step1"] = False
+    return n
 
 
 # -------------------------------------------------------------- serve holds

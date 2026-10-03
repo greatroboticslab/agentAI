@@ -1742,6 +1742,10 @@ class Stream:
             if row.get("refused"):
                 reasons["refused_in_queue"] += 1
                 continue
+            if row.get("test_v1"):
+                # a main-test list holds it (step1_stream.test_v1_rows): never trained
+                reasons["test_v1"] += 1
+                continue
             vec = _species_vec(row)
             if vec is None:
                 reasons["bad_species_boxes"] += 1
