@@ -78,6 +78,26 @@ Pinned:
     deciding the re-derived image otherwise (reason or match) leaves the hit
     unweighed, the reason naming no evaluation image; changed decisions
     refuse.
+  * continuation shards (step 1b, amendment 2026-10-03): with a cap of 4
+    over 10 boxed images, shard 1 takes 4, shard 2 the next 4 (none decided
+    before, drawn by cap_items with the same seed), shard 3 the last 2 and
+    removes the extracted tree, which the earlier shards kept; a 4th intake
+    is the no-op; a shard killed in its loop commits nothing and its rerun
+    takes the same shard; summary.json, batches.jsonl and sources.jsonl
+    record each shard and the images it leaves deferred; keys never collide;
+    inside the fetch the shards are one batch (an exact copy of an earlier
+    shard's image is exact_dup_intake, a near copy is kept); over a tree
+    whose marker names the fetch record no blob is hashed again, over one
+    whose marker does not they are; decisions that do not hash as recorded
+    refuse the next shard; a kept tree that lost a deferred image's file is
+    extracted again (blobs hashed) and the image taken, and a deferred image
+    a fresh extraction lacks ends as not_in_source; an hf_parquet shard never
+    writes into a committed image's file, and a write failing part-way leaves
+    no partial file; a run killed after the last shard's commit leaves the
+    tree, which the next intake (the no-op) removes; a run killed between
+    its registration and its commit counts its rows once in the registry;
+    each shard records its class map's sha256 and flags a change; past the
+    time budget the first image is still judged, so each shard moves on.
 
 Run:  python3 tests/test_collect_intake.py
 """
@@ -466,14 +486,423 @@ def test_intake_cap(cfg):
     r3 = I.intake(cfg3, "weedai_" + ref3, guard=W.FakeGuard())
     sm3 = json.loads((pathlib.Path(r3["dir"]) / "summary.json").read_text())
     dec3 = [json.loads(l) for l in (pathlib.Path(r3["dir"]) / "decisions.jsonl").read_text().splitlines()]
-    check("past budgets.intake_max_seconds the images not yet judged are deferred (over_intake_time) and the batch "
-          "commits", sm3["intake_time"]["deferred"] == 10 and sm3["rows"] == 0
-          and sum(d.get("reason") == "over_intake_time" for d in dec3) == 10 and sm3["yield"]["images_deferred"] == 10
-          and sm3["yield"]["images_seen"] == 0, (sm3.get("intake_time"), sm3["yield"]))
+    check("past budgets.intake_max_seconds the images not yet judged are deferred (over_intake_time), after the "
+          "first, and the batch commits", sm3["intake_time"]["deferred"] == 9
+          and sum(d.get("reason") == "over_intake_time" for d in dec3) == 9 and sm3["yield"]["images_deferred"] == 9
+          and sm3["yield"]["images_seen"] == 1, (sm3.get("intake_time"), sm3["yield"]))
+    r3b = I.intake(cfg3, "weedai_" + ref3, guard=W.FakeGuard())
+    check("  a fixed cost past the budget still moves each continuation shard on by one image (the shards end)",
+          r3b["shard"] == 2 and r3b["deferred_remaining"] == 8, r3b)
     again, rec = I.cap_items([{"rel": n, "group": n.split(".mp4")[0], "boxes": [(1,)]} for n in order], 4, "s")
     check("  the same seed takes the same images; under the cap nothing is deferred",
           again == I.cap_items([{"rel": n, "group": n.split(".mp4")[0], "boxes": [(1,)]} for n in order], 4, "s")[0]
           and I.cap_items([{"rel": "a", "group": "a", "boxes": [(1,)]}], 4, "s") == (None, None), rec)
+
+
+def test_continuation_shards(cfg):
+    """Step 1b (amendment 2026-10-03): the deferred images of a capped batch
+    flow through continuation shards of the same fetch record."""
+    from weed_optimizer_framework.tools.collect import (StaleInput, batches_ledger, intake_dir, staging_dir,
+                                                        state as S, verify_chain)
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.collect import normalize as NZ
+    from weed_optimizer_framework.tools.collect.config import CollectConfig
+    print("continuation shards: a capped fetch is taken shard by shard until nothing is deferred")
+    ref = "cacacaca-0000-0000-0000-000000000021"
+    sid = "weedai_" + ref
+    cats = [{"id": 1, "name": "weed: amaranthus palmeri"}]
+    # five capture groups of two frames each: in pair0 and pair1 the second frame is the first's bytes (an exact
+    # duplicate), in pair2..pair4 a near copy (1-2 dHash bits). The cap draws one frame per group before any
+    # second, so the pairs of the four groups shard 1 reaches straddle two shards
+    imgs = {}
+    for g in range(5):
+        imgs["pair%d.mp4_0.png" % g] = W.img_bytes(720 + g)
+        imgs["pair%d.mp4_1.png" % g] = imgs["pair%d.mp4_0.png" % g] if g < 2 else W.img_bytes(720 + g, paint=(2,))
+    order = sorted(imgs)
+    anns = [{"id": i + 1, "image_id": i, "category_id": 1, "bbox": [10, 20, 40, 40]} for i, n in enumerate(order)]
+    raw = json.loads(json.dumps(cfg.raw))
+    raw["budgets"]["intake_max_images"] = 4
+    cfg2 = CollectConfig(raw, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    fetch_simple(cfg2, ref, coco_files(imgs, cats, anns), cats=("weed: amaranthus palmeri",))
+    fetch_sha = hashlib.sha256((staging_dir(sid) / "fetch.json").read_bytes()).hexdigest()
+    tree = intake_dir() / "work" / sid / fetch_sha[:12]
+    n_ledger = len(batches_ledger().read_text().splitlines())
+
+    def files(r):
+        b = pathlib.Path(r["dir"])
+        return (json.loads((b / "summary.json").read_text()),
+                [json.loads(l) for l in (b / "manifest.jsonl").read_text().splitlines()],
+                [json.loads(l) for l in (b / "decisions.jsonl").read_text().splitlines()],
+                json.loads((b / "guard.json").read_text()))
+
+    def images(dec, decision=None):
+        return {d["rel"] for d in dec if d["kind"] == "image" and (decision is None or d["decision"] == decision)}
+
+    def base(rels):
+        return sorted(x.rsplit("/", 1)[-1] for x in rels)
+
+    r1 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    s1, m1, d1, _g1 = files(r1)
+    taken1 = images(d1) - images(d1, "deferred")
+    # the source as intake reads it (the kept tree), for replaying the draws
+    _t, res = NZ.read(tree / "x", I._read_options(cfg2, json.loads((staging_dir(sid) / "fetch.json").read_text())))
+    src_items = sorted(res.items, key=lambda x: x["rel"])
+    all_rels = {it["rel"] for it in src_items}
+    check("shard 1 takes 4 of 10 and defers 6; its summary records shard 1 and 6 deferred",
+          r1["shard"] == 1 and len(taken1) == 4 and len(images(d1, "deferred")) == 6
+          and s1["shard"]["n"] == 1 and s1["shard"]["deferred_remaining"] == 6 and s1["yield"]["images_deferred"] == 6
+          and s1["shard"]["earlier_batches"] == [] and r1["deferred_remaining"] == 6, (r1, s1.get("shard")))
+    check("  one frame of four different capture groups (the cap's round robin)",
+          len({x.split(".mp4")[0] for x in taken1}) == 4, sorted(taken1))
+    check("  the extracted tree is kept while images remain deferred, its marker naming the fetch record",
+          (tree / "x" / ".complete").is_file() and I.tree_fetch_sha(tree / "x") == fetch_sha, str(tree))
+    blob = next((staging_dir(sid) / "blobs").glob("*"))
+    keep = blob.read_bytes()
+    blob.write_bytes(keep[:-1] + bytes([keep[-1] ^ 0xFF]))     # same size, other bytes: hashing would refuse
+    try:
+        r2 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    finally:
+        blob.write_bytes(keep)
+    s2, m2, d2, g2 = files(r2)
+    taken2 = images(d2) - images(d2, "deferred")
+    want2 = I.cap_items([it for it in src_items if it["rel"] not in taken1], 4, fetch_sha)[0]
+    check("shard 2 takes the next 4: none decided before, drawn by cap_items with the same seed; 2 remain",
+          r2["status"] == "intaken" and r2["shard"] == 2 and len(taken2) == 4 and not taken2 & taken1
+          and taken2 == want2 and len(images(d2, "deferred")) == 2 and s2["shard"]["deferred_remaining"] == 2
+          and s2["shard"]["earlier_batches"] == [r1["batch"]] and s2["intake_cap"]["eligible"] == 6,
+          (base(taken2), base(want2 or []), s2.get("shard")))
+    check("  over the kept tree no blob is read again (a changed blob of the same size passes; fetch.json is "
+          "hashed)", s2["shard"]["tree"] == "reused" and s2["shard"]["arrival"]["blobs"].startswith("presence")
+          and s2["shard"]["arrival"]["fetch_sha256"] == fetch_sha, s2["shard"])
+    check("  the earlier shard's images are out of the near_dup_intake index and counted as the fetch's own",
+          g2["same_fetch_shard_images"]["images"] == len(m1) and g2["same_fetch_shard_images"]["batches"]
+          == [r1["batch"]], g2.get("same_fetch_shard_images"))
+    # a tree whose marker does not name the fetch record (written before shards existed): every blob is hashed
+    (tree / "x" / ".complete").write_text("2026-10-02T00:00:00Z\n")
+    blob.write_bytes(keep[:-1] + bytes([keep[-1] ^ 0xFF]))
+    e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), StaleInput)
+    blob.write_bytes(keep)
+    check("a tree whose marker names no fetch record: the blobs are hashed, and a changed one refuses",
+          e is not None and "changed" in str(e) and len(batches_ledger().read_text().splitlines()) == n_ledger + 2, e)
+    # a shard killed in its per-image loop commits nothing; the rerun takes the same shard
+    real = I._label_text
+
+    def boom(boxes):
+        raise OSError("killed (injected)")
+    I._label_text = boom
+    try:
+        e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), OSError)
+    finally:
+        I._label_text = real
+    check("a shard killed in its loop commits nothing and keeps the tree", e is not None
+          and len(batches_ledger().read_text().splitlines()) == n_ledger + 2 and (tree / "x").is_dir(), e)
+    r3 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    s3, m3, d3, _g3 = files(r3)
+    taken3 = images(d3)
+    check("shard 3 (rerun) takes the last 2, defers none, and removes the work tree",
+          r3["shard"] == 3 and taken3 == all_rels - taken1 - taken2 and not images(d3, "deferred")
+          and s3["shard"]["deferred_remaining"] == 0 and s3["intake_cap"] is None
+          and s3["shard"]["earlier_batches"] == [r1["batch"], r2["batch"]] and s3["shard"]["arrival"]["blobs"]
+          == "sha256" and not tree.exists(), (sorted(taken3), s3.get("shard"), tree.exists()))
+    r4 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    check("a 4th intake of the fetch is the no-op", r4["status"] == "already_intaken" and r4["batch"] == r3["batch"]
+          and r4["shards"] == 3 and r4["deferred_remaining"] == 0
+          and len(batches_ledger().read_text().splitlines()) == n_ledger + 3, r4)
+    dec = d1 + d2 + d3
+    decided = [d for d in dec if d["kind"] == "image" and d["decision"] != "deferred"]
+    check("the shards partition the source: every image decided once", sorted(d["rel"] for d in decided)
+          == sorted(all_rels), sorted(d["rel"] for d in decided))
+    reasons = {d["rel"].rsplit("/", 1)[-1]: d["reason"] for d in decided}
+    rows = m1 + m2 + m3
+    dup = sorted(n for n, why in reasons.items() if why == "exact_dup_intake")
+    check("judged as one batch: of each exact pair one row kept, the other exact_dup_intake (across shards too); "
+          "every near copy kept (no near_dup_intake against an earlier shard)",
+          len(rows) == 8 and len(dup) == 2 and {n.split(".mp4")[0] for n in dup} == {"pair0", "pair1"}
+          and "near_dup_intake" not in reasons.values()
+          and all(reasons.get("pair%d.mp4_%d.png" % (g, k)) == "kept" for g in (2, 3, 4) for k in (0, 1)), reasons)
+    straddle = [g for g in range(5) if len({("pair%d.mp4_%d.png" % (g, k)) in base(taken1) for k in (0, 1)}) == 2]
+    check("  (fixture: shard 1 split four pairs across shards)", len(straddle) == 4, straddle)
+    keys = [r["key"] for r in rows]
+    others = {r.get("key") for b in batches_ledger().read_text().splitlines()
+              for r in ([] if json.loads(b)["source"] == sid else
+                        [json.loads(l) for l in (intake_dir() / json.loads(b)["batch"] / "manifest.jsonl")
+                         .read_text().splitlines()])}
+    check("keys never collide, across the shards and with every other batch", len(set(keys)) == len(keys)
+          and not set(keys) & others, keys)
+    ev = [x for x in S.read() if x["source"] == sid and x["event"] == "intaken"]
+    led = [json.loads(b) for b in batches_ledger().read_text().splitlines() if json.loads(b)["source"] == sid]
+    check("the ledgers record each shard and what it left deferred; their hash chains verify",
+          [(x["shard"], x["deferred_remaining"]) for x in ev] == [(1, 6), (2, 2), (3, 0)]
+          and [(x["shard"], x["deferred_remaining"]) for x in led] == [(1, 6), (2, 2), (3, 0)]
+          and verify_chain(batches_ledger()) == [], (ev, led))
+    # a rerun from the same fetch record takes the same shards (same seed): replayed here over the decisions
+    rerun1, _ = I.cap_items(src_items, 4, fetch_sha)
+    rerun2, _ = I.cap_items([it for it in src_items if it["rel"] not in rerun1], 4, fetch_sha)
+    check("the same seed draws the same shards again", rerun1 == taken1 and rerun2 == taken2, (rerun1, rerun2))
+    # the last shard leaves none deferred: no decisions are read (an earlier shard's, changed here, does not matter)
+    dpath = pathlib.Path(r2["dir"]) / "decisions.jsonl"
+    keep_d = dpath.read_bytes()
+    dpath.write_bytes(keep_d + b"\n")
+    try:
+        e = raises(lambda: I.shard_state(None, sid, fetch_sha), Exception)
+        st = I.shard_state(None, sid, fetch_sha) if e is None else {}
+    finally:
+        dpath.write_bytes(keep_d)
+    check("a fetch whose last shard leaves none deferred reads no decisions (the no-op stays cheap)",
+          e is None and st.get("remaining") == set() and st.get("n") == 4, (e, st))
+
+
+def test_shard_edges(cfg):
+    """shard_state refuses decisions that do not hash as their summary
+    records while images remain deferred; a kept tree that lost a deferred
+    image's file is extracted again from the blobs and the image taken; a
+    deferred image that a fresh extraction lacks ends as not_in_source, so
+    the shards always end."""
+    from weed_optimizer_framework.tools.collect import CollectError, intake_dir, staging_dir
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.collect import normalize as NZ
+    from weed_optimizer_framework.tools.collect.config import CollectConfig
+    print("continuation shards: changed decisions, a kept tree that lost a file, a deferred image the source lost")
+    ref = "cacacaca-0000-0000-0000-000000000022"
+    sid = "weedai_" + ref
+    cats = [{"id": 1, "name": "weed: amaranthus palmeri"}]
+    imgs = {"t%d.png" % i: W.img_bytes(760 + i) for i in range(4)}
+    anns = [{"id": i + 1, "image_id": i, "category_id": 1, "bbox": [10, 20, 40, 40]} for i in range(4)]
+    raw = json.loads(json.dumps(cfg.raw))
+    raw["budgets"]["intake_max_images"] = 1
+    cfg2 = CollectConfig(raw, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    fetch_simple(cfg2, ref, coco_files(imgs, cats, anns))
+    r = I.intake(cfg2, sid, guard=W.FakeGuard())
+    fetch_sha = hashlib.sha256((staging_dir(sid) / "fetch.json").read_bytes()).hexdigest()
+    dpath = pathlib.Path(r["dir"]) / "decisions.jsonl"
+    keep = dpath.read_bytes()
+    dpath.write_bytes(keep.replace(b'"deferred"', b'"kept"', 1))
+    try:
+        e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), CollectError)
+    finally:
+        dpath.write_bytes(keep)
+    check("decisions that do not hash as the summary records: the next shard is not drawn", e is not None
+          and "does not hash" in str(e), e)
+    r2 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    check("  restored, the next shard runs (3 deferred -> 2)", r2["status"] == "intaken" and r2["shard"] == 2
+          and r2["deferred_remaining"] == 2 and len(I.shard_state(None, sid, fetch_sha)["remaining"]) == 2, r2)
+    # a deferred image's file is gone from the kept tree (a partial removal of the work directory, a damaged disk),
+    # its marker intact: only a fresh extraction may say the source lacks it
+    left = sorted(I.shard_state(None, sid, fetch_sha)["remaining"])
+    tree = intake_dir() / "work" / sid / fetch_sha[:12] / "x"
+    os.unlink(str(tree / left[0]))
+    r3 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    s3 = json.loads((pathlib.Path(r3["dir"]) / "summary.json").read_text())
+    dec3 = [json.loads(l) for l in (pathlib.Path(r3["dir"]) / "decisions.jsonl").read_text().splitlines()]
+    check("a kept tree that lost a deferred image's file is extracted again from blobs hashed as recorded; nothing "
+          "is rejected not_in_source (2 deferred -> 1)", r3["shard"] == 3 and r3["rows"] == 1
+          and r3["deferred_remaining"] == 1 and "not_in_source" not in {d.get("reason") for d in dec3}
+          and s3["shard"]["tree"] == "extracted" and s3["shard"]["tree_lacked"] == 1
+          and s3["shard"]["arrival"]["blobs"].startswith("sha256") and (tree / left[0]).is_file(),
+          (r3, s3.get("shard")))
+    # the last deferred image is one the source as read now lacks, after a fresh extraction too (the reader or its
+    # options changed between the shards): decided, not deferred for ever
+    gone = sorted(I.shard_state(None, sid, fetch_sha)["remaining"])
+    real = NZ.read
+
+    def lacking(root, opts=None, out_images=None):
+        t, res = real(root, opts, out_images=out_images)
+        res.items = [it for it in res.items if it["rel"] not in gone]
+        return t, res
+    NZ.read = lacking
+    try:
+        r4 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    finally:
+        NZ.read = real
+    s4 = json.loads((pathlib.Path(r4["dir"]) / "summary.json").read_text())
+    dec4 = [json.loads(l) for l in (pathlib.Path(r4["dir"]) / "decisions.jsonl").read_text().splitlines()]
+    check("a deferred image a fresh extraction lacks is rejected not_in_source; the shards end (0 deferred, the "
+          "tree removed, the next intake the no-op)", r4["shard"] == 4 and r4["rows"] == 0
+          and r4["deferred_remaining"] == 0 and [d["rel"] for d in dec4 if d.get("reason") == "not_in_source"] == gone
+          and s4["shard"]["tree_lacked"] == 1 and not tree.exists()
+          and I.intake(cfg2, sid, guard=W.FakeGuard())["status"] == "already_intaken",
+          (r4, s4.get("shard"), [d for d in dec4 if d.get("kind") == "image"]))
+
+
+class Killed(Exception):
+    """A run killed at an injected point (a walltime kill, a node failure)."""
+
+
+def parquet_zip(n, seed=800):
+    """A one-archive hf_parquet source of n images, one box each (class 0)."""
+    import io
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    rows = [{"image": {"bytes": W.img_bytes(seed + i), "path": "f%d.png" % i},
+             "objects": {"bbox": [[10.0, 20.0, 40.0, 40.0]], "category": [0]}} for i in range(n)]
+    buf = io.BytesIO()
+    pq.write_table(pa.Table.from_pylist(rows), buf)
+    return W.zip_bytes({"data/train-00000.parquet": buf.getvalue()})
+
+
+def test_shard_files(cfg):
+    """What a continuation shard shares with committed batches, and runs
+    killed at the edges of a commit: an hf_parquet source's written images
+    are never written into (a committed batch links them); a run killed
+    between the last shard's commit and the tree's removal leaves no tree
+    after the next intake; a run killed between its registration and its
+    summary.json counts its rows in the registry once; each shard records its
+    class map, and a change between shards is flagged."""
+    from weed_optimizer_framework.tools.collect import batches_ledger, intake_dir, staging_dir, state as S
+    from weed_optimizer_framework.tools.collect import classmap as CM
+    from weed_optimizer_framework.tools.collect import fetch as F
+    from weed_optimizer_framework.tools.collect import intake as I
+    from weed_optimizer_framework.tools.collect.config import CollectConfig
+    print("continuation shards: shared files, killed runs, the class map")
+    raw = json.loads(json.dumps(cfg.raw))
+    raw["budgets"]["intake_max_images"] = 2
+    cfg2 = CollectConfig(raw, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    try:
+        import pyarrow  # noqa: F401
+    except ImportError as e:
+        print("  skip the hf_parquet shards: pyarrow is not installed here (%s)" % e)
+    else:
+        ref = "cacacaca-0000-0000-0000-000000000031"
+        sid = "weedai_" + ref
+        cands = TMP / "lab" / ("cands_%s.json" % ref[:8])
+        cands.parent.mkdir(parents=True, exist_ok=True)
+        cands.write_text(json.dumps({"format": "collect-candidates/1", "candidates": [
+            {"source_id": sid, "provider": "weedai", "ref": ref, "title": "Plants"}]}))
+        F.fetch(cfg2, sid, candidates_path=cands, net=weedai_net(cfg2, ref, parquet_zip(5),
+                                                                 cats=("weed: amaranthus palmeri",)))
+        edit_fetch(sid, classes=[{"name": "weed: amaranthus palmeri"}])
+        fetch_sha = hashlib.sha256((staging_dir(sid) / "fetch.json").read_bytes()).hexdigest()
+        work = intake_dir() / "work" / sid / fetch_sha[:12]
+        r1 = I.intake(cfg2, sid, guard=W.FakeGuard())
+        m1 = [json.loads(l) for l in (pathlib.Path(r1["dir"]) / "manifest.jsonl").read_text().splitlines()]
+
+        def facts(rows):
+            return {r["image"]: (os.stat(r["image"]).st_ino, os.stat(r["image"]).st_mtime_ns,
+                                 hashlib.sha256(pathlib.Path(r["image"]).read_bytes()).hexdigest()) for r in rows}
+        before = facts(m1)
+        check("an hf_parquet shard 1: 2 of 5 taken, its images linked to the files the reader wrote (kept tree)",
+              r1["rows"] == 2 and r1["deferred_remaining"] == 3 and all(
+                  os.stat(r["image"]).st_nlink == 2 and v[2] == r["sha256"] for r, v in zip(m1, before.values())),
+              (r1, before))
+        # a file the reader must write anew (removed here), its write failing part-way (a full disk): the run fails,
+        # no partial file is left at the path, nothing is committed
+        fresh = sorted(set(map(str, (work / "parquet_images").rglob("*.png"))) - {
+            str(pathlib.Path(r["image"]).resolve()) for r in m1} - {
+            p for p in map(str, (work / "parquet_images").rglob("*.png"))
+            if os.stat(p).st_ino in {v[0] for v in before.values()}})[0]
+        os.unlink(fresh)
+        real_wb = pathlib.Path.write_bytes
+
+        def full_disk(self, data):
+            with open(str(self), "wb") as fh:
+                fh.write(data[:10])
+            raise OSError(28, "No space left on device (injected)")
+        pathlib.Path.write_bytes = full_disk
+        try:
+            e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), OSError)
+        finally:
+            pathlib.Path.write_bytes = real_wb
+        check("  a write that fails part-way leaves no partial file and commits nothing; the committed images as "
+              "their manifest rows record", e is not None and not os.path.exists(fresh) and facts(m1) == before
+              and not [x for x in (work / "parquet_images").rglob("*.tmp")]
+              and I.shard_state(None, sid, fetch_sha)["n"] == 2, (e, facts(m1)))
+        # shard 2, with every write into a file a committed batch links made to cut that file short and fail (what a
+        # full disk does to a write in place): the reader never writes into one, so nothing fires
+        inos = {v[0] for v in before.values()}
+        fired = []
+
+        def into_committed(self, data):
+            if os.path.exists(str(self)) and os.stat(str(self)).st_ino in inos:
+                fired.append(str(self))
+                with open(str(self), "wb") as fh:
+                    fh.write(data[:10])
+                raise OSError(28, "No space left on device (injected)")
+            return real_wb(self, data)
+        pathlib.Path.write_bytes = into_committed
+        try:
+            r2 = I.intake(cfg2, sid, guard=W.FakeGuard())
+        finally:
+            pathlib.Path.write_bytes = real_wb
+        check("  shard 2 runs (2 more, 1 deferred) without writing into a committed image's file: each committed "
+              "image keeps its file, time and bytes", r2["shard"] == 2 and r2["rows"] == 2
+              and r2["deferred_remaining"] == 1 and not fired and facts(m1) == before and os.path.exists(fresh),
+              (r2, fired, facts(m1)))
+        # the last shard commits, and its run is killed before the tree is removed
+        real_rm = I.shutil.rmtree
+
+        def killed(p, *a, **k):
+            if pathlib.Path(p) == work:
+                raise Killed("killed between the commit and the tree's removal (injected)")
+            return real_rm(p, *a, **k)
+        I.shutil.rmtree = killed
+        try:
+            e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), Killed)
+        finally:
+            I.shutil.rmtree = real_rm
+        committed = I.shard_state(None, sid, fetch_sha)
+        check("a run killed after the last shard's commit leaves the tree", e is not None and work.exists()
+              and committed["n"] == 4 and not committed["remaining"], (e, committed and committed["n"]))
+        r4 = I.intake(cfg2, sid, guard=W.FakeGuard())
+        check("  the next intake is the no-op and removes it", r4["status"] == "already_intaken"
+              and r4["shards"] == 3 and not work.exists(), (r4, work.exists()))
+    # a run killed between its registration and its summary.json (the commit marker), then redone whole
+    ref = "cacacaca-0000-0000-0000-000000000032"
+    cats = [{"id": 1, "name": "weed: amaranthus palmeri"}]
+    imgs = {"k%d.png" % i: W.img_bytes(780 + i) for i in range(5)}
+    anns = [{"id": i + 1, "image_id": i, "category_id": 1, "bbox": [10, 20, 40, 40]} for i in range(5)]
+    sid = fetch_simple(cfg2, ref, coco_files(imgs, cats, anns))
+    fetch_sha = hashlib.sha256((staging_dir(sid) / "fetch.json").read_bytes()).hexdigest()
+    real_w = I.write_json_atomic
+
+    def no_summary(path, obj):
+        if pathlib.Path(path).name == "summary.json":
+            raise Killed("killed before summary.json (injected)")
+        return real_w(path, obj)
+    I.write_json_atomic = no_summary
+    try:
+        e = raises(lambda: I.intake(cfg2, sid, guard=W.FakeGuard()), Killed)
+    finally:
+        I.write_json_atomic = real_w
+    r1 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    reg = json.loads(pathlib.Path(os.environ["COLLECT_REGISTRY"]).read_text())["datasets"][sid]
+    check("a run killed between its registration and its commit, redone: the registry counts the batch's rows once",
+          e is not None and r1["rows"] == 2 and reg["images"] == 2 and reg["intake_batch_rows"] == {r1["batch"]: 2},
+          (e, reg.get("images"), reg.get("intake_batch_rows")))
+    s1 = json.loads((pathlib.Path(r1["dir"]) / "summary.json").read_text())
+    check("each shard records its class map's sha256; a first shard flags no change",
+          s1["shard"]["class_map_sha256"] == I.class_map_sha(json.loads((pathlib.Path(r1["dir"]) / "sources.json")
+                                                                        .read_text())["class_map"]["by_src"])
+          and s1["shard"]["class_map_changed"] is None, s1["shard"])
+    # a batch committed before the shard record existed (no shard block): its sources.json gives the class map
+    sp = pathlib.Path(r1["dir"]) / "summary.json"
+    legacy = dict(s1)
+    legacy.pop("shard")
+    sp.write_text(json.dumps(legacy))
+    r2 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    s2 = json.loads((pathlib.Path(r2["dir"]) / "summary.json").read_text())
+    reg = json.loads(pathlib.Path(os.environ["COLLECT_REGISTRY"]).read_text())["datasets"][sid]
+    check("  shard 2 after a shard-less summary: the same class map, no change flagged; the registry adds its rows",
+          r2["shard"] == 2 and s2["shard"]["class_map_sha256"] == s1["shard"]["class_map_sha256"]
+          and s2["shard"]["class_map_changed"] is None and reg["images"] == 4, (s2["shard"], reg.get("images")))
+    # the names or the config changed between the shards: the label ids mean something else, flagged
+    real_b = CM.build
+
+    def remapped(*a, **k):
+        m = real_b(*a, **k)
+        m["by_src"] = {s: cfg2.unmapped_id for s in m["by_src"]}
+        return m
+    CM.build = remapped
+    try:
+        r3 = I.intake(cfg2, sid, guard=W.FakeGuard())
+    finally:
+        CM.build = real_b
+    s3 = json.loads((pathlib.Path(r3["dir"]) / "summary.json").read_text())
+    ev = [x for x in S.read() if x["source"] == sid and x["event"] == "intaken"][-1]
+    check("  a class map that changed between shards is flagged (from, to) in summary.json and the intaken event",
+          s3["shard"]["class_map_changed"] == {"from": s1["shard"]["class_map_sha256"],
+                                               "to": s3["shard"]["class_map_sha256"]}
+          and s3["shard"]["class_map_sha256"] != s1["shard"]["class_map_sha256"]
+          and ev.get("class_map_changed") == s3["shard"]["class_map_changed"], (s3["shard"], ev))
 
 
 def fetch_simple(cfg, ref, files, cats=("weed: amaranthus palmeri",), licence="https://creativecommons.org/licenses/by/4.0/"):
@@ -1305,6 +1734,9 @@ def main():
         test_research_only(cfg)
         test_licence_override(cfg)
         test_intake_cap(cfg)
+        test_continuation_shards(cfg)
+        test_shard_edges(cfg)
+        test_shard_files(cfg)
         test_ftp_box_table(cfg)
         test_unlisted_and_clearance(cfg)
         test_copy_rule_and_keys(cfg)

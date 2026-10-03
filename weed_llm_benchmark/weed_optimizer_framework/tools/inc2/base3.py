@@ -33,10 +33,12 @@ Inputs (all recorded by sha256 in summary.json):
     registry's class_names; a slug whose registry path lies under the
     intake directory is never read through the registry;
   * the committed intake batches of the listed intake sources
-    (INC_DIR/intake/<batch>/manifest.jsonl): their label ids are INC ids
-    (0-13), every one a weed box here. A row with intake holds is admitted
-    only when Step 1's queue (inc2.stream.QueueView, the queue's one
-    reader) holds it with no hold left;
+    (INC_DIR/intake/<batch>/manifest.jsonl, with its summary.json), the
+    first shard of each fetch record only (a continuation shard, amendment
+    2026-10-03 of collect.intake, is recorded and not read): their label ids
+    are INC ids (0-13), every one a weed box here. A row with intake holds
+    is admitted only when Step 1's queue (inc2.stream.QueueView, the queue's
+    one reader) holds it with no hold left;
   * the stream's source quarantines (--stream SID: inc2.stream's ledger
     fold, its head recorded): a quarantined source's rows never enter arm B.
     The quarantine is an input, never a constant here, and it is applied
@@ -785,6 +787,19 @@ def base_rows(conf, lock=None, production=True):
     return out, {"path": str(path), "sha256": got, "provenance_sha256": psha, "rows": len(out)}
 
 
+def _later_shard(summary):
+    """The shard number of a committed intake batch past its fetch record's
+    first (collect.intake step 1b, continuation shards), else None: a batch
+    whose summary.json has no shard record was committed before shards
+    existed and is the first of its fetch."""
+    sh = (summary or {}).get("shard") if isinstance((summary or {}).get("shard"), dict) else {}
+    try:
+        n = int(sh.get("n") or 1)
+    except (TypeError, ValueError):
+        n = 1
+    return n if n > 1 else None
+
+
 def intake_rows(conf, holds_view=None):
     """The listed intake sources' committed batches (INC_DIR/intake/<batch>/
     manifest.jsonl), every label id a weed box. A row with intake holds is
@@ -796,7 +811,13 @@ def intake_rows(conf, holds_view=None):
     the session joins every frame of a video into one capture group. A row
     whose name the pattern does not match cannot be placed with its video,
     in test v1 or in arm B, so it is dropped (group_unmatched); each batch's
-    record counts the matched and unmatched rows per source."""
+    record counts the matched and unmatched rows per source. Read are the
+    batches that are committed (summary.json, collect.intake's commit marker,
+    is written after the manifest) and the first shard of each fetch record:
+    E1 was pre-registered on the first batch of a capped source (SIU's
+    40,000 frames), and the continuation shards that take the rest of it
+    (amendment 2026-10-03) never enter base v3, whenever they are committed.
+    Each batch not read is recorded with the reason."""
     idir = Path(C.INC_DIR) / "intake"
     rxs = {s: _group_regex(s, e) for s, e in conf["intake"].items()}
     out, rec = [], {}
@@ -810,6 +831,19 @@ def intake_rows(conf, holds_view=None):
         srcs = {r.get("source") for r in rows}
         mine = [r for r in rows if r.get("source") in conf["intake"]]
         if not mine:
+            continue
+        sp = idir / b / "summary.json"
+        try:
+            with open(sp) as fh:
+                summ = json.load(fh)
+        except (OSError, ValueError):
+            summ = None
+        later = _later_shard(summ) if isinstance(summ, dict) else None
+        if not isinstance(summ, dict) or later:
+            rec[b] = {"manifest_sha256": C.sha256_file(mp), "rows": 0, "sources": sorted(s for s in srcs if s),
+                      "not_read": ("continuation shard %d of its fetch record (base v3 reads the first shard of each "
+                                   "fetch, as pre-registered)" % later) if later else
+                      "not committed (no readable summary.json)"}
             continue
         rec[b] = {"manifest_sha256": C.sha256_file(mp), "rows": len(mine), "sources": sorted(s for s in srcs if s)}
         grx = {}

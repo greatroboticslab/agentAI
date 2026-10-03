@@ -79,6 +79,10 @@ What is pinned:
   their session, so a video's frames are one capture group: the holdout and
   the siu family cap take whole videos, where without it a video's frames
   were split between test v1 and arm B;
+- the intake batches read: committed ones only (summary.json), the first
+  shard of each fetch record (a continuation shard, amendment 2026-10-03, is
+  recorded and not read, so base v3 stays on SIU's pre-registered first
+  batch whenever the shards are committed);
 - inc2.baseline builds E1's arms with cold_budget (the pinned driver
   accepts the definition), a manifest no base v3 summary records and that
   lies outside splits/v3 gets the cold table, and a base v3 manifest that is
@@ -306,6 +310,9 @@ def build_registry_world(Wd):
                      "dhash": C.dhash(img), "holds": (["licence"] if i == 0 else ["h6_scan"] if i == 1 else []),
                      "licence": "cc-by-4.0", "research_only": i == 0, "label_sha256": C.sha256_file(lab)})
     (idir / "manifest.jsonl").write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in rows))
+    # committed (collect.intake writes summary.json last); a batch committed before shards existed has no shard record
+    (idir / "summary.json").write_text(json.dumps({"format": "collect-summary/1", "source": "int_src",
+                                                   "batch": "i0001_int_src", "rows": len(rows)}))
     f["intake_rows"] = rows
     conf = json.loads(B3.CONFIG.read_text())
     conf["rules"]["holdout"].update(min_images=2, max_images=4)
@@ -1256,6 +1263,45 @@ def test_prior_lists(Wd, reg, cp):
         shutil.rmtree(d)
 
 
+def test_intake_shards(f):
+    print("base v3 reads committed intake batches, the first shard of each fetch record (continuation shards, "
+          "amendment 2026-10-03)")
+    conf = json.loads(B3.CONFIG.read_text())
+    conf["intake"] = {"int_src": {"tier": 1, "classes": "all_weed", "family": "siu"}}
+    idir = C.INC_DIR / "intake"
+    src = idir / "i0001_int_src"
+    made = []
+
+    def batch(name, summary):
+        d = idir / name
+        d.mkdir(parents=True)
+        made.append(d)
+        rows = [dict(r, key=r["key"] + "_" + name, batch=name) for r in f["intake_rows"][:2]]
+        (d / "manifest.jsonl").write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in rows))
+        if summary is not None:
+            (d / "summary.json").write_text(json.dumps(summary))
+    try:
+        base, _ = B3.intake_rows(conf, holds_view={})
+        batch("i0002_int_src", {"source": "int_src", "batch": "i0002_int_src", "rows": 2,
+                                "shard": {"n": 2, "deferred_remaining": 0, "earlier_batches": ["i0001_int_src"]}})
+        batch("i0003_int_src", None)
+        batch("i0004_int_src", {"source": "int_src", "batch": "i0004_int_src", "rows": 2,
+                                "shard": {"n": 1, "deferred_remaining": 0, "earlier_batches": []}})
+        rows, rec = B3.intake_rows(conf, holds_view={})
+        got = sorted({r["batch"] for r in rows})
+        check("the first shard of each fetch (with or without a shard record) is read; a continuation shard and a "
+              "batch without summary.json (not committed) are recorded and not read (%s)" % got,
+              got == ["i0001_int_src", "i0004_int_src"] and len(rows) == len(base) + 2
+              and rec["i0002_int_src"]["rows"] == 0 and "continuation shard 2" in rec["i0002_int_src"]["not_read"]
+              and rec["i0003_int_src"]["rows"] == 0 and "not committed" in rec["i0003_int_src"]["not_read"]
+              and len(rec["i0002_int_src"]["manifest_sha256"]) == 64, rec)
+    finally:
+        for d in made:
+            shutil.rmtree(d)
+    check("  (the fixture's committed batch is still read alone)", (src / "summary.json").is_file()
+          and sorted({r["batch"] for r in B3.intake_rows(conf, holds_view={})[0]}) == ["i0001_int_src"])
+
+
 def test_intake_family(f):
     print("an intake source's family: its rows carry it (the family cap applies), an unknown one refuses")
     conf = json.loads(B3.CONFIG.read_text())
@@ -1534,6 +1580,9 @@ def _vid_rows(src, batch, frames, rel_dir="weed_dataset/Dataset/images/test"):
                     "height": 960, "dhash": h64(key), "holds": [], "licence": "cc-by-nc-sa-4.0",
                     "research_only": True})
     (idir / "manifest.jsonl").write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in out))
+    # committed, as collect.intake marks a batch (summary.json last), the first shard of its fetch
+    (idir / "summary.json").write_text(json.dumps({"format": "collect-summary/1", "source": src, "batch": batch,
+                                                   "rows": len(out)}))
     return idir, out
 
 
@@ -1636,6 +1685,7 @@ def main():
     test_prior_lists(Wd, reg, cp)
     test_intake_family(f)
     test_intake_video_groups()
+    test_intake_shards(f)
     print("\n%d failure(s) in %.0fs" % (len(FAILURES), time.time() - t0))
     if FAILURES:
         for x in FAILURES:
