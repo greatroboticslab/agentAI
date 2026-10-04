@@ -702,6 +702,42 @@ class World(object):
                                                    "status": status, "seeds": [0, 1, 2], "exam": "dev",
                                                    "written_utc": utc(self.t[0])})
 
+    def e1_verdict(self, qualifies=True, status="decided", exp=None):
+        """inc2.baseline's E1 verdict (capacity/e1_v1.json, dev only): E1-B
+        against E1-A, decided and qualifying unless told otherwise."""
+        e1 = self.dom.get("e1") or {}
+        items = {b["id"]: b for b in self.dom["baselines"]["items"]}
+        eb = exp or (items.get((e1.get("arms") or {}).get("B")) or {}).get("exp")
+        ea = (items.get((e1.get("arms") or {}).get("A")) or {}).get("exp")
+        doc = {"format": "inc2-e1-verdict/1", "status": status, "exp": eb, "reference": ea, "seeds": [0, 1, 2],
+               "exam": "dev", "generated_utc": utc(self.t[0])}
+        if status == "decided":
+            doc.update(diff=0.0217, pooled_sd=0.0025, two_pooled_sd=0.005, se_diff=0.0068, qualifies=qualifies,
+                       conditions={"above_2_pooled_sd": qualifies, "above_se": qualifies})
+        self._w("capacity/e1_v1.json", doc)
+
+    def e2_records(self, qualifying=("W",), chosen=None, status="decided", rescore=True, verdict=True):
+        """inc2.baseline rescore-e2's records: with verdict, E2's verdict
+        (capacity/e2_v1.json, dev only; the ticker raises its card once), and
+        with rescore its record (capacity/e2_rescore.json, complete)."""
+        arms = {}
+        for k in ("W", "S"):
+            q = k in qualifying
+            arms[k] = {"status": "decided", "seeds": [0, 1, 2], "diff": 0.012 if q else 0.002, "pooled_sd": 0.002,
+                       "two_pooled_sd": 0.004, "se_diff": 0.003, "qualifies": q,
+                       "conditions": {"above_2_pooled_sd": q, "above_se": q}}
+        q = [k for k in ("W", "S") if k in qualifying]
+        ch = chosen if chosen is not None else (q[-1] if q else None)
+        if verdict:
+            self._w("capacity/e2_v1.json", {"format": "inc2-e2-verdict/1", "status": status, "exam": "dev",
+                                            "arms": arms, "qualifying": q, "chosen": ch,
+                                            "generated_utc": utc(self.t[0])})
+        if rescore:
+            self._w("capacity/e2_rescore.json", {"format": "inc2-e2-rescore/1", "status": "complete", "exam": "dev",
+                                                 "imgsz": 640, "verdict": {"name": "e2_v1.json", "status": status,
+                                                                           "qualifying": q, "chosen": ch},
+                                                 "written_utc": utc(self.t[0])})
+
     def native_verdict_file(self, qualifying=(), decided=None):
         """inc2.baseline native-verdict's record (capacity/native_v1.json, dev
         only): each decided arm with its rule's numbers; `qualifying` the arms
@@ -926,7 +962,11 @@ class World(object):
         arms are done and rescored at their own resolution (their
         native_rescore.json records), so no S-case waits on their L23N; E1's
         base v3 is built and its arms rescored (splits/v3/summary.json and
-        the agnostic record), so none waits on L23V or L23E either."""
+        the agnostic record), so none waits on L23V or L23E either; E1's
+        verdict qualifies E1-B and E2's six experiments are done with their
+        rescore record (capacity/e1_v1.json, e2_rescore.json), so none waits
+        on E2's builds or L23C (no e2_v1.json: no S-case carries E2's verdict
+        card)."""
         self.lock()
         if bootstrap:
             self.step1_status()
@@ -941,6 +981,9 @@ class World(object):
             self.base3_summary()
             items = {b["id"]: b for b in self.dom["baselines"]["items"]}
             self.agnostic_record(items[e1["arms"]["B"]]["exp"])
+            self.e1_verdict()
+        if (self.dom.get("e2") or {}).get("arms"):
+            self.e2_records(verdict=False)
         self.canary_file()
         self.capacity_file()
         sa = self.dom["stage_a"]

@@ -239,13 +239,15 @@ def never_train_slugs(dom):
 
 # -------------------------------------------------------------- rendering
 def _fill(tok, params):
+    """A token with its {param} placeholders filled; a name may hold digits after its first letter (L23B's {e2},
+    2026-10-04)."""
     def sub(m):
         k = m.group(1)
         v = params.get(k)
         if v is None:
             raise LeverError("the argv needs %r" % k)
         return str(v)
-    return re.sub(r"\{([a-z_]+)\}", sub, tok)
+    return re.sub(r"\{([a-z_][a-z0-9_]*)\}", sub, tok)
 
 
 def policy_params(lid, params, menu=None):
@@ -415,14 +417,17 @@ def price(lid, params, dom, info=None):
         s = len([x for x in str(p.get("seeds") or "").split(",") if x != ""]) or seeds
         bud = info.get("budget")
         if isinstance(bud, dict):
-            # E1's equal-compute recipe (2026-10-03): every base run trains the same image-epochs at the arm's
-            # measured rate, whatever its N; priced from the budget, never from the images
+            # E1's cold_budget (2026-10-03) and E2's arms (2026-10-04): priced from their image-epochs per base run
+            # at the arm's measured rate, never from the images and the 100-epoch table. finals_hours prices the
+            # finals of an experiment of the domain's `seeds` (3); an experiment of s seeds pays s / 3 of it (an
+            # E2 experiment trains one seed), so a one-seed item does not hold three seeds' finals of headroom
             ie, ms = float(bud["image_epochs"]), float(bud["ms_per_image_epoch"])
-            exp_h = s * ie * ms / 3.6e6 + finals
+            fin = finals * s / float(seeds)
+            exp_h = s * ie * ms / 3.6e6 + fin
             return round(exp_h + build, 3), dict(detail, estimator="budget", seeds=s, image_epochs=ie,
-                                                 ms_per_image_epoch=ms, finals=finals, build_job_hours=build,
-                                                 why="cold_budget: seeds x image-epochs x the arm's measured rate, "
-                                                     "plus the finals and the build job")
+                                                 ms_per_image_epoch=ms, finals=round(fin, 4), build_job_hours=build,
+                                                 why="seeds x image-epochs x the arm's measured rate, plus the "
+                                                     "seeds' share of the finals and the build job")
         exp_h = _hours(s * imgs, ep_cold, cold_ms) * factor + finals
         return round(exp_h + build, 3), dict(detail, seeds=s, images=imgs, factor=factor, build_job_hours=build)
     if kind == "pilot4":

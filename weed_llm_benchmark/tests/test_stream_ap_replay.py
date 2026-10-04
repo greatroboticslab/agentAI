@@ -1578,7 +1578,9 @@ def s_r0():
     grammars: baselines, the verdicts, Stage A, the stream's creation, the
     arm, Stage C, the measurement arms and their rescores, E1 (2026-10-03:
     base v3's build L23V, its two arms L23B --role baseline, their agnostic
-    rescore L23E), then the first segment."""
+    rescore L23E), E2 (2026-10-04: once E1's verdict qualifies E1-B, its six
+    single-seed builds L23B --e2 W|S, then its rescore and verdict L23C), then
+    the first segment."""
     w = World("r0")
     w.lock()
     w.step1_status()
@@ -1706,6 +1708,36 @@ def s_r0():
           [e for e in w.stream_ledger() if e.get("event") == "arm"] == arm0
           and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0
           and [e.get("lever") for e in w.events("proposed")].count("LA") == 1, arm0)
+    # 2026-10-04: E2. E1's verdict qualifies E1-B (inc2.baseline wrote capacity/e1_v1.json in L23E's job): E2's six
+    # single-seed builds, one at a time, then its rescore and verdict (L23C), each once, within the envelope
+    w.e1_verdict()
+    e2 = [b for b in w.dom["baselines"]["items"] if b.get("requires") == "e1"]
+    e2got = []
+    for b in e2:
+        e2got.append(_step(w, "L23B", lambda b=b: (w.experiment(b["exp"], final=[w.final_row("base", 0.85, 0.002, 1)]),
+                                                   w.job_done("inc_build_%s" % b["exp"]))))
+    e2ex = [e.get("basis") for e in w.events("executed")
+            if e.get("lever") == "L23B" and e.get("child_exp") in [b["exp"] for b in e2]]
+    e2sub = [x for x in w.submits if "--e2" in x["argv"]]
+    e2req = SR.parse_submit("build", e2sub[1]["argv"][e2sub[1]["argv"].index("inc2.baseline"):]) \
+        if len(e2sub) > 1 else {}
+    check("E2: E1-B qualified, so its six builds next, each once, as L23B (--seeds k --arm m640 --role baseline "
+          "--e2 W|S), in the order W0, S0, W1, S1, W2, S2, within the envelope, each one build job named after its "
+          "experiment; the cluster's grammar reads --e2 back",
+          [(x or {}).get("child_exp") for x in e2got] == ["e2_w_m640_seed0", "e2_s_m640_seed0", "e2_w_m640_seed1",
+                                                          "e2_s_m640_seed1", "e2_w_m640_seed2", "e2_s_m640_seed2"]
+          and [tail(x, 8) for x in e2got] == [["--seeds", b["seeds"], "--arm", "m640", "--role", "baseline", "--e2",
+                                               b["e2"]] for b in e2]
+          and e2ex == ["envelope"] * 6 and [x["name"] for x in e2sub] == ["inc_build_%s" % b["exp"] for b in e2]
+          and e2req.get("params", {}).get("e2") == "S", ([tail(x, 8) for x in e2got], e2ex))
+    pc = _step(w, "L23C", lambda: (w.job_done("inc_build_e2_v1"), w.e2_records()))
+    check("  then, all six and b_v2_m640 done, L23C once (inc2.baseline rescore-e2), within the envelope, one job "
+          "named inc_build_e2_v1; no L23N for any E2 experiment",
+          tail(pc, 2) == [MOD + "inc2.baseline", "rescore-e2"]
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23C"] == ["envelope"]
+          and [x["name"] for x in w.submits if "rescore-e2" in x["argv"]] == ["inc_build_e2_v1"]
+          and not [e for e in w.events("proposed") if e.get("lever") == "L23N"
+                   and str((e.get("argv") or [])[-3:]).count("e2_")], tail(pc, 2))
     w.tick(2)
     check("  once both exist, no measurement arm is proposed again, nor its rescore",
           [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_m832") == 1
@@ -1718,7 +1750,7 @@ def s_r0():
     lv = [e.get("lever") for e in w.events("executed") if e.get("lane") == "MAINT"]
     check("the whole sequence ran by the platform, in order, one MAINT item at a time, each once",
           lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure)
-          + ["L23V"] + ["L23B"] * len(e1) + ["L23N"] * len(measure) + ["L23E"], lv)
+          + ["L23V"] + ["L23B"] * len(e1) + ["L23N"] * len(measure) + ["L23E"] + ["L23B"] * len(e2) + ["L23C"], lv)
 
 
 def _commits_ev(segments, ctx):

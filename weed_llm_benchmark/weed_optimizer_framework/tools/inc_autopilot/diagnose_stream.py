@@ -1611,6 +1611,29 @@ def lift_wait(v, d28=None):
     return dict(out, state="waiting")
 
 
+def _e1_qualified(v, exps):
+    """(True, cites) when E2 may be built (amendment 2026-10-04): E1's
+    verdict record (stream-domain e1.record) is decided, qualifies E1-B and
+    names E1-B's experiment, and that experiment is done (its three base
+    weights exist); else (False, why). Cites only after presence is checked
+    (a cite of an absent value raises)."""
+    e1 = v.dom.get("e1") or {}
+    by_id = {b["id"]: b for b in (v.dom.get("baselines") or {}).get("items") or []}
+    eb = (by_id.get((e1.get("arms") or {}).get("B")) or {}).get("exp")
+    rec_name = e1.get("record")
+    if not eb or not rec_name:
+        return False, "the domain names no E1-B or no E1 record"
+    rec = v.ev.json(rec_name)
+    if not isinstance(rec, dict) or rec.get("status") != "decided":
+        return False, "E1's verdict %s is not decided" % rec_name
+    if rec.get("qualifies") is not True or rec.get("exp") != eb:
+        return False, "E1's verdict does not qualify E1-B (%s)" % eb
+    if exps.get(eb) != "done":
+        return False, "E1-B (%s) is not done" % eb
+    return True, [v.cite(rec_name, "/qualifies"), v.cite(rec_name, "/exp"),
+                  v.ccite(E.pointer("stage", "exp_status", eb))]
+
+
 def r0(v, d28=None):
     """DR0: the rollout's prerequisites (contract 10 R0, R0b, R1, R2), each
     proposed once in its lane when due, in order: MAINT -- the splits build
@@ -1626,7 +1649,12 @@ def r0(v, d28=None):
     after a bounded wait for a person to lift the quarantines D28 now judges
     chance (lift_wait; `d28` is D28's diagnosis of the same evidence), and
     once both E1 arms are done, their agnostic rescore and E1's verdict
-    (L23E, once). DATA --
+    (L23E, once); E2 (2026-10-04): an arm that requires e1 is proposed only
+    while E1's verdict is decided, qualifies E1-B and E1-B is done
+    (_e1_qualified), one build at a time in the domain's order (a build that
+    failed stays failed: /stage/baselines says so), and once its six
+    experiments and the reference are done, E2's rescore and verdict (L23C,
+    once). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill), then D28-v2's sidecars for batches
     committed before the amendment (L17 eval-hits, _eval_hits_due)."""
@@ -1709,6 +1737,16 @@ def r0(v, d28=None):
         for b in (v.dom.get("baselines") or {}).get("items") or []:
             if not b.get("measure") or (st.get("baselines") or {}).get(b["id"]) not in (None, "missing"):
                 continue
+            if b.get("requires") == "e1":
+                # E2 (2026-10-04): built only from an E1-B that qualified and whose three base weights exist
+                ok, ec = _e1_qualified(v, exps)
+                if not ok:
+                    continue
+                out["MAINT"] = {"lever": "L23B", "baseline": b["id"],
+                                "why": "E2 arm %s (%s, E2-%s seed %s) not built: E1-B qualified and its weights exist; "
+                                       "record only" % (b["id"], b["exp"], b.get("e2"), b.get("seeds"))}
+                cites = [v.ccite("/stage/lock"), v.ccite("/stage/baselines/%s" % b["id"])] + ec
+                break
             if b.get("requires") == "base3" and st.get("base3") != "done":
                 # E1 (2026-10-03): its manifest is splits v3's; proposed once, when this arm is next, never while
                 # it runs or after it failed (a card); the arm is built only once summary.json says complete
@@ -1777,6 +1815,22 @@ def r0(v, d28=None):
                                    "(record only, dev)" % (ea["exp"], eb["exp"])}
             cites = [v.ccite("/stage/lock"), v.ccite(E.pointer("stage", "exp_status", ea["exp"])),
                      v.ccite(E.pointer("stage", "exp_status", eb["exp"])), v.ccite("/stage/agnostic")]
+    # E2 (2026-10-04): once its six experiments and the reference are done, E2's rescore and verdict, once (record
+    # only); /stage/e2 is done once capacity/e2_rescore.json says complete, else what the platform ran
+    e2 = v.dom.get("e2") or {}
+    if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"] \
+            and e2.get("arms"):
+        by_id = {b["id"]: b for b in (v.dom.get("baselines") or {}).get("items") or []}
+        e2_items = [by_id.get(i) for k in sorted(e2["arms"]) for i in e2["arms"][k]]
+        ref = e2.get("reference_exp")
+        if e2_items and all(e2_items) and ref and all(exps.get(b["exp"]) == "done" for b in e2_items) \
+                and exps.get(ref) == "done" and st.get("e2") in (None, "missing"):
+            out["MAINT"] = {"lever": "L23C",
+                            "why": "E2's runs %s are done without their 12-class rescore at 640: E2's verdict (record "
+                                   "only, dev)" % ", ".join(b["exp"] for b in e2_items)}
+            cites = [v.ccite("/stage/lock")] + [v.ccite(E.pointer("stage", "exp_status", b["exp"]))
+                                                for b in e2_items] + \
+                [v.ccite(E.pointer("stage", "exp_status", ref)), v.ccite("/stage/e2")]
     items = {k: x for k, x in out.items() if x}
     wait = wait if wait and wait["state"] == "waiting" else None
     if not items and not wait:

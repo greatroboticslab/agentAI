@@ -25,7 +25,7 @@ prints exactly one "INCAP <json>" line (remote.emit).
         script's grammar: collect (run_inc_collect.sh fetch|intake|probe),
         admit (run_inc2_stream.sh admit|bootstrap|knowntruth|backfill|scan-holds|eval-hits),
         build (run_inc2_build.sh <pkg>.stream init|build|milestone|fork|feasibility|bisect,
-        <pkg>.splits build|lock, <pkg>.baseline build|rescore-native|rescore-agnostic,
+        <pkg>.splits build|lock, <pkg>.baseline build|rescore-native|rescore-agnostic|rescore-e2,
         <pkg>.base3 build, <pkg>.pilot4 build).
         Always GPU-shared: the allocation refuses RM-shared ("Invalid qos"),
         and a qos refusal comes back as error_kind 'qos', a platform defect,
@@ -66,7 +66,8 @@ SCRIPTS = {"collect": "run_inc_collect.sh", "admit": "run_inc2_stream.sh", "buil
 VERBS = {"collect": ("fetch", "intake", "probe"),
          "admit": ("admit", "bootstrap", "knowntruth", "backfill", "scan-holds", "eval-hits")}
 BUILD_VERBS = {"stream": ("init", "build", "milestone", "fork", "feasibility", "bisect"), "splits": ("build", "lock"),
-               "baseline": ("build", "rescore-native", "rescore-agnostic"), "pilot4": ("build",), "base3": ("build",)}
+               "baseline": ("build", "rescore-native", "rescore-agnostic", "rescore-e2"), "pilot4": ("build",),
+               "base3": ("build",)}
 RUN_VERBS = {"stream": ("commit", "compare", "choose-arm", "rollback", "quarantine", "release"),
              "baseline": ("canary-verdict", "capacity-verdict"), "pilot4": ("verdict",)}
 EXIT_BUSY = 3                                   # inc2.stream: another writer holds stream.lease
@@ -78,6 +79,9 @@ NATIVE_JOB_NAME = "inc_build_native_%s"
 # build's (L23V), each under a name of its own, followed by it the same way
 AGNOSTIC_JOB_NAME = "inc_build_agnostic_%s"
 BASE3_JOB_NAME = "inc_build_base3_v3"
+# E2 (2026-10-04): inc2.baseline rescore-e2's job (L23C: E2's six final runs on dev at 640, then E2's verdict),
+# one name for the one verdict, followed by it the same way
+E2_JOB_NAME = "inc_build_e2_v1"
 PKG_RE = re.compile(r"(?:weed_optimizer_framework\.tools\.)?(?P<pkg>[a-z][a-z0-9_]{0,31})\.(?P<mod>[a-z0-9_]+)\Z")
 SOURCE_RE = re.compile(r"(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}\Z")
 BATCH_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
@@ -546,6 +550,10 @@ def stream_summary(sid, dev_exps=()):
     # held-out set is holdout_v1) and E1's verdict (dev only; e1_v1_report.* is for people, never read here)
     put("splits/v3/summary.json", inc / "splits" / "v3" / "summary.json")
     put("capacity/e1_v1.json", inc / "capacity" / "e1_v1.json")
+    # E2 (2026-10-04): its verdict and its rescore's record (dev only; e2_v1_report.* and the test read's
+    # e2_test_*.* are for people, never read here)
+    put("capacity/e2_v1.json", inc / "capacity" / "e2_v1.json")
+    put("capacity/e2_rescore.json", inc / "capacity" / "e2_rescore.json")
     try:
         tops = sorted(p.name for p in inc.iterdir() if p.is_dir())   # INC_DIR's top level only, as remote.status
     except OSError:
@@ -659,8 +667,10 @@ BUILD_FLAGS = {
                             "--seeds": ("seeds", re.compile(r"[0-9]{1,2}(,[0-9]{1,2}){0,9}\Z")),
                             "--arm": ("arm", _ENUM("n640", "s640", "m640", "m832", "s1024", "l640", "y26m640",
                                                    "y26l640")),
-                            "--role": ("role", _ENUM("b_v2", "capacity", "canary", "union", "baseline"))},
+                            "--role": ("role", _ENUM("b_v2", "capacity", "canary", "union", "baseline")),
+                            "--e2": ("e2", _ENUM("W", "S"))},
     ("baseline", "rescore-native"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
+    ("baseline", "rescore-e2"): {},
     ("baseline", "rescore-agnostic"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
     ("base3", "build"): {"--stream": ("stream", _NAME)},
     ("pilot4", "build"): {"--exp": ("exp", _NAME), "--from": ("from_exp", _NAME), "--recipes": ("recipes", _RECIPES)},
@@ -725,6 +735,8 @@ def job_name(req, meta):
             return NATIVE_JOB_NAME % p["exp"]
         if (req["module"], req["verb"]) == ("baseline", "rescore-agnostic"):
             return AGNOSTIC_JOB_NAME % p["exp"]
+        if (req["module"], req["verb"]) == ("baseline", "rescore-e2"):
+            return E2_JOB_NAME
         if (req["module"], req["verb"]) == ("base3", "build"):
             return BASE3_JOB_NAME
         tag = meta.get("child_exp") or (p.get("exp") if req["module"] in ("baseline", "pilot4") else None) \

@@ -421,7 +421,7 @@
   },
   "L23B": {
    "name": "baseline_v2",
-   "title": "Cold baselines on splits v2 (B_v2 milestone 0, the canary, the capacity arms, B0 u tsw)",
+   "title": "Cold baselines on splits v2 (B_v2 milestone 0, the canary, the capacity arms, B0 u tsw; the measurement arms, E1's arms and E2's six single-seed experiments, --e2 W|S)",
    "lane": "MAINT",
    "follow": "build",
    "policy_action": "inc_build_baseline_v2",
@@ -453,7 +453,14 @@
     "--arm",
     "{arm}",
     "--role",
-    "{role}"
+    "{role}",
+    {
+     "if": "e2",
+     "tokens": [
+      "--e2",
+      "{e2}"
+     ]
+    }
    ],
    "control": "B0 (identical manifests and scorer, not re-run).",
    "success": "Finals on dev, imageweeds and test.",
@@ -529,6 +536,26 @@
    "falsifier": "E1-B qualifies only when its mean agnostic dev mAP50-95 beats E1-A's by more than 2 pooled sd and the paired image-bootstrap SE (pre-registered, 2026-10-03); nothing switches, test is read once per arm afterwards by a person.",
    "estimator": "rescore",
    "note": "Record only: proposed once, when both E1 arms are done and the record is missing; a failure is a person's card and it is not proposed again."
+  },
+  "L23C": {
+   "name": "rescore_e2",
+   "title": "Score E2's final runs (and any missing reference run) on dev at 640 for their per-image arrays, then record E2's verdict",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_rescore_e2",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.baseline",
+    "rescore-e2"
+   ],
+   "control": "b_v2_m640 (base_v2, the cold recipe from yolo11m.pt; its three stored runs, not retrained).",
+   "success": "scores/dev@640.json of every E2 final run, capacity/e2_v1.json decided, capacity/e2_rescore.json complete (dev only).",
+   "falsifier": "An arm qualifies only when D > 2 pooled sd and > the paired image-bootstrap SE (pre-registered 2026-10-04); nothing switches; the chosen arm's sealed test is read once afterwards by a person.",
+   "estimator": "rescore",
+   "note": "Record only: proposed once, when E2's six experiments and b_v2_m640 are done and E2's rescore record is missing; a failure is a person's card and it is not proposed again."
   },
   "LV": {
    "name": "verdict",
@@ -865,11 +892,12 @@
    "L23N",
    "L23V",
    "L23E",
+   "L23C",
    "L25",
    "L27",
    "L28",
    "LI"
   ],
-  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03). L23's splits build and lock always wait for a person (D-A's exact command)."
+  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04). L23's splits build and lock always wait for a person (D-A's exact command)."
  }
 }
