@@ -38,12 +38,13 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 **Reported beside, not deciding.** Dev agnostic; dev AP of Carpetweed, SpottedSpurge and Purslane with SE; ImageWeeds in the report.
 
-**Test.** Read once, for the chosen arm only, after the verdict, by a person (`inc2.baseline e2-test-read`). It is reported against 0.8786 with the gap to 0.90.
+**Test.** Read once per qualifying arm, after the verdict, by a person (`inc2.baseline e2-test-read`); the chosen arm's is E2's headline. It is reported against 0.8786 with the gap to 0.90. Only a verdict decided under the pre-registered parameters (no test-mode file, 1,000 resamples, the rule, the reference) opens a read, and the report reads only the scores of the read that was prepared (their weights, one scorer, test manifest and key order).
 
 **Platform.**
 - The stream proposes the six builds itself once E1-B's verdict qualifies (L23B; 6.95 / 5.61 GPU-h per item, 37.7 total).
 - It proposes the verdict once all six are done (L23C, 2.25 GPU-h, record only).
-- A build that ends without its experiment is a card; it does not hold the MAINT lane.
+- A build whose job ran and ended without its experiment is a card when the build refused or the job was cancelled; it does not hold the MAINT lane, and E2's other builds wait for a person. A job killed from outside (NODE_FAIL, TIMEOUT, no refusal line) is built again, up to 3 times in a row. A submission that failed before anything was queued (an sbatch socket timeout, squeue unavailable) is proposed again, as on every lever.
+- The estimate of a build that ended without its experiment is released once sacct settled its job, whose SU stays in spent.
 
 ## 2026-10-04 — The loop's daily SU cap held a segment on an idle cluster; the domain default no longer binds
 

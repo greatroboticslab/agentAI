@@ -916,7 +916,7 @@ The rotation across campaigns (`_tick_all`) stays.
 ### 6.6 Budget and stop-losses
 
 **Budget (`budget.py`, group F).**
-- **Windows.** A monthly window and a daily cap on top of the lifetime envelope (P5). [amended 2026-10-04: neither has a default any more; one applies only when a campaign (or the domain's stored config) declares it. See "Amendment (2026-10-04)" at the end of this section.]
+- **Windows.** A monthly window and a daily cap on top of the lifetime envelope (P5). [amended 2026-10-04: neither has a default any more; one applies only when a campaign (or the domain's stored config) declares it. See "Amendment (2026-10-04)" at the end of this section.] [corrected 2026-10-04, E2's amendment: the domain's cap is read from `db.DEFAULT_DOMAIN_CONFIG` or a budget block the caller passes, never from the stored domain config (the ticker passes none); see "Stored domain config" in that amendment.]
 - **Cross-campaign cap.** The domain's `su_envelope` (1,500, `db.py:488`) is enforced across campaigns, by summing every campaign's `inc:<campaign>` steps. It includes the funnel's own cap of 120 GPU-h (DEC-10) and what `weed_inc_v1` has already spent.
 - **Settled job estimates.** Each L16, L17, L18 and L20 job's estimate is settled from sacct (`su_ledger.reconcile` / `parse_sacct`) when the job ends. Today estimates stay charged forever.
 - **Allocation balance.** The Bridges-2 balance is read from the `projects` output in the snapshot and feeds D27. Whether GPU-shared hours and any RM hours draw from one balance is read from that output, not assumed.
@@ -960,7 +960,7 @@ The rotation across campaigns (`_tick_all`) stays.
   - `inc2.stream.BUDGET` no longer records `daily_cap_su` (120);
   - the stream campaign's `STREAM_DEFAULTS["daily_cap_su"]` is None (it was 120).
 
-  In `budget.envelope`, `state` and `fits`, an absent daily cap means no daily cap: no refusal and no reason. It is reported as none (`daily_cap_su` and `daily_remaining_su` are None, with the source "none (no daily cap is declared)"). `today_su` is still reported. The mechanism stays: a campaign that sets `daily_cap_su` still gets it, and a domain whose stored config declares `budget.daily_cap` still caps its campaigns.
+  In `budget.envelope`, `state` and `fits`, an absent daily cap means no daily cap: no refusal and no reason. It is reported as none (`daily_cap_su` and `daily_remaining_su` are None, with the source "none (no daily cap is declared)"). `today_su` is still reported. The mechanism stays: a campaign that sets `daily_cap_su` still gets it, and a domain whose stored config declares `budget.daily_cap` still caps its campaigns. [corrected 2026-10-04, E2's amendment: "a domain whose budget block declares `budget.daily_cap`", the block being `db.DEFAULT_DOMAIN_CONFIG`'s or one the caller passes; `budget.domain_budget()` does not read the stored domain config (below, "Stored domain config").]
 - **Monthly window.** It is treated the same way. `STREAM_DEFAULTS["window_cap_su"]` is None (it was 350), `inc2.stream.BUDGET` no longer records it, and an absent window is none. `fits(…, need_daily=True)` no longer refuses with "no daily cap is declared" or "no monthly window is declared". `need_daily` is still accepted but has no effect, and the executor's envelope rule no longer passes it. A window that a campaign declares still refuses past it.
 - **Per-day lever counts.** These entries are removed from `limits` in `stream_levers.json`:
   - L16: `jobs_per_day` 12 and `gb_per_day` 50;
@@ -3186,7 +3186,7 @@ Now:
 
 ## Amendment (2026-10-04): E2, the 12-class detector on E1-B's backbone (pre-registered)
 
-Written before any E2 experiment was built or run, and before any E2 number existed. Not edited afterwards, except for the last line of "How it is verified". Decided by the owner's delegate under the 2026-09-30 grant (`human:harry567566@gmail.com`).
+Written before any E2 experiment was built or run, and before any E2 number existed, and revised before deploy after a review (the test read per qualifying arm, the verdict's parameters gating it, the report tied to the read, a failed build told from a failed submission, the build-ended budget release). Not edited afterwards, except for the last line of "How it is verified". Decided by the owner's delegate under the 2026-09-30 grant (`human:harry567566@gmail.com`).
 
 E1's sealed test read (under Why) is part of E2's motivation. No E2 parameter was chosen from a test number: the arms, the recipe, the seeds, the reference and the rule are the ones fixed before E1's test was read, or the table's.
 
@@ -3229,7 +3229,7 @@ E2 asks one question: does starting from E1-B's weights raise the 12-class score
 - The build refuses any other difference in the keys that define training: the manifest and its image count, the arm record, the protocol stamp, LOCK v2 and its never-train index, the decision exam and, for E2-W, the recipe. It also refuses an E1-B built from another splits v3 summary than the one E1's verdict was decided on, and (production) a reference whose base runs do not share one recorded training environment, and an E1-B run whose guard record is not the current LOCK v2's with nothing refused: E2's dev verdict and its test read inherit that guard's judgement, including the sources a person un-quarantined on 2026-10-03.
 
 **Declared differences from b_v2_m640's definition, besides the init and E2-S's recipe.**
-- *Role `baseline`.* Finals are dev and ImageWeeds, never test. b_v2_m640 read test at R0 (role capacity). E2's test is read once, for the chosen arm only, after the verdict, by a person (below). This is an exception to P10, declared here as E1's was.
+- *Role `baseline`.* Finals are dev and ImageWeeds, never test. b_v2_m640 read test at R0 (role capacity). E2's test is read once per qualifying arm, after the verdict, by a person (below). This is an exception to P10, declared here as E1's was.
 - *One seed per experiment* (above).
 - *research_only.* An E2 model inherits E1-B's flag, since a model trained from E1-B's weights carries E1-B's rows (§8, P6). The flag is base_v2's flag OR E1-B's flag; an E1-B flag that is missing or unknown counts as true.
 
@@ -3261,7 +3261,7 @@ A production run refuses every departure; a testing run records it.
 - *Choice.* When both arms qualify, the larger D is E2's choice. A tie goes to E2-S, the shorter schedule.
 - *Two comparisons.* Both arms are compared with one shared reference. With 3 seeds per side, the 2 pooled sd condition alone passes a null arm about 3.5 % of the time (t ≈ 2.45 on 4 df) and either of two null arms about 6.4 % (simulated, sharing the reference), before the SE condition. The rule is kept as written; the reader weighs a single qualifying arm with that in mind.
 - *Refusals.* The verdict refuses when native files of an arm or of the reference disagree on the exam manifest, key order, locked scorer, a setting or Ultralytics' version. It also refuses (production) a test-mode file, a file not checked against its production protocol score, a native file whose weights are not its base run's, a run whose base run.json does not show the recorded init, the arm's recipe, the passed init and environment checks and the whole load, two experiments of one arm with one seed, experiments that start from different E1-B records, and an experiment built against another reference manifest.
-- *Output.* The verdict goes to `capacity/e2_v1.json`, beside `e1_v1.json`. A decided verdict is never rewritten: a recomputation whose decision agrees keeps the file byte for byte, and one whose decision differs is refused. The decision compared is the status, the qualifying arms, the choice and, per arm, the seeds, the values, D, pooled sd, SE, the conditions, `qualifies` and the inputs' sha256s; the fields reported beside it (the protocol dev means, which a re-score attempt of a base run rewrites, and the cross-check against `native_v1.json`) never block a recomputation.
+- *Output.* The verdict goes to `capacity/e2_v1.json`, beside `e1_v1.json`. A decided verdict is never rewritten: a recomputation whose decision agrees keeps the file byte for byte, and one whose decision differs is refused. The decision compared is the status, the qualifying arms, the choice, `testing_allowed`, the bootstrap's seed text and resamples and, per arm, the seeds, the values, D, pooled sd, SE, the conditions, `qualifies` and the inputs' sha256s; so a file decided under other parameters (fewer resamples, test-mode files admitted) is refused by L23C's production recomputation rather than kept. The fields reported beside it (the protocol dev means, which a re-score attempt of a base run rewrites, and the cross-check against `native_v1.json`) never block a recomputation.
 - *Effect.* Qualifying switches nothing. The stream's arm, pool and incumbent stay as they are.
 
 **Reported beside the verdict, not deciding.**
@@ -3274,27 +3274,34 @@ A production run refuses every departure; a testing run records it.
 - In `e2_v1_report.{json,md}` (for people, not evidence): ImageWeeds 12-class and agnostic, from the finals.
 
 **The test read (a person's step).**
-- *When and which.* Once, for the arm the verdict chose, and only after `e2_v1.json` holds a decided verdict. A qualifying arm that was not chosen is not read: E2's test number is the chosen arm's, so the headline cannot be picked after seeing test.
+- *When and which.* Once per qualifying arm, and only after `e2_v1.json` holds a decided verdict. E2's headline test number is the chosen arm's (the larger dev D, fixed before any test is read), so reading the other qualifying arm too cannot move the headline after seeing test; its number is reported beside, marked as not the headline.
+- *Which verdict.* Only one decided under the pre-registered parameters opens a read or a report: `rule` is E2's rule, the reference is b_v2_m640, the bootstrap is `inc2/e2/species_se` with 1,000 resamples, and `testing_allowed` is false (production). A verdict a person computed by hand under other parameters (`e2_verdict(resamples=200)` to look early, or `testing_ok=True` past a production refusal) opens no sealed test.
 - *Preparing it.* `inc2.baseline e2-test-read --e2 W|S` writes, before submitting anything:
   - one kind-final spec on exam test per seed, from the arm's base weights (the weights the verdict read, by sha256);
   - one submission list per experiment;
   - the three `run_inc2_job.sh` argvs.
 
   A person submits them.
-- *Reporting it.* `inc2.baseline e2-test-report --e2 W|S` reports 12-class and agnostic test, mean ± sd over the 3 seeds, against b_v2_m640's final test files (12-class 0.8786) with the gap to 0.90. It writes `capacity/e2_test_<W|S>.{json,md}`, which the platform's evidence does not admit.
-- *Refusals.* The read refuses before the verdict, for an arm that did not qualify or was not chosen, and a second time: once prepared, or once a run, attempt or test score of the arm exists. It refuses when the weights no longer hash as the verdict read them, and a repeated call says so when the verdict changed since the read was prepared. It checks everything before writing anything.
+- *Reporting it.* `inc2.baseline e2-test-report --e2 W|S` reports 12-class and agnostic test, mean ± sd over the 3 seeds, against b_v2_m640's final test files (12-class 0.8786) with the gap to 0.90, and says whether the arm is the headline. It writes `capacity/e2_test_<W|S>.{json,md}`, which the platform's evidence does not admit, with the sha256s it read. It reads only the read that was prepared: every input has its `e2_test_read.json`, made on the verdict input's weights; each test score names those weights; each reference score names its final run's weights; and every file, the arm's and the reference's, shares one `scorer_sha256`, `manifest_sha256` and `key_order_sha256`. A score from other weights (a spec edited and resubmitted after a failed job) is refused, not averaged.
+- *Refusals.* The read refuses before the verdict or on one decided under other parameters, for an arm that did not qualify, and a second time: once prepared, or once a run, attempt or test score of the arm exists. It refuses when the weights no longer hash as the verdict read them, and a repeated call says so when the verdict changed since the read was prepared. It checks everything before writing anything.
 
 **Platform flow.** The stream proposes everything up to the verdict.
 1. *The six builds.* Once R0 is complete, the MAINT lane is free and DATA has nothing due, DR0 proposes the six builds one at a time, in the order W0, S0, W1, S1, W2, S2. Each is lever L23B: `inc2.baseline build --exp e2_<w|s>_m640_seed<k> --manifest INC_DIR/splits/v2/base_v2.jsonl --seeds <k> --arm m640 --role baseline --e2 W|S`. The next build is proposed once the previous one's experiment exists, so the builds take about six queue-plus-build cycles of one GPU-shared build job each; the experiments' runs overlap.
-2. *Their gate.* A build is proposed only while `capacity/e1_v1.json` is decided and qualifies E1-B, and E1-B's experiment is done (so its three base weights exist). Each item cites the verdict's `/qualifies` and `/exp`, E1-B's status, the lock and the item's own state.
+2. *Their gate.* A build is proposed only while `capacity/e1_v1.json` is decided and qualifies E1-B, and E1-B's experiment is done. Each item cites the verdict's `/qualifies` and `/exp`, E1-B's status, the lock and the item's own state. Whether E1-B's three base weights still exist and hash as recorded is the build's own check: a missing or changed file fails that one build (a card), and the other E2 builds wait behind it (item 4).
 3. *Their runs* are measurement arms. They get no L23N. A blocked unit or a stale advance is a person's card, never a pause.
-4. *A failed build.* A build of a measurement arm (any baselines item marked measure, E2's included) that ends without its experiment is record only: one card with the refusal, `/stage/baselines/<id>` says failed, DR0 does not propose it again, and the lane's failure count is not touched, so a refusal that every E2 build would meet cannot hold MAINT. For an E2 item the card says that L23C waits for all six experiments and gives the exact build command for a person.
+4. *A failed build.* Three cases, told apart by where the build ended:
+   - *A submission that failed before anything was queued* (an sbatch socket timeout, squeue unavailable, a duplicate job name): the lane's ordinary failure, as on every other lever. The item is proposed again under a new id; no card.
+   - *A build whose job ran and ended without its experiment because the build refused* (inc2.baseline's ERROR line in its provenance record), *or whose job was cancelled*: record only. One card with the refusal, `/stage/baselines/<id>` says failed, DR0 does not propose it again, and the lane's failure count is not touched, so a refusal that every E2 build would meet cannot hold MAINT.
+   - *A build whose job was killed from outside* (NODE_FAIL, PREEMPTED, BOOT_FAIL, TIMEOUT, or no sacct state and no refusal line): built again under a new id, with `/stage/baselines/<id>` back to missing, up to `LOST_RUNS_MAX` (3) times in a row; after that, record only as above, the card saying so.
+
+   E2's six builds are one group: while one of them is failed, DR0 proposes none of the others (one card, not six). The card says that L23C waits for all six experiments and gives the exact build command for a person; the wait ends once the failed item's experiment exists.
 5. *The verdict job.* Once all six experiments and b_v2_m640 are done and the verdict's record is missing, DR0 proposes **L23C** once. It runs `inc2.baseline rescore-e2` as one GPU job of `run_inc2_build.sh`, job name `inc_build_e2_v1`. The job:
    - scores the six final runs on dev at 640, and any reference file that is missing;
    - writes `capacity/e2_v1.json`;
    - then writes `capacity/e2_rescore.json`: complete, the files' names and sha256s and the verdict's sha256, no path.
 6. *L23C is record only.* A failure is a card, and L23C is not proposed again. A submission whose outcome is unknown is followed by its job name and `capacity/e2_rescore.json`.
-7. *The card.* When the verdict is decided, the ticker raises one card naming the qualifying arms, each with its D, 2 × pooled sd and SE, and the exact `e2-test-read` and `e2-test-report` commands for the chosen arm.
+7. *The card.* When the verdict is decided, the ticker raises one card naming the qualifying arms, each with its D, 2 × pooled sd and SE, the choice (E2's headline), and the exact `e2-test-read` and `e2-test-report` commands for each qualifying arm.
+8. *A restart during L23C's submission.* When the lab stops between L23C's submission and the state write, the restart meets "already executed". L23C (like every record-only lever) is then followed by its job name and its record, as an unknown outcome is, so a failure of its job is still a card and `/stage/e2` says failed; before, the item was declined and a failed job left no card.
 
 **Pricing.**
 - An E2 build item is priced from its image-epochs at m640's measured 14.2 ms per image-epoch, as E1's arms were:
@@ -3302,6 +3309,7 @@ A production run refuses every departure; a testing run records it.
   - E2-S: 340,550 image-epochs = 1.34 GPU-h;
   - each item adds a seed's share of the finals (0.8 GPU-h prices an experiment of 3 seeds; one seed pays 0.27) and the build job (4.0): 6.95 GPU-h for an E2-W item and 5.61 for an E2-S item.
 - The six items total 37.7 GPU-h, 24 of it the build jobs' price, which is settled from sacct.
+- A build whose job ran and ended without its experiment releases its estimate once sacct settled the job: the stream writes a 0 SU marker (`inc:job<ID>:build_ended`, `budget.record_build_ended`), and `budget.committed` releases a build whose every job is both settled and marked. The job's real SU stays in spent (its sacct entry). Before, such an estimate (6.95 SU for an E2-W item) stayed committed for good while the job's sacct SU was spent as well.
 - L23C is nine scoring passes at 0.25 GPU-h: 2.25. E2 commits 39.9 SU in all.
 - exp.json's cost_estimate uses the same rate (`inc2.recipes.e2_cost`).
 - A base run takes about 2.7 h for E2-W (b_v2_m640 measured 2.68 h) and 1.35 h for E2-S, under the pinned 8 h cold limit.
@@ -3325,8 +3333,9 @@ A production run refuses every departure; a testing run records it.
 - `run_inc2_build.sh`: `inc2.baseline rescore-e2` (name `e2_v1`, no advance).
 - Autopilot:
   - `stream_domains/weed.json`: six E2 baselines (`requires: e1`, `native: false`, `e2`, `images`, `budget`) and the block `e2`;
-  - `diagnose_stream.DR0`: the `e1` gate (`_e1_qualified`) and L23C;
-  - `stream.py`: `/stage/e2`, L23C as record only, a measurement arm's failed build as record only, the E2 verdict card, and L23B's `--e2`;
+  - `diagnose_stream.DR0`: the `e1` gate (`_e1_qualified`), E2's builds waiting as a group behind a failed one, and L23C;
+  - `stream.py`: `/stage/e2`, L23C as record only (followed after a restart's "already executed" too), a measurement arm's build that ran and ended without its experiment as record only (a refusal or a cancellation) or built again (killed from outside, up to `LOST_RUNS_MAX`), the build-ended budget release, the E2 verdict card, and L23B's `--e2`;
+  - `budget.py`: `record_build_ended` and its release in `committed` (`spent` returns `ended_builds`);
   - `stream_levers.json`: L23B's optional `--e2`, the L23C row, the envelope;
   - `levers_stream.py`: a budget-priced item pays its seeds' share of the finals; an argv placeholder may hold digits (`{e2}`);
   - `executor`, `stream_remote`, `evidence.ALLOWED`;
@@ -3341,13 +3350,14 @@ A production run refuses every departure; a testing run records it.
 4. *A tie in D goes to E2-S.*
 5. *The whole-load check* compares the state_dict, not only the parameters: BatchNorm's running statistics are part of the init.
 6. *The training environment* is checked at train time (a run refuses before it trains), not only read by the verdict: a confounded run would cost its GPU-hours.
-7. *The finals exclude test*, as E1's did, and only the chosen arm's test is read.
-8. *A failed build of any measurement arm is record only*, not only E2's: no lane waits for a measurement arm, and the next one would meet the same refusal.
+7. *The finals exclude test*, as E1's did; each qualifying arm's test is read once, and the chosen arm's is the headline.
+8. *A failed build of any measurement arm is record only* when its job ran and the build refused (or the job was cancelled), not only E2's: no lane waits for a measurement arm, and the next one would meet the same refusal. A submission that failed before anything was queued is retried as on every lever, and a job killed from outside is built again a bounded number of times.
+9. *The stored domain budget is not read.* `budget.domain_budget()` still reads `db.DEFAULT_DOMAIN_CONFIG` (or a block its caller passes), never the domain's stored config. The symptom that motivated reading it (weed_stream_v1's 180 SU daily cap cut to the code default's 120, L18 filed for a person) was removed on main by 11c01b0 and the 2026-10-04 amendment of §6.6 (no default daily cap). Reading the stored config now would re-apply whatever `budget.daily_cap` the stored weed config holds; it may still hold the old 120 default, which cannot be checked without the lab's database, and that would bring back the throttle the owner removed. The read stays planned (§6.6, "Stored domain config"), with that check made first.
 
 ### How it is verified
 
-- `tests/test_inc2_e2.py` (new): the constants, recipes, the build and its refusals (each leaving no directory), inc2.train in production (stops at device; every refusal at stage recipe), the whole load (a real 1-epoch CPU run; a 12-class head; a BatchNorm buffer; a DDP-style wrapper), the bootstrap, the rule on synthetic native files (each condition alone, pooled sd, the choice, a tie, pending, every refusal, dev only by `brain_plan.dev_leaks`, the evidence scrub and an exact-value check), the kept verdict, `rescore-e2` end to end with real CPU passes, the test read and report, the CLI.
-- `tests/test_stream_ap_units.py` (`t_e2`): the domain items, prices, argv and proposal ids, the grammar and the evidence list, the gate in five states, the six builds in order, L23C at six and not at five, its failure and its unknown outcome, a failed build (two in a row hold nothing), an E2 D5, the verdict card.
+- `tests/test_inc2_e2.py` (new): the constants, recipes, the build and its refusals (each leaving no directory; every key of the reference compared, the reference's seeds included), inc2.train in production (stops at device; every refusal at stage recipe), the whole load (a real 1-epoch CPU run; a 12-class head; a BatchNorm buffer; a DDP-style wrapper), the bootstrap, the rule on synthetic native files (each condition alone, pooled sd, the choice, a tie, pending, every refusal, dev only by `brain_plan.dev_leaks`, the evidence scrub and an exact-value check), the kept verdict (refused under other resamples or with test-mode files admitted), `rescore-e2` end to end with real CPU passes, the test read (each qualifying arm once; a verdict under other parameters refused) and report (the headline; every score tied to the prepared read), the CLI.
+- `tests/test_stream_ap_units.py` (`t_e2`): the domain items, prices, argv and proposal ids, the grammar and the evidence list, the gate in five states, the six builds in order, L23C at six and not at five, its failure and its unknown outcome (a job queued past `BUILD_LOST_SNAPSHOTS` stays followed by its name), a restart after L23C's submission (its job failing, then completing), a build the build refused (one card, the others waiting, the wait ending once a person builds it, the estimate released), a cancelled build job, a job killed from outside (built again, then failed after three in a row; a retry that builds), a submission refused by an sbatch socket timeout and one meeting an unavailable squeue (the lane's ordinary failure, proposed again), an E2 D5, the verdict card with one and with two qualifying arms; the budget's build-ended release (settled and marked, never either alone).
 - `tests/test_stream_ap_replay.py`: stream_r0 now ends with L23E, E2's six builds, then L23C, each once, within the envelope.
 - `tests/test_stream_pipeline.py`: E2 is never built in a world that never reaches E1's verdict. `tests/test_inc2_stream.py`: `run_inc2_build.sh inc2.baseline rescore-e2`.
 - An ad hoc mutation run on scratch copies of the package and tests: 36 mutants of the new logic, each killed by a failing check of the tests above. They covered:
@@ -3356,21 +3366,25 @@ A production run refuses every departure; a testing run records it.
   - the verdict: either condition off, the smaller D chosen, a tie to W, the kept file rewritten, the whole document compared;
   - the test read: no qualifying check, no choice check, attempt.json not checked, a spec written before every check;
   - the platform: the e1 gate ignoring `qualifies` or E1-B's status, L23C at five of six, a failed L23C marked agnostic, L23C followed by another job name, a failed measure build counted as a lane failure, a failed build read as missing, the finals not scaled, the card without the command, L23B without `--e2`.
-- The affected suites pass with 0 failures: `test_inc2_e2.py`, `test_inc2_e1.py`, `test_inc2_native.py`, `test_inc2_baseline.py`, `test_inc2_train.py`, `test_inc2_base3.py`, `test_inc2_stream.py`, every `test_stream_ap_*.py` (the mutation suite included), `test_stream_pipeline.py`, `test_inc_ap_replay.py`, `test_inc_ap_governance.py`, `test_funnel_ap_replay.py`, `test_funnel_ap_mutations.py`, `test_funnel_domain_free.py`. In the full suite (146 scripts) every script passes except `test_brain_api.py`, which fails the same way on main.
+- A second mutation run, after the review that revised the amendment: 29 mutants, each killed by a failing check (or, for one, an uncaught refusal) of `test_stream_ap_units.py` or `test_inc2_e2.py`:
+  - the platform: record only for any failed measure build (a submission failure included); no retry of a killed job; a cancelled job retried; a retry leaving `/stage/baselines` building; a build refusal retried; no group wait for E2; "already executed" declined for a record-only lever; L23C followed by another job name; no build-ended marker written; `committed` not releasing a marked build, or releasing one sacct has not settled; the card naming the chosen arm's read only;
+  - the test read: the chosen arm only; no check of `testing_allowed`, the bootstrap, the rule or the reference; the kept verdict compared without `testing_allowed` or the bootstrap; the report without its read record, the scores' weights, the shared stamps, the reference's weights, or the read record's weights against the verdict's;
+  - the build: no comparison of LOCK v2, the never-train index, the arm record or the decision exam; no check that the reference has the seed.
+- The affected suites pass with 0 failures: `test_inc2_e2.py`, `test_inc2_e1.py`, `test_inc2_native.py`, `test_inc2_baseline.py`, `test_inc2_train.py`, `test_inc2_base3.py`, `test_inc2_stream.py`, every `test_stream_ap_*.py` (the mutation suite included), `test_stream_pipeline.py`, `test_inc_ap_replay.py`, `test_inc_ap_governance.py`, `test_funnel_ap_replay.py`, `test_funnel_ap_mutations.py`, `test_funnel_domain_free.py`. After the review's fixes, on main's 2026-10-04 commits (54de0cb), the full suite (142 scripts) passes except `test_brain_api.py`, which fails the same way on main (a decision path reads the reviewer: `supervision_health.py`).
 
 ### Deploy
 
 These files change `executor.code_hash()` and the stream rules version:
-- `inc_autopilot/{executor.py, stream.py, stream_remote.py, diagnose_stream.py, evidence.py, levers_stream.py, stream_levers.json, stream_domains/weed.json}`;
+- `inc_autopilot/{executor.py, budget.py, stream.py, stream_remote.py, diagnose_stream.py, evidence.py, levers_stream.py, stream_levers.json, stream_domains/weed.json}`;
 - `brain/{policy_actions.json, approvals.py}`;
 - `tests/test_stream_ap_replay.py`.
 
 `inc2/{recipes.py, train.py, baseline.py}` are hashed into every run's drift check and S23.
 
-Sync the lab and both cluster copies from one commit, restart the dashboard (`inc_dashboard.py`), then run `executor.run_replay_tests` so envelope grants resume.
+Sync the lab and both cluster copies from one commit that contains main's 2026-10-04 commits (no default time-based caps, `db.py` to the lab only: its pre-flight then runs `test_stream_ap_no_throttles.py`), restart the dashboard (`inc_dashboard.py`), then run `executor.run_replay_tests` so envelope grants resume.
 
 Before autonomy is turned on, these read-only checks are made. Each one that fails would refuse every E2 build or run, or hold the item silently:
-1. *Budget.* weed_stream_v1's `window_remaining_su`, campaign `remaining_su` and `domain_remaining_su` are each at least E2's 39.9 SU plus the next L18 (about 116 SU). "This month's window" and "of the domain's" are wait refusals that hold MAINT silently, and "left in the campaign envelope" pauses the stream. If one is short, a person raises the cap.
+1. *Budget.* weed_stream_v1's campaign `remaining_su` and `domain_remaining_su` are each at least E2's 39.9 SU plus the next L18 (about 116 SU): "of the domain's" is a wait refusal that holds MAINT silently, and "left in the campaign envelope" pauses the stream. Since the §6.6 amendment of 2026-10-04 no daily cap or monthly window has a default; the campaign's `daily_cap_su` and `window_cap_su` read none once a person ran `stream configure ... --daily-cap-su none --window-cap-su none`. If either is still declared, `daily_remaining_su` and `window_remaining_su` must cover the same 39.9 + 116 SU, or a person clears or raises it. If an envelope is short, a person raises it.
 2. *The reference's definition.* `b_v2_m640/exp.json`: `splits_v2.lock_sha256` and `nevertrain_sha256` equal the current LOCK v2's; `base.manifest_sha256` is base_v2's; `base.recipe` equals `inc2.recipes.cold('m640')`; `arm` equals `inc2.recipes.resolve_arm('m640', REPO)`, yolo11m.pt's sha256 included; the protocol stamps are v3, inc2, v2.
 3. *The reference's files.* `b_v2_m640/runs/final__base__s{0,1,2}/scores/dev@640.json` and `.images.npz` exist and hash as `capacity/native_v1.json`'s `reference_inputs` record.
 4. *E1-B.* `capacity/e1_v1.json` is decided, qualifies `e1_b_m640` and has `testing_allowed` false; `e1_b_m640/runs/base__s{0,1,2}/run.json` is done, `testing` false, its guard record names the current LOCK v2 with nothing refused, and `weights/final.pt` is a regular file that hashes to its `weights_sha256`.
