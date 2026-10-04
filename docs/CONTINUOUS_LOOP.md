@@ -3398,3 +3398,23 @@ Before autonomy is turned on, these read-only checks are made. Each one that fai
 - x1b's warmup_bias_lr (0.01) differs from cold's (0.1), and close_mosaic 10 is 20 % of x1b's 50 epochs against 10 % of cold's 100. E2-S against E2-W therefore confounds the schedule's length with the bias warm-up and the share of epochs without mosaic: read E2-S as "the table's x1b", not "cold, shorter".
 - Every E2 model is research-only if E1-B is (external rows of unknown licence): a qualifying E2 cannot become a deployable or incumbent model, the robot's included, without a separate licence step.
 - E2 does not read test v1.
+
+## Amendment (2026-10-04, later): E2-C, the attribution control (pre-registered)
+
+Written after E2's amendment and before any E2 build, run or number existed. Decided by the owner's delegate under the 2026-09-30 grant (`human:harry567566@gmail.com`). It supersedes the first Open item above ("it is not run").
+
+**Why.** A qualifying E2 arm differs from b_v2_m640 in two things at once: the pre-training data (base v3's 44,485 images, base_v2's 6,811 among them) and the one-class pre-training stage itself (about 1.2M extra image-epochs). Without a control, a gain cannot be credited to data scale.
+
+**Arm.** E2-C (`e2_c_m640_seed0`, `_seed1`, `_seed2`) is E2-W's definition exactly (base_v2 by LOCK v2's sha256, the cold recipe key for key, YOLO11m at 640, seeds 0, 1, 2, role baseline, finals dev and ImageWeeds, every check of E2's build and of inc2.train), except the init: arm-seed s starts from **E1-A's** final EMA weights of seed s, `e1_a_m640/runs/base__s<s>/weights/final.pt`, recorded by path and sha256, which must equal that run.json's `weights_sha256`. E1-A trained base_v2's 6,811 images as class 12 under the same cold_budget (1.2M image-epochs) as E1-B. E2-W against E2-C therefore differs in one variable: the pre-training data (44,485 against 6,811 images at equal pre-training compute).
+
+**Attribution rule (dev, record only).**
+- D_data = mean(E2-W) − mean(E2-C) over seeds 0, 1, 2, on dev species_map50_95 from `inc2.scorer_native` at 640, as E2's statistic.
+- SE(D_data): E2's paired image bootstrap, 1,000 resamples under `stable_int("inc2/e2/attribution_se")`.
+- E2's gain is credited to base v3's data when D_data > 2 pooled sd **and** D_data > SE(D_data). Otherwise E2's result is reported as a property of one-class pre-training, not of data scale.
+- When E2-S is E2's choice, E2-S − E2-C is computed the same way and reported as confounded by the recipe (E2-C trains the cold recipe).
+- Reported beside, not deciding: E2-C − b_v2_m640 (two-stage pre-training without extra data), and dev agnostic and Carpetweed, SpottedSpurge and Purslane for E2-C.
+- The record is `capacity/e2_attr_v1.json`. It never rewrites `capacity/e2_v1.json`: E2's qualification and choice stay exactly as pre-registered above, and E2-C can neither qualify nor be chosen.
+
+**Test.** When E2's chosen arm's test is read, E2-C's test is read once as well, by the same person's step, and reported beside the headline (12-class and agnostic, mean ± sd over 3 seeds). No decision rests on it. If no E2 arm qualifies, E2-C's test is not read.
+
+**Platform.** The stream proposes E2-C's three builds after E2's six (C0, C1, C2), gated on E1's verdict being decided and E1-A's experiment being done, and proposes the attribution record once E2-W's and E2-C's runs are scored. The implementation follows in its own change, deployed before any E2 dev score exists; E2's six builds and L23C proceed as written above meanwhile. Price: as an E2-W item, 6.95 GPU-h per build item, 20.9 for the three.
