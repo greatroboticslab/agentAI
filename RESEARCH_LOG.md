@@ -13,6 +13,12 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-04 — The loop's daily SU cap held a segment on an idle cluster; the domain default no longer binds
+
+- From 09:27Z (SIU's last shard admitted) to about 19:30Z the cluster ran no job of the loop. The stream's next segment (L18, 116.2 SU estimated) was filed at 06:47Z over "today's cap of 120": the campaign declares 180, but the domain's code default (120) capped it, and an approval does not lift a cap.
+- The domain default is now its envelope (1500), so only a campaign's own cap applies (CHANGELOG 2026-10-04). Removing the time-based caps altogether (the daily cap, the monthly window, the per-day lever counts) is in review; the lifetime envelope, in-flight limits, disk headroom and stop-losses stay.
+- The next experiment, E2 (a 12-class detector started from E1-B's weights), is being built so the platform proposes and runs it itself.
+
 ## 2026-10-04 — E1: 44,485 weed images place better boxes than 6,811 (agnostic dev +0.0217, pre-registered rule met)
 
 **Result.** E1 trained one-class weed detectors (YOLO11m@640, cold_budget 1.2M image-epochs, 3 seeds per arm) on two bases.

@@ -485,7 +485,13 @@ DEFAULT_DOMAIN_CONFIG = {
                          "api": "ollama", "num_ctx": 32768, "timeout_s": 300,
                          "steps": ["train", "filter", "collect"]},
               "review_timeout_min": 90, "periodic_audit_every": 4},
-    "budget": {"su_envelope": 1500, "daily_cap": 120, "per_round_cap": 60},
+    # The domain daily cap equals the domain envelope, so it never binds on its
+    # own (owner decision 2026-10-04): a daily cap paces healthy work without
+    # guarding anything the envelope, in-flight limits and stop-losses do not.
+    # On 2026-10-04 the old default (120) silently overrode the stream
+    # campaign's own 180 and held a filed segment for 12 h on an idle cluster.
+    # It stays declared because the envelope grant needs a known daily figure.
+    "budget": {"su_envelope": 1500, "daily_cap": 1500, "per_round_cap": 60},
     # The sealed menu of things an experiment is allowed to change, and the
     # control each change is measured against. It is pre-registered for two
     # reasons: an experiment whose lever was chosen after seeing the result is

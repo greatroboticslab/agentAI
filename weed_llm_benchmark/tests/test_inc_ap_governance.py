@@ -876,8 +876,13 @@ def section_resources_and_caps():
         check("  but not granted", r["status"] == "filed"
               and any("Mongo's health" in x for x in r["reasons"]), r["reasons"])
         st = X.budget_now(dict(CAMP_OFF, daily_cap_su=1000.0), w.ctx)
-        check("a campaign daily cap is capped at the domain daily_cap",
-              st["daily_cap_su"] == 120.0, st["daily_cap_su"])
+        check("the domain's default daily cap equals its envelope (2026-10-04): the campaign's own cap stands",
+              st["daily_cap_su"] == 1000.0, st["daily_cap_su"])
+        env = B.envelope(dict(CAMP_OFF, daily_cap_su=1000.0), {"su_envelope": 1500.0, "daily_cap": 120})
+        check("a campaign daily cap is capped at a lower domain daily_cap", env["daily_cap_su"] == 120.0, env)
+        env = B.envelope(dict(CAMP_OFF))
+        check("  with no campaign cap the domain default applies, the envelope's 1500",
+              env["daily_cap_su"] == 1500.0, env)
         env = B.envelope(dict(CAMP_OFF, daily_cap_su=-5.0))
         check("  a negative one is 0", env["daily_cap_su"] == 0.0, env)
     finally:
