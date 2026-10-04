@@ -142,8 +142,8 @@ function burn(b){
     + '<span class="spent" style="width:' + w1.toFixed(1) + '%"></span>'
     + '<span class="committed" style="width:' + w2.toFixed(1) + '%"></span></div>'
     + '<div class="tiny">' + num(sp, 1) + ' SU spent + ' + num(cm, 1) + ' SU committed of ' + num(env, 0)
-    + ' SU; ' + num(b.remaining_su, 1) + ' SU left. Today ' + num(b.today_su, 1) + ' of '
-    + num(b.daily_cap_su, 0) + ' SU.</div>';
+    + ' SU; ' + num(b.remaining_su, 1) + ' SU left. Today ' + num(b.today_su, 1)
+    + (b.daily_cap_su == null ? ' SU (no daily cap).' : ' of ' + num(b.daily_cap_su, 0) + ' SU.') + '</div>';
 }
 function healthLine(h){
   if(!h) return "";

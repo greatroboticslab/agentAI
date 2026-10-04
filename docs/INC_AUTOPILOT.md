@@ -474,7 +474,7 @@ All in-menu levers are **existing** CLI flags. Every lever is a new experiment, 
   - `tier2:<model>` (brain; propose only);
   - `human:<email>`.
 - **R3 approvals.** Because `round-scheduler` has no R3 cell, R3 items are filed directly with `approvals.propose` (AP:107-133). The executor then authorises **as `human:<decided_by>`** at execution time, which makes the approval itself the authority. The executor also:
-  - passes real `budget_state`: the su_ledger fold of the campaign envelope, defaulting to a 300-SU sub-envelope of `budget.su_envelope` 1500 (db.py:488), plus a daily cap;
+  - passes real `budget_state`: the su_ledger fold of the campaign envelope, defaulting to a 300-SU sub-envelope of `budget.su_envelope` 1500 (db.py:488), plus a daily cap [amended 2026-10-04: only when the campaign or the domain declares one; db.py no longer declares 120 SU by default, docs/CONTINUOUS_LOOP.md 6.6];
   - passes `resources` (`mongo_ok`, cluster reachability), so `_check_budget` and `_check_resources` (POL:624-667) finally run;
   - writes `su_ledger.record` from `report.gpu_hours` when an experiment finishes (V100 at 1.0 SU per GPU-hour).
 - **Risk tiers:**
@@ -647,18 +647,18 @@ Edits outside the new files: `campaign.py` (dispatch, `check_goal(..., mode)`, s
 
 ### Configuration
 
-`~/.round_scheduler.json` → `campaigns.<name>`, written by `stream.configure_stream` (a person's command; the CLI is `python -m weed_optimizer_framework.tools.inc_autopilot.stream enable --name N --by human:<email> --domain weed ...`):
+`~/.round_scheduler.json` → `campaigns.<name>`, written by `stream.configure_stream` (a person's command; the CLI is `python -m weed_optimizer_framework.tools.inc_autopilot.stream enable --name N --by human:<email> --domain weed ...`, or `configure` with the same settings to change them without enabling the campaign or releasing a hold):
 
 ```
 {"mode": "stream", "domain": "weed", "protocol_package": "inc2",
  "stream": {"sid": "weed_stream_v1", "stream_domain": "weed", "collect_config": "collect/domains/weed.json", "K_max": 4},
  "goal": {"kind": "continuous"}, "autonomy": "off" | "envelope", "autonomy_granted_by": "human:<email>",
  "data_autonomy": "off" | "on", "envelope_su": 1000, "envelope_end_utc": "2026-12-31T23:59:59Z",
- "window": "month", "window_cap_su": 350, "daily_cap_su": 120, "alloc_reserve_su": null,
- "collect_gb_envelope": 200, "collect_gb_daily": 50, "protocol_v3_accepted_by": null}
+ "window": "month", "window_cap_su": null, "daily_cap_su": null, "alloc_reserve_su": null,
+ "collect_gb_envelope": 200, "collect_gb_daily": null, "protocol_v3_accepted_by": null}
 ```
 
-The defaults are L-2's. `data_autonomy`, `autonomy: envelope`, `protocol_v3_accepted_by` and a completion (`completed_by`) are a person's flags: `configure_stream` refuses any actor but `human:<email>`, and the ticker never writes them.
+The defaults are L-2's, as amended on 2026-10-04 (docs/CONTINUOUS_LOOP.md 6.6): no monthly window, no daily cap and no daily byte cap unless a person declares one (`--window-cap-su`, `--daily-cap-su`, `--collect-gb-daily`; `none` clears one). `data_autonomy`, `autonomy: envelope`, `protocol_v3_accepted_by` and a completion (`completed_by`) are a person's flags: `configure_stream` refuses any actor but `human:<email>`, and the ticker never writes them.
 
 ### The lanes and the tick
 

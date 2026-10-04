@@ -17,8 +17,9 @@ Order of work, under the intake lock (one writer):
   4. the files: the provider's listing, the known item's select block, the
      default data and skip patterns; ordered index files first;
   5. the byte plan: at most min(--max-bytes, the per-source cap minus what was
-     fetched, the daily cap minus today's bytes, the envelope minus the total,
-     the free disk minus the margin); files are taken in order while the
+     fetched, the daily cap minus today's bytes when the config declares one
+     (none by default since the 2026-10-04 amendment), the envelope minus the
+     total, the free disk minus the margin); files are taken in order while the
      listed sizes fit (a file of unknown size is streamed under the cap), the
      rest recorded as remaining (the next fetch continues: shards);
   6. every file is streamed to staging/<source>/blobs/<sha256> (checked
@@ -341,9 +342,11 @@ def _byte_cap(cfg, ctx, source_id, max_bytes, sdir):
     bu = cfg.budgets()
     st = (ctx.get("state") or {}).get(source_id) or {}
     per = float((bu.get("approved_bytes") or {}).get(source_id) or bu["bytes_per_source"]) - float(st.get("bytes") or 0)
-    daily = float(bu["bytes_daily"]) - float(ctx.get("bytes_today") or 0)
     env = float(bu["bytes_envelope"]) - float(ctx.get("bytes_total") or 0)
-    caps = [per, daily, env]
+    caps = [per, env]
+    daily = PF.daily_byte_cap(bu)               # None: no daily byte cap (amendment 2026-10-04)
+    if daily is not None:
+        caps.append(daily - float(ctx.get("bytes_today") or 0))
     if max_bytes is not None:
         caps.append(float(max_bytes))
     free = disk_free(sdir)

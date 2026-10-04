@@ -876,13 +876,22 @@ def section_resources_and_caps():
         check("  but not granted", r["status"] == "filed"
               and any("Mongo's health" in x for x in r["reasons"]), r["reasons"])
         st = X.budget_now(dict(CAMP_OFF, daily_cap_su=1000.0), w.ctx)
-        check("the domain's default daily cap equals its envelope (2026-10-04): the campaign's own cap stands",
-              st["daily_cap_su"] == 1000.0, st["daily_cap_su"])
+        check("a campaign daily cap stands when the domain declares none (db.py has no default daily_cap since "
+              "the 2026-10-04 amendment)", st["daily_cap_su"] == 1000.0, st["daily_cap_su"])
+        check("  and a campaign with none has no daily cap", X.budget_now(CAMP_OFF, w.ctx)["daily_cap_su"] is None)
+        w.ctx.domain_budget = {"su_envelope": 1500, "daily_cap": 120}
+        try:
+            st = X.budget_now(dict(CAMP_OFF, daily_cap_su=1000.0), w.ctx)
+            check("a campaign daily cap is capped at a daily_cap the domain declares",
+                  st["daily_cap_su"] == 120.0, st["daily_cap_su"])
+        finally:
+            w.ctx.domain_budget = None
         env = B.envelope(dict(CAMP_OFF, daily_cap_su=1000.0), {"su_envelope": 1500.0, "daily_cap": 120})
-        check("a campaign daily cap is capped at a lower domain daily_cap", env["daily_cap_su"] == 120.0, env)
+        check("  and envelope() caps it at a lower domain daily_cap that is declared",
+              env["daily_cap_su"] == 120.0, env)
         env = B.envelope(dict(CAMP_OFF))
-        check("  with no campaign cap the domain default applies, the envelope's 1500",
-              env["daily_cap_su"] == 1500.0, env)
+        check("  with no campaign cap and no domain cap declared there is no daily cap (no 1500 or 120 default)",
+              env["daily_cap_su"] is None and env["domain_daily_cap_su"] is None, env)
         env = B.envelope(dict(CAMP_OFF, daily_cap_su=-5.0))
         check("  a negative one is 0", env["daily_cap_su"] == 0.0, env)
     finally:

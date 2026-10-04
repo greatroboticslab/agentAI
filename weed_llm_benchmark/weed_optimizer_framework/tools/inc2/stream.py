@@ -194,8 +194,14 @@ MILESTONE_EXAMS = ("dev", "imageweeds", "test")
 BISECT_EXAMS = ("dev",)                           # a bisect arm never reads test (P10)
 GATE_BLOCK = {"flips_mode": "net"}
 MILESTONE_TRIGGERS = {"accepted_increments": 4, "segments": 3, "days_with_accepted": 30}
-BUDGET = {"envelope_su": 1000, "window": "month", "window_cap_su": 350, "daily_cap_su": 120,
-          "until": "2026-12-31", "decided": "L-2 (2026-09-28)"}
+# The budget a new stream's definition records (stream.json "budget"; the
+# report reads it). L-2's monthly window (350 SU) and daily cap (120 SU) were
+# removed on 2026-10-04 by the owner (docs/CONTINUOUS_LOOP.md 6.6): they only
+# delayed healthy work (about 9 h of an idle cluster that day). A stream
+# defined before then still records them in its definition; what is enforced
+# is the campaign's config (inc_autopilot.budget), never this record.
+BUDGET = {"envelope_su": 1000, "until": "2026-12-31",
+          "decided": "L-2 (2026-09-28); its monthly window and daily cap removed 2026-10-04 (owner)"}
 HOLD_KINDS = ("h6_scan", "licence", "join_conflict", "funnel_F9")
 # GuardV2 reasons that are harmless for a queue row at cut time: the Step 1
 # seen / intake indexes (the row itself, admitted earlier). Anything else

@@ -18,6 +18,7 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 - From 09:27Z (SIU's last shard admitted) to about 19:30Z the cluster ran no job of the loop. The stream's next segment (L18, 116.2 SU estimated) was filed at 06:47Z over "today's cap of 120": the campaign declares 180, but the domain's code default (120) capped it, and an approval does not lift a cap.
 - The domain default is now its envelope (1500), so only a campaign's own cap applies (CHANGELOG 2026-10-04). Removing the time-based caps altogether (the daily cap, the monthly window, the per-day lever counts) is in review; the lifetime envelope, in-flight limits, disk headroom and stop-losses stay.
 - The next experiment, E2 (a 12-class detector started from E1-B's weights), is being built so the platform proposes and runs it itself.
+- Follow-up (same day): the time-based caps are removed altogether, superseding the 1500 default above: no default daily cap, monthly window or per-day lever count; a cap a campaign declares still applies (CHANGELOG 2026-10-04, `docs/CONTINUOUS_LOOP.md` §6.6 "Amendment (2026-10-04)").
 
 ## 2026-10-04 — E1: 44,485 weed images place better boxes than 6,811 (agnostic dev +0.0217, pre-registered rule met)
 

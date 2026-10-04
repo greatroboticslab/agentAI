@@ -912,18 +912,30 @@ def s15():
     check("a sharded source whose 3 attempts are used, shards remaining: filed for a person (L16R), no pause and no "
           "4th automatic attempt", "src00" in rev and not w3.config().get("paused_reason") and not fetches(w3),
           (rev, w3.config().get("paused_reason")))
-    # the day's job allowance counts jobs: lab -> cluster syncs (no job, no download) do not use it
+    # a day's job allowance counts jobs: lab -> cluster syncs (no job, no download) do not use it. Since
+    # the 2026-10-04 amendment stream_levers.json declares no per-day count; the mechanism stays for one
+    # that is declared, so the check declares six jobs a day here
     now = w3.clock()
     ex = [{"campaign": NAME, "lever": "L16S", "action": "inc_stream_sync", "status": "executed", "epoch": now - 60,
            "params": {"source": "s%d" % i}} for i in range(8)]
-    orig = X.executions
-    X.executions = lambda ctx=None: ex
+    jobs = [{"campaign": NAME, "lever": "L16", "action": "inc_stream_collect", "status": "executed", "epoch": now - 60,
+             "params": {"source": "j%d" % i, "max_bytes": 1000}} for i in range(6)]
+    req16 = {"action": "inc_stream_collect", "params": {"source": "new", "max_bytes": 1000}}
+    orig, orig_lim = X.executions, LS.limits
     try:
-        why = X.stream_limits(w3.xctx, {"name": NAME}, "L16", {"action": "inc_stream_collect",
-                                                             "params": {"source": "new", "max_bytes": 1000}})
+        X.executions = lambda ctx=None: ex + jobs
+        why_none = X.stream_limits(w3.xctx, {"name": NAME}, "L16", req16)
+        LS.limits = lambda lid, menu=None: dict(orig_lim(lid, menu), jobs_per_day=6)
+        X.executions = lambda ctx=None: ex
+        why = X.stream_limits(w3.xctx, {"name": NAME}, "L16", req16)
+        X.executions = lambda ctx=None: ex + jobs
+        why6 = X.stream_limits(w3.xctx, {"name": NAME}, "L16", req16)
     finally:
-        X.executions = orig
-    check("  eight syncs today leave the six-jobs-a-day allowance untouched", not why, why)
+        X.executions, LS.limits = orig, orig_lim
+    check("  no per-day job count by default: eight syncs and six fetch jobs today leave a 7th fetch free", not why_none,
+          why_none)
+    check("  eight syncs today leave a declared six-jobs-a-day allowance untouched", not why, why)
+    check("  six fetch jobs today use it up", any("in the last 24 h (limit 6)" in x for x in why6), why6)
 
 
 # ----------------------------------------------------------------------- S16
@@ -1533,7 +1545,7 @@ def s_prospective():
     check("  a finished L22 is never proposed again on evidence taken before its effect showed (no second L22, no "
           "failed step)", len([e for e in wd.events("proposed") if e.get("lever") == "L22"]) == 1
           and not wd.lane("TRAIN").get("fails"), ([e.get("lever") for e in wd.events("proposed")], wd.lane("TRAIN")))
-    wf.advance(DAY)                                # the daily L18 limit of the old stream's segment
+    wf.advance(DAY)                                # (was: the daily L18 limit, removed 2026-10-04)
     wf.tick(6)
     check("  the forked stream adopts the capacity decision itself (LA: its init carries no arm line)",
           any("choose-arm" in r and new_sid in r for r in wf.runs), [r[3:] for r in wf.runs])
@@ -1555,7 +1567,7 @@ def _step(w, lever, simulate=None, ticks=8):
         if len(ex) > n0:
             if simulate:
                 simulate()
-            w.advance(DAY)                         # a new day: the daily cap does not bind the sequence
+            w.advance(DAY)                         # a new day (no daily cap binds since 2026-10-04 anyway)
             return [e for e in w.events("proposed") if e.get("lever") == lever][-1]
     return None
 

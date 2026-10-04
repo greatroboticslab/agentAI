@@ -48,7 +48,7 @@ other's change:
                      | {"kind": "exp_done", "exp": "<exp>"},
         "exps": ["pilot_v1", ...], "current_exp": "pilot_v1",
         "autonomy": "off" | "envelope", "autonomy_granted_by": "human:<email>",
-        "envelope_su": 300, "daily_cap_su": 120,
+        "envelope_su": 300, "daily_cap_su": null | 120 (none: no daily cap, the 2026-10-04 amendment),
         "brain": {"enabled": false, "model": null},
         "updated_by": "human:<email>", "updated_utc": "...",
         "resumed_utc": "...", "switch": {"exp", "utc", "by"},

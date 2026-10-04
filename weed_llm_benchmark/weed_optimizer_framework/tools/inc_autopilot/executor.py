@@ -43,7 +43,9 @@ What happens to a request
      a diagnosis the ticker reports as fired that names this lever (or
      supports it, levers.json `supports`) and whose cites the proposal
      carries, no stop-loss diagnosis is firing, and its estimate fits the
-     envelope and the daily cap, the executor records a grant by the
+     envelope (and a daily cap or monthly window when the campaign declares
+     one: none has a default since the 2026-10-04 amendment,
+     docs/CONTINUOUS_LOOP.md 6.6), the executor records a grant by the
      autopilot (lever, trigger diagnoses, cites, envelope balance) and runs
      the item at once, authorised as the person who enabled the envelope
      (`campaign.autonomy_granted_by`). Every other rule still applies.
@@ -100,7 +102,7 @@ once-per-proposal rule and the one-unblock-per-unit rule read that file.
 Campaign config read here (the ticker owns it):
     {"name": "<campaign>", "autonomy": "off" | "envelope",
      "autonomy_granted_by": "human:<email>", "envelope_su": 300,
-     "daily_cap_su": 120, "paused_reason": null}
+     "daily_cap_su": null (no daily cap; a number declares one), "paused_reason": null}
 
 The ticker's fired diagnoses reach the envelope rule through the Context's
 `diagnoses` hook (a list of model.diagnosis records, or a callable taking the
@@ -1929,7 +1931,15 @@ def stream_limits(ctx, camp, lever, req):
     Counts come from the execution log (runs that ran or may have run); the
     in-flight and per-milestone / per-rollback / per-version counts come from
     the ticker (campaign 'in_flight', 'limit_counts'). The byte limits count
-    each attempt's fetched bytes where they are known (fetched_bytes)."""
+    each attempt's fetched bytes where they are known (fetched_bytes).
+
+    The per-day counts (jobs_per_day, per_day, gb_per_day) and the campaign's
+    collect_gb_daily apply only when declared. Since the 2026-10-04 amendment
+    (decided by the owner, docs/CONTINUOUS_LOOP.md 6.6) stream_levers.json
+    declares none and the stream campaign's collect_gb_daily has no default:
+    'L18 already ran 1 time(s) in the last 24 h (limit 1)' held a healthy
+    segment for a person while the cluster sat idle. The in-flight, per-source
+    and total limits are fuses that never delay healthy work and stay."""
     from . import levers_stream as LS
     lim = LS.limits(lever)
     if not lim:
@@ -2115,7 +2125,9 @@ def _autonomy(ctx, req, camp, row, est, bud, resources, item=None):
     elif est["su"] is None or est["su"] <= 0:
         why.append("no positive SU estimate (%s)" % est["su"])
     else:
-        _ok, r = B.fits(bud, est["su"], need_daily=True)
+        # an undeclared daily cap or window no longer refuses (amendment
+        # 2026-10-04): only the envelope and a cap the campaign declares do
+        _ok, r = B.fits(bud, est["su"])
         why += ["budget: " + x for x in r]
     unknown = _resources_known(resources, True)
     if unknown:

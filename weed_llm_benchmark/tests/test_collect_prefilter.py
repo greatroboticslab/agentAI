@@ -292,8 +292,15 @@ def test_precheck(cfg, nm, tg):
     r3 = PF.precheck(rf3, cfg3, ctx())
     check("... never a refused licence: rejected and closed whatever an override says", rf3["source_id"] == rf_src
           and rf3["decision"]["status"] == "rejected" and "licence_refused" in codes(r3) and r3["action"] == "close", r3)
-    r = PF.precheck(ok, cfg, ctx(bytes_today=50e9))
-    check("the daily byte cap: hold, no person", "daily_bytes" in codes(r) and r["risk"] is None, r)
+    r = PF.precheck(ok, cfg, ctx(bytes_today=500e9))
+    check("no daily byte cap by default (2026-10-04 amendment): 500 GB in the last 24 h holds nothing",
+          cfg.raw["budgets"].get("bytes_daily") is None and "daily_bytes" not in codes(r), r)
+    raw4 = json.loads(json.dumps(cfg.raw))
+    raw4["budgets"]["bytes_daily"] = 50e9
+    cfg4 = CollectConfig(raw4, cfg.path, cfg.sha256, cfg.funnel, cfg.eppo, cfg.eppo_record)
+    r = PF.precheck(ok, cfg4, ctx(bytes_today=50e9))
+    check("a daily byte cap the config declares (50 GB) still holds, no person", "daily_bytes" in codes(r)
+          and r["risk"] is None, r)
     r = PF.precheck(ok, cfg, ctx(bytes_total=200e9))
     check("the byte envelope: hold, R3", "byte_envelope" in codes(r) and r["risk"] == "R3", r)
     r = PF.precheck(ok, cfg, ctx(state={ok["source_id"]: {"status": "fetched", "failed_attempts": 3, "bytes": 0}}))

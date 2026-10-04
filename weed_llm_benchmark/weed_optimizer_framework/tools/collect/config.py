@@ -168,9 +168,14 @@ def validate(raw):
         p.append("licence_policy: an object")
     bu = raw.get("budgets")
     if isinstance(bu, dict):
-        for k in ("bytes_per_source", "bytes_daily", "bytes_envelope", "attempts_per_source"):
+        for k in ("bytes_per_source", "bytes_envelope", "attempts_per_source"):
             if not _is_num(bu.get(k)) or bu.get(k) <= 0:
                 p.append("budgets.%s: a positive number" % k)
+        # no daily byte cap unless one is declared (amendment 2026-10-04,
+        # docs/CONTINUOUS_LOOP.md 6.6): null or absent is none
+        bd = bu.get("bytes_daily")
+        if bd is not None and (not _is_num(bd) or bd <= 0):
+            p.append("budgets.bytes_daily: null (no daily byte cap) or a positive number")
         im = bu.get("intake_max_images")
         if im is not None and not (isinstance(im, int) and not isinstance(im, bool) and im > 0):
             p.append("budgets.intake_max_images: null or a positive integer")

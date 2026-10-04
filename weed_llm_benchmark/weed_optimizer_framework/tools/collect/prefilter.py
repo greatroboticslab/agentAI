@@ -393,6 +393,17 @@ def _fail(out, code, detail, action, risk=None):
     out.append({"code": code, "detail": detail, "action": action, "risk": risk})
 
 
+def daily_byte_cap(bu):
+    """The config's daily byte cap (budgets.bytes_daily), or None: no daily
+    byte cap. None by default since the 2026-10-04 amendment (decided by the
+    owner, docs/CONTINUOUS_LOOP.md 6.6): a per-day throttle only delays
+    healthy work, and the 50 GB a day held a source whose fetch the per-source
+    cap, the byte envelope and the disk margin already bound. A domain config
+    that declares a number still gets it."""
+    v = (bu or {}).get("bytes_daily")
+    return None if v is None else float(v)
+
+
 def precheck(c, cfg, ctx):
     """Every reason L16 may not fetch candidate c now (module docstring).
     ctx: {"state": {source: folded state}, "registry": {slug: entry},
@@ -459,8 +470,9 @@ def precheck(c, cfg, ctx):
     if isinstance(est, (int, float)) and est > 0 and done + est > cap:
         _fail(f, "over_source_cap", "%.2f GB fetched + %.2f GB planned > the %.0f GB per-source cap (a person may "
               "approve more)" % (done / 1e9, est / 1e9, cap / 1e9), "hold", "R3")
-    if float(ctx.get("bytes_today") or 0) >= float(bu["bytes_daily"]):
-        _fail(f, "daily_bytes", "the daily byte cap (%.0f GB) is reached" % (bu["bytes_daily"] / 1e9), "hold")
+    daily = daily_byte_cap(bu)
+    if daily is not None and float(ctx.get("bytes_today") or 0) >= daily:
+        _fail(f, "daily_bytes", "the daily byte cap (%.0f GB) is reached" % (daily / 1e9), "hold")
     if float(ctx.get("bytes_total") or 0) >= float(bu["bytes_envelope"]):
         _fail(f, "byte_envelope", "the byte envelope (%.0f GB) is spent" % (bu["bytes_envelope"] / 1e9), "hold", "R3")
     if int(st.get("failed_attempts") or 0) >= int(bu["attempts_per_source"]):

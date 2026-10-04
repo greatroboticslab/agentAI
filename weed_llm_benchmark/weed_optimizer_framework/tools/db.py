@@ -485,13 +485,17 @@ DEFAULT_DOMAIN_CONFIG = {
                          "api": "ollama", "num_ctx": 32768, "timeout_s": 300,
                          "steps": ["train", "filter", "collect"]},
               "review_timeout_min": 90, "periodic_audit_every": 4},
-    # The domain daily cap equals the domain envelope, so it never binds on its
-    # own (owner decision 2026-10-04): a daily cap paces healthy work without
-    # guarding anything the envelope, in-flight limits and stop-losses do not.
-    # On 2026-10-04 the old default (120) silently overrode the stream
-    # campaign's own 180 and held a filed segment for 12 h on an idle cluster.
-    # It stays declared because the envelope grant needs a known daily figure.
-    "budget": {"su_envelope": 1500, "daily_cap": 1500, "per_round_cap": 60},
+    # No `daily_cap` (removed 2026-10-04, decided by the owner;
+    # docs/CONTINUOUS_LOOP.md 6.6): this code default of 120 SU silently cut
+    # the stream campaign's own 180 SU daily cap to 120 through
+    # inc_autopilot.budget.envelope, and the cluster sat idle about 9 h while
+    # a 116.2 SU segment waited for the UTC day to turn. An absent daily cap
+    # is no daily cap; a domain whose stored config declares one still gets
+    # it. `su_envelope` stays as the lifetime fuse against a runaway bug. An
+    # interim default of 1500 (the envelope, so it never bound; commit 11c01b0)
+    # was kept only because fits(need_daily=True) refused an undeclared daily
+    # cap; that refusal is gone too, so no figure is declared.
+    "budget": {"su_envelope": 1500, "per_round_cap": 60},
     # The sealed menu of things an experiment is allowed to change, and the
     # control each change is measured against. It is pre-registered for two
     # reasons: an experiment whose lever was chosen after seeing the result is

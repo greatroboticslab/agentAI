@@ -12,8 +12,13 @@ again under a new approval id, each tick (two in a row hold the MAINT lane).
 execute_approved now checks the campaign's caps first: an approval never lifts
 them, and a refusal that names today's cap is one the stream waits on.
 
+Since the 2026-10-04 amendment (docs/CONTINUOUS_LOOP.md 6.6) no daily cap has a
+default; the mechanism stays for a campaign that declares one, so this world
+declares the 120 SU the stream had then.
+
 Pinned, in the stream world of test_stream_ap_world:
-  * an arm past today's cap is filed for a person, not run;
+  * with no daily cap declared, no arm is filed: each runs within the envelope;
+  * an arm past today's (declared) cap is filed for a person, not run;
   * approved, it waits: the same approval stays open on the lane, no failed
     step and no refusal are recorded, nothing is filed again;
   * when the UTC day turns it runs, once, under that approval;
@@ -31,9 +36,12 @@ from test_stream_ap_world import AP, OWNER, check  # noqa: E402
 DAY = 86400.0
 
 
-def to_cap(tag):
-    """The measure world with the arms built in order until one is filed past today's cap."""
+def to_cap(tag, daily_cap_su=120.0):
+    """The measure world with the arms built in order until one is filed past today's cap
+    (the campaign declares `daily_cap_su`; None declares none, the default)."""
     w = U._measure_world(tag)
+    if daily_cap_su is not None:
+        w.set_config(daily_cap_su=daily_cap_su)
     w.queue(4 * w.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w.t[0] - 2 * DAY))
     w.tick(3)
     for b in [x for x in w.dom["baselines"]["items"] if x.get("measure")]:
@@ -94,7 +102,19 @@ def test_unapproved_runs_by_envelope():
           [(e.get("child_exp"), e.get("basis")) for e in ex])
 
 
+def test_no_cap_no_filing():
+    print("with no daily cap declared (the default since 2026-10-04) no arm is filed: each runs by the envelope")
+    w, it, b = to_cap("cap_none", daily_cap_su=None)
+    ex = l23b(w, "executed")
+    check("no arm is filed for a person; every measurement arm ran within the envelope",
+          b is None and not l23b(w, "filed") and len(ex) == len([x for x in w.dom["baselines"]["items"]
+                                                                  if x.get("measure") and not x.get("requires")])
+          and all(e.get("basis") == "envelope" for e in ex),
+          (it.get("status"), [(e.get("child_exp"), e.get("basis")) for e in ex]))
+
+
 def main():
+    test_no_cap_no_filing()
     test_approved_waits()
     test_unapproved_runs_by_envelope()
     return W.closing()

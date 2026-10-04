@@ -52,8 +52,14 @@ no class, source, exam or lab.
 CLI (lab):
     python -m weed_optimizer_framework.tools.inc_autopilot.stream enable --name N --by human:<email>
         --domain D [--autonomy off|envelope] [--data-autonomy off|on] [--envelope-su SU]
-        [--window-cap-su SU] [--daily-cap-su SU] [--alloc-reserve-su SU] [--collect-gb-envelope GB]
-        [--collect-gb-daily GB] [--envelope-end-utc YYYY-MM-DDTHH:MM:SSZ] [--protocol-v3-accepted]
+        [--window-cap-su SU|none] [--daily-cap-su SU|none] [--alloc-reserve-su SU] [--collect-gb-envelope GB]
+        [--collect-gb-daily GB|none] [--envelope-end-utc YYYY-MM-DDTHH:MM:SSZ] [--protocol-v3-accepted]
+    python -m weed_optimizer_framework.tools.inc_autopilot.stream configure --name N --by human:<email>
+        [the same settings as enable]
+        (changes the settings only: it neither enables the campaign nor lifts a pause or a held lane,
+        which `enable` does. `none` clears a time-based cap: daily_cap_su, window_cap_su and
+        collect_gb_daily have no default since the 2026-10-04 amendment, docs/CONTINUOUS_LOOP.md 6.6,
+        and a cleared one is no cap.)
     python -m weed_optimizer_framework.tools.inc_autopilot.stream status [--name N]
     python -m weed_optimizer_framework.tools.inc_autopilot.stream release --name N --by human:<email>
         (a person's release of every lane a stop-loss held: 2 consecutive failed steps, a step past
@@ -128,15 +134,28 @@ NAMES_REFUSAL = "(lever L26)"
 WAIT_REFUSALS = ("today's cap", "this month's window", "of the domain's", "the cluster is not reachable",
                  "Mongo's health", "the execution log", "no slurm_sh hook", "could not be locked",
                  "collides with another request", "could not be filed", "one ssh per tick")
-# L-2 (docs/CONTINUOUS_LOOP.md 2.6): the stream campaign's defaults.
+# L-2 (docs/CONTINUOUS_LOOP.md 2.6): the stream campaign's defaults. The
+# time-based caps have none since 2026-10-04 (decided by the owner, 6.6
+# amendment): L-2's 350 SU monthly window, its 120 SU daily cap and the 50 GB
+# daily byte cap only delayed healthy work (on 2026-10-04 the cluster sat idle
+# about 9 h while a segment waited for the UTC day to turn). None means no cap
+# (budget.fits, executor.stream_limits); a campaign may still declare one. The
+# lifetime fuses keep their defaults: envelope_su, its end date and
+# collect_gb_envelope.
 STREAM_DEFAULTS = {"enabled": False, "paused_reason": None, "mode": "stream", "domain": None,
                    "protocol_package": None, "stream": {}, "goal": {"kind": "continuous"},
                    "autonomy": "off", "autonomy_granted_by": None, "data_autonomy": "off",
                    "envelope_su": 1000.0, "envelope_end_utc": "2026-12-31T23:59:59Z", "window": "month",
-                   "window_cap_su": 350.0, "daily_cap_su": 120.0, "alloc_reserve_su": None,
-                   "collect_gb_envelope": 200.0, "collect_gb_daily": 50.0, "protocol_v3_accepted_by": None,
+                   "window_cap_su": None, "daily_cap_su": None, "alloc_reserve_su": None,
+                   "collect_gb_envelope": 200.0, "collect_gb_daily": None, "protocol_v3_accepted_by": None,
                    "reopened_sources": {},
                    "brain": {"enabled": False, "model": None}}
+# What a person passes to clear a time-based cap (configure_stream, the CLI's
+# `--daily-cap-su none`): the setting becomes None, which is no cap. Only these
+# three may be cleared; the lifetime envelope and collect_gb_envelope are fuses
+# and always hold a number.
+CLEAR = "none"
+CLEARABLE = ("window_cap_su", "daily_cap_su", "collect_gb_daily")
 LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "DATA", "L16R": "DATA",
            "L16RL": "DATA", "L16I": "DATA", "L16S": "DATA", "L17": "DATA", "L24": "STOP", "LH": "DATA",
            "L18": "TRAIN", "L19": "TRAIN", "L22": "TRAIN",
@@ -338,7 +357,9 @@ def configure_stream(name, by, domain=None, enable=None, autonomy=None, data_aut
                      reopen_source=None, reopen_why=None):
     """Create or change a stream campaign as person `by`. data_autonomy,
     autonomy 'envelope', the acceptance of Protocol v3 and a completion are a
-    person's flags (6.5, 10): the ticker never writes them."""
+    person's flags (6.5, 10): the ticker never writes them. A setting left
+    None is unchanged; CLEAR ("none") clears one of CLEARABLE (a time-based
+    cap) to None, which is no cap."""
     from . import campaign as C
     if not NAME_RE.match(str(name or "")):
         raise ValueError("campaign name %r is not valid" % (name,))
@@ -347,8 +368,11 @@ def configure_stream(name, by, domain=None, enable=None, autonomy=None, data_aut
     for label, v in (("envelope_su", envelope_su), ("window_cap_su", window_cap_su), ("daily_cap_su", daily_cap_su),
                      ("alloc_reserve_su", alloc_reserve_su), ("collect_gb_envelope", collect_gb_envelope),
                      ("collect_gb_daily", collect_gb_daily)):
+        if v == CLEAR and label in CLEARABLE:
+            continue
         if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0):
-            raise ValueError("%s must be a number >= 0, got %r" % (label, v))
+            raise ValueError("%s must be a number >= 0%s, got %r"
+                             % (label, " or %r" % CLEAR if label in CLEARABLE else "", v))
     if envelope_end_utc is not None and _secs(envelope_end_utc) is None:
         # the envelope's end pauses the campaign (envelope_ended): a person
         # sets the new end here, never by hand-editing the config
@@ -387,7 +411,9 @@ def configure_stream(name, by, domain=None, enable=None, autonomy=None, data_aut
         for k, v in (("envelope_su", envelope_su), ("window_cap_su", window_cap_su), ("daily_cap_su", daily_cap_su),
                      ("alloc_reserve_su", alloc_reserve_su), ("collect_gb_envelope", collect_gb_envelope),
                      ("collect_gb_daily", collect_gb_daily)):
-            if v is not None:
+            if v == CLEAR:
+                c[k] = None
+            elif v is not None:
                 c[k] = float(v)
         if envelope_end_utc is not None:
             c["envelope_end_utc"] = str(envelope_end_utc)
@@ -3741,17 +3767,31 @@ def main(argv=None):
     ap.add_argument("--config", default=None)
     ap.add_argument("--lab-repo", default=None)
     sub = ap.add_subparsers(dest="cmd")
-    e = sub.add_parser("enable")
-    e.add_argument("--name", required=True)
-    e.add_argument("--by", required=True)
-    e.add_argument("--domain", default=None)
-    e.add_argument("--autonomy", choices=("off", "envelope"), default=None)
-    e.add_argument("--data-autonomy", choices=("off", "on"), default=None)
-    for f in ("--envelope-su", "--window-cap-su", "--daily-cap-su", "--alloc-reserve-su", "--collect-gb-envelope",
-              "--collect-gb-daily"):
-        e.add_argument(f, type=float, default=None)
-    e.add_argument("--envelope-end-utc", default=None)
-    e.add_argument("--protocol-v3-accepted", action="store_true")
+
+    def cap_or_none(v):
+        # a time-based cap takes a number or `none` (CLEAR: no cap, the 2026-10-04 amendment)
+        if str(v).strip().lower() == CLEAR:
+            return CLEAR
+        try:
+            return float(v)
+        except ValueError:
+            raise argparse.ArgumentTypeError("a number or %r, not %r" % (CLEAR, v))
+
+    def settings(p):
+        p.add_argument("--name", required=True)
+        p.add_argument("--by", required=True)
+        p.add_argument("--domain", default=None)
+        p.add_argument("--autonomy", choices=("off", "envelope"), default=None)
+        p.add_argument("--data-autonomy", choices=("off", "on"), default=None)
+        for f in ("--envelope-su", "--window-cap-su", "--daily-cap-su", "--alloc-reserve-su", "--collect-gb-envelope",
+                  "--collect-gb-daily"):
+            clearable = f[2:].replace("-", "_") in CLEARABLE
+            p.add_argument(f, type=cap_or_none if clearable else float, default=None,
+                           help="a number, or none for no cap" if clearable else None)
+        p.add_argument("--envelope-end-utc", default=None)
+        p.add_argument("--protocol-v3-accepted", action="store_true")
+    settings(sub.add_parser("enable"))
+    settings(sub.add_parser("configure", help="change settings only: no enable, no release of a pause or a hold"))
     s = sub.add_parser("status")
     s.add_argument("--name", default=None)
     rl = sub.add_parser("release")
@@ -3784,8 +3824,9 @@ def main(argv=None):
     from . import campaign as C
     hooks = C.default_cfg_hooks(a.config)
     try:
-        if a.cmd == "enable":
-            out = configure_stream(a.name, a.by, domain=a.domain, enable=True, autonomy=a.autonomy,
+        if a.cmd in ("enable", "configure"):
+            out = configure_stream(a.name, a.by, domain=a.domain, enable=True if a.cmd == "enable" else None,
+                                   autonomy=a.autonomy,
                                    data_autonomy=a.data_autonomy, envelope_su=a.envelope_su,
                                    window_cap_su=a.window_cap_su, daily_cap_su=a.daily_cap_su,
                                    alloc_reserve_su=a.alloc_reserve_su, collect_gb_envelope=a.collect_gb_envelope,

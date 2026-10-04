@@ -1698,9 +1698,10 @@ def r0(v, d28=None):
     # the measurement arms (baselines marked measure, 2026-09-30): proposed only
     # once R0 is complete (the stream's arm adopted, Stage C read) and nothing
     # else of it is due, so R0 READY never waits for them (they share the
-    # stream's daily and monthly caps, though: a grant of theirs can defer a
-    # segment's to the next UTC day); capacity-verdict never reads them as
-    # candidates. They are built while the TRAIN lane runs, and /stage changes
+    # stream's envelope, and a daily or monthly cap when the campaign declares
+    # one; none has a default since the 2026-10-04 amendment, so a grant of
+    # theirs no longer defers a segment's to the next UTC day);
+    # capacity-verdict never reads them as candidates. They are built while the TRAIN lane runs, and /stage changes
     # with every experiment it builds: an envelope grant needs the diagnosis's
     # cites unchanged at submission, so the item cites only what it rests on
     # (the lock and the arm's own state)

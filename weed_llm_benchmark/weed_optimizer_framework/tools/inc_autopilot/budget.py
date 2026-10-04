@@ -9,9 +9,23 @@ The envelope
 A campaign draws on a sub-envelope of the domain's `budget.su_envelope`
 (db.py DEFAULT_DOMAIN_CONFIG: 1500 SU). The sub-envelope is the campaign's
 `envelope_su`, 300 SU when the campaign does not set one, and never more than
-the domain envelope. A daily cap applies as well: the campaign's `daily_cap_su`,
-or the domain's `budget.daily_cap` (120 SU) when the campaign does not set one,
-and never more than the domain's daily cap.
+the domain envelope. A daily cap applies only when one is declared: the
+campaign's `daily_cap_su`, else the domain's `budget.daily_cap` when the
+domain declares one, and never more than a domain cap that is declared.
+
+No time-based throttle by default (docs/CONTINUOUS_LOOP.md 6.6, amendment
+2026-10-04, decided by the owner). db.DEFAULT_DOMAIN_CONFIG carried
+`budget.daily_cap` 120 and the stream campaign's defaults a 120 SU daily cap
+and a 350 SU monthly window. On 2026-10-04 the cluster sat idle about 9 h
+while the stream's next segment was filed for a person only because "116.2 SU
+exceeds the 86.52 SU left under today's cap of 120" (the campaign had set
+180; the code default cut it to 120) and L18 had run once in the last 24 h.
+A cap that only delays healthy work protects nothing the fuses below do not,
+so none has a default: an absent daily cap or window is no cap (no refusal,
+no reason, reported as none). A cap a campaign or a domain declares still
+applies. The fuses stay: the lifetime envelopes (the campaign's and the
+domain's, against a runaway bug), the executor's in-flight and per-source
+limits, D27's disk headroom, the stop-losses and the allocation's end date.
 
 What counts against it
 ----------------------
@@ -27,7 +41,8 @@ What counts against it
   record states) is recorded. An action with no report of its own
   (relevance, audit) keeps its walltime estimate for good, which overstates
   rather than understates.
-* **Today**: estimates charged since 00:00 UTC, against the daily cap.
+* **Today**: estimates charged since 00:00 UTC, reported always and checked
+  only against a declared daily cap.
 
 The executor writes a `started` record (charged) before it runs anything and
 an outcome record with the same `run_id` after; `fold` keeps the last record
@@ -86,7 +101,11 @@ def domain_budget(given=None):
 
 
 def envelope(campaign, given_budget=None):
-    """The campaign's sub-envelope and daily cap, with where each came from."""
+    """The campaign's sub-envelope and daily cap, with where each came from.
+
+    The daily cap is the campaign's `daily_cap_su`, else the domain's declared
+    `daily_cap`; with neither it is None ("none"): no daily cap (amendment
+    2026-10-04: db.py no longer declares one by default)."""
     c = campaign if isinstance(campaign, dict) else {}
     dom, dom_src = domain_budget(given_budget)
     dom_env = _num(dom.get("su_envelope", dom.get("envelope")))
@@ -108,7 +127,8 @@ def envelope(campaign, given_budget=None):
     daily_src = "campaign.daily_cap_su"
     if daily is None:
         daily = dom_daily
-        daily_src = "domain budget.daily_cap (%s)" % dom_src if daily is not None else "none"
+        daily_src = ("domain budget.daily_cap (%s)" % dom_src if daily is not None
+                     else "none (no daily cap is declared)")
     elif daily < 0:
         reasons.append("campaign daily_cap_su %r is negative; treated as 0" % daily)
         daily = 0.0
@@ -289,7 +309,9 @@ def stream_windows(campaign, executions, env, sp, cm, now, domain=M.DOMAIN, base
 
     Window: the SU the ledger holds for this campaign with a timestamp in the
     current calendar month (UTC), plus the estimates charged this month that
-    are still committed, against `window_cap_su` (L-2: 350). Domain: every
+    are still committed, against the campaign's `window_cap_su` when it
+    declares one (L-2's 350 was its default until the 2026-10-04 amendment;
+    an absent window is none and refuses nothing). Domain: every
     campaign's `inc:*` ledger steps (the funnel's and weed_inc_v1's included)
     plus every campaign's committed estimates in the domain's execution log,
     against the domain envelope (db.py su_envelope 1500, or the live domain's
@@ -342,9 +364,14 @@ def budget_state(st):
 def fits(st, est_su, need_daily=False):
     """(ok, [reasons]): may `est_su` more be charged to this campaign now?
 
-    `need_daily` makes an undeclared daily cap a refusal (the envelope rule);
-    otherwise a cap that is declared still applies and an absent one does not.
+    The envelope is always checked (unknown refuses). A daily cap and a
+    monthly window are checked when declared; an absent one is no cap.
+    `need_daily` (the envelope rule's caller) once made an undeclared daily
+    cap or window a refusal; since the 2026-10-04 amendment (no time-based
+    throttle by default) it changes nothing, and it is still accepted so a
+    caller written before the amendment keeps working.
     """
+    del need_daily
     reasons = []
     est = _num(est_su)
     if est is None:
@@ -360,20 +387,14 @@ def fits(st, est_su, need_daily=False):
                        % (est, rem, st.get("spent_su") or 0.0, st.get("committed_su") or 0.0,
                           st.get("envelope_su") or 0.0))
     daily = st.get("daily_remaining_su")
-    if daily is None:
-        if need_daily:
-            reasons.append("no daily cap is declared for this campaign")
-    elif est > daily:
+    if daily is not None and est > daily:
         reasons.append("estimated %.4g SU exceeds the %.4g SU left under today's cap of %.4g"
                        % (est, daily, st.get("daily_cap_su") or 0.0))
     # stream mode only (the keys exist only for a stream campaign): the monthly
     # window and the domain's cross-campaign cap
     if "window_remaining_su" in st:
         win = st.get("window_remaining_su")
-        if win is None:
-            if need_daily:
-                reasons.append("no monthly window is declared for this stream campaign")
-        elif est > win:
+        if win is not None and est > win:
             reasons.append("estimated %.4g SU exceeds the %.4g SU left in this month's window of %.4g"
                            % (est, win, st.get("window_cap_su") or 0.0))
     if "domain_remaining_su" in st:

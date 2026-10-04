@@ -813,21 +813,17 @@
   "why": "Contract 6.3: the recipe (Protocol v3), leave-one-source-out after a rollback, class policy and the verifier refit are the existing cards of levers.json."
  },
  "limits": {
-  "_why": "Contract 6.6 'Limits': these replace the blanket 3-per-campaign rule for the stream levers; L1-L14 keep it.",
+  "_why": "Contract 6.6 'Limits': these replace the blanket 3-per-campaign rule for the stream levers; L1-L14 keep it. Amendment 2026-10-04 (decided by the owner): the per-day counts are removed (L16 jobs_per_day 12 and gb_per_day 50, L17 jobs_per_day 6, L18 per_day 1). They only delayed healthy work: on 2026-10-04 the cluster sat idle about 9 h while the next segment was filed for a person because 'L18 already ran 1 time(s) in the last 24 h (limit 1)' (and a daily SU cap, removed with them). The fuses that never delay healthy work stay: in_flight, attempts_per_source, gb_per_source (a person may approve more) and the totals of L21, L22, L25, L27, L28 and LI.",
   "L16": {
    "attempts_per_source": 3,
    "in_flight": 2,
-   "jobs_per_day": 12,
-   "gb_per_day": 50,
    "gb_per_source": 50
   },
   "L17": {
-   "in_flight": 2,
-   "jobs_per_day": 6
+   "in_flight": 2
   },
   "L18": {
-   "in_flight": 1,
-   "per_day": 1
+   "in_flight": 1
   },
   "L20": {
    "in_flight": 1

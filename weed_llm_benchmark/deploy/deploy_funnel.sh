@@ -62,7 +62,9 @@ PINNED_RE='weed_optimizer_framework/tools/(cwd12_species|inc/(driver|gate|splits
 # Libraries the live harvest, trainer and scheduler also run, shipped only so that the stream's job
 # scripts find the outer and nested copies identical (they hash them and refuse on drift): a deploy that
 # would change one on the cluster is refused unless --allow-shared-change.
-SHARED_RE='weed_optimizer_framework/tools/(near_dup|semisup_labeler|registry_lock|mega_trainer|license_audit|brain/(su_ledger|policy))\.py$'
+# db.py is one of them since 2026-10-04: the dashboard, the harvest and the round scheduler import it, and the
+# autopilot's budget reads its DEFAULT_DOMAIN_CONFIG (see PKG_PATHS).
+SHARED_RE='weed_optimizer_framework/tools/(near_dup|semisup_labeler|registry_lock|mega_trainer|license_audit|db|brain/(su_ledger|policy))\.py$'
 PY="${PYTHON:-python3}"
 
 GIT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -97,6 +99,11 @@ PKG_PATHS=(
   weed_optimizer_framework/tools/registry_lock.py weed_optimizer_framework/tools/mega_trainer.py
   weed_optimizer_framework/tools/license_audit.py
   weed_optimizer_framework/tools/brain/su_ledger.py weed_optimizer_framework/tools/brain/policy.py
+  # the domain's default budget block, which inc_autopilot.budget.domain_budget() reads on the lab where the
+  # ticker runs: the 2026-10-04 amendment (docs/CONTINUOUS_LOOP.md 6.6) removed its daily_cap (120, then an
+  # interim 1500), and a lab whose db.py still declares one caps every campaign at that figure a day (SHARED_RE:
+  # the deploy refuses to change it on the cluster unless --allow-shared-change)
+  weed_optimizer_framework/tools/db.py
 )
 while IFS= read -r t; do PKG_PATHS+=("$t"); done < <(ls tests/test_funnel_*.py tests/funnel_*.py tests/test_inc_*.py \
   tests/test_inc2_*.py tests/test_collect_*.py tests/test_stream_*.py tests/test_round_scheduler_stream_guard.py 2>/dev/null)
@@ -105,10 +112,13 @@ ROOT_PATHS=(docs/FUNNEL_AUDIT.md docs/FUNNEL_AUDIT_RUNNER.md docs/FUNNEL_REPRODU
             docs/CONTINUOUS_LOOP.md docs/INCREMENTAL_PROTOCOL.md docs/INCREMENTAL_PROTOCOL_RUNNER.md docs/INC_AUTOPILOT.md)
 # The replay set envelope autonomy needs a pass for (executor.REPLAY_SCRIPTS: inc, funnel and stream,
 # with both mutation harnesses) plus the stream's end-to-end pipeline: all must pass locally before any
-# copy (docs/CONTINUOUS_LOOP.md 6.5: a failing S-case blocks the funnel's autonomy too).
+# copy (docs/CONTINUOUS_LOOP.md 6.5: a failing S-case blocks the funnel's autonomy too). Since 2026-10-04 it
+# also runs test_stream_ap_no_throttles.py: a tree that declares a default daily cap, monthly window or per-day
+# lever count again (a merge that took an older db.py, say) is refused before anything is copied (6.6,
+# "Amendment (2026-10-04)").
 PREFLIGHT=(tests/test_inc_ap_replay.py tests/test_inc_ap_governance.py tests/test_funnel_ap_replay.py
            tests/test_funnel_ap_mutations.py tests/test_funnel_domain_free.py tests/test_stream_ap_replay.py
-           tests/test_stream_ap_mutations.py tests/test_stream_pipeline.py)
+           tests/test_stream_ap_mutations.py tests/test_stream_pipeline.py tests/test_stream_ap_no_throttles.py)
 
 for p in "${PKG_PATHS[@]}"; do [ -e "$p" ] || { echo "missing package path: $p" >&2; exit 1; }; done
 for p in "${ROOT_PATHS[@]}"; do [ -e "$GIT_ROOT/$p" ] || { echo "missing git-root path: $p" >&2; exit 1; }; done

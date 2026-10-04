@@ -433,11 +433,17 @@ def build(sid, stream=None):
     month_spent = sum(v["month_gpu_h"] for v in su.values()) * SU_PER_GPU_H
     summ = st.summary()
     budget = f.defn.get("budget") or ST.BUDGET
+    # The monthly window is the current rule's (ST.BUDGET: none since the
+    # 2026-10-04 amendment, docs/CONTINUOUS_LOOP.md 6.6), not the stream
+    # definition's record: a stream defined before the amendment still records
+    # L-2's 350 SU there, which no longer applies. A window a campaign declares
+    # lives in its config, which this report does not read.
+    window_cap = ST.BUDGET.get("window_cap_su")
     rep = {"format": "inc2-stream-report/1", "sid": st.sid, "generated_utc": D._utc(), "testing": bool(f.defn.get("testing")),
            "target": TARGET, "headline": head, "capacity_arms": arms, "milestones": ms_rows, "timeline": timeline,
            "segments": segs, "yield": {"stream": {k: dict(v) for k, v in yield_.items()}, "intake": intake},
            "su": {"per_experiment": su, "spent_su": spent, "month": month, "month_su": month_spent,
-                  "envelope_su": budget.get("envelope_su"), "window_cap_su": budget.get("window_cap_su"),
+                  "envelope_su": budget.get("envelope_su"), "window_cap_su": window_cap,
                   "until": budget.get("until"), "note": "GPU-hours from run.json seconds (V100: 1 SU per GPU-h); build "
                                                         "and scorer jobs are not included"},
            "supply": summ.get("queue"), "pool": summ.get("pool"), "M": f.defn["M"],
@@ -525,9 +531,10 @@ def render(rep):
     su = rep["su"]
     L.append("## SU against the envelope (L-2)")
     L.append("")
-    L.append("Spent %.1f of %s SU (to %s); %s: %.1f of the %s SU window. %s"
-             % (su["spent_su"], su["envelope_su"], su["until"], su["month"], su["month_su"], su["window_cap_su"],
-                su["note"]))
+    window = ("of the %s SU window" % su["window_cap_su"] if su.get("window_cap_su") is not None
+              else "SU this month (no monthly window)")
+    L.append("Spent %.1f of %s SU (to %s); %s: %.1f %s. %s"
+             % (su["spent_su"], su["envelope_su"], su["until"], su["month"], su["month_su"], window, su["note"]))
     L.append("")
     q = rep.get("supply") or {}
     L.append("## Supply")

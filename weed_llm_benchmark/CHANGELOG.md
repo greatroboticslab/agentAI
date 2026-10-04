@@ -10871,3 +10871,37 @@ Every result sat near test 0.85, against the 0.90 goal.
 - **Problem (live, 2026-10-04).** The stream campaign `weed_stream_v1` declares `daily_cap_su` 180, but `inc_autopilot/budget.envelope` caps a campaign's daily cap at the domain's, and the domain budget comes from `db.DEFAULT_DOMAIN_CONFIG` (`daily_cap` 120). The stream's next segment (L18, estimated 116.2 SU) was filed at 06:47Z as "exceeds the 86.52 SU left under today's cap of 120", stayed there after a person's approval (an approval never lifts a cap), and the cluster ran no job of the loop from 09:27Z to 19:30Z.
 - **Change.** `db.DEFAULT_DOMAIN_CONFIG.budget.daily_cap` = 1500, the domain envelope, so the domain default never binds on its own; a campaign's own daily cap applies. The figure stays declared because the envelope grant (`executor`, `budget.fits(..., need_daily=True)`) refuses a campaign with no known daily figure. Decided by the owner: a daily cap paces healthy work without guarding anything the lifetime envelope, in-flight limits and stop-losses do not.
 - **Verified.** `test_inc_ap_governance.py` (the default no longer caps a campaign's 1000; a lower domain cap that is set still caps; no campaign cap gives the domain's 1500), the deploy pre-flight set (`test_inc_ap_replay`, `test_funnel_ap_replay`, `test_funnel_ap_mutations`, `test_funnel_domain_free`, `test_stream_ap_replay`, `test_stream_ap_mutations`, `test_stream_pipeline`) and every test that reads the domain config (`test_domain_config`, `test_brain_signals`, `test_policy_gate_paths`, `test_inc_ap_dashboard`, `test_stream_ap_cap_approved`, `test_inc_ap_brain`, ...): all pass.
+- **Superseded the same day** by the next entry (`docs/CONTINUOUS_LOOP.md` §6.6, "Amendment (2026-10-04)"): `db.DEFAULT_DOMAIN_CONFIG` declares no `daily_cap` at all, and `budget.fits(..., need_daily=True)` no longer refuses a campaign with no daily cap, so the reason given above for keeping the 1500 declared no longer holds.
+
+## 2026-10-04 — No time-based compute throttles by default (decided by the owner; docs/CONTINUOUS_LOOP.md §6.6, "Amendment (2026-10-04)")
+
+- Why (measured): on 2026-10-04 the cluster sat idle for about 9 h. The stream's next segment (L18) was filed "awaiting approval" for two reasons only: "estimated 116.2 SU exceeds the 86.52 SU left under today's cap of 120" and "L18 already ran 1 time(s) in the last 24 h (limit 1)". The campaign's `daily_cap_su` was 180, but `budget.envelope` cut it to the 120 SU `budget.daily_cap` of `db.DEFAULT_DOMAIN_CONFIG`, a code default (the entry above then set it to 1500). The 350 SU monthly window (176 SU used) would have been the next blocker.
+- Daily SU cap and monthly window: no default anywhere.
+  - `db.DEFAULT_DOMAIN_CONFIG["budget"]` has no `daily_cap` (neither the 120 nor the interim 1500); `inc2.stream.BUDGET` has no `daily_cap_su` or `window_cap_su`; in `inc_autopilot.stream.STREAM_DEFAULTS`, `daily_cap_su` and `window_cap_su` are None.
+  - In `budget.envelope`, `state`, `stream_windows` and `fits`, an absent cap or window is none: no refusal and no reason, reported as None.
+  - `fits(need_daily=True)` no longer refuses an undeclared cap or window. The parameter is still accepted but has no effect, and the executor's envelope rule no longer passes it.
+  - A cap that a campaign declares, or a `daily_cap` that a domain declares, still applies.
+- Per-day counts and byte caps: removed.
+  - `stream_levers.json` `limits` loses L16 `jobs_per_day` 12 and `gb_per_day` 50, L17 `jobs_per_day` 6, and L18 `per_day` 1. `executor.stream_limits` still honours a per-day count if one is declared; none is.
+  - The stream campaign's `collect_gb_daily` default (50) is None.
+  - The collector's `budgets.bytes_daily` (`collect/domains/weed.json`) is null. `collect.config` accepts null or a positive number. `prefilter.precheck` (`daily_bytes`) and the byte plan in `fetch._byte_cap` apply it only when declared (`prefilter.daily_byte_cap`). Without this, the collector would still have enforced 50 GB a day.
+- Kept as fuses, since none of them delays healthy work:
+  - the in-flight limits;
+  - `attempts_per_source`, and `gb_per_source` (a person may approve more);
+  - the L21, L22, L25, L27, L28 and LI totals;
+  - the lifetime envelopes (`envelope_su`, the domain's `su_envelope`, `collect_gb_envelope`);
+  - D27, the stop-losses, and the allocation's end date.
+- New CLI verb `inc_autopilot.stream configure`: the same settings as `enable`, but it neither enables the campaign nor releases a pause or a hold. `--daily-cap-su`, `--window-cap-su` and `--collect-gb-daily` take `none` (`CLEAR`) to clear the cap; the envelopes cannot be cleared. `enable` takes `none` too.
+- Displays: the /inc page reads "no daily cap"; the stream report reads "SU this month (no monthly window)", taking the window from the current rule.
+- Records: decision L-2a in `stream_domains/weed.json`; docstrings in `budget`, `executor` and `stream`; `docs/INC_AUTOPILOT.md`.
+- `deploy/deploy_funnel.sh` ships `tools/db.py`, listed in `SHARED_RE`, so a change on the cluster needs `--allow-shared-change`. The ticker reads the domain's default budget from `db.py` on the lab, so a lab still holding an older `db.py` keeps its declared cap (120, or 1500 from the entry above). The deploy's pre-flight set now also runs `test_stream_ap_no_throttles.py`, so a tree that declares a default cap again (a merge resolved to the older `db.py`) is refused before anything is copied.
+- Tests:
+  - New: `test_stream_ap_no_throttles.py` (defaults, budget, executor, configure, collector, deploy pre-flight).
+  - Updated, with the mechanism still covered by an explicit cap: `test_stream_ap_cap_approved.py` (declares 120 SU; new case where no cap means no filing), `test_stream_ap_units.py`, `test_inc_ap_governance.py` (with no campaign or domain cap there is no daily cap, which the 1500 default fails), `test_stream_ap_replay.py` S15 (a declared per-day count), `test_collect_prefilter.py`, `test_collect_config.py`, `test_inc2_stream_report.py`.
+  - With the modules reverted, 22 of the new checks fail. Reverted to the entry above's modules (1500 declared), 19 fail before the configure test exits on the unknown verb, the deploy checks fail on its `deploy_funnel.sh`, and `test_inc_ap_governance.py` fails two checks on its `db.py`.
+  - Full suite, rebased onto the entry above: 146 files, 145 pass. `test_brain_api.py` fails the same way on `main`.
+  - Replay gate run locally (`executor.run_replay_tests` on the fixtures): `pass`, with 56 cases passing and R2 and R4b skipped (allowed). Both `replay_status` and `stream_replay_status` pass. No recorded ledger contains a refusal of this kind, so no stored decision changes.
+- After deploy:
+  - `record-replay`.
+  - The ticker writes a new prospective stream record, because the stream rules version moved.
+  - A person runs `python -m weed_optimizer_framework.tools.inc_autopilot.stream configure --name weed_stream_v1 --by human:<email> --daily-cap-su none --window-cap-su none --collect-gb-daily none`.

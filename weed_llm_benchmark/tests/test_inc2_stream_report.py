@@ -173,8 +173,11 @@ def main():
         stj = json.loads(D.Paths(e).state.read_text())
         hours += 100.0 * len(stj["runs"]) / 3600.0
     su = rep["su"]
-    check("SU against the L-2 envelope: the runs' seconds of every stream experiment",
-          abs(su["spent_su"] - hours) < 1e-9 and su["envelope_su"] == 1000 and su["window_cap_su"] == 350, su)
+    check("SU against the L-2 envelope: the runs' seconds of every stream experiment; no monthly window since the "
+          "2026-10-04 amendment", abs(su["spent_su"] - hours) < 1e-9 and su["envelope_su"] == 1000
+          and su["window_cap_su"] is None, su)
+    check("  the report says so rather than naming a window", any("SU this month (no monthly window)" in x for x in md),
+          [x for x in md if "this month" in x or "window" in x])
     check("supply: the eligible queue and holds", rep["supply"]["eligible_images"] == 0
           and "held" in rep["supply"], rep["supply"])
     entry = (st.p.milestone_dir(1) / "research_log_entry.md").read_text()

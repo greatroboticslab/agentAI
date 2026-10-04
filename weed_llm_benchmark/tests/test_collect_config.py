@@ -87,6 +87,8 @@ def main():
                 (lambda r: r["known_items"][1].pop("decided_by"), "decided_by is required"),
                 (lambda r: r["placement"].update(lab_only=["nosuch"]), "placement.lab_only"),
                 (lambda r: r["budgets"].update(floor_gb=5.0), "placeholder"),
+                (lambda r: r["budgets"].update(bytes_daily=0), "budgets.bytes_daily: null"),
+                (lambda r: r["budgets"].update(bytes_daily="50 GB"), "budgets.bytes_daily: null"),
                 (lambda r: r["class_map"]["status_map"].update(default="nowhere"), "status_map"),
                 (lambda r: r.update(licence_overrides=["mediatum_1717366"]), "licence_overrides: an object"),
                 (lambda r: r["licence_overrides"].update(mediatum_1717366="research-only"),
@@ -118,6 +120,13 @@ def main():
         r = copy.deepcopy(raw)
         r["budgets"]["floor_gb"] = {"value": 120.0, "set_by": "person 2026-10-15 from the first wave"}
         check("a floor written by a person with its value and who set it is valid", CF.validate(r) == [])
+        r = copy.deepcopy(raw)
+        r["budgets"].pop("bytes_daily", None)
+        r2 = copy.deepcopy(raw)
+        r2["budgets"]["bytes_daily"] = 50e9
+        check("bytes_daily may be null (the default since 2026-10-04: no daily byte cap), absent or a positive number",
+              raw["budgets"].get("bytes_daily") is None and CF.validate(raw) == [] and CF.validate(r) == []
+              and CF.validate(r2) == [], (CF.validate(r), CF.validate(r2)))
         r = copy.deepcopy(raw)
         r["licence_overrides"]["mediatum_1717366"].update(id="CC BY 4.0", research_only=False)
         r["licence_overrides"]["kg_yuzhenlu__cottonweeddet3"].update(id="unknown")

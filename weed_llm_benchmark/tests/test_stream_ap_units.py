@@ -415,6 +415,7 @@ def t_budget():
               "status": "executed", "run_id": "r2", "job_ids": ["702"]},
              {"campaign": "weed_inc_v1", "action": "inc_build_realloop", "params": {"exp": "rl9"}, "charged": True,
               "est_su": 30.0, "epoch": now - 7200, "ts": W.utc(now - 7200), "status": "executed", "run_id": "r3"}]
+    # the caps are declared here (none has a default since the 2026-10-04 amendment)
     camp = {"name": NAME, "mode": "stream", "envelope_su": 1000.0, "daily_cap_su": 120.0, "window_cap_su": 350.0}
     st = B.state(camp, execs, {"su_envelope": 1500, "daily_cap": 120}, now, base_dir=base)
     check("the stream campaign's committed estimates: its collect job and its segment build", st["committed_su"] == 44.0,
@@ -434,8 +435,11 @@ def t_budget():
     st3 = B.state(camp, execs, None, now, base_dir=base)
     check("a stream build's estimate is released by its child experiment's report spend (child_exp)",
           st3["committed_su"] == 0.0 and st3["spent_su"] == 30.5, st3)
-    ok, why = B.fits(dict(st3, window_remaining_su=5.0), 10.0, need_daily=True)
-    check("fits refuses past this month's window", not ok and any("month" in x for x in why), why)
+    ok, why = B.fits(dict(st3, window_remaining_su=5.0), 10.0)
+    check("fits refuses past this month's window (one the campaign declares)", not ok
+          and any("month" in x for x in why), why)
+    ok, why = B.fits(dict(st3, window_remaining_su=None, daily_remaining_su=None), 10.0, need_daily=True)
+    check("  and nothing on a window or daily cap that is not declared, even for the envelope rule", ok, why)
     ok, why = B.fits(dict(st3, domain_remaining_su=5.0), 10.0)
     check("  and past the domain's cap", not ok and any("domain" in x for x in why), why)
     exp_st = B.state({"name": "weedinc", "envelope_su": 300}, [], None, now, base_dir=base)
@@ -598,6 +602,8 @@ def t_measure():
               (last.get("child_exp"), last.get("argv", [])[-4:]))
         it = w.lane("MAINT").get("item") or {}
         if it.get("status") == "filed":
+            # only with a daily cap the campaign declares (none by default since the 2026-10-04
+            # amendment; test_stream_ap_cap_approved declares one)
             why = [e.get("reasons") for e in w.events("filed") if e.get("lever") == "L23B"][-1]
             check("  past today's cap (120 SU) it is filed for a person, not run", "today's cap" in str(why), why)
             aid = it["approval_id"]
@@ -621,6 +627,12 @@ def t_measure():
     d = {x["id"]: x for x in json.loads(S.StreamPaths(str(w.lab), "weed").diagnoses(NAME).read_text())["diagnoses"]}
     check("once all exist, none is proposed again (DR0 is silent)", pro == [b["exp"] for b in meas]
           and not d["DR0"]["fired"], (pro, d["DR0"]["summary"]))
+    ex = [e for e in w.events("executed") if e.get("lever") == "L23B"]
+    check("with no daily cap declared (the default since 2026-10-04) every arm ran within the envelope the day it "
+          "was proposed: none was filed for a person",
+          not [e for e in w.events("filed") if e.get("lever") == "L23B"]
+          and [e.get("child_exp") for e in ex] == [b["exp"] for b in meas]
+          and all(e.get("basis") == "envelope" for e in ex), [(e.get("child_exp"), e.get("basis")) for e in ex])
     arms = [e for e in w.stream_ledger() if e.get("event") == "arm"]
     check("the stream's arm is unchanged throughout: the capacity decision's n640, one arm line, no LA, "
           "capacity_v1.json untouched",
@@ -1184,10 +1196,12 @@ def t_config():
     check("configure_stream refuses a non-person", _raises(lambda: S.configure_stream(NAME, "round-scheduler:x",
                                                                                      cfg_hooks=w.hooks)))
     cfg = w.config()
-    check("L-2's defaults: 1,000 SU to 2026-12-31, 350 monthly, 120 daily; data_autonomy off; the stream block",
-          S.stream_config(cfg, NAME)["envelope_su"] == 1000.0 and S.stream_config(cfg, NAME)["window_cap_su"] == 350.0
-          and S.stream_config(cfg, NAME)["daily_cap_su"] == 120.0 and cfg["data_autonomy"] == "off"
-          and cfg["stream"]["sid"] == "weed_stream_v1", cfg)
+    full = S.stream_config(cfg, NAME)
+    check("L-2's defaults as amended 2026-10-04: 1,000 SU to 2026-12-31, no monthly window, no daily cap, no daily "
+          "byte cap; data_autonomy off; the stream block",
+          full["envelope_su"] == 1000.0 and full["envelope_end_utc"] == "2026-12-31T23:59:59Z"
+          and full["window_cap_su"] is None and full["daily_cap_su"] is None and full["collect_gb_daily"] is None
+          and cfg["data_autonomy"] == "off" and cfg["stream"]["sid"] == "weed_stream_v1", cfg)
     check("an experiment campaign cannot be turned into a stream one", _raises(lambda: _to_stream(w)))
     rc = S.main(["--config", str(w.cfg), "--lab-repo", str(w.lab), "enable", "--name", NAME, "--by", OWNER,
                  "--envelope-end-utc", "2027-03-31T23:59:59Z", "--collect-gb-daily", "30"])

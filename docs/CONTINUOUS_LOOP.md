@@ -153,7 +153,7 @@ These were made after the design review and before any code, under the owner's d
 | Id | Decision | Reason |
 |---|---|---|
 | L-1 | P1–P4 and P6–P11 are adopted as §2.5 states them. | They are the design's defaults, and the review found no reason to change them. |
-| L-2 | **Budget (replaces P5).** The campaign envelope is 1,000 SU until 2026-12-31, with a 350 SU monthly window and a 120 SU daily cap. It stays inside the allocation (10,529 GPU SU remaining on 2026-09-28) and inside the domain's 1,500 SU. | The capacity arms of L-4 and Stage C are added to R0. |
+| L-2 | **Budget (replaces P5).** The campaign envelope is 1,000 SU until 2026-12-31, with a 350 SU monthly window and a 120 SU daily cap. It stays inside the allocation (10,529 GPU SU remaining on 2026-09-28) and inside the domain's 1,500 SU. [amended 2026-10-04 by the owner: the monthly window and the daily cap are removed; the envelope and its end date stay (§6.6, "Amendment (2026-10-04)").] | The capacity arms of L-4 and Stage C are added to R0. |
 | L-3 | **The species guard's tolerance is per species (Protocol v3, pre-registered).** For each species s, tol_s = max(0.03, 1.96 × SE_s). SE_s is the image-bootstrap standard error of the incumbent's dev AP for s: 1,000 resamples of dev images, with the seed from `stable_int("inc2/v3/species_se")`. The overall regression guard and every other guard are unchanged. It is implemented as a new gate version in `inc2/`; `inc/gate.py` stays pinned. Stage C (§5.1) is its first reading. | The v1/v2 guard scales one species' drop by the overall null spread (sd 0.0061), with a 0.03 floor. PricklySida has 42 dev boxes, and its own sampling noise is several times larger. The guard failed on PricklySida in 5 of 6 realloop_v1 steps, drops of 0.033–0.057. That rejects data on measurement noise, not on harm. |
 | L-4 | **Capacity grid at R0 (n640, s640, m640).** B_v2 is trained cold with YOLO11n at 640 px (continuity), YOLO11s at 640 px and YOLO11m at 640 px. Every arm trains and scores at 640 px, so the grid varies capacity only. Each arm gets 3 seeds, the same cold recipe, final EMA weights and the locked scorer. **Rule:** if an arm's dev mean beats YOLO11n's by more than 2 pooled sd, the stream switches to the best such arm. Otherwise it stays on YOLO11n. When the chosen arm's per-step cost with the truth arm exceeds 25 GPU-h, the truth arm runs on every ⌈cost/25⌉-th step, and that is recorded. Test is read once per arm at R0, as a milestone read, and reported with the gap to 0.90. | Class-agnostic test mAP50-95 is 0.874 for B0 and 0.873 for B. Box accuracy therefore caps the 12-class score below 0.90, whatever the species accuracy. Earlier larger models (RF-DETR-L; yolo26x at 1024) reached about 0.89–0.90 under another evaluator. That motivates the arms, but it is not evidence under the locked scorer. yolo26x at 1024 needs roughly 75× the FLOPs of YOLO11n at 640, so it is left out of a loop that trains at every step. The grid first had YOLO11s at 1024 px (s1024). The locked scorer infers at 640 px only, so an arm trained at 1024 px would be measured at 640 px and confound capacity with resolution; s640 replaces it. A resolution arm needs a new scorer version (R4) and is not in this grid. |
 | L-5 | **base_v2 drops the images of `rf_karthikeya-c8pvy__weed-detection-cwp10` and `rf_zig-zag-lnodr__weed-detection-vanpe` outright.** These are 812 of base B's 878 harvested images. The other 66 go through the copy scan (§4.2). | Both sources are re-uploads from the lab that produced dev and test, and the v1 pool caught 132 and 59 near-eval copies in them. A copy that dHash misses would inflate the success measure. Their images add little beyond cwd12 itself: B against B0 moved dev by +0.005 and test by −0.004, both within noise. |
@@ -286,7 +286,7 @@ reports: segment report.md, stream report, RESEARCH_LOG entry at each milestone
     - A failed continuation intake counts as for any job (the source's failure, the lane's step), and the source stays `shard_pending`; three failures within one shard close it. A failed shard admit counts on the lane and the step (L17's params name the batch, not the source), and the batch is admitted again under a new id.
     - The stream decides on what a snapshot shows, never on what it lacks (a snapshot whose summaries failed to read decides nothing). A continuation intake that made no new batch is decided once a snapshot holds the collector's ledger and the latest summary: when the collector's last batch left nothing deferred the source is complete (`admitted`, `shards_done`, its deferred count 0); otherwise the shard made no progress. A shard that left as many images deferred as the shard before it made no progress too. Such a source is closed with a card (`stream reopen` resumes its shards), so a shard is never proposed in a loop.
     - A source the stream admitted before this amendment (no `admitted_batches`) gets its batches as admitted at the first snapshot that holds its latest summary, and waits for its next shard when that summary shows images deferred. An admit that completes before such a snapshot leaves it admitted as before, and D21 does not judge it while its count is unknown. Live, `i0004_zenodo_15808623`'s admit was running at 18:28Z; either path makes the source `shard_pending`.
-    - The limits stay as they are: `jobs_per_day` (L16: 12; L17: 6) and `in_flight` are the executor's.
+    - The limits stay as they are: `jobs_per_day` (L16: 12; L17: 6) and `in_flight` are the executor's. [amended 2026-10-04: the per-day job counts are removed; `in_flight` stays (§6.6, "Amendment (2026-10-04)").]
   - Revision before deploy (2026-10-03). A review of the first version of this amendment found, and this text now describes the fixes for: an hf_parquet shard rewriting committed images in place; `not_in_source` decided on a kept tree that lost files; a tree left after a kill between the last commit and its removal; a shard that could judge nothing and loop; the class map not recorded per shard; the registry counting a redone batch twice; base v3 able to read later shards (a failed build rerun by a person, or a build reading an uncommitted manifest); the stream deciding shards on a missing summary (an orphaned batch, or a source left admitted with images deferred); a detour of the status (a hold and release, a reopening) turning a source part-way through its shards into a candidate; failures accumulating across shards and closing a source that admitted data as a zero-yield failure; D20 taking the DATA lane while eval-hits was due; a stale zero-yield entry kept for the whole shard period; no progress check between shards; and shards waiting on a base v3 state with no end. Each has a test that fails without its fix (checked by reverting each fix alone).
   - Open items:
     - The kept tree of a source that is closed or quarantined while shards remain (up to the size of its extracted archives, about 50 GB for SIU) is not removed by the stream; a person removes `INC_DIR/intake/work/<source>/`.
@@ -916,14 +916,14 @@ The rotation across campaigns (`_tick_all`) stays.
 ### 6.6 Budget and stop-losses
 
 **Budget (`budget.py`, group F).**
-- **Windows.** A monthly window and a daily cap on top of the lifetime envelope (P5).
+- **Windows.** A monthly window and a daily cap on top of the lifetime envelope (P5). [amended 2026-10-04: neither has a default any more; one applies only when a campaign (or the domain's stored config) declares it. See "Amendment (2026-10-04)" at the end of this section.]
 - **Cross-campaign cap.** The domain's `su_envelope` (1,500, `db.py:488`) is enforced across campaigns, by summing every campaign's `inc:<campaign>` steps. It includes the funnel's own cap of 120 GPU-h (DEC-10) and what `weed_inc_v1` has already spent.
 - **Settled job estimates.** Each L16, L17, L18 and L20 job's estimate is settled from sacct (`su_ledger.reconcile` / `parse_sacct`) when the job ends. Today estimates stay charged forever.
 - **Allocation balance.** The Bridges-2 balance is read from the `projects` output in the snapshot and feeds D27. Whether GPU-shared hours and any RM hours draw from one balance is read from that output, not assumed.
 - **A rate for every partition.** `brain/su_rates.json` gets an explicit rate for every partition the loop uses, so no job is priced "unknown".
 - **Estimate.** At a supply-limited pace of one or two segments per month, spend is about 45–100 SU per month (est., §10). The monthly cap of 250 does not bind at that rate.
 
-**Byte budget.** `collect_gb_envelope` and `collect_gb_daily`, checked against /ocean headroom (about 675 of 7,000 GB used on 2026-09-09).
+**Byte budget.** `collect_gb_envelope` and `collect_gb_daily`, checked against /ocean headroom (about 675 of 7,000 GB used on 2026-09-09). [amended 2026-10-04: `collect_gb_daily` and the collector's `budgets.bytes_daily` have no default; `collect_gb_envelope`, the per-source cap and D27's headroom stay.]
 
 [review] **The headroom reading is stale and may already trip D27.** The INC loop's state record of 2026-09-26 gives /ocean as 93 % full (503 GB free). If that holds, D27's rule (staging + projected bytes > quota − 10 %, that is, less than 700 GB free) fires on the first snapshot, and the campaign PAUSEs before it collects anything. The quota is read live by the snapshot before R3. If free space is below 10 % + `collect_gb_envelope`, R3 does not start. A card names the largest directories under `INC_DIR` and `downloads/`, because deleting data is a person's action, and the 200 GB envelope proposal is resized to what fits. L-7 (§2.6) sets the floor to 3 % (about 210 GB). With 454 GB free on 2026-09-28, D27 does not fire, and free space covers 3 % plus the 200 GB envelope.
 
@@ -935,8 +935,8 @@ The rotation across campaigns (`_tick_all`) stays.
 
 | Lever | Limit |
 |---|---|
-| L16 / L17 | ≤ 3 attempts per source; ≤ 2 in flight; ≤ 6 jobs and ≤ 50 GB per day; ≤ 50 GB per source unless a person approves |
-| L18 | ≤ 1 in flight; ≤ 1 per day |
+| L16 / L17 | ≤ 3 attempts per source; ≤ 2 in flight; ~~≤ 6 jobs and ≤ 50 GB per day~~ (removed 2026-10-04); ≤ 50 GB per source unless a person approves |
+| L18 | ≤ 1 in flight; ~~≤ 1 per day~~ (removed 2026-10-04) |
 | L20 | ≤ 1 in flight |
 | L21 | ≤ 1 per milestone |
 | L1–L14 | keep "3 per campaign", so R1–R14 are unchanged |
@@ -949,6 +949,78 @@ The rotation across campaigns (`_tick_all`) stays.
   - D7, D10, D14 or D27 fires;
   - the ticker raises on 3 ticks in a row (`ERRORS_TO_PAUSE`).
 - **Halt.** OP_HALT fires if a decision path touches a non-dev exam.
+
+#### Amendment (2026-10-04, decided by the owner): no time-based throttles by default
+
+**Why (measured).** On 2026-10-04 the cluster sat idle for about 9 h while the stream's next segment (L18) was filed "awaiting approval" for two reasons only: "estimated 116.2 SU exceeds the 86.52 SU left under today's cap of 120" and "L18 already ran 1 time(s) in the last 24 h (limit 1)". The campaign's own `daily_cap_su` was 180 (raised on 2026-10-03), but `budget.envelope` capped it at 120, the `budget.daily_cap` of `db.DEFAULT_DOMAIN_CONFIG`: a code default that nobody had set for the domain. (An interim change the same day, commit `11c01b0`, set that default to 1500, the domain envelope, so that it never bound; it kept a figure declared only because `fits(…, need_daily=True)` refused an undeclared daily cap. This amendment removes both.) The monthly window (350 SU; 176 SU used by 2026-10-04) would have been the next blocker within days. None of these caps protects anything that the fuses below do not already protect. All they did was delay healthy work.
+
+**What changed.**
+- **Daily SU cap.** There is no default anywhere:
+  - `db.DEFAULT_DOMAIN_CONFIG["budget"]` no longer declares `daily_cap` (it was 120, then the interim 1500);
+  - `inc2.stream.BUDGET` no longer records `daily_cap_su` (120);
+  - the stream campaign's `STREAM_DEFAULTS["daily_cap_su"]` is None (it was 120).
+
+  In `budget.envelope`, `state` and `fits`, an absent daily cap means no daily cap: no refusal and no reason. It is reported as none (`daily_cap_su` and `daily_remaining_su` are None, with the source "none (no daily cap is declared)"). `today_su` is still reported. The mechanism stays: a campaign that sets `daily_cap_su` still gets it, and a domain whose stored config declares `budget.daily_cap` still caps its campaigns.
+- **Monthly window.** It is treated the same way. `STREAM_DEFAULTS["window_cap_su"]` is None (it was 350), `inc2.stream.BUDGET` no longer records it, and an absent window is none. `fits(…, need_daily=True)` no longer refuses with "no daily cap is declared" or "no monthly window is declared". `need_daily` is still accepted but has no effect, and the executor's envelope rule no longer passes it. A window that a campaign declares still refuses past it.
+- **Per-day lever counts.** These entries are removed from `limits` in `stream_levers.json`:
+  - L16: `jobs_per_day` 12 and `gb_per_day` 50;
+  - L17: `jobs_per_day` 6;
+  - L18: `per_day` 1.
+
+  `executor.stream_limits` still honours a per-day count if a limits entry declares one; none does now. `levers.json` has no per-day or windowed count. Experiment mode keeps its "more than 3 per campaign" stop-loss, which is a total, not a rate.
+- **Per-day byte caps.**
+  - The stream campaign's `collect_gb_daily` default (50 GB) is now None.
+  - The collector's `budgets.bytes_daily` in `collect/domains/weed.json` (50 GB) is now null. `collect.config` accepts null or a positive number.
+  - `collect.prefilter.precheck` (the `daily_bytes` hold) and the byte plan in `collect.fetch` apply the cap only when one is declared (`prefilter.daily_byte_cap`).
+
+  Without the collector change, removing L16's `gb_per_day` would have left the same 50 GB a day in force: the collector would still clip, and then hold, every cluster fetch.
+- **Configure command.** `python -m weed_optimizer_framework.tools.inc_autopilot.stream configure --name N --by human:<email> [settings]` changes settings only. Unlike `enable`, it does not enable the campaign and does not release a pause or a held lane.
+  - `--daily-cap-su`, `--window-cap-su` and `--collect-gb-daily` accept `none` (`configure_stream`'s `CLEAR`), which stores None: no cap. `enable` accepts `none` too.
+  - The lifetime envelope and `collect_gb_envelope` cannot be cleared: passing `none` for them is a usage error.
+- **Displays and records.**
+  - The /inc page shows "no daily cap" when none is declared.
+  - The stream report shows "SU this month (no monthly window)". It takes the window from the current rule, not from a definition written before this amendment.
+  - `stream_domains/weed.json` records decision L-2a, and L-2 (§2.6) is marked as amended.
+
+**What stays, and why none of it delays healthy work.**
+- **In-flight limits** (L16 2, L17 2, L18 1, L20 1). They bound how many jobs run at once, never when the next one may start. One segment at a time is the protocol's order, not a throttle.
+- **Per-source limits.** `attempts_per_source` (3) and `gb_per_source` (50 GB, unless a person approves more). A source that keeps failing, or that grows past its size, waits for a person; a healthy source is never held by them.
+- **Count totals.** The limits on L21, L22, L25, L27, L28 and LI are counts per milestone, rollback, stream version or campaign, not rates.
+- **Lifetime envelopes.** The campaign's `envelope_su` (1,000 SU to 2026-12-31), the domain's `su_envelope` (1,500 SU across every campaign) and `collect_gb_envelope` (200 GB) are the fuses against a runaway bug that submits jobs in a loop.
+- **Disk headroom, stop-losses and the end date.**
+  - D27's disk headroom stays.
+  - The stop-losses stay: 2 consecutive failed steps hold a lane; 3 zero-yield sources hold DATA; 2 held lanes, D7, D10S, D14, D27 or 3 raising ticks pause the campaign.
+  - The allocation's end date stays.
+
+**How it was verified.**
+- **New tests: `tests/test_stream_ap_no_throttles.py`.**
+  - The defaults: nothing above declares a time-based cap, and the fuses keep their values.
+  - With no cap declared, a 116.2 SU request passes in two cases: with 120 SU already charged today (0 left under the old cap), and with the incident's 33.48 SU (86.52 left). A campaign's 180 is no longer cut to 120. With 400 SU spent this month, no window refuses.
+  - A declared daily cap or window still refuses, and a domain's declared `daily_cap` still caps a campaign (180 → 100).
+  - The envelopes still refuse: the campaign's 300 SU and the domain's 1,500 SU.
+  - Through `executor.submit`, two L18s of 116.2 SU run within the envelope on the same UTC day. Each of these then refuses a further L18: `in_flight` 1, a 300 SU envelope, a declared 180 SU daily cap, and a declared 300 SU window. 13 L16 jobs and 65 GB in 24 h, or 7 L17 jobs, leave the next one free. The 50 GB per-source cap still refuses.
+  - The `configure` command clears all three caps without enabling the campaign or lifting its pause, and records the change in the stream ledger. `enable --daily-cap-su none` works too. `--envelope-su none` is a usage error.
+  - The collector neither clips nor holds a fetch when no `bytes_daily` is declared, and clips to the remainder when one is.
+  - The deploy: `deploy_funnel.sh --dry-run` lists `tools/db.py` among the shipped files and this file in its pre-flight.
+- **Updated tests.** They keep covering the mechanism, now with an explicit cap:
+  - `test_stream_ap_cap_approved.py` declares the 120 SU cap the stream had then, and adds a case where no arm is filed when no cap is declared;
+  - `test_stream_ap_units.py` covers the amended defaults, adds the measurement arms running by the envelope with none filed, and checks that `need_daily` no longer refuses;
+  - `test_inc_ap_governance.py`: a campaign's cap stands without a domain cap, and is still capped by a declared one (through `executor.budget_now` and through `budget.envelope`); with neither declared there is no daily cap, so the interim 1500 (or the old 120) fails it;
+  - `test_stream_ap_replay.py` S15: no per-day count by default, plus a declared six-jobs-a-day count that syncs do not use up and six fetch jobs do;
+  - `test_collect_prefilter.py`, `test_collect_config.py` and `test_inc2_stream_report.py`.
+- **The new checks fail on the code before this change.** With the modules reverted to the commit before the interim change (120 declared), 22 checks fail, and the configure test exits on the unknown verb. With them reverted to `main` after the interim change (1500 declared), 19 fail before the same exit; the deploy checks fail on `main`'s `deploy_funnel.sh` (no `db.py` shipped, this file not in the pre-flight), and `test_inc_ap_governance.py` fails two checks on `main`'s `db.py`.
+- **Full suite.** All 146 `tests/*.py` files were run, on the change rebased onto the interim change. 145 pass. `test_brain_api.py` fails with the same failure on `main` before this change (`supervision_health.py` reads the reviewer), so the failure is unrelated.
+- **Replay gate, run locally.** This is `executor.run_replay_tests`, which `record-replay` runs on the lab, run against the fixtures. It records `pass`: 56 cases pass, and R2 and R4b are the two skips the gate allows (their fixtures are not committed). Both `replay_status` and `stream_replay_status` pass.
+- **No stored decision changes.** The recorded ledgers the gate replays (pilot_v1–v3, realloop_v1, the funnel's) contain no daily-cap, window or per-day refusal. The change therefore alters no decision they made; it only removes future refusals of that kind.
+
+**Deploy.**
+- **`tools/db.py`.** `deploy/deploy_funnel.sh` now ships `tools/db.py`, under `SHARED_RE`: if the file differs on the cluster, the deploy refuses unless `--allow-shared-change` is given. Without it, the lab's `db.py` may still declare `daily_cap` 120, or 1500 if the interim change (`11c01b0`) was deployed; `budget.domain_budget()` reads that file on the lab (where the ticker runs), and that cap would stay.
+- **Pre-flight.** The deploy's local pre-flight set now runs `tests/test_stream_ap_no_throttles.py` as well as `test_inc_ap_governance.py`, so a tree that declares a default daily cap, window or per-day lever count again (for example a merge resolved to the interim `db.py`) is refused before anything is copied.
+- **Hashes and records.** The change moves `executor.code_hash()`, so the replay must be recorded again (`record-replay`). It also moves the stream rules version (`stream_levers.json`, `diagnose_stream.py`); the ticker writes a new prospective stream record before the next L18. `inc2/stream.py` changes only `BUDGET`, which is written into a new stream's definition, so the live stream records a `code_change` event.
+- **After the deploy, a person clears the live campaign's explicit caps:** `python -m weed_optimizer_framework.tools.inc_autopilot.stream configure --name weed_stream_v1 --by human:<email> --daily-cap-su none --window-cap-su none --collect-gb-daily none`.
+- **Stored domain config.** Once `budget.domain_budget()` reads the stored domain config (planned), the weed domain's stored `budget` block must not declare a `daily_cap`. If it does, that cap applies to every campaign again.
+
+**Left unchanged.** `round_scheduler`'s `max_rounds_per_day` (default 2) is a per-day count of the old round scheduler, which has been paused since 2026-08-29. It does not govern the stream campaign.
 
 ### 6.7 What keeps it running, and what stops it
 
@@ -2098,7 +2170,7 @@ Agnostic test grew with capacity alone. So whether a larger or a newer detector 
 - **Pricing.** The platform prices the builds at 18.7 (y26l640), 16.7 (y26m640) and 16.7 (l640) GPU-h, the build job included. `capacity.measure_arms` cost factors are 3.5, 3.0 and 3.0, against n640's 7.0 ms per image-epoch.
 - **Expected time.** From m640's measured 2.68 h per base run, scaled by GFLOPs at nc 13 (YOLO11m at 640 is GPU-bound): about 3.7–4.0, 2.9–3.2 and 3.4 h per base run. That is under D26's 6.4 h line and the pinned 8 h cold limit.
 - **Rescores.** 1.5 GPU-h each.
-- **Daily cap.** At 120 SU a UTC day, one or two arms run per day beside the segments.
+- **Daily cap.** At 120 SU a UTC day, one or two arms run per day beside the segments. [amended 2026-10-04: there is no daily cap by default; the arms are bounded by the envelope and by MAINT's one item in flight.]
 - **Left out.** yolo11x and yolo26x (195.5 and 208.7 GFLOPs) would take about 8 h per base run on one V100.
 
 **Measured before the change** (Ultralytics 8.4.37, nc 13):

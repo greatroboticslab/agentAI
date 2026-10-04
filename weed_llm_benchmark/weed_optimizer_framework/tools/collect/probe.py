@@ -119,7 +119,7 @@ def summary(cfg, inc=None, extra=(), testing=False, now=None):
         "sources": folded, "by_status": by_status, "batches": per_batch,
         "recent_outcomes": [{"ts": t, "source": s, "outcome": o, "reasons": r} for t, s, o, r in outcomes(folded)],
         "bytes": {"last_24h": S.bytes_since(rows, now - datetime.timedelta(hours=24)), "total": S.bytes_total(rows),
-                  "daily_cap": bu["bytes_daily"], "envelope": bu["bytes_envelope"],
+                  "daily_cap": bu.get("bytes_daily"), "envelope": bu["bytes_envelope"],
                   "per_source_cap": bu["bytes_per_source"]},
         "chains": {"sources.jsonl": verify_chain(sources_ledger(inc)), "batches.jsonl": verify_chain(batches_ledger(inc))},
         "placement": (placement or {}).get("providers"), "floors": cfg.yield_floors(),
