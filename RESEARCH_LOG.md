@@ -25,7 +25,11 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 - D = +0.0217. It exceeds both 2 pooled sd (0.0050) and the paired bootstrap SE (0.0068), so E1-B qualifies under the pre-registered rule (capacity/e1_v1.json, written by L23E at 05:27Z).
 - This is the first measured gain from scale in this project. It is on box placement, the limit identified on 2026-10-01: the 12-class YOLO11m on base_v2 has agnostic dev 0.8695 and test 0.8901.
 - The cross-lab ImageWeeds score rises by 56 % relative, but it stays low (0.19).
-- The sealed test was read once per arm by a person (e1-test-read, jobs 47399746/47399747). The 12-class sealed test stays 0.8786 until a 12-class model is trained on base v3.
+- **Sealed test, read once per arm by a person** (e1-test-read, jobs 47399746/47399747). The score is class-agnostic mAP50-95 on cwd12 test.
+  - B: 0.8996 ± 0.0015 (seeds 0.9003, 0.9006, 0.8980).
+  - A: 0.8838 ± 0.0018.
+  - Reference: the best 12-class model's boxes score 0.8901.
+  - Box placement, the limit found on 2026-10-01, now reaches about 0.90 with data alone. The 12-class sealed test stays 0.8786 until a 12-class model is trained on base v3.
 
 **Base v3.**
 - Composition: SIU 15,532 (its 35 % family cap bound: 3,219 dropped), MH-Weed16 4,576, rf_tuf 4,315, cwd12 train 3,048, and 20 more sources.
