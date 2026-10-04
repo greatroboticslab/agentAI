@@ -2770,9 +2770,41 @@ def t_e1_cut_order():
           [e.get("lever") for e in w2.events("executed")])
 
 
+def t_fork_stage_c():
+    """A forked stream version inherits the campaign's Stage C (live,
+    2026-10-04): the fork's own ledger holds init, prospective, arm, cuts and a
+    build but no feasibility event, and R0 must still read complete so the
+    measurement arms (E2's builds) are proposed."""
+    print("a forked stream version inherits the campaign's recorded Stage C")
+
+    class V(object):
+        def __init__(self, ledger, decided):
+            self.led, self.decided = ledger, decided
+
+        def stream_ledger(self):
+            return self.led
+
+        def c(self, ptr, default=None):
+            return self.decided if ptr == "/stage/stage_c_decided" else default
+
+    fork = [{"event": e} for e in ("init", "prospective", "arm", "cut", "cut", "build")]
+    parent = [{"event": "init"}, {"event": "arm"}, {"event": "feasibility", "phase": "build"},
+              {"event": "feasibility", "phase": "read"}]
+    ss = DS._stream_state(V(fork, True))
+    check("the fork with the campaign's Stage C decided reads Stage C built and read",
+          ss["stage_c_built"] and ss["stage_c_read"] and ss["arm"] and ss["init"], ss)
+    ss = DS._stream_state(V(fork, False))
+    check("  without the campaign's decision it does not", not ss["stage_c_built"] and not ss["stage_c_read"], ss)
+    ss = DS._stream_state(V(parent, None))
+    check("  the version that built and read Stage C reads it from its own ledger",
+          ss["stage_c_built"] and ss["stage_c_read"], ss)
+    ss = DS._stream_state(V([{"event": "init"}, {"event": "arm"}, {"event": "feasibility", "phase": "build"}], False))
+    check("  built but not read, and not decided: not read", ss["stage_c_built"] and not ss["stage_c_read"], ss)
+
+
 def main():
     for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_e1, t_e1_lift_wait, t_e1_lift_faults, t_e1_cut_order,
-               t_e2,
+               t_e2, t_fork_stage_c,
                t_formats,
                t_replay_gate,
                t_config, t_lab, t_lanes, t_d28, t_d28_v2, t_d28_v2_sources, t_d28_v2_round3):

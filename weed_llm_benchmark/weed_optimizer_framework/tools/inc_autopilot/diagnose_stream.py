@@ -1515,13 +1515,23 @@ def canary(v):
 # ------------------------------------------------ the lanes' own work items
 def _stream_state(v):
     """What the stream ledger says about its own set-up: initialised, the arm
-    adopted (choose-arm), Stage C built and read."""
+    adopted (choose-arm), Stage C built and read.
+
+    Stage C is the campaign's feasibility check at R0: read once (DSC) and
+    recorded on the campaign (/stage/stage_c_decided). A later stream version
+    (L22's fork, which adopts the pool and the quarantine) starts a ledger of
+    its own without a feasibility event and never builds Stage C again, so the
+    campaign's recorded decision counts as Stage C built and read for it. Seen
+    live on 2026-10-04: after the 05:57Z fork, R0 read as incomplete and every
+    measurement arm, E2's six builds included, waited on a Stage C the fork
+    would never read."""
     led = v.stream_ledger()
     ev = [e.get("event") for e in led]
     fz = [e for e in led if e.get("event") == "feasibility"]
+    decided = bool(v.c("/stage/stage_c_decided"))
     return {"init": "init" in ev, "arm": "arm" in ev,
-            "stage_c_built": any(e.get("phase") == "build" for e in fz),
-            "stage_c_read": any(e.get("phase") == "read" for e in fz)}
+            "stage_c_built": any(e.get("phase") == "build" for e in fz) or decided,
+            "stage_c_read": any(e.get("phase") == "read" for e in fz) or decided}
 
 
 def _eval_hits_due(v):
