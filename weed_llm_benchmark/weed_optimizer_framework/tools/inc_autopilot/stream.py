@@ -177,12 +177,22 @@ RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
                       "L23V": "Base v3 build (splits v3, E1) failed (L23V)",
                       "L23E": "E1's agnostic rescore of %s failed (L23E)",
                       "L23C": "E2's 12-class rescore and verdict failed (L23C)"}
-# A measurement arm's build (L23B of a baselines item marked measure) that ends
-# without its experiment: record only as well (a card; no lane failure; DR0
-# skips the item, /stage/baselines says failed), since no lane waits for it
-# and the next measure item would otherwise meet the same refusal and hold
-# MAINT (2026-10-04, E2's six builds)
+# A measurement arm's build (L23B of a baselines item marked measure) whose job
+# ran and ended without its experiment: record only as well (a card; no lane
+# failure; DR0 skips the item, /stage/baselines says failed), since no lane
+# waits for it and the next measure item would otherwise meet the same refusal
+# and hold MAINT (2026-10-04, E2's six builds). Only a build that ran: a
+# submission that failed or was refused before anything was queued (an sbatch
+# socket timeout, squeue unavailable, a duplicate job name) is the lane's
+# ordinary failure and is proposed again, as on every lever. A build that ended
+# with no refusal line in its provenance (the job was killed from outside:
+# NODE_FAIL, PREEMPTED, BOOT_FAIL, TIMEOUT, or no sacct state at all) is built
+# again under a new id, up to LOST_RUNS_MAX times in a row, before it is
+# record only; a refusal of the build itself (inc2.baseline's ERROR line) or a
+# cancelled job is record only at once (_failed, `ended`).
 MEASURE_BUILD_TITLE = "Measurement arm %s: its build ended without the experiment (L23B)"
+# sacct states a person or the scheduler's operator chose (never retried by the stream)
+CANCELLED_STATES = ("CANCELLED",)
 # A callable taking the StreamRun and returning its lab runner (tests).
 LAB_RUNNER = None
 # Refusals the identical request meets again (retry: false): a Step 1 batch
@@ -1409,7 +1419,7 @@ class StreamRun(object):
         # DR0's bounded wait before the base v3 build, before the fired diagnoses' cards (an escalation raised
         # this tick then stays the current card, and the alarm with it)
         self._lift_wait(by)
-        # E2's decided verdict (2026-10-04): one card naming the chosen arm's test read, a person's step
+        # E2's decided verdict (2026-10-04): one card naming each qualifying arm's test read, a person's step
         self._e2_card()
         # cards and holds
         for d in fired:
@@ -2624,6 +2634,14 @@ class StreamRun(object):
                 it["status"] = "running"          # its experiment is followed by name
                 self._on_started(ln, it)
                 return
+            if it["lever"] in RECORD_ONLY_LEVERS:
+                # a record-only job (L23N, L23V, L23E, L23C) whose submission ran before the lab stopped (a restart
+                # between the ssh and the state write): followed by its job name and its record as an unknown
+                # outcome is (_follow_record_only), so a failure of the job is still a card and r0 says so;
+                # declining it here would leave a failed job with no card and the item never proposed again
+                it.update(status="running", uncertain=True, job_ids=[])
+                self._on_started(ln, it)
+                return
             # a job or verb that already ran has no job id to follow here: its
             # effect shows in the snapshots; following it would fail it as a
             # job that "ended unknown" and count toward the lane's stop-loss
@@ -2834,11 +2852,20 @@ class StreamRun(object):
             st["bisected"] = rb[-1]["utc"] if rb else self.utc
         self._clear(ln)
 
-    def _failed(self, ln, it, why, charged=False, retry=True, lost=False):
+    def _failed(self, ln, it, why, charged=False, retry=True, lost=False, ended=None):
+        """An item that ended without its effect. `ended` is given only by the
+        follow of a build whose job ran and ended without its experiment
+        ({"refusal": the provenance's refusal line or None, "states": the
+        job's sacct states}); a submission that failed or was refused before
+        anything was queued never passes it."""
         st = self.st
         p = it["proposal"]
         lever, params = it["lever"], p.get("params") or {}
         lane = st["lanes"][ln]
+        if ended is not None:
+            # the build job's estimate (its runs included) is released once sacct settled it: the sacct entry
+            # holds what it cost, and no experiment's report spend will ever release it (budget.committed)
+            self._build_ended_spend(it, why)
         if lever in FETCH_LEVERS:
             # ended: the byte limits count what it fetched, not its max_bytes
             self._fetch_ends()[p["id"]] = self.utc
@@ -2899,26 +2926,51 @@ class StreamRun(object):
                        "leaves it" % (_short(why, 400), rerun), lever=lever, trigger=list(p.get("trigger") or []))
             self._clear(ln)
             return
-        mb = self._measure_build(lever, params, p)
+        mb = self._measure_build(lever, params, p) if ended is not None else None
         if mb is not None:
-            # a measurement arm's build that ended without its experiment (MEASURE_BUILD_TITLE): record only, as
-            # its runs are; the item stays failed (/stage/baselines), so DR0 does not propose it again, the lane's
-            # failure count is not touched, and the next measure item is not stopped by this one's refusal
+            # a measurement arm's build whose job ran and ended without its experiment (MEASURE_BUILD_TITLE):
+            # record only, as its runs are; the lane's failure count is not touched, and the next measure item is
+            # not stopped by this one's refusal. A job killed from outside (no refusal line, not cancelled) is
+            # built again under a new id, up to LOST_RUNS_MAX times in a row (/stage/baselines says missing
+            # again, so DR0 proposes it); a refusal of the build itself, a cancelled job, or the last of those
+            # retries leaves the item failed (/stage/baselines), and DR0 does not propose it again
             r0 = st["stage"].setdefault("r0", {})
+            states = list(ended.get("states") or [])
+            refusal = ended.get("refusal")
+            cancelled = any(str(x).startswith(CANCELLED_STATES) for x in states)
+            key = step_key(lever, params)
+            tries = ""
+            if not refusal and not cancelled:
+                lr = st.setdefault("lost_runs", {})
+                lr[key] = int(lr.get(key) or 0) + 1
+                if lr[key] < LOST_RUNS_MAX:
+                    att = st.setdefault("attempts", {})
+                    att[key] = int(att.get(key) or 0) + 1
+                    st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+                    r0.pop("baseline_%s" % mb["id"], None)
+                    self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
+                                 charged=charged, record_only=True, child_exp=mb["exp"], lost=True,
+                                 lost_runs=lr[key], states=states, next="built again under a new id")
+                    self._clear(ln)
+                    return
+                tries = " It ended without a refusal line (sacct %s) %d times in a row, so it is not built again." % (
+                    ",".join(states) or "unknown", lr[key])
+                lr.pop(key, None)
             r0["baseline_%s" % mb["id"]] = "failed"
             st["declined"] = (list(st.get("declined") or []) + [p["id"]])[-200:]
             self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
-                         charged=charged, record_only=True, child_exp=mb["exp"])
+                         charged=charged, record_only=True, child_exp=mb["exp"], states=states)
             after = ""
             if mb.get("requires") == "e1":
-                after = (" E2's verdict (L23C) needs all six of E2's experiments: it is not proposed until a person "
-                         "builds %s (inc2.baseline build --exp %s --manifest INC_DIR/%s --seeds %s --arm %s --role %s "
-                         "--e2 %s), or leaves E2 incomplete." % (mb["exp"], mb["exp"], mb.get("manifest"),
-                                                                 mb.get("seeds"), mb.get("arm"), mb.get("role"),
-                                                                 mb.get("e2")))
+                after = (" E2's verdict (L23C) needs all six of E2's experiments, and E2's other builds wait while "
+                         "this one is failed (one card): nothing more of E2 is proposed until a person builds %s "
+                         "(inc2.baseline build --exp %s --manifest INC_DIR/%s --seeds %s --arm %s --role %s --e2 %s; "
+                         "the wait ends once its experiment exists), or leaves E2 incomplete."
+                         % (mb["exp"], mb["exp"], mb.get("manifest"), mb.get("seeds"), mb.get("arm"), mb.get("role"),
+                            mb.get("e2")))
             self._card("escalation", MEASURE_BUILD_TITLE % mb["exp"],
-                       "%s. Record only: the stream runs on and the build is not proposed again.%s"
-                       % (_short(why, 600), after), lever=lever, trigger=list(p.get("trigger") or []))
+                       "%s.%s Record only: the stream runs on and the build is not proposed again.%s"
+                       % (_short(why, 600), tries, after), lever=lever, trigger=list(p.get("trigger") or []))
             self._clear(ln)
             return
         if not retry:
@@ -3466,12 +3518,15 @@ class StreamRun(object):
                     and ("inc_build_%s" % child) not in names
                 if ended:
                     it["lost"] = int(it.get("lost") or 0) + 1
-                    if it["lost"] >= BUILD_LOST_SNAPSHOTS or any((sacct.get(j) or {}).get("state") not in
-                                                                (None, "RUNNING", "PENDING", "COMPLETED")
-                                                                for j in it.get("job_ids") or []):
+                    states = [(sacct.get(j) or {}).get("state") for j in it.get("job_ids") or []]
+                    if it["lost"] >= BUILD_LOST_SNAPSHOTS or any(s_ not in (None, "RUNNING", "PENDING", "COMPLETED")
+                                                                for s_ in states):
                         prov = ((payload.get("status") or {}).get("builds") or {}).get(child) or {}
+                        # the build ran and ended without its experiment: what _failed needs to tell a refusal
+                        # of the build itself from a job killed from outside (a measurement arm's build)
                         self._failed(ln, it, "the build of %s ended without the experiment%s" % (
-                            child, (": %s" % prov.get("refusal")) if prov.get("refusal") else ""))
+                            child, (": %s" % prov.get("refusal")) if prov.get("refusal") else ""),
+                            ended={"refusal": prov.get("refusal"), "states": [str(s_) for s_ in states if s_]})
                 continue
             if follow == "job":
                 ids = [str(j) for j in it.get("job_ids") or []]
@@ -3572,6 +3627,25 @@ class StreamRun(object):
             B.record_job_spend(j, self.name, r, it["proposal"].get("policy_action"), domain=self.domain,
                                base_dir=self.xctx.su_base_dir, ts=self.utc)
         it["build_settled"] = self.utc
+
+    def _build_ended_spend(self, it, why):
+        """A build whose job ran and ended without its experiment: once
+        _settle_build_job wrote its jobs' sacct spend, each job is marked
+        ended (budget.record_build_ended), so budget.committed releases the
+        build's estimate, which only its experiment's report spend releases
+        otherwise and which would then stay committed for good (the job's
+        sacct SU in spent as well). A build sacct did not settle keeps its
+        estimate: overstated, never understated."""
+        if not it.get("build_settled"):
+            return
+        p = it["proposal"]
+        child = p.get("child_exp") or (p.get("params") or {}).get("exp")
+        for j in [str(x) for x in it.get("job_ids") or []]:
+            r = B.record_build_ended(j, self.name, child, _short(why, 300), domain=self.domain,
+                                     base_dir=self.xctx.su_base_dir, ts=self.utc)
+            if not r.get("ok"):
+                self.log.warning("[inc-stream] build job %s of %s: its estimate stays committed (%s)"
+                                 % (j, child, r.get("reason")))
 
     def _adopt_fork(self, q):
         """The new stream version a finished fork (L22) created: the campaign's
@@ -3733,8 +3807,9 @@ class StreamRun(object):
     def _e2_card(self):
         """One card once E2's verdict (capacity/e2_v1.json, shipped) is
         decided: the arms that qualify, each with its D, 2 pooled sd and SE,
-        and for the chosen arm the exact commands of a person's one read of
-        the sealed test. Raised once (state e2_card)."""
+        and for each qualifying arm the exact commands of a person's one read
+        of its sealed test (the chosen arm's is E2's headline). Raised once
+        (state e2_card)."""
         st = self.st
         if st.get("e2_card"):
             return
@@ -3755,10 +3830,12 @@ class StreamRun(object):
             title = "E2's verdict: E2-%s qualif%s" % (", E2-".join(q), "ies" if len(q) == 1 else "y")
             if chosen in q:
                 title += " (chosen: E2-%s)" % chosen
-                lines.append("E2's choice is E2-%s (the larger D; a tie goes to S). A person reads its sealed test "
-                             "once: python -m weed_optimizer_framework.tools.inc2.baseline e2-test-read --e2 %s, "
-                             "submit the printed argvs, then python -m weed_optimizer_framework.tools.inc2.baseline "
-                             "e2-test-report --e2 %s. Nothing switches." % (chosen, chosen, chosen))
+                lines.append("E2's choice is E2-%s (the larger D; a tie goes to S): its sealed test is E2's headline "
+                             "number. Nothing switches." % chosen)
+            for k in q:
+                lines.append("A person reads E2-%s's sealed test once: python -m weed_optimizer_framework.tools.inc2."
+                             "baseline e2-test-read --e2 %s, submit the printed argvs, then python -m "
+                             "weed_optimizer_framework.tools.inc2.baseline e2-test-report --e2 %s." % (k, k, k))
         else:
             lines.append("No arm qualifies: nothing to read; nothing switches.")
             title = "E2's verdict: no arm qualifies"

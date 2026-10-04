@@ -38,9 +38,12 @@ What counts against it
   (`charged: true` in its execution log) whose experiment has no spend in the
   ledger yet. A build's estimate is released when the spend of the
   experiment it builds (its own `params.exp`, whatever `child_exp` the
-  record states) is recorded. An action with no report of its own
-  (relevance, audit) keeps its walltime estimate for good, which overstates
-  rather than understates.
+  record states) is recorded, or when the stream judged that its job ran and
+  ended without that experiment once sacct settled the job
+  (`record_build_ended`): the sacct entry then holds what the job cost, and
+  no report spend would ever release the estimate. An action with no report
+  of its own (relevance, audit) keeps its walltime estimate for good, which
+  overstates rather than understates.
 * **Today**: estimates charged since 00:00 UTC, reported always and checked
   only against a declared daily cap.
 
@@ -149,11 +152,14 @@ def _exp_of_job(job):
 
 
 _SACCT_JOB_RE = re.compile(r"^inc:job([0-9]+(?:_[0-9]+)?):sacct$")
+# A build job the stream judged ended without its experiment (record_build_ended: 0 SU, a marker)
+_ENDED_BUILD_RE = re.compile(r"^inc:job([0-9]+(?:_[0-9]+)?):build_ended$")
 
 
 def spent(name, domain=M.DOMAIN, base_dir=None):
-    """SU the ledger holds for campaign `name`, the experiments it settles, and
-    the jobs settled from sacct (stream mode: record_job_spend)."""
+    """SU the ledger holds for campaign `name`, the experiments it settles, the
+    jobs settled from sacct (stream mode: record_job_spend) and the build jobs
+    the stream judged ended without their experiment (record_build_ended)."""
     step = campaign_step(name)
     # su_ledger folds each (job, step) to its last line; its public readers do
     # not filter by step, so the fold and its aggregate are reused directly.
@@ -161,8 +167,10 @@ def spent(name, domain=M.DOMAIN, base_dir=None):
     agg = su_ledger._aggregate(entries)
     settled = sorted({x for x in (_exp_of_job(e.get("job")) for e in entries) if x})
     jobs = sorted({m.group(1) for m in (_SACCT_JOB_RE.match(str(e.get("job") or "")) for e in entries) if m})
+    ended = sorted({m.group(1) for m in (_ENDED_BUILD_RE.match(str(e.get("job") or "")) for e in entries) if m})
     return {"su": agg["su"], "n_entries": agg["n_entries"], "n_unknown": agg["n_unknown"],
-            "unknown_su_jobs": agg["unknown_su_jobs"], "settled_exps": settled, "settled_jobs": jobs}
+            "unknown_su_jobs": agg["unknown_su_jobs"], "settled_exps": settled, "settled_jobs": jobs,
+            "ended_builds": ended}
 
 
 def fold(executions):
@@ -219,11 +227,12 @@ def child_of(rec):
 STREAM_CHILD_ACTIONS = ("inc_build_segment", "inc_build_consolidation")
 
 
-def committed(executions, name, settled_exps=(), settled_jobs=()):
+def committed(executions, name, settled_exps=(), settled_jobs=(), ended_builds=()):
     """Estimates charged by the executor whose experiment has no recorded spend
     (and, in stream mode, whose jobs sacct has not settled)."""
     settled = set(settled_exps or ())
     jobs = set(str(j) for j in settled_jobs or ())
+    ended = set(str(j) for j in ended_builds or ())
     su, items = 0.0, []
     for rec, est in _charged(executions, name):
         child = child_of(rec)
@@ -232,8 +241,11 @@ def committed(executions, name, settled_exps=(), settled_jobs=()):
         ids = [str(j) for j in rec.get("job_ids") or []]
         # a job settled from sacct releases its estimate, unless it is a build
         # whose experiment's report spend releases it (a build job with no
-        # experiment, such as a stream fork, is released by its sacct)
-        if jobs and ids and (not str(rec.get("action") or "").startswith("inc_build_") or not child) \
+        # experiment, such as a stream fork, is released by its sacct); a build
+        # whose every job sacct settled and the stream judged ended without its
+        # experiment is released too (record_build_ended)
+        if jobs and ids and (not str(rec.get("action") or "").startswith("inc_build_") or not child
+                             or all(j in ended for j in ids)) \
                 and all(j in jobs for j in ids):
             continue
         su += est
@@ -264,7 +276,7 @@ def state(campaign, executions=(), given_budget=None, now=None, domain=M.DOMAIN,
     name = c.get("name")
     env = envelope(c, given_budget)
     sp = spent(name, domain, base_dir)
-    cm = committed(executions, name, sp["settled_exps"], sp.get("settled_jobs"))
+    cm = committed(executions, name, sp["settled_exps"], sp.get("settled_jobs"), sp.get("ended_builds"))
     td = today(executions, name, now if now is not None else datetime.datetime.now(
         datetime.timezone.utc).timestamp())
     remaining = None
@@ -341,7 +353,8 @@ def stream_windows(campaign, executions, env, sp, cm, now, domain=M.DOMAIN, base
             s_n = spent(n, domain, base_dir)
         except ValueError:
             continue
-        dom_committed += committed(executions, n, s_n["settled_exps"], s_n.get("settled_jobs"))["su"]
+        dom_committed += committed(executions, n, s_n["settled_exps"], s_n.get("settled_jobs"),
+                                   s_n.get("ended_builds"))["su"]
     dom_cap = env.get("domain_envelope_su")
     dom_used = round(dom_spent + dom_committed, 6)
     return {"window": "month", "window_start_utc": datetime.datetime.fromtimestamp(
@@ -518,6 +531,30 @@ def record_job_spend(job_id, campaign_name, sacct_job, action=None, actor=M.AUTO
     except (OSError, ValueError) as e:
         return {"ok": False, "reason": "the SU ledger could not be written: %s" % e}
     return {"ok": True, "job": job_id, "su": su.get("value"), "key": r.get("key")}
+
+
+def record_build_ended(job_id, campaign_name, exp, why, domain=M.DOMAIN, base_dir=None, ts=None):
+    """Mark build job `job_id` (it built nothing: the stream judged that it ran
+    and ended without experiment `exp`) with a 0 SU su_ledger entry, job
+    `inc:job<ID>:build_ended` under the campaign's step. `committed` then
+    releases the build's estimate once sacct has settled every job of it: the
+    job's cost is its sacct entry (record_job_spend), and the estimate's runs
+    were never started. The stream writes it only after sacct settled the
+    job, so nothing is released that the ledger does not hold. A second call
+    updates the same (job, step) key."""
+    if not re.match(r"^[0-9]+(_[0-9]+)?$", str(job_id or "")):
+        return {"ok": False, "reason": "no job id (%r)" % (job_id,)}
+    su = su_ledger.su_for(GPU_TYPE, 1, 0.0, estimated=False)
+    su["source"] = "marker"
+    su["reason"] = ("0 SU, a marker: build job %s ended without experiment %s (%s); its cost is the sacct entry "
+                    "inc:job%s:sacct" % (job_id, exp, str(why or "")[:300], job_id))
+    try:
+        r = su_ledger.record({"domain": domain, "job": "inc:job%s:build_ended" % job_id,
+                              "step": campaign_step(campaign_name), "actor": M.AUTOPILOT_ACTOR, "gpu_count": 1,
+                              "gpu_type": GPU_TYPE, "elapsed_s": 0.0, "su": su, "ts": ts}, base_dir=base_dir)
+    except (OSError, ValueError) as e:
+        return {"ok": False, "reason": "the SU ledger could not be written: %s" % e}
+    return {"ok": True, "job": job_id, "exp": exp, "key": r.get("key")}
 
 
 def partition_rates(path=None):

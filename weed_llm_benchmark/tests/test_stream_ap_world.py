@@ -953,6 +953,18 @@ class World(object):
                 keep.append(j)
         self.squeue = keep
 
+    def build_refused(self, exp, refusal="[inc2.baseline] ERROR: refused", state="FAILED"):
+        """run_inc2_build.sh's end when the build itself refused: its provenance
+        record (INC_DIR/_campaign/provenance/<exp>.json, status build_failed
+        with the refusal line, read by remote.status into the snapshot's
+        builds) and its job ended (sacct state)."""
+        p = self.inc / "_campaign" / "provenance" / ("%s.json" % exp)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps({"format": "inc_autopilot.provenance/1", "exp": exp, "script": "run_inc2_build.sh",
+                                 "attempts": [{"status": "build_failed", "build_rc": 1, "refusal": refusal,
+                                               "started_utc": utc(self.t[0]), "updated_utc": utc(self.t[0])}]}))
+        self.job_done("inc_build_%s" % exp, state=state)
+
     def ready_r0(self, stage_c=True, bootstrap=True):
         """Every R0/R1 prerequisite in place on the cluster, as the other
         groups' code writes it: the lock; the baselines done; the canary's,

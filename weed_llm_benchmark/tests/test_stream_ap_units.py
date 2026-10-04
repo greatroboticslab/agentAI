@@ -458,6 +458,29 @@ def t_budget():
     after = B.state(camp, execs2, None, now, base_dir=base)
     check("a fork's estimate (a build job with no experiment) is released by its sacct settlement",
           before == 4.0 and after["committed_su"] == 0.0, (before, after["committed_su"]))
+    # a build with an experiment whose job ran and ended without it (2026-10-04): released only once sacct settled
+    # the job AND the stream marked it ended (budget.record_build_ended), never by either alone
+    execs3 = execs2 + [{"campaign": NAME, "action": "inc_build_baseline_v2", "params": {"exp": "e2_w_m640_seed0"},
+                        "child_exp": "e2_w_m640_seed0", "charged": True, "est_su": 6.953, "epoch": now - 20,
+                        "ts": W.utc(now - 20), "status": "executed", "run_id": "r5", "job_ids": ["705"]}]
+    c0 = B.state(camp, execs3, None, now, base_dir=base)["committed_su"]
+    B.record_build_ended("705", NAME, "e2_w_m640_seed0", "refused", base_dir=base, ts=W.utc(now))
+    c1 = B.state(camp, execs3, None, now, base_dir=base)
+    B.record_job_spend("705", NAME, {"state": "FAILED", "elapsed_s": 360.0, "gpu_count": 1, "gpu_type": "v100-32"},
+                       "inc_build_baseline_v2", base_dir=base, ts=W.utc(now))
+    c2 = B.state(camp, execs3, None, now, base_dir=base)
+    execs4 = execs3 + [dict(execs3[-1], run_id="r6", job_ids=["706"], params={"exp": "e2_s_m640_seed0"},
+                            child_exp="e2_s_m640_seed0")]
+    B.record_job_spend("706", NAME, {"state": "COMPLETED", "elapsed_s": 360.0, "gpu_count": 1, "gpu_type": "v100-32"},
+                       "inc_build_baseline_v2", base_dir=base, ts=W.utc(now))
+    c3 = B.state(camp, execs4, None, now, base_dir=base)
+    check("a build that ended without its experiment: its estimate (6.953) stays committed with only the marker "
+          "written (record_build_ended, 0 SU), and is released once sacct settled its job too (its 0.1 SU in spent, "
+          "the marker adding none); a build settled from sacct but never marked keeps its estimate",
+          c0 == 6.953 and c1["committed_su"] == 6.953 and c1["spent_su"] == after["spent_su"]
+          and c2["committed_su"] == 0.0 and abs(c2["spent_su"] - (after["spent_su"] + 0.1)) < 1e-9
+          and c3["committed_su"] == 6.953, (c0, c1["committed_su"], c2["committed_su"], c3["committed_su"],
+                                            c2["spent_su"], after["spent_su"]))
     check("  the domain's committed SU (what the allocation balance does not yet show) is reported apart from its "
           "spent SU (D27): weed_inc_v1's open 30 SU, beside 30.67 spent", after["domain_committed_su"] == 30.0
           and abs(after["domain_inc_su"] - (after["domain_committed_su"] + 30.666667)) < 1e-6, after)
@@ -2066,6 +2089,10 @@ def _e2_world(tag, verdict=True):
     return w
 
 
+class _Killed(BaseException):
+    """A hard stop of the lab process (a deploy restart) right after the tick's ssh, before its state is written."""
+
+
 def _e2_build_step(w, b):
     """E2 item b's build ends with its experiment built (running)."""
     w.experiment(b["exp"], done=False)
@@ -2210,7 +2237,7 @@ def t_e2():
     st = w.state()
     cards = [c for c in st.get("cards") or [] if c["title"].startswith("E2's verdict")]
     check("its record complete: nothing of E2 is proposed again (DR0 silent), the stream's arm and capacity_v1.json "
-          "unchanged; one verdict card naming the exact test read of the chosen arm",
+          "unchanged; one verdict card naming the exact test read of the qualifying (chosen) arm",
           len([e for e in w.events("proposed") if e.get("lever") == "L23C"]) == 1 and not d["DR0"]["fired"]
           and w.state()["capacity"]["chosen"] == "n640"
           and (w.inc / "capacity" / "capacity_v1.json").read_bytes() == cap0
@@ -2220,6 +2247,17 @@ def t_e2():
     w.tick(3)
     check("  no second card on later ticks", len([c for c in w.state().get("cards") or []
                                                   if c["title"].startswith("E2's verdict")]) == 1)
+    w2 = _e2_world("e2_both")
+    for b in e2:
+        w2.experiment(b["exp"], done=True)
+    w2.e2_records(qualifying=("W", "S"), chosen="W")
+    w2.tick(2)
+    c2 = [c for c in w2.state().get("cards") or [] if c["title"].startswith("E2's verdict")]
+    check("both arms qualify: one card, the choice its headline, and each qualifying arm's own test read (once per "
+          "qualifying arm, pre-registered)",
+          [c["title"] for c in c2] == ["E2's verdict: E2-W, E2-S qualify (chosen: E2-W)"]
+          and all("e2-test-read --e2 %s" % k in c2[0]["detail"] and "e2-test-report --e2 %s" % k in c2[0]["detail"]
+                  for k in ("W", "S")) and "E2's choice is E2-W" in c2[0]["detail"], [c.get("detail") for c in c2])
     wn = _e2_world("e2_none")
     for b in e2:
         wn.experiment(b["exp"], done=True)
@@ -2270,27 +2308,196 @@ def t_e2():
               % ("done once capacity/e2_rescore.json is complete" if case == "done"
                  else "failed (one card) after 3 snapshots with neither"), ok0 and ok,
               (it.get("lever"), it.get("status"), [c["title"] for c in wu.state().get("cards") or []]))
-    # a failed E2 build: record only (a card), the lane not held, not proposed again, L23C never proposed
+    wq = _e2_world("e2_unc_queued")
+    for b in e2:
+        wq.experiment(b["exp"], done=True)
+    wq.lose_reply = "rescore-e2"
+    wq.tick(2)
+    wq.tick(S.BUILD_LOST_SNAPSHOTS + 3)
+    it = wq.lane("MAINT").get("item") or {}
+    check("  an unknown outcome whose job inc_build_e2_v1 stays queued for %d snapshots (more than %d): still running "
+          "and followed by that name, no card, r0.e2 running" % (S.BUILD_LOST_SNAPSHOTS + 3, S.BUILD_LOST_SNAPSHOTS),
+          it.get("lever") == "L23C" and it.get("status") == "running" and it.get("uncertain")
+          and not [c for c in wq.state().get("cards") or [] if "L23C" in c["title"]]
+          and wq.state()["stage"]["r0"].get("e2") == "running" and any(j["name"] == "inc_build_e2_v1" for j in wq.squeue),
+          (it.get("lever"), it.get("status"), it.get("lost"), [c["title"] for c in wq.state().get("cards") or []]))
+    wq.job_done("inc_build_e2_v1")
+    wq.e2_records()
+    wq.tick(2)
+    check("  then done once the job ended and capacity/e2_rescore.json is complete",
+          any(e.get("lever") == "L23C" for e in wq.events("item_done")) and not wq.lane("MAINT").get("item"))
+    # the lab stopped between L23C's submission and the state write: the restart meets 'already executed'
+    for outcome in ("FAILED", "COMPLETED"):
+        wk = _e2_world("e2_l23c_kill_%s" % outcome.lower())
+        for b in e2:
+            wk.experiment(b["exp"], done=True)
+        real_submit = S.StreamRun._submit_ready
+        killed = {"n": 0}
+
+        def killer(self, _real=real_submit, _w=wk, _k=killed):
+            r = _real(self)
+            if not _k["n"] and any("rescore-e2" in x["argv"] for x in _w.submits):
+                _k["n"] += 1
+                raise _Killed()
+            return r
+        S.StreamRun._submit_ready = killer
+        try:
+            for _ in range(4):
+                try:
+                    wk.tick(1)
+                except _Killed:
+                    break
+        finally:
+            S.StreamRun._submit_ready = real_submit
+        wk.tick(2)
+        it = wk.lane("MAINT").get("item") or {}
+        ok0 = killed["n"] == 1 and it.get("lever") == "L23C" and it.get("status") == "running" \
+            and it.get("uncertain") and wk.state()["stage"]["r0"].get("e2") == "running" \
+            and [x["name"] for x in wk.submits if "rescore-e2" in x["argv"]] == ["inc_build_e2_v1"] \
+            and any(e.get("lever") == "L23C" for e in wk.events("recovered"))
+        wk.job_done("inc_build_e2_v1", state=outcome)
+        if outcome == "COMPLETED":
+            wk.e2_records()
+        wk.tick(5)
+        stk = wk.state()
+        if outcome == "FAILED":
+            ok = stk["stage"]["r0"].get("e2") == "failed" and [c["title"] for c in stk.get("cards") or []] == [
+                "E2's 12-class rescore and verdict failed (L23C)"] and not stk.get("paused")
+        else:
+            ok = any(e.get("lever") == "L23C" for e in wk.events("item_done")) and not [
+                c for c in stk.get("cards") or [] if "L23C" in c["title"] and "failed" in c["title"]]
+        check("L23C submitted, then the lab stopped before its state was written: the restart meets 'already "
+              "executed' and follows inc_build_e2_v1 (running, r0.e2 running, one submission); the job %s -> %s"
+              % (outcome, "r0.e2 failed with one card" if outcome == "FAILED" else "done"), ok0 and ok,
+              (killed, it.get("lever"), it.get("status"), it.get("uncertain"), stk["stage"]["r0"].get("e2"),
+               [c["title"] for c in stk.get("cards") or []]))
+    # an E2 build the build itself refused: record only (a card), the lane not held, not proposed again, E2's other
+    # builds wait, L23C never proposed
     wb = _e2_world("e2_build_fail")
     wb.tick(3)
-    wb.job_done("inc_build_e2_w_m640_seed0", state="FAILED", refusal="[inc2.baseline] ERROR: refused")
+    wb.build_refused("e2_w_m640_seed0", refusal="[inc2.baseline] ERROR: e1_b_m640/runs/base__s0/weights/final.pt "
+                                                "is missing")
     wb.tick(3)
     st = wb.state()
     pro = [e.get("child_exp") for e in wb.events("proposed") if e.get("lever") == "L23B"]
     cards = [c for c in st.get("cards") or [] if "its build ended without the experiment" in c["title"]]
-    check("an E2 build ending FAILED: one card (naming L23C's dependence and the rebuild), MAINT neither held nor "
-          "counting a failure, e2_w0 failed and not proposed again, the next item (e2_s0) proposed, no L23C",
+    bud = X.budget_now(dict(wb.config(), name=NAME), wb.xctx)
+    check("an E2 build the build itself refused (provenance build_failed, its ERROR line): one card (the refusal, "
+          "L23C's dependence, the rebuild), MAINT neither held nor counting a failure, e2_w0 failed and not proposed "
+          "again, E2's other builds wait (e2_s0 not proposed), no L23C; its estimate released once sacct settled the "
+          "job (the job's SU in spent)",
           len(cards) == 1 and "e2_w_m640_seed0" in cards[0]["title"] and "L23C" in cards[0]["detail"]
-          and "--e2 W" in cards[0]["detail"] and not wb.lane("MAINT").get("hold")
+          and "final.pt is missing" in cards[0]["detail"] and "--e2 W" in cards[0]["detail"]
+          and "other builds wait" in cards[0]["detail"] and not wb.lane("MAINT").get("hold")
           and not int(wb.lane("MAINT").get("fails") or 0) and st["stage"]["r0"].get("baseline_e2_w0") == "failed"
-          and pro == ["e2_w_m640_seed0", "e2_s_m640_seed0"] and not st.get("paused")
-          and not [e for e in wb.events("proposed") if e.get("lever") == "L23C"],
-          (pro, [c["title"] for c in st.get("cards") or []], wb.lane("MAINT")))
-    wb.job_done("inc_build_e2_s_m640_seed0", state="FAILED", refusal="[inc2.baseline] ERROR: refused")
-    wb.tick(3)
-    check("  a second refused build in a row is a second card and still holds nothing",
+          and pro == ["e2_w_m640_seed0"] and not st.get("paused")
+          and len([x for x in wb.submits if "--e2" in x["argv"]]) == 1
+          and not [e for e in wb.events("proposed") if e.get("lever") == "L23C"]
+          and not [x for x in bud["committed"] if str(x.get("child_exp") or "").startswith("e2_")]
+          and bud["spent_su"] > 0,
+          (pro, [c["title"] for c in st.get("cards") or []], wb.lane("MAINT"), bud["committed"], bud["spent_su"]))
+    wb.tick(6)
+    check("  six ticks later: still one card, still nothing of E2 proposed",
           not wb.lane("MAINT").get("hold") and not wb.state().get("paused")
-          and len([c for c in wb.state().get("cards") or [] if "its build ended" in c["title"]]) == 2)
+          and len([c for c in wb.state().get("cards") or [] if "its build ended" in c["title"]]) == 1
+          and [e.get("child_exp") for e in wb.events("proposed") if e.get("lever") == "L23B"] == ["e2_w_m640_seed0"])
+    wb.experiment("e2_w_m640_seed0", done=False)
+    wb.tick(3)
+    pro = [e.get("child_exp") for e in wb.events("proposed") if e.get("lever") == "L23B"]
+    check("  a person builds e2_w_m640_seed0 by hand: the wait ends, e2_s0 is proposed next",
+          pro == ["e2_w_m640_seed0", "e2_s_m640_seed0"] and wb.state()["stage"]["r0"].get("baseline_e2_w0") == "failed",
+          pro)
+    # a build job cancelled (a person or the operator): record only at once, no retry
+    wc = _e2_world("e2_build_cancel")
+    wc.tick(3)
+    wc.job_done("inc_build_e2_w_m640_seed0", state="CANCELLED by 12345")
+    wc.tick(4)
+    stc = wc.state()
+    check("an E2 build job CANCELLED with no refusal line: record only at once (one card), not built again",
+          stc["stage"]["r0"].get("baseline_e2_w0") == "failed"
+          and [x["name"] for x in wc.submits if "--e2" in x["argv"]] == ["inc_build_e2_w_m640_seed0"]
+          and len([c for c in stc.get("cards") or [] if "its build ended" in c["title"]]) == 1
+          and not int(wc.lane("MAINT").get("fails") or 0), ([x["name"] for x in wc.submits], stc["stage"]["r0"]))
+    # a build job killed from outside: built again under a new id, LOST_RUNS_MAX times in a row at most
+    wn = _e2_world("e2_build_nodefail")
+    wn.tick(3)
+    wn.job_done("inc_build_e2_w_m640_seed0", state="NODE_FAIL")
+    wn.tick(3)
+    stn = wn.state()
+    ids = [e.get("proposal_id") for e in wn.events("proposed") if e.get("lever") == "L23B"]
+    bud = X.budget_now(dict(wn.config(), name=NAME), wn.xctx)
+    check("an E2 build job ending NODE_FAIL (no refusal line): no card, no lane failure, e2_w0 built again under a "
+          "new id (its build job submitted twice), r0 building again; the first attempt's estimate released "
+          "(one E2 estimate committed, the running retry's)",
+          [x["name"] for x in wn.submits if "--e2" in x["argv"]] == ["inc_build_e2_w_m640_seed0"] * 2
+          and len(ids) == 2 and len(set(ids)) == 2 and stn["stage"]["r0"].get("baseline_e2_w0") == "building"
+          and not [c for c in stn.get("cards") or [] if "its build ended" in c["title"]]
+          and not int(wn.lane("MAINT").get("fails") or 0) and not wn.lane("MAINT").get("hold")
+          and [x["child_exp"] for x in bud["committed"] if str(x.get("child_exp") or "").startswith("e2_")]
+          == ["e2_w_m640_seed0"],
+          ([x["name"] for x in wn.submits], ids, stn["stage"]["r0"].get("baseline_e2_w0"), bud["committed"]))
+    for state in ("PREEMPTED", "TIMEOUT"):
+        wn.job_done("inc_build_e2_w_m640_seed0", state=state)
+        wn.tick(3)
+    stn = wn.state()
+    cards = [c for c in stn.get("cards") or [] if "its build ended" in c["title"]]
+    check("  NODE_FAIL, PREEMPTED, then TIMEOUT (LOST_RUNS_MAX = %d in a row): failed, one card saying so, built "
+          "three times in all, not again" % S.LOST_RUNS_MAX,
+          stn["stage"]["r0"].get("baseline_e2_w0") == "failed" and len(cards) == 1
+          and "3 times in a row" in cards[0]["detail"]
+          and [x["name"] for x in wn.submits if "--e2" in x["argv"]] == ["inc_build_e2_w_m640_seed0"] * 3
+          and not int(wn.lane("MAINT").get("fails") or 0),
+          ([x["name"] for x in wn.submits], [c["title"] for c in stn.get("cards") or []]))
+    wr = _e2_world("e2_build_retry_ok")
+    wr.tick(3)
+    wr.job_done("inc_build_e2_w_m640_seed0", state="NODE_FAIL")
+    wr.tick(3)
+    _e2_build_step(wr, e2[0])
+    wr.tick(3)
+    pro = [e.get("child_exp") for e in wr.events("proposed") if e.get("lever") == "L23B"]
+    check("  a retry that builds the experiment: e2_w0 building, the next item (e2_s0) proposed, its lost count "
+          "cleared", pro == ["e2_w_m640_seed0", "e2_w_m640_seed0", "e2_s_m640_seed0"]
+          and not (wr.state().get("lost_runs") or {}), (pro, wr.state().get("lost_runs")))
+    # a submission that failed before anything was queued: the lane's ordinary failure, proposed again
+    for kind in ("sbatch", "squeue"):
+        wt = _e2_world("e2_submit_%s" % kind)
+        left = {"n": 1}
+        if kind == "sbatch":
+            real_run = wt._subprocess_run
+
+            def flaky(argv, _real=real_run, _left=left, **kw):
+                if argv and argv[0] == "sbatch" and _left["n"] and any("e2_w_m640_seed0" in a for a in argv):
+                    _left["n"] -= 1
+                    return W._Proc(1, "", "sbatch: error: Batch job submission failed: Socket timed out on "
+                                          "send/recv operation")
+                return _real(argv, **kw)
+            wt._subprocess_run = flaky
+        else:
+            real_act = wt._activate
+
+            def act(_real=real_act, _left=left, _w=wt):
+                _real()
+                if _left["n"] and _w.verbs and _w.verbs[-1][:1] == ["stream-submit"] \
+                        and any("e2_w_m640_seed0" in str(a) for a in _w.verbs[-1]):
+                    _left["n"] -= 1
+                    R.squeue_jobs = lambda prefix="inc_": {"ok": False, "error": "slurm_load_jobs error: Socket "
+                                                                                 "timed out on send/recv operation"}
+            wt._activate = act
+        wt.tick(6)
+        stt = wt.state()
+        fails = [" ".join(e.get("reasons") or []) for e in wt.events("failed") if e.get("lever") == "L23B"]
+        check("a submission of E2-W0 that %s before anything was queued: the lane's ordinary failure (MAINT fails "
+              "1, not record only), no card, e2_w0 not failed and proposed again; its build job then submitted"
+              % ("sbatch refused with a socket timeout" if kind == "sbatch" else "met an unavailable squeue"),
+              len(fails) == 1 and ("Socket timed out" in fails[0])
+              and not [e for e in wt.events("failed") if e.get("record_only")]
+              and not [c for c in stt.get("cards") or [] if "its build ended" in c["title"]]
+              and stt["stage"]["r0"].get("baseline_e2_w0") != "failed"
+              and [e.get("child_exp") for e in wt.events("proposed") if e.get("lever") == "L23B"][:2]
+              == ["e2_w_m640_seed0", "e2_w_m640_seed0"]
+              and "inc_build_e2_w_m640_seed0" in [x["name"] for x in wt.submits],
+              (fails, [c["title"] for c in stt.get("cards") or []], stt["stage"]["r0"].get("baseline_e2_w0"),
+               [x["name"] for x in wt.submits], wt.lane("MAINT").get("fails")))
     # an E2 experiment's D5: a card, not a pause
     wd = _e2_world("e2_d5")
     wd.tick(3)

@@ -1614,8 +1614,11 @@ def lift_wait(v, d28=None):
 def _e1_qualified(v, exps):
     """(True, cites) when E2 may be built (amendment 2026-10-04): E1's
     verdict record (stream-domain e1.record) is decided, qualifies E1-B and
-    names E1-B's experiment, and that experiment is done (its three base
-    weights exist); else (False, why). Cites only after presence is checked
+    names E1-B's experiment, and that experiment is done; else (False,
+    why). Whether its three base weights still exist and hash as their
+    run.json records is the build's check (inc2.baseline e2_record): a
+    refusal there fails one E2 build, and E2's other builds wait behind it
+    (r0), so a missing weight costs one build job and one card. Cites only after presence is checked
     (a cite of an absent value raises)."""
     e1 = v.dom.get("e1") or {}
     by_id = {b["id"]: b for b in (v.dom.get("baselines") or {}).get("items") or []}
@@ -1652,7 +1655,8 @@ def r0(v, d28=None):
     (L23E, once); E2 (2026-10-04): an arm that requires e1 is proposed only
     while E1's verdict is decided, qualifies E1-B and E1-B is done
     (_e1_qualified), one build at a time in the domain's order (a build that
-    failed stays failed: /stage/baselines says so), and once its six
+    failed stays failed: /stage/baselines says so, and E2's other builds
+    wait while it is), and once its six
     experiments and the reference are done, E2's rescore and verdict (L23C,
     once). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
@@ -1738,12 +1742,19 @@ def r0(v, d28=None):
             if not b.get("measure") or (st.get("baselines") or {}).get(b["id"]) not in (None, "missing"):
                 continue
             if b.get("requires") == "e1":
-                # E2 (2026-10-04): built only from an E1-B that qualified and whose three base weights exist
+                # E2 (2026-10-04): built only from an E1-B that qualified and is done (the build checks its weights)
                 ok, ec = _e1_qualified(v, exps)
                 if not ok:
                     continue
+                # E2's builds are one group: while one of them is failed (its build ran and ended without the
+                # experiment; its card names the refusal and the build command), the others wait. A refusal one
+                # E2 build meets (E1-B's weights or records changed, the reference's definition) the next would
+                # meet too, and L23C needs all six; the wait ends once the failed one's experiment exists
+                if any(x.get("requires") == "e1" and (st.get("baselines") or {}).get(x["id"]) == "failed"
+                       for x in (v.dom.get("baselines") or {}).get("items") or []):
+                    continue
                 out["MAINT"] = {"lever": "L23B", "baseline": b["id"],
-                                "why": "E2 arm %s (%s, E2-%s seed %s) not built: E1-B qualified and its weights exist; "
+                                "why": "E2 arm %s (%s, E2-%s seed %s) not built: E1-B qualified and is done; "
                                        "record only" % (b["id"], b["exp"], b.get("e2"), b.get("seeds"))}
                 cites = [v.ccite("/stage/lock"), v.ccite("/stage/baselines/%s" % b["id"])] + ec
                 break

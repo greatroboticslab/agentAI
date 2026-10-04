@@ -553,7 +553,7 @@
    ],
    "control": "b_v2_m640 (base_v2, the cold recipe from yolo11m.pt; its three stored runs, not retrained).",
    "success": "scores/dev@640.json of every E2 final run, capacity/e2_v1.json decided, capacity/e2_rescore.json complete (dev only).",
-   "falsifier": "An arm qualifies only when D > 2 pooled sd and > the paired image-bootstrap SE (pre-registered 2026-10-04); nothing switches; the chosen arm's sealed test is read once afterwards by a person.",
+   "falsifier": "An arm qualifies only when D > 2 pooled sd and > the paired image-bootstrap SE (pre-registered 2026-10-04); nothing switches; each qualifying arm's sealed test is read once afterwards by a person (the chosen arm's is E2's headline).",
    "estimator": "rescore",
    "note": "Record only: proposed once, when E2's six experiments and b_v2_m640 are done and E2's rescore record is missing; a failure is a person's card and it is not proposed again."
   },
