@@ -139,6 +139,25 @@ compared with the table above as before. budget_cost prices it: seeds x
 BUDGET_IMAGE_EPOCHS x BUDGET_MS_PER_IMAGE_EPOCH (m640's measured 14.2 ms) plus
 the finals, independent of N.
 
+E2's arms (docs/CONTINUOUS_LOOP.md, "Amendment (2026-10-04): E2, the 12-class
+detector on E1-B's backbone (pre-registered)"). E2 trains the 12 species on
+base_v2 from E1-B's weights (its one-class weed detector on 44,485 images),
+one experiment per seed (the pinned driver gives every base run of an
+experiment one init, and seed s starts from E1-B's seed s), on m640 only:
+  W  b_v2_m640's definition except the init: the cold recipe, key for key;
+  S  the same data and init with x1b (50 epochs, warmup 3, peak lr0 0.01,
+     warmup_bias_lr 0.01, cosine to lrf 0.01), whether a shorter schedule
+     keeps more of the pre-training. x1b is an incremental recipe of the
+     table; it trains a base run only when the caller names it (recipe_name
+     'x1b', E2_BASE_RECIPES): deviations() and match() then compare a base
+     run with incremental('x1b', arm), and inc2.train names it only for an
+     exp.json whose e2 record says arm S. Every other base run is compared
+     with the cold table as before.
+e2_recipe(letter) writes the arm's recipe, e2_exp(letter, seed) its
+pre-registered experiment name; e2_cost prices one experiment from its
+image-epochs (N x the recipe's epochs) at m640's measured 14.2 ms, as E1's
+arms were priced, plus the dev score and the finals.
+
 Cost (estimates, V100, 1 SU per GPU-hour). The measured rates are YOLO11n at
 640 px (docs/CONTINUOUS_LOOP.md §5.6): cold 6.0-7.0 ms per image-epoch
 (realloop_v1 base 1.974 h / 3 / 3,927 / 100 = 6.0; b0_v1 base 1.768 h / 3 /
@@ -245,6 +264,25 @@ BUDGET_MS_PER_IMAGE_EPOCH = 14.2          # m640 measured: 2.68 GPU-h per base r
 BUDGET_BASIS = ("E1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-03): epochs = round_half_up(1.2e6 / N), "
                 "warmup_epochs = round(640 / ceil(N / batch), 6), close_mosaic = max(1, round_half_up(0.1 x epochs)); "
                 "every other key the arm's cold recipe")
+
+# ------------------------------------------- E2's arms (amendment 2026-10-04)
+E2_ARM = "m640"                           # E2 is pre-registered on YOLO11m at 640 only
+E2_SEEDS = (0, 1, 2)                      # seed s starts from E1-B's seed s
+E2_ARMS = {"W": COLD_NAME, "S": "x1b"}    # arm letter -> the recipe its base runs train
+E2_EXPS = {"W": "e2_w_m640_seed%d", "S": "e2_s_m640_seed%d"}     # one experiment per arm and seed
+E2_REFERENCE_EXP = "b_v2_m640"            # its stored runs are read, never retrained
+E2_INIT_RUN = "base__s%d"                 # E1-B's base run whose weights/final.pt seed s starts from
+E2_E1_VERDICT = "e1_v1.json"              # under INC_DIR/capacity
+E2_E1_FORMAT = "inc2-e1-verdict/1"        # = inc2.baseline.E1_FORMAT (a test asserts equality)
+# what an E2 experiment records of E1's verdict and inc2.train compares: the decision, not the file (e1_verdict
+# rewrites generated_utc whenever it runs)
+E2_E1_DECISION_KEYS = ("format", "status", "exp", "reference", "seeds", "diff", "pooled_sd", "se_diff", "qualifies")
+E2_BASE_RECIPES = ("x1b",)                # incremental recipes a base run may train: E2-S's only
+E2_BASE_KINDS = ("base",)
+E2_FINAL_EXAMS = ("dev", "imageweeds")    # test is read once, after the verdict, by a person
+E2_MS_PER_IMAGE_EPOCH = BUDGET_MS_PER_IMAGE_EPOCH     # 14.2, m640 measured
+E2_DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-04): E2, the 12-class detector on E1-B's backbone "
+                 "(pre-registered)")
 
 
 class RecipeError(ValueError):
@@ -384,6 +422,31 @@ def check_budget_record(rec, arm, n_images):
             if k != "basis" and rec.get(k) != want[k]]
 
 
+def _e2_letter(letter):
+    if letter not in E2_ARMS:
+        raise RecipeError("E2's arms are %s (pre-registered), not %r" % (sorted(E2_ARMS), letter))
+    return letter
+
+
+def e2_exp(letter, seed):
+    """The pre-registered experiment of E2's arm `letter` and seed (one
+    experiment per seed: seed s starts from E1-B's seed s)."""
+    _e2_letter(letter)
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed not in E2_SEEDS:
+        raise RecipeError("E2's seeds are %s (pre-registered), not %r" % (list(E2_SEEDS), seed))
+    return E2_EXPS[letter] % seed
+
+
+def e2_recipe(letter, arm=E2_ARM):
+    """The base runs' recipe of E2's arm (module docstring), in exp.json's
+    form (no seed): W the arm's cold recipe, S the table's x1b."""
+    _e2_letter(letter)
+    aid = arm_id(arm)
+    if aid != E2_ARM:
+        raise RecipeError("E2 is pre-registered on %s only, not %s" % (E2_ARM, aid))
+    return cold(aid) if E2_ARMS[letter] == COLD_NAME else incremental(E2_ARMS[letter], aid)
+
+
 def _diff(recipe, want):
     out = []
     for k in sorted(set(want) | set(recipe)):
@@ -399,31 +462,41 @@ def _diff(recipe, want):
     return out
 
 
-def _budget_wanted(kind, recipe_name, n_images, arm):
-    """The cold_budget recipe a run is compared with, or None when the caller
-    does not name it. Named for another kind than 'base' (a union, an
-    incremental run) it raises: only a baseline's base runs train it."""
+def _named_wanted(kind, recipe_name, n_images, arm):
+    """(name, recipe) a run is compared with when the caller names a recipe
+    other than the table's own for its kind, or None when it names none (or
+    'cold'). cold_budget (E1) is a base run's with the base's n_images; x1b
+    (E2-S, E2_BASE_RECIPES) is a base run's, the table's x1b of the arm.
+    Named for another kind (a union, an incremental run) either raises, and
+    so does any other name: only a baseline's base runs train them."""
     if recipe_name in (None, COLD_NAME):
         return None
-    if recipe_name != BUDGET_NAME:
-        raise RecipeError("recipe name %r is not %s or %s" % (recipe_name, COLD_NAME, BUDGET_NAME))
-    if kind not in BUDGET_KINDS:
-        raise RecipeError("%s is a %s recipe; a %s run trains the table" % (BUDGET_NAME, list(BUDGET_KINDS), kind))
-    return cold_budget(arm, n_images)
+    if recipe_name == BUDGET_NAME:
+        if kind not in BUDGET_KINDS:
+            raise RecipeError("%s is a %s recipe; a %s run trains the table" % (BUDGET_NAME, list(BUDGET_KINDS),
+                                                                                kind))
+        return BUDGET_NAME, cold_budget(arm, n_images)
+    if recipe_name in E2_BASE_RECIPES:
+        if kind not in E2_BASE_KINDS:
+            raise RecipeError("%s is E2-S's base-run recipe; a %s run trains the table" % (recipe_name, kind))
+        return recipe_name, incremental(recipe_name, arm)
+    raise RecipeError("recipe name %r is not %s, %s or %s" % (recipe_name, COLD_NAME, BUDGET_NAME,
+                                                              " or ".join(E2_BASE_RECIPES)))
 
 
 def match(kind, recipe, arm=DEFAULT_ARM, recipe_name=None, n_images=None):
     """The table name recipe equals for a run of this kind ('cold', 'r0',
     'x1a' or 'x1b'; 'cold_budget' when the caller names it for a base run
-    of n_images), or None."""
+    of n_images, and 'x1b' when the caller names it for a base run, E2-S),
+    or None."""
     if not isinstance(recipe, dict):
         return None
     try:
-        want = _budget_wanted(kind, recipe_name, n_images, arm)
+        named = _named_wanted(kind, recipe_name, n_images, arm)
     except RecipeError:
         return None
-    if want is not None:
-        return BUDGET_NAME if not _diff(recipe, want) else None
+    if named is not None:
+        return named[0] if not _diff(recipe, named[1]) else None
     if kind in COLD_KINDS:
         return COLD_NAME if not _diff(recipe, cold(arm)) else None
     if kind in INC_KINDS:
@@ -440,7 +513,9 @@ def deviations(kind, recipe, arm=DEFAULT_ARM, recipe_name=None, n_images=None):
     listed against the nearest table recipe (fewest differing keys, then the
     table's order), named in the first entry. recipe_name 'cold_budget'
     (with the base's n_images) compares a base run with cold_budget(arm,
-    n_images) instead; named for any other kind it is itself a departure."""
+    n_images) instead, and recipe_name 'x1b' (E2-S) with incremental('x1b',
+    arm); named for any other kind, or any other name, it is itself a
+    departure."""
     if kind not in TRAIN_KINDS:
         raise RecipeError("kind %r trains nothing; only %s have a recipe" % (kind, list(TRAIN_KINDS)))
     if not isinstance(recipe, dict):
@@ -450,11 +525,11 @@ def deviations(kind, recipe, arm=DEFAULT_ARM, recipe_name=None, n_images=None):
     if t in EXCLUDED_TRAINERS:
         extra.append("trainer %r is out of stream version 1 (%s)" % (t, EXCLUDED_TRAINERS[t]))
     try:
-        want = _budget_wanted(kind, recipe_name, n_images, arm)
+        named = _named_wanted(kind, recipe_name, n_images, arm)
     except RecipeError as e:
         return extra + [str(e)]
-    if want is not None:
-        return extra + _diff(recipe, want)
+    if named is not None:
+        return extra + _diff(recipe, named[1])
     if kind in COLD_KINDS:
         return extra + _diff(recipe, cold(arm))
     best = None
@@ -628,6 +703,36 @@ def budget_cost(n_images, seeds, final_exams, arm="m640", exam_images=None, wall
             "note": "est.: m640's measured rate (2.68 GPU-h per 100-epoch run on 6,811 images, cache ram) times the "
                     "budget; a loader-bound base (no RAM cache) is slower, which is why splits v3 holds images "
                     "pre-resized to 640 px"}
+
+
+def e2_cost(n_images, letter, seeds, final_exams, arm=E2_ARM, exam_images=None, walltime_h=8.0):
+    """baseline_cost for an E2 experiment (module docstring): every base run
+    trains n_images x the arm's recipe epochs image-epochs at
+    E2_MS_PER_IMAGE_EPOCH (m640's measured rate, est.); the dev score and
+    the finals are priced as baseline_cost prices them."""
+    exam_images = dict(V2_FINAL_EXAM_IMAGES, **(exam_images or {}))
+    rate = rates(arm)
+    rec = e2_recipe(letter, arm)
+    n_seeds = len(list(seeds))
+    ie = int(n_images) * int(rec["epochs"])
+    tr = _hours(E2_MS_PER_IMAGE_EPOCH, ie)
+    dev = score_hours(exam_images["dev"], rate=rate)
+    per_run = (tr + dev[0], tr + dev[1])
+    fin = score_hours(sum(exam_images[e] for e in final_exams), rate=rate)
+    total = (n_seeds * (per_run[0] + fin[0]), n_seeds * (per_run[1] + fin[1]))
+    return {"estimate": True, "arm": arm_id(arm), "n_images": int(n_images), "seeds": n_seeds,
+            "recipe_name": E2_ARMS[letter], "epochs": rec["epochs"], "imgsz": rec["imgsz"],
+            "image_epochs": ie, "ms_per_image_epoch": E2_MS_PER_IMAGE_EPOCH,
+            "per_run_gpu_h": [round(per_run[0], 3), round(per_run[1], 3)],
+            "final_run_gpu_h": [round(fin[0], 3), round(fin[1], 3)],
+            "total_gpu_h": [round(total[0], 2), round(total[1], 2)],
+            "walltime": {"limit_h": walltime_h, "d26_line_h": round(0.8 * walltime_h, 2),
+                         "longest_run_h": [round(per_run[0], 2), round(per_run[1], 2)],
+                         "over_d26_line": [per_run[0] >= 0.8 * walltime_h, per_run[1] >= 0.8 * walltime_h]},
+            "basis": "%s: image-epochs (N x the arm's recipe epochs) x m640's measured %.1f ms" % (
+                E2_DECIDED_BY, E2_MS_PER_IMAGE_EPOCH),
+            "note": "est.: m640's measured rate (2.68 GPU-h per 100-epoch run on 6,811 images, cache ram); E2-W "
+                    "trains b_v2_m640's 100 epochs, E2-S x1b's 50"}
 
 
 def step_cost(n_pool, m, arm=DEFAULT_ARM, recipe="r0", seeds=3, truth=True, cold_ms=None, inc_ms=None):

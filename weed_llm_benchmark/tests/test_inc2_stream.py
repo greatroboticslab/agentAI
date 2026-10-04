@@ -1795,6 +1795,12 @@ def test_build_script():
           p.returncode == 0 and "[stub baseline] rescore-agnostic --exp e1_b_m640 --reference e1_a_m640" in p.stdout
           and "[stub driver]" not in p.stdout and a.get("status") == "scored" and prov("e1_b_m640") is None,
           (p.returncode, p.stdout[-400:], a))
+    p = run(["inc2.baseline", "rescore-e2"])
+    a = ((prov("e2_v1") or {}).get("attempts") or [{}])[-1]
+    check("inc2.baseline rescore-e2 (L23C, 2026-10-04): run without --exp, recorded as scored under e2_v1, no advance "
+          "(it builds nothing)",
+          p.returncode == 0 and "[stub baseline] rescore-e2" in p.stdout and "[stub driver]" not in p.stdout
+          and a.get("status") == "scored" and a.get("build_rc") == 0, (p.returncode, p.stdout[-400:], a))
     p = run(["inc2.base3", "build", "--stream", "wsv"])
     a = ((prov("base3_v3") or {}).get("attempts") or [{}])[-1]
     check("inc2.base3 build (L23V, 2026-10-03): run under the provenance and lock base3_v3 with HF_HUB_OFFLINE=1, "

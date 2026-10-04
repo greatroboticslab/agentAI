@@ -46,6 +46,20 @@ re-scores, and the atomic run.json. What differs from inc/train.py:
     and then only with init_weights yolo11n.pt (or none). A production cold
     run whose init is not the arm's is refused; a testing run records it
     (init_check);
+  * E2 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04): an exp.json with an
+    `e2` record (inc2.baseline build --e2 W|S) starts its base runs from
+    E1-B's recorded weights instead of the arm's checkpoint: init_check aims
+    at the record (the path, its sha256, and the run's seed equal to the
+    record's, since seed s starts from E1-B's seed s); e2_problems checks the
+    definition against the pre-registered arm (one seed, m640, the arm's
+    recipe, no test), E1's verdict (still decided, qualifying and the
+    decision the record holds) and E1-B's run (still recording the weights
+    E2 starts from); the run must train in the environment b_v2_m640's base
+    runs trained in (Ultralytics and torch versions, as the record holds
+    them); x1b trains a base run only there (E2-S); and at Ultralytics' setup,
+    before the first step, every tensor of the model it trains must equal
+    the init's (init_transfer: the init loaded whole). A production run
+    refuses every departure; a testing run records it;
   * CODE_MODULES adds every tools/inc2/*.py module present and
     tools/funnel/leak.py (the dHash variants) with the two funnel modules it
     imports (__init__.py, embed.py);
@@ -198,7 +212,10 @@ CARRY_OVER = ("init", "init_sha256", "train_manifest", "train_manifest_sha256", 
               "duplicate_images", "dhash0_collisions", "guard", "materialised", "dataset_check",
               "train_dir", "train_kwargs", "trainable_params", "total_params", "weights_epoch", "lora",
               "cache", "amp_check_weights", "protocol_recipe", "recipe_deviations", "soup", "soup_of",
-              "soup_sha256", "train_seconds", "weights_source", "arm", "init_check", "recipe_name")
+              "soup_sha256", "train_seconds", "weights_source", "arm", "init_check", "recipe_name", "e2",
+              "init_transfer", "training_env_check")
+# E2 (amendment 2026-10-04): what a base run's environment must share with the reference's base runs
+E2_ENV_KEYS = ("ultralytics_version", "torch_version")
 
 
 class RunError(RuntimeError):
@@ -385,29 +402,132 @@ def protocol_deviations(kind, r, arm=RC.DEFAULT_ARM, recipe_name=None, n_images=
 
 
 def experiment_budget(exp, arm):
-    """(recipe_name, n_images, problems) of the equal-compute recipe exp.json
-    names (E1, inc2.recipes.cold_budget): (None, None, []) when it names
-    none. Only a 'baseline' experiment may name it; its base's n_images
-    (the driver pins it against the manifest's sha256) gives the recipe, and
-    its budget record must be the pre-registered one (inc2.recipes
-    constants), so a definition cannot carry a budget of its own."""
+    """(recipe_name, n_images, problems) of the recipe exp.json names for its
+    base runs when it is not the cold table's: E1's equal-compute recipe
+    (inc2.recipes.cold_budget), or x1b for E2-S's base runs. (None, None,
+    problems) when it names none; problems then holds e2_problems for an E2
+    experiment (W trains the cold table) and is [] otherwise. Only a
+    'baseline' experiment may name cold_budget; its base's n_images (the
+    driver pins it against the manifest's sha256) gives the recipe, and its
+    budget record must be the pre-registered one (inc2.recipes constants),
+    so a definition cannot carry a budget of its own. x1b is named only by
+    an exp.json whose e2 record says arm S."""
     data = _read_json(C.INC_DIR / exp / "exp.json")
     if not isinstance(data, dict):
         raise RunError("recipe", "cannot read %s" % (C.INC_DIR / exp / "exp.json"))
     name = data.get("recipe_name")
+    e2p = e2_problems(data) if "e2" in data else []
     if name in (None, RC.COLD_NAME):
-        return None, None, []
+        return None, None, e2p
+    if name in RC.E2_BASE_RECIPES:
+        probs = list(e2p)
+        if not isinstance(data.get("e2"), dict) or data["e2"].get("arm") != "S":
+            probs.append("exp.json names %s for its base runs, which only E2-S's experiments train (an e2 record "
+                         "with arm S)" % name)
+        return name, None, probs
     if name != RC.BUDGET_NAME:
-        return name, None, ["exp.json's recipe_name %r is not one inc2.recipes knows" % (name,)]
+        return name, None, ["exp.json's recipe_name %r is not one inc2.recipes knows" % (name,)] + e2p
     probs = []
     if data.get("type") != "baseline":
         probs.append("%s is pre-registered for baseline experiments, not a %r one" % (name, data.get("type")))
     n = (data.get("base") or {}).get("n_images")
     if not _is_int(n) or n < 1:
-        return name, None, probs + ["exp.json's base records no image count for %s" % name]
+        return name, None, probs + ["exp.json's base records no image count for %s" % name] + e2p
     probs += RC.check_budget_record(data.get("budget"), arm["id"], n)
     probs += e1_problems(data)
-    return name, n, probs
+    return name, n, probs + e2p
+
+
+def experiment_e2(exp):
+    """exp.json's e2 record (E2, amendment 2026-10-04), or None."""
+    data = _read_json(C.INC_DIR / exp / "exp.json")
+    e2 = data.get("e2") if isinstance(data, dict) else None
+    return e2 if isinstance(e2, dict) else None
+
+
+def e1_verdict_path():
+    """INC_DIR/capacity/e1_v1.json: E1's verdict, which E2 starts from."""
+    return C.INC_DIR / "capacity" / RC.E2_E1_VERDICT
+
+
+def e2_problems(data):
+    """How an exp.json with an e2 record fails to be one of E2's
+    pre-registered experiments now ([] when it is one): its arm and seed,
+    the experiment's name, the arm's recipe, no test among the finals, the
+    init the record names (E1-B's run of the same seed), the reference's
+    manifest; E1's verdict still decided, qualifying and the decision the
+    record holds (by its decision keys: e1_verdict rewrites generated_utc
+    whenever it runs, so the file's sha256 is not compared); E1-B's run
+    still done and recording the weights E2 starts from."""
+    e2 = data.get("e2")
+    if not isinstance(e2, dict) or e2.get("arm") not in RC.E2_ARMS:
+        return ["e2.arm %r is not one of %s" % (e2.get("arm") if isinstance(e2, dict) else e2, sorted(RC.E2_ARMS))]
+    letter = e2["arm"]
+    probs = []
+    if data.get("type") != "baseline":
+        probs.append("an E2 experiment is a baseline, not a %r one" % (data.get("type"),))
+    if (data.get("arm") or {}).get("id") != RC.E2_ARM:
+        probs.append("E2 is pre-registered on %s, not %s" % (RC.E2_ARM, (data.get("arm") or {}).get("id")))
+    seed = e2.get("seed")
+    if not _is_int(seed) or seed not in RC.E2_SEEDS or data.get("seeds") != [seed]:
+        probs.append("an E2 experiment trains its one pre-registered seed (e2.seed %r, seeds %r)"
+                     % (seed, data.get("seeds")))
+    elif data.get("exp") != RC.e2_exp(letter, seed):
+        probs.append("experiment %r is not E2-%s seed %d's pre-registered %s" % (data.get("exp"), letter, seed,
+                                                                               RC.e2_exp(letter, seed)))
+    if (data.get("recipe_name") or RC.COLD_NAME) != RC.E2_ARMS[letter] \
+            or (data.get("base") or {}).get("recipe") != RC.e2_recipe(letter):
+        probs.append("base.recipe is not E2-%s's %s" % (letter, RC.E2_ARMS[letter]))
+    if "test" in (data.get("final_exams") or []):
+        probs.append("an E2 experiment's finals never read test (it is read once, after the verdict, by a person)")
+    init = e2.get("init") if isinstance(e2.get("init"), dict) else {}
+    if not init.get("path") or data.get("init_weights") != init.get("path"):
+        probs.append("init_weights %r is not the e2 record's init %r" % (data.get("init_weights"), init.get("path")))
+    if _is_int(seed) and init.get("run_id") != RC.E2_INIT_RUN % seed:
+        probs.append("the e2 record's init is E1-B's %r, not %s (seed s starts from E1-B's seed s)"
+                     % (init.get("run_id"), RC.E2_INIT_RUN % seed))
+    ref = e2.get("reference") if isinstance(e2.get("reference"), dict) else {}
+    if (data.get("base") or {}).get("manifest_sha256") != ref.get("manifest_sha256"):
+        probs.append("its base manifest is not the reference's (%s)" % str(ref.get("manifest_sha256"))[:12])
+    vp = e1_verdict_path()
+    v = _read_json(vp)
+    if not isinstance(v, dict) or v.get("format") != RC.E2_E1_FORMAT or v.get("status") != "decided" \
+            or v.get("qualifies") is not True:
+        probs.append("%s is not a decided verdict that qualifies E1-B" % vp)
+    else:
+        now = {k: v.get(k) for k in RC.E2_E1_DECISION_KEYS}
+        was = (e2.get("e1_verdict") or {}).get("decision") if isinstance(e2.get("e1_verdict"), dict) else None
+        if now != was:
+            probs.append("E1's verdict changed since this experiment was built (%s differ)"
+                         % ", ".join(k for k in RC.E2_E1_DECISION_KEYS if (was or {}).get(k) != now.get(k)))
+        if v.get("exp") != init.get("exp"):
+            probs.append("E1's verdict qualifies %s, not the init's experiment %s" % (v.get("exp"), init.get("exp")))
+    ie, ir = init.get("exp"), init.get("run_id")
+    if not (isinstance(ie, str) and NAME_RE.fullmatch(ie) and isinstance(ir, str) and NAME_RE.fullmatch(ir)):
+        probs.append("the e2 record's init names no run (%r, %r)" % (ie, ir))
+    else:
+        rj = _read_json(C.INC_DIR / ie / "runs" / ir / RUN_JSON)
+        if not isinstance(rj, dict) or rj.get("status") != "done" or rj.get("weights_sha256") != init.get("sha256"):
+            probs.append("E1-B's %s/%s no longer records the weights E2 starts from (%s, weights %s; the record %s)"
+                         % (ie, ir, (rj or {}).get("status") if isinstance(rj, dict) else "no run.json",
+                            str((rj or {}).get("weights_sha256") if isinstance(rj, dict) else None)[:12],
+                            str(init.get("sha256"))[:12]))
+    return probs
+
+
+def e2_env_check(rec, e2):
+    """[] when this run's Ultralytics and torch versions (run.json's
+    environment, _env_record) are the ones b_v2_m640's base runs trained
+    with, as the e2 record holds them (reference.training_env); else how
+    they differ. E2's one variable is the init."""
+    want = ((e2.get("reference") or {}).get("training_env") or {}) if isinstance(e2, dict) else {}
+    out = []
+    for k in E2_ENV_KEYS:
+        if want.get(k) is None:
+            out.append("the e2 record holds no %s of the reference's training" % k)
+        elif rec.get(k) != want.get(k):
+            out.append("%s %s, the reference trained with %s" % (k, rec.get(k), want.get(k)))
+    return out
 
 
 def e1_problems(data):
@@ -465,7 +585,10 @@ def testing_settings(exp):
 def experiment_arm(exp):
     """(arm record, warnings) of the experiment: exp.json's "arm"
     (inc2.recipes.check_arm_record), or the continuity arm n640 when there is
-    none, provided exp.json's init_weights is absent or n640's checkpoint."""
+    none, provided exp.json's init_weights is absent or n640's checkpoint.
+    init_weights other than the arm's checkpoint is accepted only when the
+    exp.json's e2 record names it (an E2 experiment starts from E1-B's
+    weights); this holds for every kind of run of the experiment."""
     data = _read_json(C.INC_DIR / exp / "exp.json")
     if not isinstance(data, dict):
         raise RunError("recipe", "cannot read %s" % (C.INC_DIR / exp / "exp.json"))
@@ -482,9 +605,12 @@ def experiment_arm(exp):
         RC.check_arm_record(rec)
     except RC.RecipeError as e:
         raise RunError("recipe", "exp.json's arm: %s" % e)
-    if data.get("init_weights") not in (None, rec["model"]):
-        raise RunError("recipe", "exp.json's init_weights %r is not its arm's checkpoint %s"
-                       % (data.get("init_weights"), rec["model"]))
+    iw = data.get("init_weights")
+    if iw not in (None, rec["model"]):
+        e2 = data.get("e2") if isinstance(data.get("e2"), dict) else {}
+        if not (isinstance(e2.get("init"), dict) and iw == e2["init"].get("path")):
+            raise RunError("recipe", "exp.json's init_weights %r is not its arm's checkpoint %s, and no e2 record "
+                           "names it (only an E2 experiment starts from other weights)" % (iw, rec["model"]))
     return dict(rec), []
 
 
@@ -519,12 +645,33 @@ def experiment_research_only(exp):
     return next((v for v in vals if v is not False), False)
 
 
-def init_check(kind, init_path, arm):
+def init_check(kind, init_path, arm, e2=None, seed=None):
     """[] when a cold run's init is the arm's checkpoint (file name, and its
     sha256 when the arm pins one); else how it departs. Other kinds start from
-    an incumbent and are not checked here."""
+    an incumbent and are not checked here. With an E2 record (exp.json's e2)
+    a cold run's init is aimed at the record instead, never at the arm's
+    checkpoint: only a base run starts from it, the resolved path must be
+    the recorded one, the file must hash to the recorded sha256, and the
+    run's seed must be the record's (seed s starts from E1-B's seed s)."""
     if kind not in COLD_KINDS:
         return []
+    if e2 is not None:
+        init = e2.get("init") if isinstance(e2.get("init"), dict) else {}
+        if kind != "base":
+            return ["E2's init is pre-registered for base runs only, not a %s run" % kind]
+        out = []
+        want = init.get("path")
+        got = resolve_local(init_path)
+        if not want or got != Path(want).resolve():
+            out.append("init %s is not E2's recorded init %s" % (got, want))
+        sha = _sha_or_none(got)
+        if sha is None or sha != init.get("sha256"):
+            out.append("init %s hashes to %s, E2 records %s" % (init_path, (sha or "none")[:12],
+                                                               str(init.get("sha256"))[:12]))
+        if seed is not None and seed != e2.get("seed"):
+            out.append("the run's seed %s is not E2's seed %s (seed s starts from E1-B's seed s)"
+                       % (seed, e2.get("seed")))
+        return out
     out = []
     p = Path(init_path)
     if p.name != arm["model"]:
@@ -1273,6 +1420,62 @@ def _require_final_epoch(epoch, recipe, what, rec, extra=None):
                                                                                recipe["epochs"]))
 
 
+def _unwrap(model):
+    """The module a trainer's model wraps: DDP's .module and torch.compile's
+    ._orig_mod removed, so state_dict names are the checkpoint's."""
+    import torch
+    for _ in range(8):
+        inner = getattr(model, "module", None)
+        if not isinstance(inner, torch.nn.Module):
+            inner = getattr(model, "_orig_mod", None)
+        if not isinstance(inner, torch.nn.Module):
+            break
+        model = inner
+    return model
+
+
+def init_transfer(model, init):
+    """Whether the model a trainer holds carries the init whole (E2): every
+    state_dict tensor (parameters and buffers such as BatchNorm's running
+    statistics; num_batches_tracked, a counter, skipped) equal, by name,
+    shape and value, to the init's (its EMA, else its model, as Ultralytics
+    loads it: float), and no tensor of the init left out. Ultralytics loads
+    an init by intersect_dicts, which copies only the tensors whose name and
+    shape match; a tensor it skipped keeps its fresh initialisation and
+    differs here."""
+    import torch
+    ck = torch.load(str(init), map_location="cpu", weights_only=False)
+    src = ck.get("ema") if ck.get("ema") is not None else ck.get("model")
+    if src is None:
+        raise RunError("train", "%s holds no model to compare the trained model with" % init)
+    ref = {k: v for k, v in src.float().state_dict().items() if not k.endswith("num_batches_tracked")}
+    got = []
+    for k, v in _unwrap(model).state_dict().items():
+        name = k.replace("_orig_mod.", "")
+        if not name.endswith("num_batches_tracked"):
+            got.append((name, v))
+    differ = [n for n, v in got if n not in ref or tuple(ref[n].shape) != tuple(v.shape)
+              or not torch.equal(v.detach().float().cpu(), ref[n].float())]
+    names = {n for n, _v in got}
+    left_out = sorted(k for k in ref if k not in names)
+    return {"tensors": len(got), "equal": len(got) - len(differ), "first_differing": differ[:5],
+            "n_differing": len(differ), "init_only": left_out[:5], "n_init_only": len(left_out),
+            "whole": not differ and not left_out, "init": str(init),
+            "compared": "state_dict by name, shape and value (num_batches_tracked skipped), at Ultralytics' "
+                        "on_pretrain_routine_end, before the first step"}
+
+
+def require_whole_load(rec, init, testing=False):
+    """RunError('train') unless the init loaded whole (init_transfer); a
+    testing run only records it."""
+    if rec.get("whole") or testing:
+        return
+    raise RunError("train", "the init did not load whole: %d of %d tensors differ from %s at setup (first %s), %d of "
+                            "its tensors are not in the model (first %s); E2's one variable is the init"
+                   % (rec.get("n_differing"), rec.get("tensors"), init, (rec.get("first_differing") or [])[:3],
+                      rec.get("n_init_only"), (rec.get("init_only") or [])[:3]))
+
+
 def train_full(init, data_yaml, recipe, out_dir, device, n_rows, rec, cache):
     """YOLO(init).train(...) for 'full' / 'freeze'. Returns (the weights to
     score, the trainer's save_dir)."""
@@ -1293,6 +1496,10 @@ def train_full(init, data_yaml, recipe, out_dir, device, n_rows, rec, cache):
         if used != n_rows:
             raise RunError("train", "Ultralytics loaded %d of the manifest's %d training images"
                            % (used, n_rows))
+        if rec.get("e2") is not None:
+            # E2's one variable is the init: the model Ultralytics trains holds the init whole before the first step
+            rec["init_transfer"] = init_transfer(trainer.model, init)
+            require_whole_load(rec["init_transfer"], init, testing=bool(rec.get("testing")))
 
     model.add_callback("on_pretrain_routine_end", on_setup)
     model.train(**kw)
@@ -2193,11 +2400,27 @@ def _run(spec, spec_path, out_dir, rec, prev, resume_from, ctx, lock):
         if devs and testing is None:
             raise RunError("recipe", "a production %s run trains a Protocol v3 recipe of its arm (%s) only; this "
                            "one departs from it in %s" % (kind, arm["id"], devs))
-        departs = init_check(kind, spec["init"], arm)
+        e2 = experiment_e2(spec["exp"])
+        if e2 is not None:
+            # E2 (amendment 2026-10-04): the base runs start from E1-B's recorded weights
+            e2_init = e2.get("init") if isinstance(e2.get("init"), dict) else {}
+            rec["e2"] = {"arm": e2.get("arm"), "seed": e2.get("seed"), "init_exp": e2_init.get("exp"),
+                         "init_sha256": e2_init.get("sha256")}
+        departs = init_check(kind, spec["init"], arm, e2=e2, seed=(spec.get("recipe") or {}).get("seed"))
         rec["init_check"] = {"passed": not departs, "departures": departs}
         if departs and testing is None:
+            if e2 is not None:
+                raise RunError("recipe", "a production run of an E2 experiment starts from E1-B's recorded weights "
+                                         "(its base runs only): %s" % departs)
             raise RunError("recipe", "a production %s run starts from its arm's checkpoint (%s): %s"
                            % (kind, arm["id"], departs))
+        if e2 is not None:
+            env_d = e2_env_check(rec, e2)
+            rec["training_env_check"] = {"passed": not env_d, "departures": env_d,
+                                         "reference": (e2.get("reference") or {}).get("training_env")}
+            if env_d and testing is None:
+                raise RunError("recipe", "a production E2 run trains in the environment b_v2_m640's base runs trained "
+                                         "in (E2's one variable is the init): %s" % env_d)
 
     stage("device")
     import torch

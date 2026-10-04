@@ -19,6 +19,7 @@
 #   python -m weed_optimizer_framework.tools.inc2.baseline build --exp E --manifest M [--seeds ...] [...]
 #   python -m weed_optimizer_framework.tools.inc2.baseline rescore-native --exp E --reference R
 #   python -m weed_optimizer_framework.tools.inc2.baseline rescore-agnostic --exp E --reference R
+#   python -m weed_optimizer_framework.tools.inc2.baseline rescore-e2
 #   python -m weed_optimizer_framework.tools.inc2.base3    build --stream SID
 #   python -m weed_optimizer_framework.tools.inc2.pilot4   build --exp E [...]
 #   python -m weed_optimizer_framework.tools.inc2.stream   init | build | milestone | fork | feasibility | bisect
@@ -39,7 +40,10 @@
 # it, and its provenance and lock are named native_<exp>, never the arm's own.
 # inc2.baseline rescore-agnostic (L23E, 2026-10-03: E1's final runs scored for
 # their per-image class-agnostic arrays on dev, then E1's verdict) is the same:
-# no advance, provenance and lock agnostic_<exp>. inc2.base3 build (L23V,
+# no advance, provenance and lock agnostic_<exp>. inc2.baseline rescore-e2 (L23C,
+# 2026-10-04: E2's final runs scored on dev at 640, then E2's verdict) takes no
+# --exp (E2's six experiments are pre-registered): no advance, provenance and
+# lock e2_v1. inc2.base3 build (L23V,
 # 2026-10-03: splits v3, E1's base) builds no experiment: no advance, its
 # provenance and lock are named base3_v3; it runs with HF_HUB_OFFLINE=1 (its
 # embedding check loads DINOv2 from the Hugging Face cache; compute nodes have
@@ -99,7 +103,7 @@ export INC_JOB_SCRIPT="$REPO/weed_llm_benchmark/run_inc2_job.sh"
 
 usage() {
     echo "usage: sbatch run_inc2_build.sh {inc2.splits build|lock | inc2.baseline build|rescore-native|" \
-         "rescore-agnostic | inc2.base3 build | inc2.pilot4 build |" \
+         "rescore-agnostic|rescore-e2 | inc2.base3 build | inc2.pilot4 build |" \
          "inc2.stream init|build|milestone|fork|feasibility|bisect} [flags ...]" >&2
     exit 2
 }
@@ -114,6 +118,7 @@ case "$MOD" in
 esac
 case "$MOD $CMD" in
     "splits build"|"splits lock"|"baseline build"|"baseline rescore-native"|"baseline rescore-agnostic") shift 2 ;;
+    "baseline rescore-e2") shift 2 ;;
     "pilot4 build"|"base3 build") shift 2 ;;
     "stream init"|"stream build"|"stream milestone"|"stream fork"|"stream feasibility"|"stream bisect") shift 2 ;;
     *) usage ;;
@@ -140,6 +145,8 @@ elif [ "$MOD" = base3 ]; then
         usage
     fi
     NAME="base3_v3"
+elif [ "$MOD $CMD" = "baseline rescore-e2" ]; then
+    NAME="e2_v1"
 elif [ -n "$EXP" ]; then
     if ! [[ "$EXP" =~ $NAME_RE ]]; then
         echo "FATAL: --exp '$EXP' is not an experiment name" >&2
@@ -380,7 +387,8 @@ if [ "$rc" != 0 ]; then
     prov update status=build_failed "build_rc=$rc" "refusal=$refusal" "built_exp=$BUILT" finish
     exit "$rc"
 fi
-if [ "$MOD $CMD" = "baseline rescore-native" ] || [ "$MOD $CMD" = "baseline rescore-agnostic" ]; then
+if [ "$MOD $CMD" = "baseline rescore-native" ] || [ "$MOD $CMD" = "baseline rescore-agnostic" ] \
+        || [ "$MOD $CMD" = "baseline rescore-e2" ]; then
     # scores only: nothing was built, nothing is advanced
     prov update status=scored build_rc=0 finish
     echo "=== done $(date) ==="
