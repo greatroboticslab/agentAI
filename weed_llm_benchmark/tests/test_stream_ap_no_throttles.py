@@ -32,7 +32,8 @@ Pinned:
     `none` as well; the lifetime envelope cannot be cleared that way;
   * the collector: no daily byte hold and no daily clip without a declared
     bytes_daily; a declared one still holds;
-  * the deploy: deploy_funnel.sh ships tools/db.py and its pre-flight runs
+  * the deploy: deploy_funnel.sh ships tools/db.py to the lab only (the
+    cluster's copy belongs to the paused harvest) and its pre-flight runs
     this file, so a tree that declares a default cap again is refused before
     anything is copied.
 """
@@ -304,15 +305,17 @@ def t_deploy():
     was in review (11c01b0 set db.py's daily_cap to an interim 1500), and a
     merge resolved to that side kept a code-default daily cap; the pre-flight
     set did not run this file, so nothing refused it before the copy."""
-    print("the deploy ships db.py and its pre-flight runs this file")
+    print("the deploy ships db.py to the lab only and its pre-flight runs this file")
     import subprocess
     script = W.PKG_ROOT / "deploy" / "deploy_funnel.sh"
     dry = subprocess.run(["bash", str(script), "--dry-run"], capture_output=True, text=True, cwd=str(W.PKG_ROOT))
     check("deploy_funnel.sh --dry-run (copies nothing, needs no ssh) exits 0", dry.returncode == 0, dry.stderr[-300:])
     pkg = [ln.split(": ", 1)[1] for ln in dry.stdout.splitlines() if ln.startswith("package: ")]
+    lab = [ln.split(": ", 1)[1] for ln in dry.stdout.splitlines() if ln.startswith("lab-only: ")]
     pre = [ln.split(": ", 1)[1] for ln in dry.stdout.splitlines() if ln.startswith("pre-flight: ")]
-    check("it ships tools/db.py, whose DEFAULT_DOMAIN_CONFIG the lab's ticker reads",
-          "weed_optimizer_framework/tools/db.py" in pkg, pkg[-5:])
+    check("it ships tools/db.py, whose DEFAULT_DOMAIN_CONFIG the lab's ticker reads, to the lab only",
+          "weed_optimizer_framework/tools/db.py" in lab and "weed_optimizer_framework/tools/db.py" not in pkg,
+          (lab, pkg[-5:]))
     check("its pre-flight runs tests/test_stream_ap_no_throttles.py and tests/test_inc_ap_governance.py",
           "tests/test_stream_ap_no_throttles.py" in pre and "tests/test_inc_ap_governance.py" in pre, pre)
 

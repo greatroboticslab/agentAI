@@ -62,9 +62,7 @@ PINNED_RE='weed_optimizer_framework/tools/(cwd12_species|inc/(driver|gate|splits
 # Libraries the live harvest, trainer and scheduler also run, shipped only so that the stream's job
 # scripts find the outer and nested copies identical (they hash them and refuse on drift): a deploy that
 # would change one on the cluster is refused unless --allow-shared-change.
-# db.py is one of them since 2026-10-04: the dashboard, the harvest and the round scheduler import it, and the
-# autopilot's budget reads its DEFAULT_DOMAIN_CONFIG (see PKG_PATHS).
-SHARED_RE='weed_optimizer_framework/tools/(near_dup|semisup_labeler|registry_lock|mega_trainer|license_audit|db|brain/(su_ledger|policy))\.py$'
+SHARED_RE='weed_optimizer_framework/tools/(near_dup|semisup_labeler|registry_lock|mega_trainer|license_audit|brain/(su_ledger|policy))\.py$'
 PY="${PYTHON:-python3}"
 
 GIT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -99,12 +97,12 @@ PKG_PATHS=(
   weed_optimizer_framework/tools/registry_lock.py weed_optimizer_framework/tools/mega_trainer.py
   weed_optimizer_framework/tools/license_audit.py
   weed_optimizer_framework/tools/brain/su_ledger.py weed_optimizer_framework/tools/brain/policy.py
-  # the domain's default budget block, which inc_autopilot.budget.domain_budget() reads on the lab where the
-  # ticker runs: the 2026-10-04 amendment (docs/CONTINUOUS_LOOP.md 6.6) removed its daily_cap (120, then an
-  # interim 1500), and a lab whose db.py still declares one caps every campaign at that figure a day (SHARED_RE:
-  # the deploy refuses to change it on the cluster unless --allow-shared-change)
-  weed_optimizer_framework/tools/db.py
 )
+# Files only the lab runs, never copied to the cluster: db.py's DEFAULT_DOMAIN_CONFIG is the domain budget that
+# inc_autopilot.budget.domain_budget() reads where the ticker runs (docs/CONTINUOUS_LOOP.md 6.6, "Amendment
+# (2026-10-04)": no default daily cap). The cluster's copy belongs to the paused harvest and round scheduler, so
+# this deploy leaves it alone, and the shared-module guard (SHARED_RE) is never needed for it.
+LAB_ONLY_PATHS=(weed_optimizer_framework/tools/db.py)
 while IFS= read -r t; do PKG_PATHS+=("$t"); done < <(ls tests/test_funnel_*.py tests/funnel_*.py tests/test_inc_*.py \
   tests/test_inc2_*.py tests/test_collect_*.py tests/test_stream_*.py tests/test_round_scheduler_stream_guard.py 2>/dev/null)
 ROOT_PATHS=(docs/FUNNEL_AUDIT.md docs/FUNNEL_AUDIT_RUNNER.md docs/FUNNEL_REPRODUCE.md RESEARCH_LOG.md
@@ -120,7 +118,7 @@ PREFLIGHT=(tests/test_inc_ap_replay.py tests/test_inc_ap_governance.py tests/tes
            tests/test_funnel_ap_mutations.py tests/test_funnel_domain_free.py tests/test_stream_ap_replay.py
            tests/test_stream_ap_mutations.py tests/test_stream_pipeline.py tests/test_stream_ap_no_throttles.py)
 
-for p in "${PKG_PATHS[@]}"; do [ -e "$p" ] || { echo "missing package path: $p" >&2; exit 1; }; done
+for p in "${PKG_PATHS[@]}" "${LAB_ONLY_PATHS[@]}"; do [ -e "$p" ] || { echo "missing package path: $p" >&2; exit 1; }; done
 for p in "${ROOT_PATHS[@]}"; do [ -e "$GIT_ROOT/$p" ] || { echo "missing git-root path: $p" >&2; exit 1; }; done
 if ! git -C "$GIT_ROOT" diff --quiet HEAD -- "${PKG_PATHS[@]}" 2>/dev/null; then
   echo "WARNING: the deployed package paths differ from HEAD (uncommitted changes); the deploy record names HEAD" >&2
@@ -129,6 +127,7 @@ HEAD_SHA="$(git -C "$GIT_ROOT" rev-parse HEAD)"
 
 if [ "$DRY" = 1 ]; then
   printf 'package: %s\n' "${PKG_PATHS[@]}"
+  printf 'lab-only: %s\n' "${LAB_ONLY_PATHS[@]}"
   printf 'git root: %s\n' "${ROOT_PATHS[@]}"
   printf 'pre-flight: %s\n' "${PREFLIGHT[@]}"
   exit 0
@@ -154,8 +153,9 @@ done
   > "/tmp/deploy_stream_modules_$TS.json"
 
 echo "== 1) stage on the lab (~/$STAGE)"
-"${LSSH[@]}" "mkdir -p ~/$STAGE/pkg ~/$STAGE/root"
+"${LSSH[@]}" "mkdir -p ~/$STAGE/pkg ~/$STAGE/root ~/$STAGE/labonly"
 "${RSYNC_LAB[@]}" "${PKG_PATHS[@]}" "$LAB_SSH:$STAGE/pkg/"
+"${RSYNC_LAB[@]}" "${LAB_ONLY_PATHS[@]}" "$LAB_SSH:$STAGE/labonly/"
 (cd "$GIT_ROOT" && "${RSYNC_LAB[@]}" "${ROOT_PATHS[@]}" "$LAB_SSH:$STAGE/root/")
 
 echo "== 2) pre-check: what would change on the cluster (rsync --dry-run --checksum; the data-transfer node runs rsync only)"
@@ -189,11 +189,14 @@ echo "== 3) copy: lab tree (backup first), both cluster copies, the git-root fil
 "${LSSH[@]}" bash -s -- "$STAGE" "$LAB_TREE_REL" "$CLUSTER_REPO" "$CLUSTER_DATA_SSH" "$TS" <<'LAB'
 set -euo pipefail
 STAGE="$HOME/$1"; TREE="$HOME/$2"; CL="$3"; DATA="$4"; TS="$5"
-cd "$STAGE/pkg"
-find . -type f | while read -r f; do
-  if [ -e "$TREE/$f" ]; then mkdir -p "$TREE/.deploy_backups/$TS/$(dirname "$f")"; cp -a "$TREE/$f" "$TREE/.deploy_backups/$TS/$f"; fi
+for part in pkg labonly; do
+  cd "$STAGE/$part"
+  find . -type f | while read -r f; do
+    if [ -e "$TREE/$f" ]; then mkdir -p "$TREE/.deploy_backups/$TS/$(dirname "$f")"; cp -a "$TREE/$f" "$TREE/.deploy_backups/$TS/$f"; fi
+  done
 done
 rsync -a "$STAGE/pkg/" "$TREE/"
+rsync -a "$STAGE/labonly/" "$TREE/"
 rsync -a "$STAGE/root/" "$HOME/"
 export SSH_ASKPASS="$HOME/.cluster_askpass.sh" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
 unset SSH_AUTH_SOCK
@@ -210,9 +213,11 @@ echo "== 3b) verify: nothing differs any more (lab by sha256, cluster by rsync -
 "${LSSH[@]}" bash -s -- "$STAGE" "$LAB_TREE_REL" "$CLUSTER_REPO" "$CLUSTER_DATA_SSH" > /tmp/deploy_funnel_post_$TS.txt <<'LAB'
 set -uo pipefail
 STAGE="$HOME/$1"; TREE="$HOME/$2"; CL="$3"; DATA="$4"
-cd "$STAGE/pkg" && find . -type f | sort | while read -r f; do
-  a=$(sha256sum < "$f" | cut -c1-64); b=$(sha256sum < "$TREE/$f" 2>/dev/null | cut -c1-64)
-  [ "$a" = "$b" ] || echo "lab:${f#./}"
+for part in pkg labonly; do
+  cd "$STAGE/$part" && find . -type f | sort | while read -r f; do
+    a=$(sha256sum < "$f" | cut -c1-64); b=$(sha256sum < "$TREE/$f" 2>/dev/null | cut -c1-64)
+    [ "$a" = "$b" ] || echo "lab:${f#./}"
+  done
 done
 cd "$STAGE/root" && find . -type f | while read -r f; do
   a=$(sha256sum < "$f" | cut -c1-64); b=$(sha256sum < "$HOME/$f" 2>/dev/null | cut -c1-64)
