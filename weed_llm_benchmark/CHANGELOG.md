@@ -10905,3 +10905,14 @@ Every result sat near test 0.85, against the 0.90 goal.
   - `record-replay`.
   - The ticker writes a new prospective stream record, because the stream rules version moved.
   - A person runs `python -m weed_optimizer_framework.tools.inc_autopilot.stream configure --name weed_stream_v1 --by human:<email> --daily-cap-su none --window-cap-su none --collect-gb-daily none`.
+
+## 2026-10-04 — E2 pre-registered: the 12-class detector on E1-B's backbone
+
+- **E2 (docs/CONTINUOUS_LOOP.md, "Amendment (2026-10-04)").**
+  - Arms: E2-W (b_v2_m640's cold recipe) and E2-S (x1b), YOLO11m@640 on base_v2. Seed s starts from E1-B's base__s<s> final EMA weights, by path and sha256. There are six single-seed experiments, because the pinned driver gives one init per experiment.
+  - Rule, dev only, record only: D (12-class dev species mAP50-95, at 640 by inc2.scorer_native) over b_v2_m640 must exceed 2 pooled sd and the paired image-bootstrap SE (`stable_int("inc2/e2/species_se")`, 1,000 resamples); the larger D is the choice, a tie goes to S. Verdict `capacity/e2_v1.json`; a decided one is kept byte for byte while its decision reproduces and is never rewritten.
+  - The sealed test is read once, for the chosen arm only, by a person (`e2-test-read`, `e2-test-report`).
+  - `inc2/recipes.py` (E2 constants, `e2_exp`, `e2_recipe`, `e2_cost`, x1b for E2-S base runs), `inc2/train.py` (`e2_problems`, the init aimed at the record, the training environment of b_v2_m640's base runs, `init_transfer`: the whole state_dict equal to the init's at setup), `inc2/baseline.py` (`build --e2`, `rescore-e2`, `e2-verdict`, `e2-test-read`, `e2-test-report`), `run_inc2_build.sh` (`rescore-e2`).
+  - Autopilot: six L23B items gated on E1-B qualifying, priced from image-epochs plus a seed's share of the finals (6.95 / 5.61 GPU-h each). L23C (`inc_rescore_e2`, record only, job `inc_build_e2_v1`). `/stage/e2`. One verdict card. A measurement arm's build that ends without its experiment is now record only (a card; no lane failure; not proposed again). An argv placeholder may hold digits (`{e2}`).
+  - Tests: `test_inc2_e2.py` (new), `test_stream_ap_units.py` (`t_e2`), `test_stream_ap_replay.py` (stream_r0), `test_stream_pipeline.py`, `test_inc2_stream.py`; an ad hoc mutation run (36 mutants, each killed).
+  - Deploy: moves `executor.code_hash()` and the stream rules version. Sync the lab and both cluster copies, restart the dashboard, then `executor.run_replay_tests`. The read-only checks before autonomy are in the amendment's Deploy subsection.

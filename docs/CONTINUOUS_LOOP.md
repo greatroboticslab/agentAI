@@ -3183,3 +3183,204 @@ Now:
 - Frames of a held-out video that are not yet admitted (190,899 SIU frames are deferred) are in no companion list; the cutter still needs each queue row's capture keys (`step1_stream.test_v1_rows`) once `step1_stream.py` may change.
 - Registry companions are matched by the cutter by bytes or dHash only (their Step 1 keys differ from this builder's), and a registry row dropped before materialisation may carry no original sha256.
 - The SIU plants: each species has 22 videos (11 weeks × 2), and no IMG id appears in two weeks, which fits two pots per species filmed weekly (an inference). If so, a test v1 SIU video shares its plants with arm B videos of other weeks; grouping by video does not remove that.
+
+## Amendment (2026-10-04): E2, the 12-class detector on E1-B's backbone (pre-registered)
+
+Written before any E2 experiment was built or run, and before any E2 number existed. Not edited afterwards, except for the last line of "How it is verified". Decided by the owner's delegate under the 2026-09-30 grant (`human:harry567566@gmail.com`).
+
+E1's sealed test read (under Why) is part of E2's motivation. No E2 parameter was chosen from a test number: the arms, the recipe, the seeds, the reference and the rule are the ones fixed before E1's test was read, or the table's.
+
+**Why.**
+- The best sealed cwd12 test score is 0.8786 ± 0.0018. That is the 12-class mAP50-95 of b_v2_m640: YOLO11m at 640 on base_v2's 6,811 images. The gap to 0.90 is 0.021.
+- Its weakest species on test are Carpetweed 0.736, SpottedSpurge 0.810 and Purslane 0.828.
+- Five larger or newer detectors and larger inputs (l640, y26m640, y26l640, m832, s1024) gave at most +0.005 on dev. None qualified. On 6,811 images the detector is not the limit; the data is.
+- E1 (amendment 2026-10-03) answered the box half of the gap. One-class weed detectors trained on base v3's 44,485 images (36,531 distinct photos) scored:
+  - agnostic dev 0.8787 ± 0.0033, against 0.8570 ± 0.0014 on base_v2's 6,811. D = +0.0217, above 2 pooled sd (0.0050) and above the bootstrap SE (0.0068), so E1-B qualifies (`capacity/e1_v1.json`);
+  - sealed test 0.8996 ± 0.0015, against 0.8838 ± 0.0018. The best 12-class model's boxes score 0.8901 there.
+- No 12-class model uses those boxes yet.
+
+E2 asks one question: does starting from E1-B's weights raise the 12-class score when the detector then learns the species on base_v2?
+
+**Design (one variable: the init).**
+- The 12-class labels stay base_v2's. Base v3's external boxes bring no species label into E2.
+- E1-B trained every weed box as class 12 in the same 13-class INC space. Its whole network, head included, therefore loads into a 13-class model.
+- Its classes 0–11 were trained only as negatives. E2 learns them on base_v2.
+
+### Pre-registration
+
+**Reference.** b_v2_m640 is not retrained; its stored scores are read. It is:
+- YOLO11m at 640 on base_v2 (by LOCK v2's sha256), seeds 0, 1, 2;
+- the cold recipe: 100 epochs, SGD, lr0 0.01, warmup 3 epochs, warmup_bias_lr 0.1, cosine to lrf 0.01.
+
+**Arms.** Both arms are YOLO11m at 640 on base_v2 (by LOCK v2's sha256), seeds 0, 1, 2.
+- *The init.* Arm-seed s starts from E1-B's final EMA weights of seed s: `e1_b_m640/runs/base__s<s>/weights/final.pt`. This is the base run's own file; `final__base__s<s>` links to it. It is recorded by absolute path and by sha256, which must equal that run.json's `weights_sha256`.
+- **E2-W** (`e2_w_m640_seed0`, `_seed1`, `_seed2`): b_v2_m640's definition except the init. That means the same manifest, arm record, cold recipe key for key, LOCK v2 and never-train index.
+- **E2-S** (`e2_s_m640_seed0`, `_seed1`, `_seed2`): the same data and init, with recipe x1b of the Protocol v3 table. x1b is 50 epochs, warmup 3, peak lr0 0.01, cosine to lrf 0.01, and warmup_bias_lr 0.01 (the table's convention for re-warm recipes). Question: does a shorter schedule keep more of the pre-training? x1b differs from cold in epochs (50 vs 100) and warmup_bias_lr (0.01 vs 0.1), and in nothing else.
+
+**Six experiments, one per arm and seed.**
+- Why: the pinned driver gives every base run of an experiment one init (exp.json `init_weights`, `inc/driver.py` `cold_init`), but seed s needs E1-B's seed s.
+- So each E2 experiment trains one seed, and its `init_weights` is the absolute path of that seed's E1-B file. The driver passes the path into the base run's spec unchanged; the driver itself is not changed.
+- exp.json carries an `e2` record:
+  - the arm and the seed;
+  - the init: E1-B's experiment, run id, path and sha256, the sha256 of its run.json and exp.json, its splits v3 summary sha256, its run's never-train guard record (LOCK v2 and index sha256, rows checked, refused, cross-check hits) and its research-only flag;
+  - E1's verdict: its path, its sha256 and its decision keys;
+  - the reference: the sha256 of its exp.json, its manifest sha256, recipe, role, seeds, finals and the training environment its base runs recorded (Ultralytics and torch versions);
+  - what differs from the reference: `init_weights` (E2-W), or `init_weights` and `base.recipe` (E2-S).
+- The build refuses any other difference in the keys that define training: the manifest and its image count, the arm record, the protocol stamp, LOCK v2 and its never-train index, the decision exam and, for E2-W, the recipe. It also refuses an E1-B built from another splits v3 summary than the one E1's verdict was decided on, and (production) a reference whose base runs do not share one recorded training environment, and an E1-B run whose guard record is not the current LOCK v2's with nothing refused: E2's dev verdict and its test read inherit that guard's judgement, including the sources a person un-quarantined on 2026-10-03.
+
+**Declared differences from b_v2_m640's definition, besides the init and E2-S's recipe.**
+- *Role `baseline`.* Finals are dev and ImageWeeds, never test. b_v2_m640 read test at R0 (role capacity). E2's test is read once, for the chosen arm only, after the verdict, by a person (below). This is an exception to P10, declared here as E1's was.
+- *One seed per experiment* (above).
+- *research_only.* An E2 model inherits E1-B's flag, since a model trained from E1-B's weights carries E1-B's rows (§8, P6). The flag is base_v2's flag OR E1-B's flag; an E1-B flag that is missing or unknown counts as true.
+
+**What inc2.train checks on every E2 base run.** These come on top of every existing check (the manifest checks, the v2 never-train guard, materialisation, the final-epoch check, the locked scorer, the sidecar).
+- The run's init is the e2 record's path and hashes to its sha256.
+- E1-B's run.json still records that sha256.
+- E1's verdict still holds the recorded decision (its decision keys; the file's sha256 is not compared, because `e1_verdict` rewrites `generated_utc` whenever it runs).
+- The run's seed is the e2 record's seed.
+- E2-W trains the cold recipe and E2-S trains x1b, key for key. x1b trains a base run only in an E2-S experiment.
+- *The environment.* The run's Ultralytics and torch versions are the ones b_v2_m640's base runs trained with (`training_env_check`).
+- *Whole load.* At Ultralytics' setup (`on_pretrain_routine_end`), before the first step, every tensor of the state_dict of the model it trains (parameters and buffers such as BatchNorm's running statistics; `num_batches_tracked` skipped; a DDP or `torch.compile` wrapper removed) must equal the init's by name, shape and value, and no tensor of the init may be left out (`init_transfer`). Ultralytics loads an init by `intersect_dicts`, which skips a tensor whose name or shape differs, so this proves the init loaded whole.
+
+A production run refuses every departure; a testing run records it.
+
+**Statistic.**
+- *The number.* Each run's dev species_map50_95 (the 12-class mean AP50-95), read from its final run's dev score at 640 by `inc2.scorer_native`: `scores/dev@640.json` plus its per-image arrays.
+- *How it is scored.* scorer_native runs the locked scorer's own code and settings as a library. It must reproduce the run's recorded protocol dev score within 0.002 for the mAP and for every class (`vs_protocol_score`), or it refuses. So D and its SE come from one pass.
+- *The reference's files.* b_v2_m640's three files exist: L23N wrote them as the native verdict's reference, and `capacity/native_v1.json` records their sha256s. They are read, never rewritten.
+- *Reported beside, not deciding.* The base runs' protocol dev scores (b_v2_m640: 0.8524 ± 0.0025).
+
+**Rule (dev only, record only).**
+- *D.* For each arm, over the seeds it shares with b_v2_m640 (0, 1, 2): D = mean(arm) − mean(b_v2_m640).
+- *Qualifies when* D > 2 × pooled sd **and** D > SE(D). Pooled sd = √((sd_arm² + sd_ref²)/2), with sample sd.
+- *SE(D)* is the native rule's paired image bootstrap (`inc2.baseline.native_bootstrap`, unchanged):
+  - 1,000 resamples of the dev images under `stable_int("inc2/e2/species_se")`, one draw for every run;
+  - per run and resample, each species' AP50-95 on the run's tie-broken per-image arrays, then the 12-class mean over the species with a GT box in the resample;
+  - the mean over seeds per arm, then the arm minus the reference;
+  - SE is the sample sd over the resamples.
+- *Choice.* When both arms qualify, the larger D is E2's choice. A tie goes to E2-S, the shorter schedule.
+- *Two comparisons.* Both arms are compared with one shared reference. With 3 seeds per side, the 2 pooled sd condition alone passes a null arm about 3.5 % of the time (t ≈ 2.45 on 4 df) and either of two null arms about 6.4 % (simulated, sharing the reference), before the SE condition. The rule is kept as written; the reader weighs a single qualifying arm with that in mind.
+- *Refusals.* The verdict refuses when native files of an arm or of the reference disagree on the exam manifest, key order, locked scorer, a setting or Ultralytics' version. It also refuses (production) a test-mode file, a file not checked against its production protocol score, a native file whose weights are not its base run's, a run whose base run.json does not show the recorded init, the arm's recipe, the passed init and environment checks and the whole load, two experiments of one arm with one seed, experiments that start from different E1-B records, and an experiment built against another reference manifest.
+- *Output.* The verdict goes to `capacity/e2_v1.json`, beside `e1_v1.json`. A decided verdict is never rewritten: a recomputation whose decision agrees keeps the file byte for byte, and one whose decision differs is refused. The decision compared is the status, the qualifying arms, the choice and, per arm, the seeds, the values, D, pooled sd, SE, the conditions, `qualifies` and the inputs' sha256s; the fields reported beside it (the protocol dev means, which a re-score attempt of a base run rewrites, and the cross-check against `native_v1.json`) never block a recomputation.
+- *Effect.* Qualifying switches nothing. The stream's arm, pool and incumbent stay as they are.
+
+**Reported beside the verdict, not deciding.**
+- In `e2_v1.json` (dev only), for each arm and the reference:
+  - dev agnostic mAP50-95 from the same files;
+  - the dev AP50-95 of Carpetweed, SpottedSpurge and Purslane, with their bootstrap SE;
+  - the protocol dev means;
+  - the training environment of each run and whether it is one;
+  - whether the reference's files are the ones `native_v1.json` records.
+- In `e2_v1_report.{json,md}` (for people, not evidence): ImageWeeds 12-class and agnostic, from the finals.
+
+**The test read (a person's step).**
+- *When and which.* Once, for the arm the verdict chose, and only after `e2_v1.json` holds a decided verdict. A qualifying arm that was not chosen is not read: E2's test number is the chosen arm's, so the headline cannot be picked after seeing test.
+- *Preparing it.* `inc2.baseline e2-test-read --e2 W|S` writes, before submitting anything:
+  - one kind-final spec on exam test per seed, from the arm's base weights (the weights the verdict read, by sha256);
+  - one submission list per experiment;
+  - the three `run_inc2_job.sh` argvs.
+
+  A person submits them.
+- *Reporting it.* `inc2.baseline e2-test-report --e2 W|S` reports 12-class and agnostic test, mean ± sd over the 3 seeds, against b_v2_m640's final test files (12-class 0.8786) with the gap to 0.90. It writes `capacity/e2_test_<W|S>.{json,md}`, which the platform's evidence does not admit.
+- *Refusals.* The read refuses before the verdict, for an arm that did not qualify or was not chosen, and a second time: once prepared, or once a run, attempt or test score of the arm exists. It refuses when the weights no longer hash as the verdict read them, and a repeated call says so when the verdict changed since the read was prepared. It checks everything before writing anything.
+
+**Platform flow.** The stream proposes everything up to the verdict.
+1. *The six builds.* Once R0 is complete, the MAINT lane is free and DATA has nothing due, DR0 proposes the six builds one at a time, in the order W0, S0, W1, S1, W2, S2. Each is lever L23B: `inc2.baseline build --exp e2_<w|s>_m640_seed<k> --manifest INC_DIR/splits/v2/base_v2.jsonl --seeds <k> --arm m640 --role baseline --e2 W|S`. The next build is proposed once the previous one's experiment exists, so the builds take about six queue-plus-build cycles of one GPU-shared build job each; the experiments' runs overlap.
+2. *Their gate.* A build is proposed only while `capacity/e1_v1.json` is decided and qualifies E1-B, and E1-B's experiment is done (so its three base weights exist). Each item cites the verdict's `/qualifies` and `/exp`, E1-B's status, the lock and the item's own state.
+3. *Their runs* are measurement arms. They get no L23N. A blocked unit or a stale advance is a person's card, never a pause.
+4. *A failed build.* A build of a measurement arm (any baselines item marked measure, E2's included) that ends without its experiment is record only: one card with the refusal, `/stage/baselines/<id>` says failed, DR0 does not propose it again, and the lane's failure count is not touched, so a refusal that every E2 build would meet cannot hold MAINT. For an E2 item the card says that L23C waits for all six experiments and gives the exact build command for a person.
+5. *The verdict job.* Once all six experiments and b_v2_m640 are done and the verdict's record is missing, DR0 proposes **L23C** once. It runs `inc2.baseline rescore-e2` as one GPU job of `run_inc2_build.sh`, job name `inc_build_e2_v1`. The job:
+   - scores the six final runs on dev at 640, and any reference file that is missing;
+   - writes `capacity/e2_v1.json`;
+   - then writes `capacity/e2_rescore.json`: complete, the files' names and sha256s and the verdict's sha256, no path.
+6. *L23C is record only.* A failure is a card, and L23C is not proposed again. A submission whose outcome is unknown is followed by its job name and `capacity/e2_rescore.json`.
+7. *The card.* When the verdict is decided, the ticker raises one card naming the qualifying arms, each with its D, 2 × pooled sd and SE, and the exact `e2-test-read` and `e2-test-report` commands for the chosen arm.
+
+**Pricing.**
+- An E2 build item is priced from its image-epochs at m640's measured 14.2 ms per image-epoch, as E1's arms were:
+  - E2-W: 6,811 × 100 = 681,100 image-epochs = 2.69 GPU-h;
+  - E2-S: 340,550 image-epochs = 1.34 GPU-h;
+  - each item adds a seed's share of the finals (0.8 GPU-h prices an experiment of 3 seeds; one seed pays 0.27) and the build job (4.0): 6.95 GPU-h for an E2-W item and 5.61 for an E2-S item.
+- The six items total 37.7 GPU-h, 24 of it the build jobs' price, which is settled from sacct.
+- L23C is nine scoring passes at 0.25 GPU-h: 2.25. E2 commits 39.9 SU in all.
+- exp.json's cost_estimate uses the same rate (`inc2.recipes.e2_cost`).
+- A base run takes about 2.7 h for E2-W (b_v2_m640 measured 2.68 h) and 1.35 h for E2-S, under the pinned 8 h cold limit.
+
+### What changed
+
+- `inc2/recipes.py`:
+  - E2's pre-registered constants (`E2_*`);
+  - `e2_exp`, `e2_recipe` and `e2_cost`;
+  - `deviations` and `match` accept x1b for kind base only, when the caller names it (`_named_wanted`, which replaces `_budget_wanted`; cold_budget unchanged).
+- `inc2/train.py`:
+  - `experiment_e2`, `e2_problems`, `e2_env_check` and `e1_verdict_path`;
+  - `experiment_arm` accepts an init other than the arm's checkpoint only when the e2 record names it;
+  - `init_check` aims at the recorded init (path, sha256, seed);
+  - `experiment_budget` admits x1b for E2-S only and returns an E2 experiment's problems;
+  - the environment check and the `init_transfer` check at setup (`init_transfer`, `require_whole_load`).
+- `inc2/baseline.py`:
+  - `build --e2 W|S` (`e2_record`, `e2_research_only`; inc2.train's `e2_problems` on the definition before the manifest is copied);
+  - verbs `rescore-e2` (L23C), `e2-verdict`, `e2-test-read` and `e2-test-report`;
+  - `rescore_native`'s per-file step factored out unchanged (`_native_one`).
+- `run_inc2_build.sh`: `inc2.baseline rescore-e2` (name `e2_v1`, no advance).
+- Autopilot:
+  - `stream_domains/weed.json`: six E2 baselines (`requires: e1`, `native: false`, `e2`, `images`, `budget`) and the block `e2`;
+  - `diagnose_stream.DR0`: the `e1` gate (`_e1_qualified`) and L23C;
+  - `stream.py`: `/stage/e2`, L23C as record only, a measurement arm's failed build as record only, the E2 verdict card, and L23B's `--e2`;
+  - `stream_levers.json`: L23B's optional `--e2`, the L23C row, the envelope;
+  - `levers_stream.py`: a budget-priced item pays its seeds' share of the finals; an argv placeholder may hold digits (`{e2}`);
+  - `executor`, `stream_remote`, `evidence.ALLOWED`;
+  - `brain/policy_actions.json`: the `inc_rescore_e2` row and `inc_build_baseline_v2`'s `e2` bound;
+  - `brain/approvals.ENVELOPE_ACTIONS`.
+
+### Choices where the plan was silent, and why
+
+1. *Six single-seed experiments* rather than an init template in `init_weights`. A template would put a non-file in every spec's `init` and need expanding wherever an init is read. Six experiments leave the pinned driver's contract ("a weights path or name") whole.
+2. *One flag, `--e2 W|S`*, rather than free `--init-from` and `--recipe` flags. Neither the init nor the recipe is a parameter an item may choose: the build derives both from E1's verdict and the arm.
+3. *The statistic comes from the native dev files at 640.* The base runs' sidecars of b_v2_m640 failed (2026-09-29), so its only per-image arrays are the native reference files, and D and SE must come from the same pass.
+4. *A tie in D goes to E2-S.*
+5. *The whole-load check* compares the state_dict, not only the parameters: BatchNorm's running statistics are part of the init.
+6. *The training environment* is checked at train time (a run refuses before it trains), not only read by the verdict: a confounded run would cost its GPU-hours.
+7. *The finals exclude test*, as E1's did, and only the chosen arm's test is read.
+8. *A failed build of any measurement arm is record only*, not only E2's: no lane waits for a measurement arm, and the next one would meet the same refusal.
+
+### How it is verified
+
+- `tests/test_inc2_e2.py` (new): the constants, recipes, the build and its refusals (each leaving no directory), inc2.train in production (stops at device; every refusal at stage recipe), the whole load (a real 1-epoch CPU run; a 12-class head; a BatchNorm buffer; a DDP-style wrapper), the bootstrap, the rule on synthetic native files (each condition alone, pooled sd, the choice, a tie, pending, every refusal, dev only by `brain_plan.dev_leaks`, the evidence scrub and an exact-value check), the kept verdict, `rescore-e2` end to end with real CPU passes, the test read and report, the CLI.
+- `tests/test_stream_ap_units.py` (`t_e2`): the domain items, prices, argv and proposal ids, the grammar and the evidence list, the gate in five states, the six builds in order, L23C at six and not at five, its failure and its unknown outcome, a failed build (two in a row hold nothing), an E2 D5, the verdict card.
+- `tests/test_stream_ap_replay.py`: stream_r0 now ends with L23E, E2's six builds, then L23C, each once, within the envelope.
+- `tests/test_stream_pipeline.py`: E2 is never built in a world that never reaches E1's verdict. `tests/test_inc2_stream.py`: `run_inc2_build.sh inc2.baseline rescore-e2`.
+- An ad hoc mutation run on scratch copies of the package and tests: 36 mutants of the new logic, each killed by a failing check of the tests above. They covered:
+  - inc2.train: any init accepted by `experiment_arm`; `init_check` without the sha256 or the seed; `e2_problems` without E1's verdict, E1-B's run or the seed and name checks; the verdict compared by its sha256; x1b without arm S; the whole-load refusal off; the comparison on the parameters only; the environment check off;
+  - the build: no reference compare, no recipe compare for W, no splits v3 summary check, research-only not inherited, x1b for any kind;
+  - the verdict: either condition off, the smaller D chosen, a tie to W, the kept file rewritten, the whole document compared;
+  - the test read: no qualifying check, no choice check, attempt.json not checked, a spec written before every check;
+  - the platform: the e1 gate ignoring `qualifies` or E1-B's status, L23C at five of six, a failed L23C marked agnostic, L23C followed by another job name, a failed measure build counted as a lane failure, a failed build read as missing, the finals not scaled, the card without the command, L23B without `--e2`.
+- The affected suites pass with 0 failures: `test_inc2_e2.py`, `test_inc2_e1.py`, `test_inc2_native.py`, `test_inc2_baseline.py`, `test_inc2_train.py`, `test_inc2_base3.py`, `test_inc2_stream.py`, every `test_stream_ap_*.py` (the mutation suite included), `test_stream_pipeline.py`, `test_inc_ap_replay.py`, `test_inc_ap_governance.py`, `test_funnel_ap_replay.py`, `test_funnel_ap_mutations.py`, `test_funnel_domain_free.py`. In the full suite (146 scripts) every script passes except `test_brain_api.py`, which fails the same way on main.
+
+### Deploy
+
+These files change `executor.code_hash()` and the stream rules version:
+- `inc_autopilot/{executor.py, stream.py, stream_remote.py, diagnose_stream.py, evidence.py, levers_stream.py, stream_levers.json, stream_domains/weed.json}`;
+- `brain/{policy_actions.json, approvals.py}`;
+- `tests/test_stream_ap_replay.py`.
+
+`inc2/{recipes.py, train.py, baseline.py}` are hashed into every run's drift check and S23.
+
+Sync the lab and both cluster copies from one commit, restart the dashboard (`inc_dashboard.py`), then run `executor.run_replay_tests` so envelope grants resume.
+
+Before autonomy is turned on, these read-only checks are made. Each one that fails would refuse every E2 build or run, or hold the item silently:
+1. *Budget.* weed_stream_v1's `window_remaining_su`, campaign `remaining_su` and `domain_remaining_su` are each at least E2's 39.9 SU plus the next L18 (about 116 SU). "This month's window" and "of the domain's" are wait refusals that hold MAINT silently, and "left in the campaign envelope" pauses the stream. If one is short, a person raises the cap.
+2. *The reference's definition.* `b_v2_m640/exp.json`: `splits_v2.lock_sha256` and `nevertrain_sha256` equal the current LOCK v2's; `base.manifest_sha256` is base_v2's; `base.recipe` equals `inc2.recipes.cold('m640')`; `arm` equals `inc2.recipes.resolve_arm('m640', REPO)`, yolo11m.pt's sha256 included; the protocol stamps are v3, inc2, v2.
+3. *The reference's files.* `b_v2_m640/runs/final__base__s{0,1,2}/scores/dev@640.json` and `.images.npz` exist and hash as `capacity/native_v1.json`'s `reference_inputs` record.
+4. *E1-B.* `capacity/e1_v1.json` is decided, qualifies `e1_b_m640` and has `testing_allowed` false; `e1_b_m640/runs/base__s{0,1,2}/run.json` is done, `testing` false, its guard record names the current LOCK v2 with nothing refused, and `weights/final.pt` is a regular file that hashes to its `weights_sha256`.
+5. *The environment.* `b_v2_m640/runs/base__s{0,1,2}/run.json` record one `ultralytics_version` and `torch_version`, and they are the cluster environment's now (E1-B's run.json show whether it changed since); otherwise every E2 run refuses at stage recipe. The rescore job's Ultralytics is the version stamped in the reference files (8.4.37); otherwise the verdict refuses on stamps.
+
+### Open items
+
+- E2 measures "E1-B as the init", not "data at scale" alone. E1-B's base holds base_v2's 6,811 images byte-identical, trained about 27 epochs as class 12, so E2 differs from b_v2_m640 in the init and in about 1.2M extra image-epochs, its own images included. E1-A (one class, 6,811 images) scored agnostic dev 0.8570, below b_v2_m640's own 0.8695, so against the 12-class model's boxes E1-B gains about +0.009 on dev and +0.0095 on test. An E2-A control (init from E1-A) would separate the two; it is not run.
+- E1-B's test agnostic is 0.8996, under 0.90: boxes inherited from E1-B alone cannot carry E2 to 0.90 on test.
+- E2 learns species from base_v2's 6,811 labels only. Species labels at scale (base v3's verified target boxes) are a separate experiment.
+- x1b's warmup_bias_lr (0.01) differs from cold's (0.1), and close_mosaic 10 is 20 % of x1b's 50 epochs against 10 % of cold's 100. E2-S against E2-W therefore confounds the schedule's length with the bias warm-up and the share of epochs without mosaic: read E2-S as "the table's x1b", not "cold, shorter".
+- Every E2 model is research-only if E1-B is (external rows of unknown licence): a qualifying E2 cannot become a deployable or incumbent model, the robot's included, without a separate licence step.
+- E2 does not read test v1.

@@ -13,6 +13,38 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-04 — E2 pre-registered: the 12-class detector on E1-B's backbone (no results yet)
+
+**Accuracy (unchanged).**
+- Best sealed cwd12 12-class test: 0.8786 ± 0.0018 (YOLO11m@640, base_v2). Gap to 0.90: 0.021.
+- Training data: the 12-class labels are base_v2's 6,811 images (stream pool 7,493). The weed-box base E2 starts from is base v3's 44,485 images.
+
+**Why E2.**
+- E1 showed that 44,485 weed-box images place better boxes: sealed test agnostic 0.8996 ± 0.0015, against 0.8838 for 6,811. The best 12-class model's boxes score 0.8901.
+- No 12-class model uses those boxes yet.
+
+**Design (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04).**
+- E2-W: b_v2_m640's definition (base_v2, the cold recipe) with one change, the init. Seed s starts from E1-B's seed-s final EMA weights, recorded by path and sha256.
+- E2-S: the same, trained with the shorter x1b schedule (50 epochs, warmup 3, lr0 0.01).
+- Six single-seed experiments (the pinned driver has one init per experiment).
+- Finals are dev and ImageWeeds. Models inherit E1-B's research-only flag.
+- What it measures: E1-B as an init (its base holds base_v2's own images, trained about 27 epochs as class 12), not data at scale alone. E1-B's boxes score 0.8996 on test, so inherited boxes alone cannot reach 0.90.
+
+**Rule (dev only, record only).**
+- D = mean dev 12-class mAP50-95 (each final run at 640, the locked scorer's code as a library) − b_v2_m640's, over seeds 0–2.
+- An arm qualifies when D > 2 pooled sd and D > the paired image-bootstrap SE (1,000 resamples, `inc2/e2/species_se`). Two arms share one reference: the 2 pooled sd condition alone passes a null arm about 3.5 % of the time.
+- If both qualify, the larger D wins.
+- The verdict is `capacity/e2_v1.json`. Nothing switches.
+
+**Reported beside, not deciding.** Dev agnostic; dev AP of Carpetweed, SpottedSpurge and Purslane with SE; ImageWeeds in the report.
+
+**Test.** Read once, for the chosen arm only, after the verdict, by a person (`inc2.baseline e2-test-read`). It is reported against 0.8786 with the gap to 0.90.
+
+**Platform.**
+- The stream proposes the six builds itself once E1-B's verdict qualifies (L23B; 6.95 / 5.61 GPU-h per item, 37.7 total).
+- It proposes the verdict once all six are done (L23C, 2.25 GPU-h, record only).
+- A build that ends without its experiment is a card; it does not hold the MAINT lane.
+
 ## 2026-10-04 — The loop's daily SU cap held a segment on an idle cluster; the domain default no longer binds
 
 - From 09:27Z (SIU's last shard admitted) to about 19:30Z the cluster ran no job of the loop. The stream's next segment (L18, 116.2 SU estimated) was filed at 06:47Z over "today's cap of 120": the campaign declares 180, but the domain's code default (120) capped it, and an approval does not lift a cap.
