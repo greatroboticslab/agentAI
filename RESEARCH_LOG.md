@@ -13,6 +13,29 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-04 — E1: 44,485 weed images place better boxes than 6,811 (agnostic dev +0.0217, pre-registered rule met)
+
+**Result.** E1 trained one-class weed detectors (YOLO11m@640, cold_budget 1.2M image-epochs, 3 seeds per arm) on two bases.
+
+| Arm | Images (distinct photos) | Agnostic dev mAP50-95 | ImageWeeds agnostic |
+|---|---|---|---|
+| B: base v3 | 44,485 (36,531) | **0.8787 ± 0.0033** | 0.1945 ± 0.0045 |
+| A: base_v2 | 6,811 | 0.8570 ± 0.0014 | 0.1244 ± 0.0036 |
+
+- D = +0.0217. It exceeds both 2 pooled sd (0.0050) and the paired bootstrap SE (0.0068), so E1-B qualifies under the pre-registered rule (capacity/e1_v1.json, written by L23E at 05:27Z).
+- This is the first measured gain from scale in this project. It is on box placement, the limit identified on 2026-10-01: the 12-class YOLO11m on base_v2 has agnostic dev 0.8695 and test 0.8901.
+- The cross-lab ImageWeeds score rises by 56 % relative, but it stays low (0.19).
+- The sealed test was read once per arm by a person (e1-test-read, jobs 47399746/47399747). The 12-class sealed test stays 0.8786 until a 12-class model is trained on base v3.
+
+**Base v3.**
+- Composition: SIU 15,532 (its 35 % family cap bound: 3,219 dropped), MH-Weed16 4,576, rf_tuf 4,315, cwd12 train 3,048, and 20 more sources.
+- Test v1 (3,030 images) is held out by capture group, SIU by video.
+- Built in 66 min.
+
+**Stream segment s002.** It took 3 increments, mostly SIU target boxes verified by Step 1. All three were held, not accepted: dev 12-class change −0.001, agnostic −0.006. The pool stays at 7,493 images. Greenhouse frames added in small increments to a 12-class model did not help, while the large mixed base did.
+
+**SIU shards.** Shards 1–3 have been admitted (i0004–i0006); 90,899 frames remain in two shards.
+
 ## 2026-10-03 (night, decisions) — SIU admitted, four false quarantines lifted, base v3 build approved
 
 **Accuracy (unchanged).** Best sealed cwd12 test 0.8786 ± 0.0018 (YOLO11m@640, base_v2), gap to 0.90 = 0.021. Training set 7,493 images; base v3 is building.
