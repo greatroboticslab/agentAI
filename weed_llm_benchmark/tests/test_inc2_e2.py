@@ -59,9 +59,12 @@ What is pinned:
 - rescore-e2 end to end with real CPU passes (written once, a complete
   record of names and sha256s, a second run keeps everything, an undone
   final run refuses before anything is written);
-- e2-test-read only for the chosen arm, after the verdict, once, checking
-  everything before writing; e2-test-report pending, then the means and the
-  gap to 0.90, refusing a test-mode score; neither file on the evidence;
+- e2-test-read once per qualifying arm, after the verdict (one decided under
+  the pre-registered parameters), checking everything before writing;
+  e2-test-report pending, then the means and the gap to 0.90 (the chosen
+  arm the headline), refusing a test-mode score and any score that is not
+  the prepared read's (its weights, the read record, the shared scorer,
+  test manifest and key order); neither file on the evidence;
 - the CLI's refusals and a build through it.
 rescore_native after the _native_one refactor: tests/test_inc2_native.py.
 
@@ -327,6 +330,27 @@ def test_build():
         rp.write_text(json.dumps(x))
         refuse("b_v2_m640 built on another manifest", frag="base.manifest_sha256")
         refuse("  (S too)", letter="S", exp=RC.e2_exp("S", 0), frag="base.manifest_sha256")
+    # every other key that defines training (e2_record's pairs), and the reference's seeds
+    for what, change, frag in (
+            ("b_v2_m640 built under another LOCK v2", lambda x: x["splits_v2"].update(lock_sha256="0" * 64),
+             "splits_v2.lock_sha256"),
+            ("b_v2_m640 built under another never-train index", lambda x: x["splits_v2"].update(
+                nevertrain_sha256="0" * 64), "splits_v2.nevertrain_sha256"),
+            ("b_v2_m640's arm record another batch", lambda x: x["arm"].update(batch=int(x["arm"].get("batch") or 16)
+                                                                              + 1), "in arm"),
+            ("b_v2_m640's arm record another checkpoint sha256", lambda x: x["arm"].update(
+                **{k: "0" * 64 for k in x["arm"] if k.endswith("sha256")} or {"weights_sha256": "0" * 64}), "in arm"),
+            ("b_v2_m640 with another image count", lambda x: x["base"].update(n_images=x["base"]["n_images"] + 1),
+             "base.n_images"),
+            ("b_v2_m640 under another protocol stamp", lambda x: x.update(protocol="v2"), "protocol"),
+            ("b_v2_m640 deciding on another exam", lambda x: x.update(decision_exam="imageweeds"), "decision_exam"),
+            ("b_v2_m640 of another type", lambda x: x.update(type="segment"), "type"),
+            ("b_v2_m640 without seed 0 (seeds 1, 2)", lambda x: x.update(seeds=[1, 2]), "it has no seed 0")):
+        with saved(rp):
+            x = json.loads(rp.read_text())
+            change(x)
+            rp.write_text(json.dumps(x))
+            refuse(what, frag=frag)
     vp = T.e1_verdict_path()
     with saved(vp):
         vp.unlink()
@@ -826,6 +850,10 @@ def test_verdict_file(ex, out):
     check("  also when a field reported beside it changed (a base run's protocol dev score): kept",
           err is None and d.get("kept") is True and W.sha(vp) == sha0
           and d["arms"]["W"]["reported"]["protocol_dev"]["arm"]["n"] == 1, err)
+    for name, kw in (("with 10 resamples", {"resamples": 10}), ("admitting test-mode files", {"testing_ok": True})):
+        e = refused(B.e2_verdict, ex, reference=RULE_REF, out_dir=out, **dict({"resamples": 20}, **kw))
+        check("a recomputation %s refuses (the parameters are part of the decision), the file unchanged" % name,
+              e is not None and "never rewritten" in str(e) and W.sha(vp) == sha0, e)
     p = C.INC_DIR / "e2v_w1" / "runs" / "final__base__s1" / "scores" / "dev@640.json"
     x = json.loads(p.read_text())
     x["species_map50_95"] = 0.80
@@ -911,8 +939,13 @@ def test_rescore():
 
 
 # ------------------------------------------------------------------ 12, 13: the test read
-def read_world(tag, qualifying=("W",), chosen="W"):
-    """Three E2-W and three E2-S experiments with base weights (bytes), and a decided verdict naming them."""
+READ_REF = "e2r_ref"            # test_rescore's reference (its final runs), the reference of the read worlds' verdicts
+
+
+def read_world(tag, qualifying=("W",), chosen="W", **over):
+    """Three E2-W and three E2-S experiments with base weights (bytes), and a decided verdict naming them, decided
+    under the pre-registered parameters (E2_RULE, the reference READ_REF, the bootstrap's seed text and 1,000
+    resamples, no test-mode file) unless `over` replaces a field."""
     ex = {"W": [], "S": []}
     arms = {}
     for letter in ("W", "S"):
@@ -932,8 +965,11 @@ def read_world(tag, qualifying=("W",), chosen="W"):
                         "qualifies": letter in qualifying, "inputs": inputs}
     vp = C.INC_DIR / ("cap_%s" % tag) / "e2_v1.json"
     vp.parent.mkdir(parents=True, exist_ok=True)
-    vp.write_text(json.dumps({"format": B.E2_FORMAT, "status": "decided", "arms": arms,
-                              "qualifying": list(qualifying), "chosen": chosen}))
+    doc = {"format": B.E2_FORMAT, "status": "decided", "arms": arms, "qualifying": list(qualifying), "chosen": chosen,
+           "rule": B.E2_RULE, "reference": {"exp": READ_REF, "seeds": [0, 1, 2]}, "testing_allowed": False,
+           "bootstrap": {"seed_text": B.E2_SEED_TEXT, "resamples": B.E2_RESAMPLES}}
+    doc.update(over)
+    vp.write_text(json.dumps(doc))
     return ex, vp
 
 
@@ -942,20 +978,47 @@ def no_specs(ex, letter):
         and not [e for e in ex[letter] if (C.INC_DIR / e / B.E2_TEST_RECORD).exists()]
 
 
+def _test_score(exp, s, val, wsha, stamps=None, **over):
+    """The protocol test score of <exp>/runs/e2test__s<s> (inc2.train writes it): production, its weights."""
+    p = C.INC_DIR / exp / "runs" / ("e2test__s%d" % s) / "scores" / "test.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    doc = dict({"exam": "test", "production": True, "species_map50_95": val, "agnostic_map50_95": val + 0.01,
+                "weights_sha256": wsha}, **(stamps or TEST_STAMPS))
+    doc.update(over)
+    p.write_text(json.dumps(doc))
+    return p
+
+
+TEST_STAMPS = {"scorer_sha256": "c" * 64, "manifest_sha256": "t" * 64, "key_order_sha256": "k" * 64}
+
+
 def test_test_read():
-    print("e2-test-read: the chosen arm, once, after the verdict")
+    print("e2-test-read: each qualifying arm, once, after the verdict")
     ex, vp = read_world("e2t", qualifying=("W", "S"), chosen="W")
     missing = vp.with_name("none.json")
     out = {}
-    out["before the verdict"] = (refused(B.e2_test_read, "W", verdict_path=missing), "not a decided E2 verdict")
-    out["the arm letter X"] = (refused(B.e2_test_read, "X", verdict_path=vp), "is not one of E2's arms")
-    out["a qualifying arm that is not the choice (S)"] = (refused(B.e2_test_read, "S", verdict_path=vp),
-                                                          "not the verdict's choice")
+    out["before the verdict"] = (refused(B.e2_test_read, "W", verdict_path=missing, reference=READ_REF),
+                                 "not a decided E2 verdict")
+    out["the arm letter X"] = (refused(B.e2_test_read, "X", verdict_path=vp, reference=READ_REF),
+                               "is not one of E2's arms")
     ex1, vp1 = read_world("e2u", qualifying=("W",), chosen="W")
-    out["an arm that did not qualify"] = (refused(B.e2_test_read, "S", verdict_path=vp1), "did not qualify")
+    out["an arm that did not qualify"] = (refused(B.e2_test_read, "S", verdict_path=vp1, reference=READ_REF),
+                                          "did not qualify")
+    # a verdict decided under other parameters than the pre-registered ones opens no sealed test
+    for name, over in (("testing_allowed true", {"testing_allowed": True}),
+                       ("testing_allowed missing", {"testing_allowed": None}),
+                       ("200 resamples", {"bootstrap": {"seed_text": B.E2_SEED_TEXT, "resamples": 200}}),
+                       ("another seed text", {"bootstrap": {"seed_text": "inc2/e2/other", "resamples": 1000}}),
+                       ("another rule", {"rule": B.E2_RULE + " (edited)"}),
+                       ("another reference", {"reference": {"exp": "b_v2_s640"}})):
+        exo, vpo = read_world("e2o", qualifying=("W",), chosen="W", **over)
+        out["a verdict with %s" % name] = (refused(B.e2_test_read, "W", verdict_path=vpo, reference=READ_REF),
+                                           "pre-registered parameters")
+        if not no_specs(exo, "W"):
+            out["a verdict with %s (nothing written)" % name] = (None, "")
     bad = {k: str(e)[:200] for k, (e, frag) in out.items() if e is None or frag not in str(e)}
     check("refused: %s; no spec written" % ", ".join(out), not bad and no_specs(ex, "W") and no_specs(ex, "S"), bad)
-    res = B.e2_test_read("W", verdict_path=vp)
+    res = B.e2_test_read("W", verdict_path=vp, reference=READ_REF)
     specs = [json.loads(pathlib.Path(r["specs"][0]).read_text()) for r in res.values()]
     for sp in specs:
         T.validate_spec(sp, pathlib.Path(sp["out_dir"]) / "spec.json")
@@ -968,54 +1031,106 @@ def test_test_read():
                   and r["argv"][3] == "--job-name=inc_%s_e2test" % e for e, r in res.items())
           and all(json.loads((C.INC_DIR / e / B.E2_TEST_RECORD).read_text())["verdict_sha256"] == W.sha(vp)
                   for e in ex["W"]), res)
-    e = refused(B.e2_test_read, "W", verdict_path=vp)
+    try:
+        res_s = B.e2_test_read("S", verdict_path=vp, reference=READ_REF)
+    except B.BaselineError as x:
+        res_s = {"refused": {"arm": None, "chosen": None, "why": str(x)}}
+    check("a qualifying arm the verdict did not choose (S) is read too, once (pre-registered: once per qualifying "
+          "arm), its record naming the choice",
+          sorted(res_s) == sorted(ex["S"]) and all(r["chosen"] == "W" and r["arm"] == "S" for r in res_s.values())
+          and refused(B.e2_test_read, "S", verdict_path=vp, reference=READ_REF) is not None, res_s)
+    e = refused(B.e2_test_read, "W", verdict_path=vp, reference=READ_REF)
     check("a second call is refused, naming the recorded argv", e is not None and "prepared once" in str(e)
           and "sbatch" in str(e), e)
     vp.write_text(vp.read_text().replace('"decided"', '"decided" ', 1))
-    e = refused(B.e2_test_read, "W", verdict_path=vp)
+    e = refused(B.e2_test_read, "W", verdict_path=vp, reference=READ_REF)
     check("  and after the verdict file changed, says so", e is not None and "the verdict changed" in str(e), e)
     for name in ("attempt.json", "run.json", "scores/test.json"):
         exn, vpn = read_world("e2n", qualifying=("W",), chosen="W")
         p = C.INC_DIR / exn["W"][1] / "runs" / "e2test__s1" / name
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("{}")
-        e = refused(B.e2_test_read, "W", verdict_path=vpn)
+        e = refused(B.e2_test_read, "W", verdict_path=vpn, reference=READ_REF)
         check("%s in one experiment's e2test run: refused, no spec written in any of the arm's experiments" % name,
               e is not None and "read once" in str(e) and no_specs(exn, "W"), e)
     exw, vpw = read_world("e2w", qualifying=("W",), chosen="W")
     (C.INC_DIR / exw["W"][2] / "runs" / "base__s2" / "weights" / "final.pt").write_bytes(os.urandom(256))
-    e = refused(B.e2_test_read, "W", verdict_path=vpw)
+    e = refused(B.e2_test_read, "W", verdict_path=vpw, reference=READ_REF)
     check("base weights replaced since the verdict: refused, nothing written", e is not None
           and "the verdict was decided on" in str(e) and no_specs(exw, "W"), e)
 
     print("e2-test-report")
-    rep = B.e2_test_report("W", verdict_path=vp, out_dir=vp.parent, reference="e2r_ref")
+    rep = B.e2_test_report("W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF)
     check("pending while the test scores are missing", rep["status"] == "pending" and len(rep["missing"]) == 6, rep)
     tw = {0: 0.885, 1: 0.889, 2: 0.887}
-    for e in ex["W"]:
+    wsha = {}
+    for e in ex["W"] + ex["S"]:
         s = int(e[-1])
-        p = C.INC_DIR / e / "runs" / ("e2test__s%d" % s) / "scores" / "test.json"
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({"exam": "test", "production": True, "species_map50_95": tw[s],
-                                 "agnostic_map50_95": tw[s] + 0.01}))
-        q = C.INC_DIR / "e2r_ref" / "runs" / ("final__base__s%d" % s) / "scores" / "test.json"
-        q.write_text(json.dumps({"exam": "test", "production": True, "species_map50_95": 0.8786 + 0.001 * (s - 1),
-                                 "agnostic_map50_95": 0.8901}))
-    rep = B.e2_test_report("W", verdict_path=vp, out_dir=vp.parent, reference="e2r_ref")
-    check("complete: 12-class %.4f +- %.4f against the reference's %.4f, D_test %.4f, gap to 0.90 %.4f"
+        wsha[e] = json.loads((C.INC_DIR / e / B.E2_TEST_RECORD).read_text())["weights_sha256"]
+        _test_score(e, s, tw[s] - (0.004 if e in ex["S"] else 0.0), wsha[e])
+        q = C.INC_DIR / READ_REF / "runs" / ("final__base__s%d" % s) / "scores" / "test.json"
+        rw = json.loads((C.INC_DIR / READ_REF / "runs" / ("final__base__s%d" % s) / "run.json").read_text())
+        q.write_text(json.dumps(dict({"exam": "test", "production": True, "species_map50_95": 0.8786 + 0.001 * (s - 1),
+                                      "agnostic_map50_95": 0.8901, "weights_sha256": rw["weights_sha256"]},
+                                     **TEST_STAMPS)))
+    rep = B.e2_test_report("W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF)
+    check("complete: 12-class %.4f +- %.4f against the reference's %.4f, D_test %.4f, gap to 0.90 %.4f; the chosen "
+          "arm is the headline; the read records' and the scores' sha256s and the shared stamps recorded"
           % (rep["arm_scores"]["twelve"]["mean"], rep["arm_scores"]["twelve"]["sd"],
              rep["reference"]["scores"]["twelve"]["mean"], rep["d_test"]["twelve"], rep["gap_to_target"]["arm"]),
           rep["status"] == "complete" and abs(rep["arm_scores"]["twelve"]["mean"] - 0.887) < 1e-9
           and abs(rep["arm_scores"]["twelve"]["sd"] - 0.002) < 1e-9
           and abs(rep["reference"]["scores"]["twelve"]["mean"] - 0.8786) < 1e-9
           and abs(rep["gap_to_target"]["arm"] - 0.013) < 1e-9 and abs(rep["d_test"]["twelve"] - 0.0084) < 1e-9
+          and rep["headline"] is True and rep["chosen"] == "W" and rep["stamps"] == TEST_STAMPS
+          and [x["weights_sha256"] for x in rep["inputs"]] == [wsha[e] for e in ex["W"]]
+          and all(x["read_record_sha256"] and x["test_sha256"] for x in rep["inputs"])
+          and all(x["test_sha256"] for x in rep["reference"]["inputs"])
           and (vp.parent / "e2_test_W.json").is_file() and (vp.parent / "e2_test_W.md").is_file(), rep)
+    rep_s = B.e2_test_report("S", verdict_path=vp, out_dir=vp.parent, reference=READ_REF)
+    check("  the qualifying arm not chosen (S): reported, not the headline, the report saying whose is",
+          rep_s["status"] == "complete" and rep_s["headline"] is False and rep_s["chosen"] == "W"
+          and "headline test number is E2-W's" in (vp.parent / "e2_test_S.md").read_text(), rep_s.get("headline"))
+    ties = {}
+    p0 = C.INC_DIR / ex["W"][0] / "runs" / "e2test__s0" / "scores" / "test.json"
+    with saved(p0):
+        _test_score(ex["W"][0], 0, 0.95, "f" * 64)
+        ties["a test score from other weights (a resubmitted spec)"] = (
+            refused(B.e2_test_report, "W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF), "not the verdict's model")
+    with saved(p0):
+        _test_score(ex["W"][0], 0, 0.885, wsha[ex["W"][0]], stamps=dict(TEST_STAMPS, manifest_sha256="u" * 64))
+        ties["a test score on another test manifest"] = (
+            refused(B.e2_test_report, "W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF), "manifest_sha256")
+    q0 = C.INC_DIR / READ_REF / "runs" / "final__base__s0" / "scores" / "test.json"
+    with saved(q0):
+        q0.write_text(json.dumps(dict(json.loads(q0.read_text()), scorer_sha256="d" * 64)))
+        ties["a reference score from another scorer"] = (
+            refused(B.e2_test_report, "W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF), "scorer_sha256")
+    with saved(q0):
+        q0.write_text(json.dumps(dict(json.loads(q0.read_text()), weights_sha256="e" * 64)))
+        ties["a reference score from weights its final run does not hold"] = (
+            refused(B.e2_test_report, "W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF), "its final run")
+    r0 = C.INC_DIR / ex["W"][1] / B.E2_TEST_RECORD
+    with saved(r0):
+        r0.unlink()
+        ties["no e2_test_read.json for one input"] = (
+            refused(B.e2_test_report, "W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF), "no test read prepared")
+    with saved(r0):
+        r0.write_text(json.dumps(dict(json.loads(r0.read_text()), weights_sha256="a" * 64)))
+        ties["a read record on other weights than the verdict's input"] = (
+            refused(B.e2_test_report, "W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF), "the verdict read")
+    bad = {k: str(e)[:200] for k, (e, frag) in ties.items() if e is None or frag not in str(e)}
+    check("the report refuses scores that are not the prepared read's: %s" % "; ".join(ties), not bad, bad)
     p = C.INC_DIR / ex["W"][0] / "runs" / "e2test__s0" / "scores" / "test.json"
     p.write_text(json.dumps(dict(json.loads(p.read_text()), production=False)))
-    e = refused(B.e2_test_report, "W", verdict_path=vp, out_dir=vp.parent, reference="e2r_ref")
+    e = refused(B.e2_test_report, "W", verdict_path=vp, out_dir=vp.parent, reference=READ_REF)
     check("a test-mode score is refused in production", e is not None and "test-mode" in str(e), e)
-    check("e2-test-report refuses an arm that is not the choice",
-          refused(B.e2_test_report, "S", verdict_path=vp, out_dir=vp.parent) is not None)
+    check("e2-test-report refuses an arm that did not qualify",
+          refused(B.e2_test_report, "S", verdict_path=vp1, out_dir=vp1.parent, reference=READ_REF) is not None)
+    exo, vpo = read_world("e2r2", qualifying=("W",), chosen="W", testing_allowed=True)
+    check("  and a verdict that admitted test-mode files, in production",
+          "pre-registered parameters" in str(refused(B.e2_test_report, "W", verdict_path=vpo, out_dir=vpo.parent,
+                                                     reference=READ_REF)))
     check("no test-read file is on the platform's evidence (capacity/e2_test_W.json, <exp>/e2_test_read.json, the "
           "report), while e2_v1.json and e2_rescore.json are",
           not E.allowed("capacity/e2_test_W.json") and not E.allowed("capacity/e2_test_W.md")

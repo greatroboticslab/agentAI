@@ -1985,11 +1985,15 @@ E2_RULE = ("for each arm (W: b_v2_m640's cold recipe; S: x1b), on the seeds it s
            "of the dev images under stable_int('inc2/e2/species_se'), one draw for every run; per run and resample "
            "each species' AP50-95 on the run's tie-broken per-image arrays, the 12-class mean over the species with a "
            "GT box in the resample, the mean over seeds per arm, the arm minus the reference); when both qualify the "
-           "larger D is E2's choice, a tie goes to S; record only: nothing switches; the sealed test is read once, "
-           "for the chosen arm only, after this verdict, by a person (inc2.baseline e2-test-read)")
-# What a recomputation must reproduce of a decided e2_v1.json (e2_verdict): the decision, never what is reported
-# beside it (the protocol dev means, which a re-score attempt of a base run rewrites, or the native_v1 cross-check)
-E2_DECISION_KEYS = ("status", "qualifying", "chosen")
+           "larger D is E2's choice, a tie goes to S; record only: nothing switches; the sealed test is read once "
+           "per qualifying arm, after this verdict, by a person (inc2.baseline e2-test-read); E2's headline test "
+           "number is the chosen arm's")
+# What a recomputation must reproduce of a decided e2_v1.json (e2_verdict): the decision and the parameters it was
+# decided under (testing_allowed, the bootstrap's seed text and resamples: a file decided under others is refused,
+# never kept), never what is reported beside it (the protocol dev means, which a re-score attempt of a base run
+# rewrites, or the native_v1 cross-check)
+E2_DECISION_KEYS = ("status", "qualifying", "chosen", "testing_allowed")
+E2_BOOTSTRAP_KEYS = ("seed_text", "resamples")
 E2_ARM_DECISION_KEYS = ("status", "seeds", "dev", "reference_dev", "diff", "pooled_sd", "se_diff", "conditions",
                         "qualifies")
 
@@ -2230,15 +2234,18 @@ def e2_decision(exps=None, reference=E2_REFERENCE, testing_ok=False, resamples=E
                                        "averaged over seeds per arm; the arm minus the reference"},
             "reference_matches_native_v1": match_nv, "testing_allowed": bool(testing_ok),
             "on_decision": "record only: nothing switches (the stream's arm, pool and incumbent stay); the autopilot "
-                           "raises one card; a person reads the chosen arm's sealed test once (e2-test-read)",
+                           "raises one card; a person reads each qualifying arm's sealed test once (e2-test-read); "
+                           "the chosen arm's is E2's headline",
             "note": "dev only: the native dev files of the final runs at 640; ImageWeeds is in the report, for people"}
 
 
 def _e2_canonical(d):
-    """The decision of an E2 verdict document (E2_DECISION_KEYS, each arm's
-    E2_ARM_DECISION_KEYS and its inputs' sha256s): what a recomputation must
-    reproduce for a decided file to be kept."""
+    """The decision of an E2 verdict document (E2_DECISION_KEYS, the
+    bootstrap's E2_BOOTSTRAP_KEYS, each arm's E2_ARM_DECISION_KEYS and its
+    inputs' sha256s): what a recomputation must reproduce for a decided file
+    to be kept."""
     out = {k: (d or {}).get(k) for k in E2_DECISION_KEYS}
+    out["bootstrap"] = {k: ((d or {}).get("bootstrap") or {}).get(k) for k in E2_BOOTSTRAP_KEYS}
     arms = {}
     for k, a in sorted(((d or {}).get("arms") or {}).items()):
         a = a if isinstance(a, dict) else {}
@@ -2283,7 +2290,7 @@ def e2_report(decision, testing_ok=False):
     return {"format": E2_FORMAT + "-report", "arms": rows, "qualifying": decision.get("qualifying"),
             "chosen": decision.get("chosen"), "status": decision.get("status"),
             "note": "for people: dev and ImageWeeds of each arm and of b_v2_m640; the decision reads dev only; the "
-                    "sealed test is read once, for the chosen arm, after the verdict"}
+                    "sealed test is read once per qualifying arm, after the verdict"}
 
 
 def _e2_md(rep, decision):
@@ -2397,35 +2404,54 @@ def rescore_e2(exps=None, reference=E2_REFERENCE, out_dir=None, batch=None, devi
     return rec
 
 
-def _e2_verdict_doc(verdict_path=None):
+def _e2_verdict_doc(verdict_path=None, reference=E2_REFERENCE, testing_ok=False):
+    """(path, document) of E2's decided verdict, the gate of every test read
+    and report: decided under the pre-registered parameters (E2_RULE, the
+    reference, the bootstrap's seed text and resamples, and, unless
+    testing_ok, no test-mode file admitted). A verdict a person computed
+    under other parameters (e2_verdict(resamples=200) to look early, or
+    testing_ok=True past a production refusal) opens no sealed test."""
     vp = Path(verdict_path or (C.INC_DIR / "capacity" / ("%s.json" % E2_NAME)))
     v = _read_json(vp)
     if not isinstance(v, dict) or v.get("format") != E2_FORMAT or v.get("status") != "decided":
         raise BaselineError("%s is not a decided E2 verdict: test is read only after it" % vp)
+    bs = v.get("bootstrap") if isinstance(v.get("bootstrap"), dict) else {}
+    probs = []
+    if v.get("rule") != E2_RULE:
+        probs.append("its rule is not E2's pre-registered rule")
+    if (v.get("reference") or {}).get("exp") != reference:
+        probs.append("its reference is %r, not %s" % ((v.get("reference") or {}).get("exp"), reference))
+    if bs.get("seed_text") != E2_SEED_TEXT or bs.get("resamples") != E2_RESAMPLES:
+        probs.append("its bootstrap (seed text %r, %r resamples) is not the pre-registered %r, %d"
+                     % (bs.get("seed_text"), bs.get("resamples"), E2_SEED_TEXT, E2_RESAMPLES))
+    if v.get("testing_allowed") is not False and not testing_ok:
+        probs.append("it admitted test-mode files (testing_allowed %r)" % (v.get("testing_allowed"),))
+    if probs:
+        raise BaselineError("%s was not decided under E2's pre-registered parameters (%s): no sealed test is read "
+                            "on it; a person moves it aside and L23C (rescore-e2) decides again" % (vp, "; ".join(probs)))
     return vp, v
 
 
-def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN):
-    """The one read of E2's sealed test (amendment 2026-10-04, P10), by a
-    person: for the arm the decided verdict chose (it qualified, and had the
-    larger D), one kind-final spec on exam test per seed from its base run's
-    weights (runs/e2test__s<k>), one submission list per experiment and the
-    run_inc2_job.sh argv; the driver does not track the runs, and the scores
-    stay off the platform's evidence. Everything is checked before anything
-    is written. Refuses before the verdict, for an arm that is not the
-    verdict's choice, once a read was prepared (or a run, attempt or test
-    score exists), and when the base weights no longer hash as the verdict
-    read them. Returns {exp: record}."""
+def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN, reference=E2_REFERENCE):
+    """The one read of a qualifying E2 arm's sealed test (amendment
+    2026-10-04, P10), by a person: for an arm the decided verdict qualified
+    (each qualifying arm is read once; E2's headline test number is the
+    chosen arm's), one kind-final spec on exam test per seed from its base
+    run's weights (runs/e2test__s<k>), one submission list per experiment
+    and the run_inc2_job.sh argv; the driver does not track the runs, and the
+    scores stay off the platform's evidence. Everything is checked before
+    anything is written. Refuses before the verdict (or on one decided under
+    other parameters, _e2_verdict_doc), for an arm that did not qualify, once
+    a read was prepared (or a run, attempt or test score exists), and when
+    the base weights no longer hash as the verdict read them. Returns {exp:
+    record}."""
     if letter not in RC.E2_ARMS:
         raise BaselineError("--e2 %r is not one of E2's arms %s" % (letter, ", ".join(sorted(RC.E2_ARMS, reverse=True))))
-    vp, v = _e2_verdict_doc(verdict_path)
+    vp, v = _e2_verdict_doc(verdict_path, reference=reference)
     vsha = _sha(vp)
     if letter not in (v.get("qualifying") or []):
         raise BaselineError("E2-%s did not qualify (qualifying: %s): its test is not read (pre-registered)"
                             % (letter, v.get("qualifying") or "none"))
-    if v.get("chosen") != letter:
-        raise BaselineError("E2-%s qualified but is not the verdict's choice (E2-%s, the larger D): only the chosen "
-                            "arm's sealed test is read (pre-registered)" % (letter, v.get("chosen")))
     inputs = ((v.get("arms") or {}).get(letter) or {}).get("inputs") or []
     if not inputs:
         raise BaselineError("%s names no input of E2-%s" % (vp, letter))
@@ -2472,28 +2498,42 @@ def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN):
                 "--output=%s" % (root / "logs" / "%x_%A_%a.out"), str(job_script_path()), str(lst), exp]
         rec = {"format": E2_TEST_FORMAT, "exp": exp, "arm": letter, "seed": s, "verdict": str(vp),
                "verdict_sha256": vsha, "verdict_diff": ((v.get("arms") or {}).get(letter) or {}).get("diff"),
-               "weights_sha256": wsha, "specs": [str(out_d / "spec.json")], "list": str(lst), "argv": argv,
-               "written_utc": D._utc(),
-               "note": "the one read of E2's sealed test, for the chosen arm, after the dev verdict; a person submits "
+               "chosen": v.get("chosen"), "weights_sha256": wsha, "specs": [str(out_d / "spec.json")],
+               "list": str(lst), "argv": argv, "written_utc": D._utc(),
+               "note": "the one read of this qualifying arm's sealed test, after the dev verdict; a person submits "
                        "the argv; the scores stay off the platform's evidence"}
         _write_json(root / E2_TEST_RECORD, rec)
         out[exp] = rec
     return out
 
 
+E2_TEST_STAMPS = ("scorer_sha256", "manifest_sha256", "key_order_sha256")
+
+
 def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, reference=E2_REFERENCE):
-    """The chosen arm's test read, for people: 12-class (species_map50_95)
+    """A qualifying arm's test read, for people: 12-class (species_map50_95)
     and agnostic test, mean +- sd over its seeds, against the reference's
     final test files of the same seeds, with the gap to 0.90; pending while
-    a score is missing. Writes capacity/e2_test_<letter>.{json,md} (never on
-    the platform's evidence)."""
+    a score is missing. Each score must be the read e2_test_read prepared:
+    <exp>/e2_test_read.json exists for every input of the arm, each test
+    score names the weights that record and the verdict's input name, each
+    reference score names its final run's weights, and every file (the
+    arm's and the reference's) shares one scorer, test manifest and key
+    order (E2_TEST_STAMPS). The headline is the verdict's choice: a
+    qualifying arm that was not chosen is reported as such. Writes
+    capacity/e2_test_<letter>.{json,md} (never on the platform's evidence),
+    with the sha256s it read."""
     if letter not in RC.E2_ARMS:
         raise BaselineError("--e2 %r is not one of E2's arms" % (letter,))
-    vp, v = _e2_verdict_doc(verdict_path)
-    if v.get("chosen") != letter:
-        raise BaselineError("E2-%s is not the verdict's choice (%s): its test was not read" % (letter, v.get("chosen")))
+    vp, v = _e2_verdict_doc(verdict_path, reference=reference, testing_ok=testing_ok)
+    if letter not in (v.get("qualifying") or []):
+        raise BaselineError("E2-%s did not qualify (qualifying: %s): its test was not read"
+                            % (letter, v.get("qualifying") or "none"))
+    vsha = _sha(vp)
     inputs = ((v.get("arms") or {}).get(letter) or {}).get("inputs") or []
-    missing, arm_rows, ref_rows = [], [], []
+    if not inputs:
+        raise BaselineError("%s names no input of E2-%s" % (vp, letter))
+    missing, arm_rows, ref_rows, arm_in, ref_in, stamps = [], [], [], [], [], {}
 
     def read(path, what):
         d = _read_json(path)
@@ -2504,17 +2544,44 @@ def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, re
             raise BaselineError("%s is not a test score" % path)
         if d.get("production") is not True and not testing_ok:
             raise BaselineError("%s is a test-mode score: the report reads production scores only" % path)
+        st = {k: d.get(k) for k in E2_TEST_STAMPS}
+        if not stamps:
+            stamps.update(st)
+        elif st != stamps:
+            raise BaselineError("%s was scored on another scorer, test manifest or key order than the report's first "
+                                "file (%s differ)" % (path, ", ".join(sorted(k for k in st if st[k] != stamps[k]))))
         return d
     for inp in inputs:
         exp = inp.get("exp")
         s = int(_e2_defn(exp, letter)["e2"]["seed"])
-        d = read(C.INC_DIR / exp / "runs" / (E2_TEST_RUN % s) / "scores" / "test.json", "%s/%s" % (exp, E2_TEST_RUN % s))
-        r = read(C.INC_DIR / reference / "runs" / _final_id(s) / "scores" / "test.json",
-                 "%s/%s" % (reference, _final_id(s)))
+        rr = _read_json(C.INC_DIR / exp / E2_TEST_RECORD)
+        if not isinstance(rr, dict) or rr.get("format") != E2_TEST_FORMAT or rr.get("arm") != letter:
+            raise BaselineError("%s has no test read prepared by e2-test-read (%s): its test scores are not reported"
+                                % (exp, E2_TEST_RECORD))
+        if rr.get("weights_sha256") != inp.get("weights_sha256"):
+            raise BaselineError("%s's test read was prepared on weights %s; the verdict read %s"
+                                % (exp, str(rr.get("weights_sha256"))[:12], str(inp.get("weights_sha256"))[:12]))
+        tp = C.INC_DIR / exp / "runs" / (E2_TEST_RUN % s) / "scores" / "test.json"
+        d = read(tp, "%s/%s" % (exp, E2_TEST_RUN % s))
         if d is not None:
+            if d.get("weights_sha256") != rr["weights_sha256"]:
+                raise BaselineError("%s names weights %s, not the ones its test read was prepared on (%s): it is not "
+                                    "the verdict's model" % (tp, str(d.get("weights_sha256"))[:12],
+                                                             str(rr["weights_sha256"])[:12]))
             arm_rows.append(d)
+        arm_in.append({"exp": exp, "seed": s, "weights_sha256": rr["weights_sha256"],
+                       "read_record_sha256": _sha(C.INC_DIR / exp / E2_TEST_RECORD),
+                       "read_verdict_sha256": rr.get("verdict_sha256"), "test_sha256": _sha(tp) if d else None})
+        rp = C.INC_DIR / reference / "runs" / _final_id(s) / "scores" / "test.json"
+        r = read(rp, "%s/%s" % (reference, _final_id(s)))
         if r is not None:
+            rj = _read_json(C.INC_DIR / reference / "runs" / _final_id(s) / "run.json") or {}
+            if r.get("weights_sha256") != rj.get("weights_sha256"):
+                raise BaselineError("%s names weights %s, its final run %s" % (rp, str(r.get("weights_sha256"))[:12],
+                                                                              str(rj.get("weights_sha256"))[:12]))
             ref_rows.append(r)
+        ref_in.append({"run_id": _final_id(s), "weights_sha256": (r or {}).get("weights_sha256"),
+                       "test_sha256": _sha(rp) if r else None})
 
     def agg(rows):
         tw = _e2_mean([x.get("species_map50_95", x.get("map50_95")) for x in rows])
@@ -2523,8 +2590,11 @@ def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, re
     a, r = agg(arm_rows), agg(ref_rows)
     status = "pending" if missing else "complete"
     am, rm = a["twelve"]["mean"], r["twelve"]["mean"]
-    rep = {"format": E2_TEST_REPORT_FORMAT, "status": status, "arm": letter, "verdict_sha256": _sha(vp),
-           "missing": missing, "arm_scores": a, "reference": {"exp": reference, "scores": r},
+    chosen = v.get("chosen")
+    rep = {"format": E2_TEST_REPORT_FORMAT, "status": status, "arm": letter, "verdict_sha256": vsha,
+           "chosen": chosen, "headline": letter == chosen,
+           "missing": missing, "arm_scores": a, "inputs": arm_in, "stamps": dict(stamps) or None,
+           "reference": {"exp": reference, "scores": r, "inputs": ref_in},
            "d_test": {"twelve": (am - rm) if None not in (am, rm) else None,
                       "agnostic": (a["agnostic"]["mean"] - r["agnostic"]["mean"])
                       if None not in (a["agnostic"]["mean"], r["agnostic"]["mean"]) else None},
@@ -2532,7 +2602,8 @@ def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, re
            "gap_to_target": {"arm": (TARGET_TEST - am) if am is not None else None,
                              "reference": (TARGET_TEST - rm) if rm is not None else None},
            "testing_allowed": bool(testing_ok), "written_utc": D._utc(),
-           "note": "the one read of E2's sealed test, for people; never the platform's evidence"}
+           "note": "the one read of a qualifying arm's sealed test, for people; never the platform's evidence; E2's "
+                   "headline test number is the chosen arm's"}
     d = Path(out_dir) if out_dir else C.INC_DIR / "capacity"
     _write_json(d / ("e2_test_%s.json" % letter), rep)
 
@@ -2546,7 +2617,11 @@ def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, re
                                                f(r["agnostic"]["sd"]), r["twelve"]["n"]), "",
           "Gap to %.2f: E2-%s %s, %s %s. Status: %s%s." % (TARGET_TEST, letter, f(rep["gap_to_target"]["arm"]),
                                                          reference, f(rep["gap_to_target"]["reference"]), status,
-                                                         " (missing %s)" % ", ".join(missing) if missing else "")]
+                                                         " (missing %s)" % ", ".join(missing) if missing else ""),
+          "",
+          ("E2-%s is the verdict's choice: this is E2's headline test number." % letter) if letter == chosen else
+          ("E2-%s qualified, but the verdict chose E2-%s (the larger D): E2's headline test number is E2-%s's."
+           % (letter, chosen, chosen))]
     p = d / ("e2_test_%s.md" % letter)
     tmp = p.with_name(".%s.tmp" % p.name)
     tmp.write_text("\n".join(md) + "\n")
@@ -2621,7 +2696,7 @@ def main(argv=None):
                 e2_verdict(out_dir=a.out_dir)
         elif a.command in ("e2-test-read", "e2-test-report"):
             if not a.e2:
-                raise BaselineError("%s needs --e2 (the arm E2's verdict chose: W or S)" % a.command)
+                raise BaselineError("%s needs --e2 (an arm E2's verdict qualified: W or S)" % a.command)
             if a.command == "e2-test-read":
                 res = e2_test_read(a.e2)
                 print(json.dumps({e: r["argv"] for e, r in res.items()}))
