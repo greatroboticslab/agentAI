@@ -1647,6 +1647,27 @@ def _e1_qualified(v, exps):
                   v.ccite(E.pointer("stage", "exp_status", eb))]
 
 
+def _e1a_done(v, exps):
+    """(True, cites) when E2-C may be built besides E2's own gate
+    (_e1_qualified; amendment 2026-10-04, later): E1's verdict names E1-A's
+    experiment as its arm A (its `reference`) and that experiment is done;
+    else (False, why). Whether E1-A's three base weights still exist and
+    hash as their run.json records is the build's check, as for E1-B.
+    Cites only after presence is checked."""
+    e1 = v.dom.get("e1") or {}
+    by_id = {b["id"]: b for b in (v.dom.get("baselines") or {}).get("items") or []}
+    ea = (by_id.get((e1.get("arms") or {}).get("A")) or {}).get("exp")
+    rec_name = e1.get("record")
+    if not ea or not rec_name:
+        return False, "the domain names no E1-A or no E1 record"
+    rec = v.ev.json(rec_name)
+    if not isinstance(rec, dict) or rec.get("reference") != ea:
+        return False, "E1's verdict does not name E1-A (%s) as its arm A" % ea
+    if exps.get(ea) != "done":
+        return False, "E1-A (%s) is not done" % ea
+    return True, [v.cite(rec_name, "/reference"), v.ccite(E.pointer("stage", "exp_status", ea))]
+
+
 def r0(v, d28=None):
     """DR0: the rollout's prerequisites (contract 10 R0, R0b, R1, R2), each
     proposed once in its lane when due, in order: MAINT -- the splits build
@@ -1668,7 +1689,10 @@ def r0(v, d28=None):
     failed stays failed: /stage/baselines says so, and E2's other builds
     wait while it is), and once its six
     experiments and the reference are done, E2's rescore and verdict (L23C,
-    once). DATA --
+    once); E2-C (2026-10-04, later): its three builds after E2's six, under
+    E2's gate and E1-A done (_e1a_done), in E2's group of builds, and once
+    E2's verdict is recorded and E2-W's and E2-C's experiments are done,
+    the attribution's rescore and record (L23D, once). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill), then D28-v2's sidecars for batches
     committed before the amendment (L17 eval-hits, _eval_hits_due)."""
@@ -1756,6 +1780,12 @@ def r0(v, d28=None):
                 ok, ec = _e1_qualified(v, exps)
                 if not ok:
                     continue
+                if b.get("e2") == "C":
+                    # E2-C (2026-10-04, later): E2's gate, and E1-A (its init) done
+                    ok, ac = _e1a_done(v, exps)
+                    if not ok:
+                        continue
+                    ec = ec + ac
                 # E2's builds are one group: while one of them is failed (its build ran and ended without the
                 # experiment; its card names the refusal and the build command), the others wait. A refusal one
                 # E2 build meets (E1-B's weights or records changed, the reference's definition) the next would
@@ -1764,8 +1794,9 @@ def r0(v, d28=None):
                        for x in (v.dom.get("baselines") or {}).get("items") or []):
                     continue
                 out["MAINT"] = {"lever": "L23B", "baseline": b["id"],
-                                "why": "E2 arm %s (%s, E2-%s seed %s) not built: E1-B qualified and is done; "
-                                       "record only" % (b["id"], b["exp"], b.get("e2"), b.get("seeds"))}
+                                "why": "E2 arm %s (%s, E2-%s seed %s) not built: E1-B qualified and is done%s; "
+                                       "record only" % (b["id"], b["exp"], b.get("e2"), b.get("seeds"),
+                                                        ", E1-A (E2-C's init) is done" if b.get("e2") == "C" else "")}
                 cites = [v.ccite("/stage/lock"), v.ccite("/stage/baselines/%s" % b["id"])] + ec
                 break
             if b.get("requires") == "base3" and st.get("base3") != "done":
@@ -1852,6 +1883,21 @@ def r0(v, d28=None):
             cites = [v.ccite("/stage/lock")] + [v.ccite(E.pointer("stage", "exp_status", b["exp"]))
                                                 for b in e2_items] + \
                 [v.ccite(E.pointer("stage", "exp_status", ref)), v.ccite("/stage/e2")]
+    # E2-C (2026-10-04, later): once E2's verdict is recorded (/stage/e2 done: whether E2-S - E2-C is computed rests
+    # on its choice, and L23C scored E2-W's files) and E2-W's and E2-C's experiments are done, the attribution's
+    # rescore and record, once (record only); /stage/e2_attr is done once capacity/e2_attr_rescore.json says complete
+    ea2 = v.dom.get("e2_attr") or {}
+    if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"] \
+            and ea2.get("arms"):
+        by_id = {b["id"]: b for b in (v.dom.get("baselines") or {}).get("items") or []}
+        at_items = [by_id.get(i) for k in sorted(ea2["arms"]) for i in ea2["arms"][k]]
+        if at_items and all(at_items) and all(exps.get(b["exp"]) == "done" for b in at_items) \
+                and st.get("e2") == "done" and st.get("e2_attr") in (None, "missing"):
+            out["MAINT"] = {"lever": "L23D",
+                            "why": "E2's verdict is recorded and E2-W's and E2-C's runs %s are done without E2-C's "
+                                   "attribution (record only, dev)" % ", ".join(b["exp"] for b in at_items)}
+            cites = [v.ccite("/stage/lock")] + [v.ccite(E.pointer("stage", "exp_status", b["exp"]))
+                                                for b in at_items] + [v.ccite("/stage/e2"), v.ccite("/stage/e2_attr")]
     items = {k: x for k, x in out.items() if x}
     wait = wait if wait and wait["state"] == "waiting" else None
     if not items and not wait:

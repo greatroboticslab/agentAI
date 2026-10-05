@@ -738,6 +738,31 @@ class World(object):
                                                                            "qualifying": q, "chosen": ch},
                                                  "written_utc": utc(self.t[0])})
 
+    def e2_attr_records(self, credited=True, chosen="W", qualifying=("W",), rescore=True, record=True,
+                        status="decided"):
+        """inc2.baseline rescore-e2-attr's records: with record, E2-C's
+        attribution (capacity/e2_attr_v1.json, dev only; the ticker raises
+        its card once), and with rescore its record
+        (capacity/e2_attr_rescore.json, complete)."""
+        pair = {"status": "decided", "seeds": [0, 1, 2], "diff": 0.011 if credited else 0.001, "pooled_sd": 0.002,
+                "two_pooled_sd": 0.004, "se_diff": 0.003,
+                "conditions": {"above_2_pooled_sd": credited, "above_se": credited}}
+        if record:
+            self._w("capacity/e2_attr_v1.json", {
+                "format": "inc2-e2-attribution/1", "status": status, "exam": "dev",
+                "e2_verdict": {"name": "e2_v1.json", "qualifying": list(qualifying), "chosen": chosen},
+                "data": dict(pair, comparison="E2-W - E2-C"), "credited_to_data": credited,
+                "chosen_vs_control": dict(pair, comparison="E2-S - E2-C", confounded_by="the recipe")
+                if chosen == "S" else None,
+                "reported": {"control_vs_reference": dict(pair, comparison="E2-C - b_v2_m640", diff=0.009)},
+                "generated_utc": utc(self.t[0])})
+        if rescore:
+            self._w("capacity/e2_attr_rescore.json", {"format": "inc2-e2-attr-rescore/1", "status": "complete",
+                                                      "exam": "dev", "imgsz": 640,
+                                                      "attribution": {"name": "e2_attr_v1.json", "status": status,
+                                                                      "credited_to_data": credited},
+                                                      "written_utc": utc(self.t[0])})
+
     def native_verdict_file(self, qualifying=(), decided=None):
         """inc2.baseline native-verdict's record (capacity/native_v1.json, dev
         only): each decided arm with its rule's numbers; `qualifying` the arms
@@ -978,7 +1003,9 @@ class World(object):
         verdict qualifies E1-B and E2's six experiments are done with their
         rescore record (capacity/e1_v1.json, e2_rescore.json), so none waits
         on E2's builds or L23C (no e2_v1.json: no S-case carries E2's verdict
-        card)."""
+        card); E2-C's three are done with the attribution's rescore record
+        (capacity/e2_attr_rescore.json), so none waits on E2-C's builds or
+        L23D (no e2_attr_v1.json: no attribution card)."""
         self.lock()
         if bootstrap:
             self.step1_status()
@@ -996,6 +1023,8 @@ class World(object):
             self.e1_verdict()
         if (self.dom.get("e2") or {}).get("arms"):
             self.e2_records(verdict=False)
+        if (self.dom.get("e2_attr") or {}).get("arms"):
+            self.e2_attr_records(record=False)
         self.canary_file()
         self.capacity_file()
         sa = self.dom["stage_a"]
