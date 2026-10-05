@@ -468,6 +468,31 @@ def rank(v, cands, deficit):
     return out
 
 
+def zero_estimate(c):
+    """True when a candidate's own estimate predicts no target box: the
+    first of expected_target_boxes (the collector's), target_boxes, images
+    that is a number is <= 0 (rank's order). A candidate stating none of them
+    is unknown, not zero (a known item the collect config lists without
+    counts stays fetchable, S1b)."""
+    for k in ("expected_target_boxes", "target_boxes", "images"):
+        x = _num(c.get(k))
+        if x is not None:
+            return x <= 0
+    return False
+
+
+def actionable(c):
+    """A candidate D20 may act on once its pre-check passes: one whose
+    estimate is not zero (an L16 on a source predicted to give no target box
+    fetches nothing the stream can use: on 2026-10-03 D20 sent L16 to
+    rf_a-programlama__ag-programlama, 'Trypophobia', expected 0 target boxes),
+    or one whose class names are pending: the collector counts a pending name
+    as no target, so its zero is unknown, and L26 resolves the names (the
+    next L15 estimates it again from the names layer); never fetched while its
+    estimate is zero."""
+    return not zero_estimate(c) or bool(c.get("names_unresolved"))
+
+
 def d20(v):
     th = v.th
     Mv = v.M()
@@ -519,11 +544,13 @@ def d20(v):
             continue
         ok.append(c)
     classes = _priority_classes(v, deficit)
-    ranked = rank(v, ok, classes)
+    zero = [c.get("id") for c in ok if not actionable(c)]
+    ranked = rank(v, [c for c in ok if actionable(c)], classes)
     why = ("Q %d < %d (2M)" % (Q, low)) if low_water else ("species in deficit: %s" % ", ".join(deficit)) \
         if deficit else "a builder refusal asks for data"
     detail = {"Q": Q, "low_water": low, "deficit": deficit, "classes": classes,
-              "ranked": [{"source": c.get("id"), "score": s} for s, c in ranked[:10]], "review": review}
+              "ranked": [{"source": c.get("id"), "score": s} for s, c in ranked[:10]], "review": review,
+              "zero_estimate": {"n": len(zero), "sources": zero[:20]}}
     if ranked:
         top = ranked[0][1]
         idx = cands.index(top)
@@ -542,13 +569,14 @@ def d20(v):
     age = _days(v.c("/now_utc"), last) if last else None
     after = float(_t(th, "D20", "discover_after_days"))
     cites.append(v.ccite("/discover"))
+    zs = (" (%d with a zero estimate)" % len(zero)) if zero else ""
     if last is None or (age is not None and age > after):
         detail["propose"] = {"lever": "L15", "classes": classes}
-        return _diag("D20", True, "info", "%s, no open candidate; the last discovery is %s -> L15 for %s"
-                     % (why, "never run" if last is None else "%.1f days old" % age, ", ".join(classes)),
+        return _diag("D20", True, "info", "%s, no open candidate%s; the last discovery is %s -> L15 for %s"
+                     % (why, zs, "never run" if last is None else "%.1f days old" % age, ", ".join(classes)),
                      cites, ["L15"], None, detail)
-    return _diag("D20", True, "info", "%s, no open candidate, discovery ran %.1f days ago (D29 decides)" % (why, age),
-                 cites, [], None, detail)
+    return _diag("D20", True, "info", "%s, no open candidate%s, discovery ran %.1f days ago (D29 decides)"
+                 % (why, zs, age), cites, [], None, detail)
 
 
 def d29(v):
@@ -568,7 +596,7 @@ def d29(v):
                                                                         else ""), cites=cites)
     age = _days(v.c("/now_utc"), last)
     open_c = [c for c in (v.c("/candidates") or []) if isinstance(c, dict) and not precheck(v, c)[0]
-              and not precheck(v, c)[1]]
+              and not precheck(v, c)[1] and actionable(c)]
     if open_c:
         return _silent("D29", "%d open candidate(s)" % len(open_c), cites=cites)
     if age is not None and age <= recent and found == 0:  # stream-mutation: SM11

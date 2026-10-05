@@ -1253,7 +1253,9 @@ def s24():
     exp = "%s_s001" % w.sid
     why = ("nothing cut for %s: no exact fill of M = %d from %d eligible images in 9 units: a capture group larger "
            "than the remainder" % (exp, w.M, 4 * w.M))
-    w._w("_campaign/provenance/%s.json" % exp, {"exp": exp, "attempts": [
+    # run_inc2_build.sh writes every inc2.stream build's provenance as stream_<sid>.json (its last attempt is
+    # this build's job), never under the segment's name
+    w._w("_campaign/provenance/stream_%s.json" % w.sid, {"exp": "stream_%s" % w.sid, "attempts": [
         {"job_id": str(w.next_job), "status": "build_failed", "started_utc": "x", "refusal": "[inc2.stream] ERROR: " + why}]})
     w.job_done("inc_build_%s" % exp, state="FAILED")
     w.queue(4 * w.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w.t[0] - 2 * DAY),
