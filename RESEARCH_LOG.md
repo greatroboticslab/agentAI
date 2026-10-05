@@ -13,6 +13,19 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-05 — E3 revised before deploy: E3-M on class-agnostic NMS, base_v2's tagged images read, E3 merged with the zoo audit (no E3 results yet)
+
+**Accuracy (unchanged).**
+- Best sealed cwd12 12-class test: 0.8786 ± 0.0018 (YOLO11m@640, base_v2). Gap to 0.90: 0.021.
+- Training data: base_v2's 6,811 images carry the species labels E3's classifier is fitted on; E1-B's boxes come from base v3's 44,485.
+
+**What was wrong (before any E3 number).**
+- E3-M (b_v2_m640's boxes, the classifier's control) was set to decide on the locked scorer's NMS. The pre-registered design gives it class-agnostic NMS. Restored. The locked-NMS reading is now reported beside: it isolates the species stage, and the deciding reading also includes the NMS change.
+- The classifier's fit refused base_v2 images with an EXIF orientation tag. 660 of 6,811 carry one (tags 0, 3, 6, 8; all from 3seasonweeddet10/data2023). They hold 5,521 boxes: 36 % of base_v2's OtherPlant boxes and 18 % of its Purslane. The first scoring job would have failed. Drawn on the images, the labels sit on the plants in the EXIF-transposed frame, which is also the frame the detector was trained in. The fit now reads them in that frame. Dev, test and ImageWeeds carry no tag.
+- E3 was built before the model-zoo audit (L23Z) reached main, and L23Z is now running in the live MAINT lane. Main is merged in. E3's jobs come first wherever both are due, so L23Z stays last; live, E3 follows the running chain.
+
+**Next.** Deploy from one commit containing main and this revision. After the zoo's chain, the platform proposes E3's three scoring jobs (M, A, B) and its verdict on dev; a person reads the sealed test once per qualifying arm.
+
 ## 2026-10-05 — E3 pre-registered and on the platform: two-stage species detection (no E3 results yet)
 
 **Accuracy (unchanged).**
