@@ -14,9 +14,14 @@ j2 a yolo_iter run (derived superset); k a run whose merge was rebuilt; l an
 epoch snapshot; m a LoRA last.pt beside last_merged.pt; m2 a foreign module;
 n a Mamba pickle; o INC train weights, an undone run and a final link; p a
 removed file; q a stock release; r a third-party file; s a test-fixture MLflow
-copy; t a child of b), splits v3 test v1 lists and companions, and a registry
-with the maize evaluation slug, rf_test-8qezo (names '0','1') and a listed slug
-missing. No GPU; the scoring passes are in test_inc2_zoo_score.py.
+copy; t a child of b; u an init the zoo cannot resolve; v a leave4out R3 head
+on dataset_8species, byte copies of cwd12 train; x a legacy R1 head on a merge
+holding the cottonweed_holdout slug; y a legacy R1 head on cwd12 train and
+valid; z a best.pt chosen on dev and zc its child; e1/e2/st INC baselines and a
+stream run, e2 and st initialised from e1), splits v3 test v1 lists and
+companions, and a registry with the maize evaluation slug, rf_test-8qezo (names
+'0','1') and a listed slug missing. No GPU; the scoring passes are in
+test_inc2_zoo_score.py.
 
 Run:  python3 tests/test_inc2_zoo.py
 """
@@ -221,12 +226,19 @@ def build(dev_rows, test_rows, iw_rows):
     (run_f / "scores").mkdir(exist_ok=True)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         S.score(fa, "test", run_f / "scores" / "test.json", imgsz=64, batch=8, device="cpu")
-    # cwd12 roots, a train image of a dev session that is not a dev image, the leave4out supersets
-    cwd_train = HARRY / "weed_llm_benchmark" / "downloads" / "cottonweeddet12" / "train" / "images"
+    # cwd12 roots (train: a train image of a dev session that is not a dev image, two more; valid: one image), and
+    # the leave4out datasets: byte copies of cwd12 train images under their own names (run_leave4out.py, copy2)
+    cwd = HARRY / "weed_llm_benchmark" / "downloads" / "cottonweeddet12"
+    cwd_train = cwd / "train" / "images"
     sess_img = img(cwd_train / "dv_950.jpg", 950)
+    cw_a, cw_b = img(cwd_train / "cw_960.jpg", 960), img(cwd_train / "cw_961.jpg", 961)
+    cw_val = img(cwd / "valid" / "images" / "cv_962.jpg", 962)
     l4 = HARRY / "weed_llm_benchmark" / "results" / "leave4out"
-    l4a = img(l4 / "dataset_8species" / "train" / "images" / "l4a.jpg", 960)
-    img(l4 / "dataset_holdout" / "train" / "images" / "l4b.jpg", 961)
+    l4a = img(l4 / "dataset_8species" / "train" / "images" / "cw_960.jpg", 0, "copy", cw_a)
+    l4s = img(l4 / "dataset_8species" / "train" / "images" / "dv_950.jpg", 0, "copy", sess_img)
+    l4b = img(l4 / "dataset_holdout" / "train" / "images" / "cw_961.jpg", 0, "copy", cw_b)
+    for p in (sess_img, cw_a, cw_b, cw_val, l4a, l4s, l4b):
+        os.utime(p, (T0, T0))
     # test v1 rows and companions (splits/v3)
     v3 = C.INC_DIR / "splits" / "v3"
     tv1 = []
@@ -409,6 +421,75 @@ def build(dev_rows, test_rows, iw_rows):
     tau = write_args(ru, yt, model="/nowhere/parent.pt", mtime=T0 + 3600)
     FIX["u"] = rel_of(save_ckpt(ru / "weights" / "best.pt", det_model(["weed"], seed=23), date=NEW_DATE,
                                 train_args=tau))
+    # (v) a leave4out head: the first eight trainer slots (R3), trained on dataset_8species (cwd12 train copies,
+    # one of a dev session): no legacy_join, the cwd12-train note, a session hit
+    y8 = l4 / "dataset_8species" / "data.yaml"
+    y8.write_text("train: %s\nval: %s\nnc: 8\nnames: %s\n" % (
+        l4 / "dataset_8species" / "train" / "images", l4 / "dataset_8species" / "valid" / "images",
+        json.dumps(list(SP.TRAINER_SLOT_LEGACY[:8]))))
+    os.utime(y8, (T0, T0))
+    rv = l4 / "yolo_8species" / "train"
+    tav = write_args(rv, y8, mtime=T0 + 3600)
+    FIX["v"] = rel_of(save_ckpt(rv / "weights" / "best.pt", det_model(list(SP.TRAINER_SLOT_LEGACY[:8]), seed=24),
+                                train_args=tav))
+    # (x) a legacy R1 head on a merge of cwd12 train and the cottonweed_holdout slug, named as mega_trainer names
+    # its links (<slug>_<stem>): legacy_join through the slug, though every image is a cwd12 image
+    mx = FW / "merged_x"
+    link(mx / "train" / "images" / "cottonweeddet12_cw_960.jpg", cw_a)
+    link(mx / "train" / "images" / "cottonweed_holdout_cw_961.jpg", l4b)
+    yx = write_yaml(mx / "data.yaml", "train/images", base=str(mx), mtime=T0)
+    for e in (mx / "train" / "images").iterdir():
+        os.utime(e, (T0, T0), follow_symlinks=False)
+    rx = FW / "slugmerge" / "train"
+    tax = write_args(rx, yx, mtime=T0 + 3600)
+    FIX["x"] = rel_of(save_ckpt(rx / "weights" / "best.pt", det_model(SP.CWD12_LEGACY_LABELS, seed=25),
+                                train_args=tax))
+    # (y) a legacy R1 head on cwd12 train and valid themselves: cwd12 images only, no legacy_join
+    yy = cwd / "data_trainvalid.yaml"
+    yy.write_text("path: %s\ntrain:\n  - train/images\n  - valid/images\nnc: 12\nnames: %s\n"
+                  % (cwd, json.dumps(list(SP.CWD12_LEGACY_LABELS))))
+    os.utime(yy, (T0, T0))
+    ry = FW / "cwd12direct" / "train"
+    tay = write_args(ry, yy, mtime=T0 + 3600)
+    FIX["y"] = rel_of(save_ckpt(ry / "weights" / "best.pt", det_model(SP.CWD12_LEGACY_LABELS, seed=26),
+                                train_args=tay))
+    # (z) best.pt chosen on a val set staged from dev (/inc_dev/) on the clean list: dev_selected, never ranked;
+    # (zc) its child on the clean list: dev-gated through its init
+    dvv = TMP / "inc_dev" / "images"
+    img(dvv / "v0.jpg", 980)
+    yz = write_yaml(FW / "devsel_data" / "data.yaml", str(mt / "train" / "images"), val=str(dvv), mtime=T0)
+    rz = FW / "devsel" / "train"
+    taz = write_args(rz, yz, mtime=T0 + 3600)
+    fz = save_ckpt(rz / "weights" / "best.pt", det_model(["weed"], seed=27), date=NEW_DATE, train_args=taz)
+    FIX["z"] = rel_of(fz)
+    rzc = FW / "devsel_child" / "train"
+    tazc = write_args(rzc, yt, model=str(fz), mtime=T0 + 3600)
+    FIX["zc"] = rel_of(save_ckpt(rzc / "weights" / "best.pt", det_model(["weed"], seed=28), date=NEW_DATE,
+                                 train_args=tazc))
+    # (e1, e2, st) INC runs on clean manifests: e1_zt_b (inc_baseline) from stock weights, dev N and not gated;
+    # e2_zt_w (inc_baseline) and a stream run on P_0 (inc_stream), both initialised from e1's final.pt (an INC row)
+
+    def inc_run(exp, run, init, man_name, seed):
+        rd = C.INC_DIR / exp / "runs" / run
+        f = save_ckpt(rd / "weights" / "final.pt", det_model(C.CLASS_NAMES, seed=seed), date=NEW_DATE)
+        mp = C.INC_DIR / exp / "manifests" / man_name
+        msha_ = C.write_manifest(mp, [W.row_for("%s_c%d" % (exp, i), clean[i], [(0, 0.5, 0.5, 0.2, 0.2)], "clean")
+                                      for i in range(2)])
+        (C.INC_DIR / exp / "exp.json").write_text(json.dumps({"exp": exp, "type": "baseline"}))
+        (rd / "run.json").write_text(json.dumps({
+            "status": "done", "testing": False, "kind": "base",
+            "spec": {"kind": "base", "init": str(init), "train_manifest": str(mp),
+                     "recipe": {"imgsz": 640, "epochs": 2, "lr0": 0.01}},
+            "init": str(init), "init_sha256": sha(init), "train_manifest": str(mp), "train_manifest_sha256": msha_,
+            "weights": str(f), "weights_sha256": sha(f), "started_utc": "2026-10-01T10:00:00Z",
+            "finished_utc": "2026-10-01T11:00:00Z", "train_class_counts": {s: 3 for s in SP.CWD12_SPECIES},
+            "ultralytics_version": "8.4.22"}))
+        return f
+    fe1 = inc_run("e1_zt_b", "base__s0", C.REPO / "yolo11n.pt", "base.jsonl", 30)
+    inc_run("e2_zt_w", "base__s0", fe1, "base.jsonl", 31)
+    inc_run("weed_stream_v1_zt", "s001__s0", fe1, "P_0.jsonl", 32)
+    FIX["e1"], FIX["e2"], FIX["st"] = ("%s/%s/runs/%s/weights/final.pt" % (INC_REL, x, r) for x, r in (
+        ("e1_zt_b", "base__s0"), ("e2_zt_w", "base__s0"), ("weed_stream_v1_zt", "s001__s0")))
     # (w) e's weights saved again with other metadata: another sha256, the same weights digest
     ck = torch.load(str(FW / "oneclass" / "weights" / "best.pt"), map_location="cpu", weights_only=False)
     ck["date"] = "2026-09-30T00:00:00"
@@ -423,8 +504,8 @@ def build(dev_rows, test_rows, iw_rows):
             continue
         st = os.lstat(p)
         lines.append("%d %d ./%s" % (st.st_size, int(st.st_mtime), rel_of(p)))
-    for p in sorted(list(C.INC_DIR.glob("zt_inc/runs/*/weights/final.pt")) +
-                    list(C.INC_DIR.glob("zt_inc/runs/*/train/weights/*.pt"))):
+    for p in sorted(list(C.INC_DIR.glob("*/runs/*/weights/final.pt")) +
+                    list(C.INC_DIR.glob("*/runs/*/train/weights/*.pt"))):
         rel = "%s/%s" % (INC_REL, p.relative_to(C.INC_DIR).as_posix())
         if "cand__s1/weights" in rel:
             continue                                      # found by the INC glob only
@@ -439,7 +520,7 @@ def build(dev_rows, test_rows, iw_rows):
     conf["contamination"]["hash_budget_s"] = 600
     CONF.write_text(json.dumps(conf, indent=1))
     WORLD.update(dev=dev_rows, test=test_rows, iw=iw_rows, tv1=tv1, maize=mrows, sess_img=sess_img,
-                 vflip=vf, tv_copy=tvc, clean=clean, l4a=l4a, T0=T0)
+                 vflip=vf, tv_copy=tvc, clean=clean, l4a=l4a, cw_val=cw_val, T0=T0)
     return WORLD
 
 
@@ -663,6 +744,28 @@ def test_provenance():
     check("(t) init resolves to b's best.pt row; a yaml init is scratch",
           t["init"]["kind"] == "row" and t["init"]["model_id"] == ms[FIX["b_best"]]["model_id"]
           and Z._resolve_init("yolo11n.yaml", None, Z.Index([], []), conf()[0])["kind"] == "scratch", t["init"])
+    e1, e2, st, z = (pr[FIX[x]] for x in ("e1", "e2", "st", "z"))
+    check("dev_gated: an INC baseline (e2) and a stream run on P_0 (st), each initialised from an INC row (e1's "
+          "final.pt), are dev-gated; e1 (stock init) is not; best.pt chosen on a val set under /inc_dev/ is "
+          "dev_selected (z)",
+          e2["family"] == "inc_baseline" and st["family"] == "inc_stream" and e2["init"]["kind"] == "row"
+          and e2["init"]["model_id"] == ms[FIX["e1"]]["model_id"] and e2["dev_gated"] and st["dev_gated"]
+          and not e1["dev_gated"] and z["selected_on"] == "dev" and z["dev_selected"] and not z["dev_gated"],
+          {k: (pr[FIX[k]]["family"], pr[FIX[k]]["dev_gated"], pr[FIX[k]]["init"]) for k in ("e1", "e2", "st")})
+    idx = Z.Index(Z.read_files(V), Z.read_models(V))
+    c0 = conf()[0]
+    e1_id, b_id, a_id = (ms[FIX[x]]["model_id"] for x in ("e1", "b_best", "a"))
+    check("any row initialised from an INC row is dev-gated, whatever its family; an INC baseline whose init is a "
+          "non-INC row is not; a soup of an INC row is",
+          Z._dev_gated({"family": "mega_v3"}, None, {"kind": "row", "model_id": e1_id}, c0, (), idx)
+          and not Z._dev_gated({"family": "inc_baseline"}, {"kind": "base"}, {"kind": "row", "model_id": b_id}, c0,
+                               (), idx)
+          and Z._dev_gated({"family": "inc_baseline"}, {"kind": "soup"}, {"kind": "unknown"}, c0,
+                           [{"kind": "row", "model_id": e1_id}], idx))
+    lk = C.INC_DIR / "zt_inc" / "runs" / "final__base__s0" / "weights" / "final.pt"
+    got = Z._resolve_init(str(lk), None, idx, c0)
+    check("an init through a kind-final link resolves to the row its target is (the skipped link never hides it)",
+          got["kind"] == "row" and got["model_id"] == a_id, got)
     # a changed manifest: rating none, with the reason
     m = dict(ms[FIX["a"]])
     rd = C.INC_DIR / "zt_inc" / "runs" / "chg__s0"
@@ -829,6 +932,25 @@ def test_contamination():
     check("(u) a clean list but an init the zoo cannot resolve: own N, inherited U, final U",
           cu["own"]["dev"] == "N" and cu["inherited"]["states"]["dev"] == "U" and cu["final"]["dev"] == "U",
           (cu["own"]["dev"], cu["inherited"], cu["final"]["dev"]))
+    cv_, cx, cy = (ct[ms[FIX[x]]["model_id"]] for x in ("v", "x", "y"))
+    check("(v) a leave4out R3 head on dataset_8species: its byte copies are cwd12 train images (by sha256), so no "
+          "legacy_join, the cwd12-train note, and the copy of a dev-session image counts in session",
+          not cv_["legacy_join"] and cv_["cwd12"] == {"cwd12_train": 2, "cwd12_holdout": 0, "non_cwd12": 0}
+          and "trained on cwd12 train; dev is 8 sessions of it" in cv_["notes"]
+          and cv_["counts"]["dev"]["session"] == 1, (cv_["legacy_join"], cv_["cwd12"], cv_["notes"],
+                                                     cv_["counts"]["dev"]))
+    check("(x) a merge entry named for the cottonweed_holdout slug: legacy_join, though every image is a cwd12 image",
+          cx["legacy_join"] and cx["holdout_slug"] == 1 and cx["cwd12"]["non_cwd12"] == 0,
+          (cx["legacy_join"], cx["holdout_slug"], cx["cwd12"]))
+    check("(y) cwd12 train and valid themselves: cwd12 images (one of valid), no legacy_join",
+          not cy["legacy_join"] and cy["cwd12"] == {"cwd12_train": 3, "cwd12_holdout": 1, "non_cwd12": 0},
+          (cy["legacy_join"], cy["cwd12"]))
+    cz, czc, ce1, ce2 = (ct[ms[FIX[x]]["model_id"]] for x in ("z", "zc", "e1", "e2"))
+    check("dev-gated through the init chain: zc inherits it from z (chosen on dev); e2 is gated by its own init; e1 "
+          "is neither", czc["dev_gated"] and czc["dev_gated_inherited"] and cz["dev_selected"] and not cz["dev_gated"]
+          and ce2["dev_gated"] and not ce2["dev_gated_inherited"] and not ce1["dev_gated"],
+          {k: (ct[ms[FIX[k]]["model_id"]]["dev_gated"], ct[ms[FIX[k]]["model_id"]].get("dev_gated_inherited"))
+           for k in ("z", "zc", "e1", "e2")})
 
 
 
@@ -843,14 +965,41 @@ def plant(mid, exam, ag, sp=None, origin="scored", per_class=None):
 def test_plan():
     print("the plan: reused INC records, stage A whole, stage B cut to the cap, LPT shards, written once")
     c, csha = conf()
+    ms = models_by_rel()
+    inc_ids = {m["model_id"] for m in ms.values() if Z.is_inc_family(m["family"])}
+    # a world where an INC row has the smallest model_id of its size class (the non-INC rows below it left out):
+    # the pilot still picks no INC row, and its shard holds none
+    real_read_models = Z.read_models
+    every = real_read_models(V)
+    inc_low = min(m["model_id"] for m in every if m["model_id"] in inc_ids and Z.scorable(m, V) is not None)
+    low_world = [m for m in every if m["model_id"] in inc_ids or m["model_id"] > inc_low]
+    first = min((m for m in low_world if Z.scorable(m, V) is not None and m.get("size_class") in Z.SIZE_CLASSES),
+                key=lambda m: m["model_id"])
+    Z.read_models = lambda version: [dict(m) for m in low_world]
+    try:
+        quiet(Z.pilot_step, V, c, csha, False)
+    finally:
+        Z.read_models = real_read_models
+    low = json.loads((Z.zoo_dir(V) / "pilot.json").read_text())
+    check("an INC row with the smallest model_id of its size class: the pilot picks no INC row and scores none",
+          first["model_id"] in inc_ids and not (set(low["models"].values()) & inc_ids)
+          and not ({it["model_id"] for it in Z.read_shard(V, "pilot")["items"]} & inc_ids),
+          (first["family"], low["models"]))
     quiet(Z.pilot_step, V, c, csha, False)
     pilot = json.loads((Z.zoo_dir(V) / "pilot.json").read_text())
     picks = pilot["models"]
-    ms = models_by_rel()
-    inc_ids = {m["model_id"] for m in ms.values() if Z.is_inc_family(m["family"])}
-    check("the pilot picks non-INC rows only (one per size class), and writes every exam for them",
+    exn = Z.read_exams(V)["exams"]
+    with_images = [e for e in Z.ALL_EXAMS if exn[e]["n_images"]]
+    check("the pilot picks non-INC rows only (one per size class), and writes every exam with images for them",
           picks and not (set(picks.values()) & inc_ids) and len(Z.read_shard(V, "pilot")["items"]) ==
-          len(picks) * len(Z.ALL_EXAMS), picks)
+          len(picks) * len(with_images) and "ooddev_v1" not in with_images, picks)
+    e0 = refused(quiet, Z.plan_step, V, c, csha, 4, 40, 0.0)
+    rec0 = Z.read_record(V) or {}
+    check("a pilot that measured no rate (pilot.json incomplete): the plan refuses, prices nothing from an assumed "
+          "rate, writes no shard and the record says refused",
+          pilot["status"] == "incomplete" and set(pilot["missing_exams"]) == set(with_images) and e0 is not None
+          and "measured no rate" in str(e0) and rec0.get("status") == "refused"
+          and not list((Z.zoo_dir(V) / "shards").glob("a_*.json")), (e0, pilot.get("status"), rec0.get("status")))
     rates = {e: {"S": 1.0, "M": 1.0, "L": 1.0} for e in Z.ALL_EXAMS}
     pilot["rates"] = rates
     (Z.zoo_dir(V) / "pilot.json").write_text(json.dumps(pilot))
@@ -872,11 +1021,15 @@ def test_plan():
     items = [it for sh in shards for it in sh["items"]]
     tv1 = [it for it in items if it["exam"] == "test_v1"]
     devs = [it for it in items if it["exam"] == "dev"]
-    check("stage A whole (dev for every scorable row without a record, never an INC row's test v1); stage B cut "
-          "to its budget, the rest listed not_scored_budget",
+    check("stage A whole (dev for every scorable row without a record); stage B cut to its budget, the rest listed "
+          "not_scored_budget",
           len(devs) == plan["items_a"] and a_id not in {it["model_id"] for it in items}
           and len(tv1) == plan["items_b"] < len(tv1) + len(plan["items_b_dropped"])
           and all(d["why"] == "not_scored_budget" for d in plan["items_b_dropped"]), plan)
+    inc_dev = {it["model_id"] for it in devs} & inc_ids
+    inc_b = inc_ids & ({it["model_id"] for it in tv1} | {d["model_id"] for d in plan["items_b_dropped"]})
+    check("an INC row is read on dev only: stage A holds the INC rows' dev, stage B (taken or not_scored_budget) "
+          "holds no INC row", len(inc_dev) >= 3 and not inc_b, (len(inc_dev), sorted(inc_b)))
     s_ = [sh["predicted_s"] for sh in shards]
     check("exactly --shards-a shard files, LPT-balanced (max - min <= one item)",
           len(shards) == 4 and max(s_) - min(s_) <= max(it["predicted_s"] for it in items) + 1e-6, s_)
@@ -896,10 +1049,19 @@ def test_select():
     print("select: the shortlist from dev and provenance only, the cap, stage C's items within what is left")
     c, csha = conf()
     ms = models_by_rel()
+    mid = lambda k: ms[FIX[k]]["model_id"]  # noqa: E731
     vals = {"d": 0.5, "e": 0.7, "f": 0.6, "b_best": 0.9, "b_last": 0.85, "c": 0.4, "k": 0.3, "j": 0.2, "j2": 0.25,
-            "t": 0.95, "orphan": 0.1, "m_merged": 0.15}
+            "t": 0.95, "orphan": 0.1, "m_merged": 0.15, "x": 0.65}
     for k, v in vals.items():
-        plant(ms[FIX[k]]["model_id"], "dev", v)
+        plant(mid(k), "dev", v)
+    # the dev-clean rows of family 'other' (e, x, f, d agnostic; y species12) and e1 (species12, INC) also hold a
+    # cwd12 test score (species and agnostic) whose order is the reverse of dev's: nothing may rank or pick by it
+    plant(mid("y"), "dev", 0.62, 0.55)
+    plant(mid("e1"), "dev", 0.85, 0.80)
+    t12 = {"e": (0.10, None), "x": (0.20, None), "f": (0.30, None), "d": (0.40, None), "y": (0.95, 0.90),
+           "e1": (0.06, 0.05)}
+    for k, (ag, sp) in t12.items():
+        plant(mid(k), "test", ag, sp)
     ld = Z.zoo_dir(V) / "ledger"
     ld.mkdir(parents=True, exist_ok=True)
     (ld / "a__999_0.json").write_text(json.dumps({"format": Z.LEDGER_FORMAT, "kind": "a", "job": "999", "task": "0",
@@ -907,14 +1069,40 @@ def test_select():
                                                  "ended_s": 1000.0 + 7200}))
     c2 = json.loads(json.dumps(c))
     c2["shortlist"]["claims"] = [{"match": "results/framework/sp8/weights/best\\.pt\\Z", "cite": "docs/x.md:1"}]
+    # first with a cap that cuts nothing (every rule's entries kept), then again under a cap of 5
+    rows0 = {r["model_id"]: r for r in Z.build_rows(V, c2)}
+    inc_ids = {i for i, r in rows0.items() if Z.is_inc_family(r["family"])}
+    other = [r for r in rows0.values() if r["family"] == "other" and r["dev_clean"] and r["model_id"] != mid("d")]
+
+    def top3(col_sp, col_ag):
+        val = lambda r: r["cols"][col_sp] if r["section"].startswith("species12") else r["cols"][col_ag]  # noqa: E731
+        return [r["model_id"] for r in sorted((r for r in other if Z._num(val(r))),
+                                              key=lambda r: (-val(r), r["model_id"]))[:3]]
+    by_dev, by_test = top3("dev_sp", "dev_ag"), top3("t12_sp_desc", "t12_ag_desc")
+    sl0, _o = quiet(Z.select_step, V, c2, csha, 2)
+    ids0 = sl0["rules"]
+    listed = {i for r in ids0.values() for i in r} | set(sl0["ids"])
+    c_items = {it["model_id"] for p in (Z.zoo_dir(V) / "shards").glob("c_*.json")
+               for it in json.loads(p.read_text())["items"]}
+    check("under a cap that cuts nothing (%d kept of max %d): no INC row in any rule (claims, top_dev_clean, "
+          "fill_by_date, latest) nor in stage C, though e1 (INC, dev-clean) has the highest dev of its family"
+          % (len(sl0["ids"]), c2["shortlist"]["max"]),
+          len(sl0["ids"]) < c2["shortlist"]["max"] and ids0["latest"] and ids0["fill_by_date"]
+          and rows0[mid("e1")]["dev_clean"] and not (listed & inc_ids) and not (c_items & inc_ids),
+          {r: [x[:12] for x in v if x in inc_ids] for r, v in ids0.items()})
+    check("rule 3 follows dev, never the cwd12 test: family 'other' top 3 by dev (e 0.7, x 0.65, f 0.6), not by "
+          "the cwd12 test (y, f, x)", ids0["top_dev_clean"] == by_dev == [mid("e"), mid("x"), mid("f")]
+          and set(by_test) != set(by_dev), (ids0["top_dev_clean"], by_dev, by_test))
+    (Z.zoo_dir(V) / "shortlist.json").unlink()
+    for p in (Z.zoo_dir(V) / "shards").glob("c_*.json"):
+        p.unlink()
     c2["shortlist"]["max"] = 5
     sl, _o = quiet(Z.select_step, V, c2, csha, 2)
     ids = sl["rules"]
-    mid = lambda k: ms[FIX[k]]["model_id"]  # noqa: E731
     check("rule 1: the claim (d's path)", ids["claims"] == [mid("d")], ids)
-    check("rule 3: the top 3 of family 'other' among dev-clean rows by dev (e 0.7, f 0.6; d already a claim), "
-          "never a flagged row by its dev; a family with no clean row is filled by date (yolo_iter: j2)",
-          set(ids["top_dev_clean"]) == {mid("e"), mid("f")} and mid("j2") in ids["fill_by_date"]
+    check("rule 3: the top 3 of family 'other' among dev-clean rows by dev (e 0.7, x 0.65, f 0.6; d already a "
+          "claim), never a flagged row by its dev; a family with no clean row is filled by date (yolo_iter: j2)",
+          ids["top_dev_clean"] == [mid("e"), mid("x"), mid("f")] and mid("j2") in ids["fill_by_date"]
           and mid("t") not in ids["top_dev_clean"], ids)
     check("the cap (5) drops the 'latest' entries first; at most one row per run directory; INC rows never "
           "shortlisted", len(sl["ids"]) <= 5 and not ids["latest"] and ms[FIX["a"]]["model_id"] not in sl["ids"],
@@ -964,6 +1152,12 @@ def test_report():
     from weed_optimizer_framework.tools.inc_autopilot import evidence as E
     from weed_optimizer_framework.tools.inc_autopilot import remote as R
     c, csha = conf()
+    ms = models_by_rel()
+    a_id, b_id = ms[FIX["a"]]["model_id"], ms[FIX["b_best"]]["model_id"]
+    Z._write_json(Z.zoo_dir(V) / "codever_v1.json", {
+        "format": Z.CODEVER_FORMAT, "version": V, "git": "planted", "rows": {
+            a_id: {"kind": "exact", "commit": "c0de" * 10, "modules_unmatched": 0},
+            b_id: {"kind": "approx", "commit": "be7a" * 10, "before": "2026-04-01T01:00:00Z"}}})
     sh = sorted((Z.zoo_dir(V) / "shards").glob("c_*.json"))
     one = json.loads(sh[0].read_text())["items"][0]
     plant_all(skip={(one["model_id"], one["exam"])})
@@ -988,6 +1182,20 @@ def test_report():
           "the unscorable section holds n and m2",
           devs == sorted(devs, reverse=True) and ms[FIX["n"]]["model_id"] in secs["unscorable"]
           and ms[FIX["m2"]]["model_id"] in secs["unscorable"] and ms[FIX["t"]]["model_id"] not in clean, secs)
+    mid = lambda k: ms[FIX[k]]["model_id"]  # noqa: E731
+
+    def order(ids, *cols):
+        return sorted(ids, key=lambda i: tuple(-(rows[i]["cols"][k] if Z._num(rows[i]["cols"][k]) else -1.0)
+                                               for k in cols) + (i,))
+    sp12 = secs["species12_dev_clean"]
+    check("Table A follows dev, never the cwd12 test: agnostic dev-clean (family 'other') e, x, f, d by dev "
+          "agnostic, the reverse of their cwd12 test order; species12 dev-clean e1 then y by dev species, the reverse "
+          "of their cwd12 test order",
+          clean == order(clean, "dev_ag") == [mid(k) for k in ("e", "x", "f", "d")]
+          and order(clean, "t12_ag_desc") == [mid(k) for k in ("d", "f", "x", "e")]
+          and sp12 == order(sp12, "dev_sp", "dev_ag") == [mid("e1"), mid("y")]
+          and order(sp12, "t12_sp_desc", "t12_ag_desc") == [mid("y"), mid("e1")],
+          {"agnostic": [i[:12] for i in clean], "species12": [i[:12] for i in sp12]})
     hdr = (Z.zoo_dir(V) / "report.csv").read_text().splitlines()[0].split(",")
     check("report.csv columns as specified", tuple(hdr) == Z.CSV_COLUMNS, hdr)
     ext = json.loads((Z.zoo_dir(V) / "report_external.json").read_text())
@@ -999,11 +1207,52 @@ def test_report():
     check("b: legacy_join (species columns not interpretable), dev Y, selected on the cwd12 test",
           b["flags"]["legacy_join"] and b["cols"]["dev_sp"] is None and b["flags"]["dev"] == "Y"
           and b["flags"]["test_selected"] == "best", b["flags"])
+    sec = {i: k for k, ids in secs.items() for i in ids}
+    check("dev-clean is dev N, not selected on dev and not dev-gated: e1 is ranked (Table A); e2 and the P_0 stream "
+          "run (initialised from e1, an INC row), z (chosen on dev) and zc (its child) are flagged and unranked",
+          sec[mid("e1")] == "species12_dev_clean" and sec[mid("e2")] == "species12_flagged"
+          and sec[mid("st")] == "species12_flagged" and sec[mid("z")] == "agnostic_flagged"
+          and sec[mid("zc")] == "agnostic_flagged", {k: sec.get(mid(k)) for k in ("e1", "e2", "st", "z", "zc")})
+    v = rows[mid("v")]
+    check("(v) the leave4out R3 head keeps its species columns (no legacy_join, no n/i): a partial-species row",
+          v["species_level"] and not v["flags"]["legacy_join"] and v["cols"]["dev_sp"] is not None
+          and v["section"].startswith("species_partial"), (v["section"], v["flags"]["legacy_join"]))
+    import csv
+    rd = {r["model_id"]: r for r in csv.DictReader(io.StringIO((Z.zoo_dir(V) / "report.csv").read_text()))}
+    tf = md.split("## Table F.")[1] if "## Table F." in md else ""
+    check("code version and recipe per row: codever's commit joins the row (report.json), the CSV (code_commit, "
+          "method, recipe, init) and report.md (a code column; Table F: method, recipe, init, data, code per row)",
+          rows[a_id]["code"]["commit"] == "c0de" * 10 and rd[a_id]["code"] == "exact"
+          and rd[a_id]["code_commit"] == "c0de" * 10 and rd[b_id]["code_commit"] == "be7a" * 10
+          and "epochs=10" in rd[b_id]["recipe"] and "imgsz=640" in rd[b_id]["recipe"]
+          and rd[b_id]["init"] == "stock:yolo11n.pt" and rd[b_id]["method"] and "| code | flags |" in md
+          and "exact c0dec0dec0" in md and "approx be7abe7abe" in md and "| %s |" % a_id[:12] in tf
+          and "epochs=10" in tf, (rows[a_id]["code"], rd.get(b_id)))
     rec = Z.read_record(V)
     check("the platform record: complete, counts and sha256s only (no non-dev key, no score path)",
           rec["status"] == "complete" and R.non_dev_keys(rec) == [] and not E._NON_DEV_SCORE.search(json.dumps(rec))
           and rec["counts"]["files_listed"] == rep["counts"]["files_listed"], rec)
 
+
+def test_sections():
+    print("the report's sections: dev-clean sections ranked by dev alone, three rows of one family each")
+    c, _csha = conf()
+    # per section: dev species, dev agnostic, cwd12 test species, cwd12 test agnostic for s1, s2, s3; dev orders
+    # s1, s2, s3 (species sections by dev species first), while dev agnostic alone, the cwd12 test species and the
+    # cwd12 test agnostic each order them otherwise
+    vals = {"species12_dev_clean": ((0.7, 0.2, 0.1, 0.3), (0.5, 0.9, 0.3, 0.1), (0.3, 0.5, 0.8, 0.6)),
+            "species_partial_dev_clean": ((0.6, 0.1, 0.2, 0.2), (0.4, 0.8, 0.5, 0.1), (0.2, 0.3, 0.9, 0.7)),
+            "agnostic_dev_clean": ((None, 0.6, None, 0.1), (None, 0.5, None, 0.3), (None, 0.4, None, 0.9))}
+    rows = []
+    for name, vs in vals.items():
+        for i, (dsp, dag, tsp, tag) in enumerate(vs, 1):
+            rows.append({"model_id": "%s_s%d" % (name, 4 - i), "rel": "r/%s/s%d.pt" % (name, i), "family": "other",
+                         "section": name, "dates": {"sort": "2026-05-0%d" % i},
+                         "cols": {"dev_sp": dsp, "dev_ag": dag, "t12_sp_desc": tsp, "t12_ag_desc": tag}})
+    secs = Z._sections(rows, c)
+    got = {name: [r["rel"].rsplit("/", 1)[1][:-3] for r in secs[name]] for name in vals}
+    check("each dev-clean section is s1, s2, s3 (dev), never the order of the cwd12 test (species or agnostic) "
+          "nor the model_id order", got == {name: ["s1", "s2", "s3"] for name in vals}, got)
 
 
 def fake_bin(fail_at=None):
@@ -1113,7 +1362,7 @@ def test_script():
     stub.mkdir(exist_ok=True)
     (stub / "python").write_text(
         "#!/bin/bash\nif [ \"$1\" = \"-\" ]; then cat >/dev/null; exit 0; fi\n"
-        "echo \"$@ INC_DIR=$INC_DIR SOURCE=${INC_ZOO_SOURCE:-}\" >> %s/py_calls.txt\n"
+        "echo \"$@ INC_DIR=$INC_DIR SOURCE=${INC_ZOO_SOURCE:-} ZOO_SCRIPT=${ZOO_SCRIPT:-}\" >> %s/py_calls.txt\n"
         "case \"$*\" in *exam-root*) echo %s/localroot ;; esac\nexit 0\n" % (TMP, TMP))
     os.chmod(stub / "python", 0o755)
     conda = TMP / "conda.sh"
@@ -1141,6 +1390,21 @@ def test_script():
     check("the job's provenance and lock live under _zoo/v1 (never _campaign/)",
           (TMP / "incroot" / "_zoo" / V / "provenance").is_dir() and (TMP / "incroot" / "_zoo" / V / "locks").is_dir()
           and not (TMP / "incroot" / "_campaign").exists() and not (TMP / "localroot").exists())
+    # the documented person's run: `bash run_inc2_zoo.sh submit ...` from $REPO/weed_llm_benchmark, a relative path
+    nested = repo / "weed_llm_benchmark" / "run_inc2_zoo.sh"
+    shutil.copyfile(sh, nested)
+    (TMP / "py_calls.txt").unlink() if (TMP / "py_calls.txt").exists() else None
+    with env(**base):
+        r4 = subprocess.run(["bash", "run_inc2_zoo.sh", "submit", "--version", V, "--shards-a", "4"],
+                            cwd=str(nested.parent), capture_output=True, text=True)
+    pc4 = [ln for ln in ((TMP / "py_calls.txt").read_text().splitlines() if (TMP / "py_calls.txt").exists() else [])
+           if "inc2.zoo submit" in ln]
+    zs = pc4[-1].rsplit("ZOO_SCRIPT=", 1)[1].strip() if pc4 else ""
+    check("submit run by a relative path from the nested directory passes the nested script itself as ZOO_SCRIPT "
+          "(the one copy inc2.zoo submit accepts), not $REPO/run_inc2_zoo.sh",
+          r4.returncode == 0 and zs and os.path.realpath(zs) == os.path.realpath(str(nested)),
+          (r4.returncode, zs, r4.stderr[-300:]))
+    nested.unlink()
     # the import closure of a full run: every weed_optimizer_framework module and config it opened is drift-checked
     mods = set(text.split("MODULES=(", 1)[1].split(")", 1)[0].split())
     code = r"""
@@ -1204,7 +1468,7 @@ def test_pinned_unchanged():
 def main():
     world()
     for t in (test_list, test_class_maps, test_meta, test_convert, test_provenance, test_exams,
-              test_contamination, test_plan, test_select, test_report, test_submit, test_script,
+              test_contamination, test_plan, test_select, test_report, test_sections, test_submit, test_script,
               test_pinned_unchanged):
         t()
     print("\n%d failure(s)" % len(FAILURES))

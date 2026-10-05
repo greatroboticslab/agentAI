@@ -1309,15 +1309,19 @@ class Index:
         self.by_path, self.by_real = {}, {}
         rel_sha = {f["rel"]: f.get("sha256") for f in files}
         self.model_ids = {m["model_id"] for m in models}
+        self.family = {m["model_id"]: m.get("family") for m in models}
         for f in files:
             sha = f.get("sha256") if f["decision"] in ("keep", "unscorable") else \
                 (rel_sha.get(f.get("dup_of")) if f.get("reason") == "sha256_duplicate" else None)
             for k in (os.path.normpath(f["path"]),):
                 self.by_path[k] = sha
             try:
-                self.by_real[os.path.realpath(f["path"])] = sha
+                real = os.path.realpath(f["path"])
             except OSError:
-                pass
+                continue
+            # a skipped link (a kind-final link) never hides the row its target is
+            if sha or real not in self.by_real:
+                self.by_real[real] = sha
         self.inc_runs = collections.defaultdict(list)
         for f in files:
             inc = f.get("inc") or {}
@@ -1351,7 +1355,22 @@ def _resolve_init(path, sha, idx, conf):
     return {"kind": "unknown", "ref": sp, "model_id": None}
 
 
-def _dev_gated(m, rj, init, conf):
+def _inc_parent(refs, idx):
+    """Whether an init or a soup member resolves to an INC row (its weights
+    were chosen by an INC dev gate or verdict)."""
+    return any((x or {}).get("kind") == "row" and is_inc_family(idx.family.get((x or {}).get("model_id")))
+               for x in refs or ())
+
+
+def _dev_gated(m, rj, init, conf, soup=(), idx=None):
+    """The amendment's dev_gated: a row whose data or init a dev gate chose.
+    Any row (of any family) initialised from an INC row, or a soup of one; a
+    stream pool after an accepted increment (a manifest that is not P_0); a
+    pilot, real-loop or other INC candidate or soup, or one initialised from
+    another row. Inheritance through the init chain is the contamination
+    step's."""
+    if idx is not None and _inc_parent([init] + list(soup or ()), idx):
+        return True
     fam = m["family"]
     kind = ((rj.get("spec") or {}).get("kind") or rj.get("kind")) if isinstance(rj, dict) else None
     if fam == "inc_stream":
@@ -1425,7 +1444,7 @@ def provenance_one(m, idx, conf, lister, cache):
                        "digest": _sha_text("".join("%s %s\n" % (k, mods[k]) for k in sorted(mods))) if mods else None,
                        "ultralytics": rj.get("ultralytics_version"), "torch": rj.get("torch_version")}
         out["selected_on"], out["test_selected"] = "train_subset", "none"
-        out["dev_gated"] = _dev_gated(m, rj, out["init"], conf)
+        out["dev_gated"] = _dev_gated(m, rj, out["init"], conf, out["soup_of"], idx)
         out["inc_kind"] = spec.get("kind") or rj.get("kind")
         out["inc_exp"], out["inc_run"] = inc.get("exp"), inc.get("run")
         out["research_only"] = rj.get("research_only")
@@ -1505,8 +1524,12 @@ def provenance_one(m, idx, conf, lister, cache):
                     unres += got["unresolved"]
                 reals = [lister.realpath(p) for p, _mt in ents]
                 newest = max((mt for _p, mt in ents if mt is not None), default=None)
+                # entries listed under the cottonweed_holdout slug's merge prefix (their realpath loses the name)
+                pre = tuple(cont.get("cwd12_holdout_prefixes") or ())
+                slug = {r for (p, _mt), r in zip(ents, reals) if pre and os.path.basename(p).startswith(pre)}
                 cache[key] = {"sha": write_list(cache["version"], reals), "n_entries": len(ents),
-                              "n_unique": len(set(reals)), "unresolved": unres, "newest": newest}
+                              "n_unique": len(set(reals)), "unresolved": unres, "newest": newest,
+                              "holdout_slug": len(slug)}
             got = cache[key]
             if derived and out["data"]["source"] == "derived":
                 rating = "derived_superset"
@@ -1527,6 +1550,7 @@ def provenance_one(m, idx, conf, lister, cache):
                     out["data"]["reason"] = "; ".join(rebuilt)
             out["data"].update(rating=rating, list_sha256=got["sha"], n_entries=got["n_entries"],
                                n_unique=got["n_unique"], n_unresolved=got["unresolved"],
+                               holdout_slug=got.get("holdout_slug", 0),
                                newest_entry_utc=_utc(got["newest"]) if got["newest"] else None)
     if val_dirs:
         vkey = ("val", tuple(val_dirs))
@@ -1564,6 +1588,7 @@ def provenance_one(m, idx, conf, lister, cache):
     else:
         out["test_selected"] = "none"
     out["code"] = {"kind": "approx", "date_start": out["dates"].get("start_utc"), "ultralytics": ck.get("version")}
+    out["dev_gated"] = _dev_gated(m, None, init, conf, (), idx)
     return out
 
 
@@ -2483,32 +2508,83 @@ def _roots_impl(rels, root):
     return sorted(set(out))
 
 
-def _cwd12_kind(p, cont, root):
-    """'train', 'holdout' or None: whether a training image is a cwd12 image
-    (by its realpath under a cwd12 root, else by a copy prefix of its name)."""
+def _scan_images(d):
+    """The image files of one flat directory (no recursion), sorted."""
+    fmts = img_formats()
+    try:
+        with os.scandir(d) as it:
+            return sorted(e.path for e in it if not e.name.startswith(".") and "." in e.name
+                          and e.name.rpartition(".")[-1].lower() in fmts and e.is_file())
+    except OSError:
+        return []
+
+
+def cwd12_reference(version, conf, cache, procs=5):
+    """{sha256: (kind, path)} of cwd12's own images, kind 'train' (cwd12 train,
+    dev included) or 'holdout' (cwd12 valid and test: the sealed 1,977): the
+    stored sha256s of LOCK v1's dev, train_core and test manifests, and every
+    image under the configured cwd12 roots (hashed once, cached). A training
+    image is a cwd12 image when its bytes are one of these, wherever its copy
+    lies (the leave4out datasets keep the original names; merges symlink to
+    them)."""
+    cont = conf["contamination"]
+    root = conf["inventory"]["list_root"]
+    ref = {}
+    src = source_inc() / "splits" / "v1"
+    for name, kind in (("dev", "train"), ("train_core", "train"), ("test", "holdout")):
+        p = src / ("%s.jsonl" % name)
+        for r in (C.read_manifest(p) if p.is_file() else []):
+            if r.get("sha256"):
+                ref.setdefault(r["sha256"], (kind, r["image"]))
+    paths = {}
+    for key, kind in (("cwd12_roots", "train"), ("cwd12_holdout_roots", "holdout")):
+        for rel in cont.get(key) or []:
+            got = _scan_images(os.path.join(root, rel))
+            if not got:
+                warn("the cwd12 root %s holds no image: its images are known only through LOCK v1's manifests" % rel)
+            for q in got:
+                paths[q] = kind
+    if paths:
+        hashed = cache.compute(sorted(paths), procs, want_sha=True)
+        for q, kind in sorted(paths.items()):
+            sha = (hashed.get(q) or {}).get("sha256")
+            if sha:
+                ref.setdefault(sha, (kind, q))
+    return ref
+
+
+def _cwd12_kind(p, sha, ref, cont, root):
+    """('train' | 'holdout' | None, the cwd12 original's path): a training
+    image's cwd12 membership by its bytes (sha256 in `ref`), else by its
+    realpath under a cwd12 root or a configured copy root (the split folder
+    gives the kind), else by a copy prefix of its name (kind train)."""
+    if sha and sha in ref:
+        return ref[sha]
     if _under(p, _roots(cont["cwd12_roots"], root)):
-        return "train"
+        return "train", p
     if _under(p, _roots(cont.get("cwd12_holdout_roots"), root)):
-        return "holdout"
+        return "holdout", p
+    for rel, kind in sorted((cont.get("cwd12_copy_roots") or {}).items()):
+        if _under(p, _roots([rel], root)):
+            return kind, p
     b = os.path.basename(p)
-    if any(b.startswith(x) for x in cont.get("cwd12_holdout_prefixes") or []):
-        return "holdout"
     if any(b.startswith(x) for x in cont["cwd12_copy_prefixes"]):
-        return "train"
-    return None
+        return "train", p
+    return None, None
 
 
-def _cwd12_stem(p, cont, root):
+def _cwd12_stem(p, cont):
+    """The cwd12 stem of an image (its original's path, or a copy's name
+    without its merge prefix and Roboflow suffix)."""
     from . import base3 as B3
     stem = os.path.splitext(os.path.basename(p))[0]
-    if not _under(p, _roots(cont["cwd12_roots"], root)):
-        for x in cont["cwd12_copy_prefixes"]:
-            if stem.startswith(x):
-                stem = stem[len(x):]
-                break
-        m = B3.RF_STEM_RE.match(stem)
-        if m:
-            stem = m.group("stem")
+    for x in cont["cwd12_copy_prefixes"]:
+        if stem.startswith(x):
+            stem = stem[len(x):]
+            break
+    m = B3.RF_STEM_RE.match(stem)
+    if m:
+        stem = m.group("stem")
     return stem
 
 
@@ -2563,6 +2639,7 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
     cache = HashCache(version)
     t0 = time.time()
     seeded = cache.seed(_seeds(version, conf, union, prov))
+    ref = cwd12_reference(version, conf, cache, procs)
     todo = [p for p in union if (cache.get(p) or {}).get("dhash") is None]
     sample = todo[:200]
     ts = time.time()
@@ -2579,14 +2656,15 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
     ents = [got.get(p) for p in union]
     H, ok, has = B3.hash_matrix(_hash_rows(ents))
     sha = [((e or {}).get("sha256")) for e in ents]
-    # a byte copy has its original's size: a training image whose size is an exam image's gets its sha256 read
+    # a byte copy has its original's size: a training image whose size is an exam image's, or a cwd12 image's,
+    # gets its sha256 read (cwd12 membership is decided by the bytes)
     sizes = set()
-    for em in list(meta["exams"].values()) + list(meta["groups"].values()):
-        for q in em.get("paths") or []:
-            try:
-                sizes.add(os.path.getsize(q))
-            except (OSError, TypeError):
-                pass
+    for q in [q for em in list(meta["exams"].values()) + list(meta["groups"].values()) for q in em.get("paths") or []] \
+            + [v[1] for v in ref.values()]:
+        try:
+            sizes.add(os.path.getsize(q))
+        except (OSError, TypeError):
+            pass
     need = [p for p, e in zip(union, ents) if e and not e.get("sha256") and e.get("size") in sizes]
     if need:
         shas = _hash_many(need, procs)
@@ -2630,9 +2708,10 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
         | near_to(arrays["exam_test_v1_companions__H"], arrays["exam_test_v1_companions__ok"],
                   arrays["exam_test_v1_companions__has"])
     dev_sessions = {session_of(os.path.splitext(os.path.basename(p))[0]) for p in meta["exams"]["dev"]["paths"]}
-    kinds = [_cwd12_kind(p, cont, root) for p in union]
-    session = np.asarray([k == "train" and session_of(_cwd12_stem(p, cont, root)) in dev_sessions
-                          for p, k in zip(union, kinds)], dtype=bool)
+    kind_of = [_cwd12_kind(p, sha[i], ref, cont, root) for i, p in enumerate(union)]
+    kinds = [k for k, _o in kind_of]
+    session = np.asarray([k == "train" and session_of(_cwd12_stem(o, cont)) in dev_sessions
+                          for k, o in kind_of], dtype=bool)
     groups = {}
     for g, gm in meta["groups"].items():
         groups[g] = exact_to(gm.get("paths") or [], gm.get("sha256") or []) | near_to(
@@ -2690,8 +2769,11 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
         m = models.get(mid) or {}
         cmap = m.get("class_map") or {}
         date = (m.get("ckpt") or {}).get("date") or (pr.get("dates") or {}).get("start_utc")
+        # the merge joined other datasets' names into legacy slots: an image that is no cwd12 image, or an entry of
+        # the cottonweed_holdout slug (listed under its merge prefix: its ids 4-11 deleted, 0-3 moved)
+        rows[mid]["holdout_slug"] = int(d.get("holdout_slug") or 0)
         rows[mid]["legacy_join"] = bool(cmap.get("rule") in ("R1", "R2", "R3") and is_legacy_date(date) and (
-            d.get("rating") in ("none", None) or not extra or extra["non_cwd12"] or extra["cwd12_holdout"]))
+            d.get("rating") in ("none", None) or not extra or extra["non_cwd12"] or d.get("holdout_slug")))
         if extra and extra["cwd12_train"] and str(date or "")[:10] < PRE_INC_DATE:
             rows[mid]["notes"].append("trained on cwd12 train; dev is 8 sessions of it")
     # inheritance: the init's and every soup member's states (Y > P > U > N); an unknown init is U
@@ -2714,7 +2796,8 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
         if mid in stack or mid not in rows:
             return {e: "U" for e in HASH_EXAMS}, {"test": False}
         st = dict(rows[mid]["own"])
-        sel = {"test": rows[mid]["test_selected"] in ("best", "early_stop", "best_partial")}
+        sel = {"test": rows[mid]["test_selected"] in ("best", "early_stop", "best_partial"),
+               "dev": bool(rows[mid]["dev_gated"] or rows[mid]["dev_selected"])}
         inh = {e: "N" for e in HASH_EXAMS}
         for kind, ref in parents(mid):
             if kind == "unknown":
@@ -2722,6 +2805,8 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
             else:
                 ps, psel = final_of(ref, stack + (mid,))
                 sel["test_inherited"] = sel.get("test_inherited") or psel["test"] or psel.get("test_inherited", False)
+                # an init (or soup member) chosen by dev, directly or up its own chain: this row is dev-gated
+                sel["dev_inherited"] = bool(sel.get("dev_inherited") or psel.get("dev") or psel.get("dev_inherited"))
             for e in HASH_EXAMS:
                 inh[e] = _worse(inh[e], ps[e])
         rows[mid]["inherited"] = {"parents": [{"kind": k, "ref": r} for k, r in parents(mid)], "states": inh}
@@ -2734,6 +2819,9 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
         st, sel = final_of(mid)
         rows[mid]["final"] = st
         rows[mid]["test_selected_inherited"] = bool(sel.get("test_inherited"))
+        rows[mid]["dev_gated_inherited"] = bool(sel.get("dev_inherited")) and not rows[mid]["dev_gated"]
+    for mid in rows:
+        rows[mid]["dev_gated"] = bool(rows[mid]["dev_gated"] or rows[mid]["dev_gated_inherited"])
     out = [rows[k] for k in sorted(rows)]
     _write_jsonl(zd / "contamination.jsonl", out)
     summ = {"images": len(union), "lists": len(lists), "seeded": seeded, "hashed_unhashed": int(unhashed.sum()),
@@ -2920,10 +3008,12 @@ def run_items(version, conf, conf_sha, items, task, stage, shard_predicted_s=Non
     """Score items in order (the score verb's loop): skip final records, stop
     at the task deadline (not_scored_time), the task's allowance or the
     chain's GPU-hour cap (not_scored_budget), write the task record after
-    each item. Returns the task record."""
+    each item. Returns the task record. A scoring task's deadline runs from
+    its job's start; the pilot's from its own start (it runs inside the
+    inventory job, hours after that job started)."""
     from ..inc import scorer as S
     stg = conf["stages"]
-    t_start = _job_start()
+    t_start = time.time() if stage == "pilot" else _job_start()
     deadline = float(_test_setting("task_deadline_s", stg["task_deadline_s"], float))
     allowance = max(float(stg.get("task_allowance_min_s", 900)),
                     float(stg.get("task_allowance_factor", 2.0)) * float(shard_predicted_s or 0)) \
@@ -3125,9 +3215,12 @@ def pilot_step(version, conf, conf_sha, run=True):
         got = scorable(m, version)
         if got is not None and m["size_class"] not in picks:
             picks[m["size_class"]] = (m, got)
+    n_img = {e: int(x.get("n_images") or 0) for e, x in read_exams(version)["exams"].items()}
     items = []
     for sc, (m, got) in sorted(picks.items()):
         for e in ALL_EXAMS:
+            if not n_img.get(e):
+                continue                                  # an exam without images needs no rate
             items.append({"model_id": m["model_id"], "exam": e, "file": got[0], "file_sha256": got[1],
                           "conversion": _conv_brief(got[2]), "size_class": sc})
     _write_json(shard_path(version, "pilot"), {"format": SHARD_FORMAT, "stage": "pilot", "index": None,
@@ -3156,12 +3249,27 @@ def pilot_step(version, conf, conf_sha, run=True):
         for sc in SIZE_CLASSES:
             if sc not in have and top is not None:
                 rates[e][sc] = top
+    missing = unpriced_exams(version, rates)
+    task = (_read_json(zd / "tasks" / "pilot.json") or {}) if run and items else {}
     rec = {"format": PILOT_FORMAT, "version": version, "config_sha256": conf_sha, "models": {
         sc: m["model_id"] for sc, (m, _g) in picks.items()}, "rates": {e: dict(v) for e, v in rates.items()},
-        "measured": measured, "seconds": round(time.time() - t0, 1), "created_utc": _utc()}
+        "measured": measured, "status": "incomplete" if missing else "complete", "missing_exams": missing,
+        "task_counts": task.get("counts"), "seconds": round(time.time() - t0, 1), "created_utc": _utc()}
     _write_json(zd / "pilot.json", rec)
-    log("pilot: %d models, %d items, %.0f s" % (len(picks), len(items), rec["seconds"]))
+    log("pilot: %d models, %d items, %.0f s%s" % (len(picks), len(items), rec["seconds"],
+                                                  "; no rate measured for %s" % ", ".join(missing) if missing else ""))
+    if run and missing:
+        # not marked done: a resubmission runs the pilot again (its final records are kept, errors retried)
+        raise ZooRefused("the pilot measured no rate for %s (pilot task counts %s): the plan prices only from "
+                         "measured rates" % (", ".join(missing), json.dumps(task.get("counts"), sort_keys=True)))
     return rec
+
+
+def unpriced_exams(version, rates):
+    """The exams (with images) for which `rates` holds no measured rate."""
+    exams = read_exams(version)["exams"]
+    return [e for e in ALL_EXAMS if int((exams.get(e) or {}).get("n_images") or 0) > 0
+            and not any(_num(v) and v > 0 for v in ((rates or {}).get(e) or {}).values())]
 
 
 # -------------------------------------------------------------------- plan
@@ -3259,16 +3367,21 @@ def plan_step(version, conf, conf_sha, shards_a, max_gpu_hours, inventory_h=None
     models, files = read_models(version), read_files(version)
     exams = read_exams(version)["exams"]
     pilot = _read_json(zd / "pilot.json") or {}
-    reused = reuse_records(version, conf, conf_sha, models, files)
     rates = pilot.get("rates") or {}
-    default = conf["stages"].get("default_rate_s_per_image") or {}
+    missing = unpriced_exams(version, rates)
+    if missing:
+        # every item is priced from the pilot's measured rates (x margin): never from an assumed rate
+        msg = "the pilot measured no rate for %s (pilot.json status %r): nothing is priced from an assumed rate" % (
+            ", ".join(missing), pilot.get("status"))
+        update_record(version, status="refused", refusal=msg)
+        raise ZooRefused(msg)
+    reused = reuse_records(version, conf, conf_sha, models, files)
     margin = float(stg["margin"])
     inv_h = float(inventory_h if inventory_h is not None else ledger_hours(version, own="inventory").get("inventory", 0.0))
 
     def price(m, exam):
-        r = (rates.get(exam) or {}).get(m.get("size_class") or "L")
-        if r is None:
-            r = max((rates.get(exam) or {}).values() or [float(default.get(m.get("size_class") or "L") or 0.1)])
+        have = {k: float(v) for k, v in (rates.get(exam) or {}).items() if _num(v) and v > 0}
+        r = have.get(m.get("size_class") or "L") or max(have.values(), default=0.0)
         return float(r) * int(exams[exam]["n_images"]) * margin
 
     items_a, items_b = [], []
@@ -3382,6 +3495,61 @@ def _sortdate(pr, m):
     return str(d.get("end") or d.get("start_utc") or (m.get("ckpt") or {}).get("date") or "")
 
 
+def read_codever(version):
+    """{model_id: {kind, commit, ...}} from `zoo codever`'s codever_<version>.json ({} before it ran)."""
+    r = _read_json(zoo_dir(version) / ("codever_%s.json" % version))
+    return dict(r.get("rows") or {}) if isinstance(r, dict) and r.get("format") == CODEVER_FORMAT else {}
+
+
+def _row_code(pr, cv):
+    """A row's code version: provenance's (exact module sha256s for INC rows, a
+    start date otherwise) joined with its commit from codever, when it ran."""
+    code = dict(pr.get("code") or {"kind": "unknown"}, modules=None)
+    code.update(commit=(cv or {}).get("commit"), commit_kind=(cv or {}).get("kind"),
+                modules_unmatched=(cv or {}).get("modules_unmatched"), commit_before=(cv or {}).get("before"))
+    return code
+
+
+RECIPE_BRIEF = ("model", "epochs", "imgsz", "batch", "lr0", "optimizer")
+
+
+def _init_brief(init, soup_of=()):
+    if soup_of:
+        return "soup of %d" % len(soup_of)
+    i = init or {}
+    k = i.get("kind") or "unknown"
+    if k == "row":
+        return "row:%s" % str(i.get("model_id") or "")[:12]
+    ref = i.get("ref")
+    return "%s:%s" % (k, os.path.basename(str(ref))) if ref not in (None, "", True, False) else k
+
+
+def _recipe_brief(r):
+    """model, epochs, imgsz, batch, lr0, optimizer of a row's recipe (INC: the
+    run's recipe and its name; Ultralytics: the train args), compact."""
+    rec = r.get("recipe") or {}
+    src = rec.get("recipe") if isinstance(rec.get("recipe"), dict) else rec
+    out = []
+    if isinstance(rec.get("recipe_name"), str) and rec.get("recipe_name"):
+        out.append("name=%s" % rec["recipe_name"])
+    if r["flags"].get("arm"):
+        out.append("arm=%s" % r["flags"]["arm"])
+    for k in RECIPE_BRIEF:
+        v = src.get(k) if isinstance(src, dict) else None
+        if v in (None, "") and k == "model":
+            v = (r.get("arch") or {}).get("model")
+        if v in (None, ""):
+            continue
+        out.append("%s=%s" % (k, os.path.basename(str(v)) if k == "model" else v))
+    return " ".join(out)
+
+
+def _code_cell(r):
+    c = r.get("code") or {}
+    kind = c.get("kind") or "unknown"
+    return "%s %s" % (kind, str(c["commit"])[:10]) if c.get("commit") else kind
+
+
 def build_rows(version, conf):
     models = read_models(version)
     prov = read_provenance(version)
@@ -3394,6 +3562,7 @@ def build_rows(version, conf):
     claims = conf["shortlist"].get("claims") or []
     retracted = conf["shortlist"].get("retracted") or []
     short = _read_json(zoo_dir(version) / "shortlist.json") or {}
+    cv = read_codever(version)
     srules = collections.defaultdict(list)
     for rule, ids in (short.get("rules") or {}).items():
         for i in ids:
@@ -3433,7 +3602,8 @@ def build_rows(version, conf):
         rt = [c.get("cite") for c in retracted if c.get("match") and re.search(c["match"], rel)]
         imgsz = pr.get("imgsz_trained")
         rid = (pr.get("inc_run") or "") + " " + json.dumps(pr.get("recipe") or {})
-        flags = {"dev": fin.get("dev"), "dev_selected": dev_sel, "dev_gated": dev_gated, "test": fin.get("test"),
+        flags = {"dev": fin.get("dev"), "dev_selected": dev_sel, "dev_gated": dev_gated,
+                 "dev_gated_inherited": bool(ct.get("dev_gated_inherited")), "test": fin.get("test"),
                  "test_selected": ct.get("test_selected") or pr.get("test_selected"),
                  "test_selected_inherited": bool(ct.get("test_selected_inherited")),
                  "imageweeds": fin.get("imageweeds"), "test_v1": fin.get(EXAM_TV1), "eval_v1": fin.get(EXAM_EVG),
@@ -3459,7 +3629,7 @@ def build_rows(version, conf):
             section = "agnostic" + ("_dev_clean" if dev_clean else "_flagged")
         if m.get("scorable") and scorable(m, version) is None and not m.get("same_weights_as"):
             section = "unscorable"
-        rows.append({
+        row = {
             "model_id": mid, "short_id": mid[:12], "rel": rel, "family": m["family"], "method": m.get("method"),
             "run_dir": m.get("run_dir"), "ckpt_role": m.get("ckpt_role"), "also_role": m.get("also_role") or [],
             "dates": dict(pr.get("dates") or {}, sort=_sortdate(pr, m)),
@@ -3470,8 +3640,9 @@ def build_rows(version, conf):
             "imgsz_trained": imgsz, "recipe": pr.get("recipe"), "init": pr.get("init"),
             "data": {k: (pr.get("data") or {}).get(k) for k in ("source", "ref", "n_entries", "n_unique", "rating",
                                                                   "reason")},
-            "selected_on": pr.get("selected_on"),
-            "code": dict(pr.get("code") or {}, modules=None) if pr.get("code") else None,
+            "selected_on": pr.get("selected_on"), "soup_of": [x.get("model_id") or x.get("ref")
+                                                              for x in pr.get("soup_of") or []],
+            "code": _row_code(pr, cv.get(mid) or cv.get(sid)),
             "class_map": {"rule": cmap.get("rule"), "n_species_channels": nsp, "converted": bool(conv),
                           "converted_sha256": (conv or {}).get("converted_sha256"),
                           "fidelity_ok": (conv or {}).get("ok"),
@@ -3484,7 +3655,9 @@ def build_rows(version, conf):
                 "unscorable_fidelity" if m.get("scorable") and scorable(m, version) is None
                 and not m.get("same_weights_as") else None),
             "rescore_command": "python -m weed_optimizer_framework.tools.inc2.zoo score --version %s --item %s:dev"
-                               % (version, sid)})
+                               % (version, sid)}
+        row.update(recipe_brief=_recipe_brief(row), init_brief=_init_brief(row["init"], row["soup_of"]))
+        rows.append(row)
     return rows
 
 
@@ -3614,7 +3787,7 @@ CSV_COLUMNS = ("short_id", "family", "ckpt", "date_end", "arch", "params_m", "im
                "n_train_unique", "provenance", "map_rule", "converted", "dev_sp", "dev_ag", "dev_named", "iw_rag",
                "iw_ag", "od1_ag", "t12_sp_desc", "t12_ag_desc", "flag_dev", "flag_dev_sel", "flag_dev_gated",
                "flag_test", "flag_test_sel", "flag_iw", "flag_tv1", "flag_ev1", "legacy_join", "suspect", "section",
-               "rank", "code", "rel", "model_id")
+               "rank", "method", "recipe", "init", "code", "code_commit", "rel", "model_id")
 EXTERNAL_COLUMNS = ("short_id", "family", "ckpt", "date_end", "tv1_ag", "ev1_ag", "flag_tv1", "flag_ev1", "rel",
                     "model_id")
 SECTION_ORDER = ("species12_dev_clean", "species_partial_dev_clean", "agnostic_dev_clean", "species12_flagged",
@@ -3681,14 +3854,14 @@ def _flag_string(r):
 
 def _md_table(rows, ranked, with_rank=True):
     head = ("| %sid | family | ckpt | date | arch@imgsz | train imgs (rating) | map | dev sp | dev ag | dev named | "
-            "IW Rag | IW ag | OOD ag | cwd12 test sp* | cwd12 test ag* | flags |" % ("# | " if with_rank else ""))
+            "IW Rag | IW ag | OOD ag | cwd12 test sp* | cwd12 test ag* | code | flags |" % ("# | " if with_rank else ""))
     out = [head, "|" + "---|" * (head.count("|") - 1)]
     for i, r in enumerate(rows, 1):
         c = r["cols"]
         imgsz = r.get("imgsz_trained")
         dag = "%s%s" % (_status_cell(r, "dev", "dev_ag") if not _num(c["dev_ag"]) else _f(c["dev_ag"]),
                         "" if r["dev_clean"] or not ranked else "")
-        out.append("| %s%s | %s | %s | %s | %s@640%s | %s (%s) | %s%s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+        out.append("| %s%s | %s | %s | %s | %s@640%s | %s (%s) | %s%s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
             ("%d | " % i if (ranked and _num(c["dev_ag"])) else "— | ") if with_rank else "",
             r["short_id"], r["family"], r["ckpt_role"] + ("+" + "+".join(r["also_role"]) if r["also_role"] else ""),
             str(r["dates"].get("end") or r["dates"].get("start_utc") or "")[:10],
@@ -3699,7 +3872,7 @@ def _md_table(rows, ranked, with_rank=True):
             dag, _f(c["dev_named"]), _f(c["iw_rag"]), _status_cell(r, "imageweeds", "iw_ag") if not _num(c["iw_ag"])
             else _f(c["iw_ag"]), _status_cell(r, EXAM_OOD, "od1_ag") if not _num(c["od1_ag"]) else _f(c["od1_ag"]),
             _f(c["t12_sp_desc"]), _status_cell(r, "test", "t12_ag_desc") if not _num(c["t12_ag_desc"])
-            else _f(c["t12_ag_desc"]), _flag_string(r)))
+            else _f(c["t12_ag_desc"]), _code_cell(r), _flag_string(r)))
     return out
 
 
@@ -3718,7 +3891,9 @@ def _csv_row(r, rank):
             "1" if f.get("dev_selected") else "", "1" if f.get("dev_gated") else "", f.get("test") or "",
             f.get("test_selected") or "", f.get("imageweeds") or "", f.get("test_v1") or "", f.get("eval_v1") or "",
             "1" if f.get("legacy_join") else "", "1" if f.get("class_map_suspect") else "", r["section"],
-            str(rank or ""), str((r.get("code") or {}).get("kind") or ""), r["rel"], r["model_id"]]
+            str(rank or ""), str(r.get("method") or ""), r.get("recipe_brief") or "", r.get("init_brief") or "",
+            str((r.get("code") or {}).get("kind") or ""), str((r.get("code") or {}).get("commit") or ""), r["rel"],
+            r["model_id"]]
 
 
 def _write_csv(path, header, rows):
@@ -3890,9 +4065,10 @@ def _report_md(version, rep, secs, exams, conf):
                                                              rep["inputs"]["list_sha256"]),
          "- zoo LOCK sha256 `%s`; locked scorer (inc/scorer.py) sha256 `%s`" % (rep["inputs"]["lock_sha256"],
                                                                              rep["inputs"]["scorer_sha256"]),
-         "- code versions: %s" % ("codever_%s.json sha256 `%s`" % (version, rep["inputs"]["codever_sha256"])
-                                  if rep["inputs"]["codever_sha256"] else "INC rows exact (module sha256s); others "
-                                  "approximate (main before the run started; `zoo codever` resolves them)"), "",
+         "- code versions: %s; each row's commit is in its code column and in Table F" % (
+             "codever_%s.json sha256 `%s`" % (version, rep["inputs"]["codever_sha256"])
+             if rep["inputs"]["codever_sha256"] else "no codever_%s.json yet (INC rows exact by module sha256s, "
+             "others approximate by start date; `zoo codever --git <repo> --report` adds the commits)" % version), "",
          "| exam | images | boxes | role | labels | not read |", "|---|---|---|---|---|---|"]
     for e in ALL_EXAMS:
         x = exams["exams"][e]
@@ -3936,6 +4112,14 @@ def _report_md(version, rep, secs, exams, conf):
     for i in rep["sections"].get("unscorable") or []:
         r = by[i]
         L.append("| %s | %s | %s | %s |" % (r["short_id"], r["family"], r["rel"], r.get("unscorable_reason")))
+    L += ["", "## Table F. Method, recipe, init and code of every row", "",
+          "| id | family | method | ckpt | recipe | init | data | code | rel |", "|---|---|---|---|---|---|---|---|---|"]
+    fo = family_order(conf)
+    for r in sorted(rep["rows"], key=lambda r: (fo.get(r["family"], 999), r["dates"]["sort"], r["model_id"])):
+        L.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            r["short_id"], r["family"], r.get("method") or "", r["ckpt_role"], r.get("recipe_brief") or "-",
+            r.get("init_brief") or "-", "%s (%s)" % (r["data"].get("source") or "-", r["data"].get("rating") or "-"),
+            _code_cell(r), r["rel"]))
     L += ["", "## Families", "", "| family | method | models | dates | dev sp (min / median / max) | "
           "dev ag (min / median / max) | dev flags |", "|---|---|---|---|---|---|---|"]
     for f in rep["families"]:
@@ -3952,8 +4136,9 @@ def _report_md(version, rep, secs, exams, conf):
           "- flags: `dev:Y test:S+Y iw:N tv1:N ev1:P`: Y (an exact or near copy of an exam image in the training "
           "list), P (possible: hits on a list rebuilt after the run or a derived superset, or more than 1 % of the "
           "list unhashed), U (no list, or an unknown init), N (a complete, non-empty list with no hit); `+sel` "
-          "selected on dev; `+gated` a dev-gated INC lineage; S selected on the cwd12 test (best.pt, an early stop, "
-          "or a val set holding test images), s the same through its init.",
+          "selected on dev; `+gated` dev-gated (its data or init chosen by a dev gate: an INC candidate, a stream "
+          "pool, any row initialised from an INC row or from a dev-gated or dev-selected row); S selected on the "
+          "cwd12 test (best.pt, an early stop, or a val set holding test images), s the same through its init.",
           "- `*` cwd12 test is descriptive: the sealed test, the selection set from 03-15 to 09-26.",
           "- `†N`: read at 640, trained at N. The native-resolution reads of the measurement arms (L23N) are in "
           "capacity/native_v1.json and their runs' scores/dev@<imgsz>.json.",
@@ -3965,6 +4150,8 @@ def _report_md(version, rep, secs, exams, conf):
           "- Agnostic AP collapses every class: a multi-class head keeps cross-class duplicates at different anchors "
           "after per-class NMS, which a one-class head does not have; agnostic reads favour one-class heads.",
           "- planted_noise: a pilot run trained on the Bswap increment (40 % of its boxes relabelled on purpose).",
+          "- code: `exact <commit>` (an INC row: the commit holding every module sha256 its run recorded), `approx "
+          "<commit>` (main's last commit before the run started), or the kind alone before `zoo codever` ran.",
           "", FOOTER, ""]
     return "\n".join(L)
 

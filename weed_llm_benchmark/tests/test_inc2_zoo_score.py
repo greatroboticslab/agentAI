@@ -24,6 +24,10 @@ What is pinned:
   says exam_root local and equals the Lustre root's score; too little room:
   the Lustre root;
 - score --item ID:EXAM matches the shard's record;
+- the pilot (a real subprocess, as the inventory runs it) inside a job that
+  started 4.2 h ago scores every item (its deadline runs from its own start)
+  and measures a rate for every exam with images; a pilot that measures
+  nothing (task_deadline_s 0) refuses and is not marked done;
 - nothing under the INC run directories changes; no score file appears there.
 
 Run:  python3 tests/test_inc2_zoo_score.py
@@ -36,6 +40,7 @@ import os
 import pathlib
 import shutil
 import sys
+import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import test_inc2_zoo as T  # noqa: E402  (the zoo world; sets INC_DIR / REPO / INC_SCORER_TESTING first)
@@ -99,11 +104,50 @@ def run(items, task="a_000", stage="a"):
         return Z.run_items(V, c, csha, items, task, stage)
 
 
+def pilot_checks():
+    print("the pilot: its deadline runs from its own start; a pilot that measures no rate refuses")
+    c, csha = T.conf()
+    zd = Z.zoo_dir(V)
+    e0 = None
+    with T.env(INC_ZOO_TASK_DEADLINE_S="0"):
+        try:
+            T.quiet(Z.run_step, V, c, csha, "pilot", None)
+        except Z.ZooRefused as e:
+            e0 = e
+    p0 = json.loads((zd / "pilot.json").read_text())
+    exn = Z.read_exams(V)["exams"]
+    with_images = sorted(e for e in Z.ALL_EXAMS if exn[e]["n_images"])
+    check("a pilot that measures nothing (task_deadline_s 0: every item not_scored_time) refuses, says incomplete "
+          "and is not marked done (a resubmission runs it again)",
+          e0 is not None and "measured no rate" in str(e0) and p0["status"] == "incomplete"
+          and sorted(p0["missing_exams"]) == with_images and p0["task_counts"] == {"not_scored_time": len(with_images)}
+          and not Z.step_done(V, "pilot", csha), (e0, p0.get("status"), p0.get("task_counts")))
+    e1, pr = None, {}
+    with T.env(SLURM_JOB_START_TIME=str(int(time.time() - 4.2 * 3600))):
+        try:
+            pr, _o = T.quiet(Z.run_step, V, c, csha, "pilot", None)
+        except Z.ZooRefused as e:
+            e1 = e
+    task = json.loads((zd / "tasks" / "pilot.json").read_text())
+    check("inside an inventory job that started 4.2 h ago (past the 3.75 h task deadline) the pilot scores every item "
+          "(its deadline runs from its own start): a measured rate for every exam with images; marked done",
+          e1 is None and task["counts"] == {"scored": len(task["items"])} and len(task["items"]) == len(with_images)
+          and pr.get("status") == "complete" and not pr.get("missing_exams")
+          and all(pr["rates"].get(e) for e in with_images) and Z.step_done(V, "pilot", csha),
+          (e1, task["counts"], pr.get("missing_exams")))
+    # the pilot's records are real records: removed so the stage-A checks below start from none
+    for it in Z.read_shard(V, "pilot")["items"]:
+        p = Z.score_path(V, it["model_id"], it["exam"])
+        if p.exists():
+            p.unlink()
+
+
 def main():
     T.world()
     T.run_steps("list", "meta", "provenance", "convert", "exams", "contamination")
     inc_before = tree_hash(C.INC_DIR / "zt_inc")
     root = Z.root_dir(V)
+    pilot_checks()
     items = [item(k, e) for k in ("b_best", "e", "f") for e in ("dev", "test_v1")]
     print("a stage-A shard on dev and test v1 under the zoo root")
     with as_root(root):

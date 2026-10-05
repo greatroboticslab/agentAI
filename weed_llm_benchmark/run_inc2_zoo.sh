@@ -50,6 +50,9 @@
 # INC_BUILD_REPO and INC_BUILD_CONDA_SH replace the cluster paths below (tests only).
 set -uo pipefail
 
+# this script's own absolute path, taken before the cd below (a relative invocation, `bash run_inc2_zoo.sh
+# submit ...` from the nested directory, resolves against the caller's directory, not $REPO)
+ZOO_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 REPO="${INC_BUILD_REPO:-/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark}"
 CONDA_SH="${INC_BUILD_CONDA_SH:-/jet/home/byler/miniconda3/etc/profile.d/conda.sh}"
 export REPO
@@ -57,7 +60,6 @@ cd "$REPO" || exit 1
 export PYTHONPATH="$REPO${PYTHONPATH:+:$PYTHONPATH}"
 INC_ROOT="${INC_DIR:-$REPO/results/framework/inc}"
 export YOLO_OFFLINE=true YOLO_AUTOINSTALL=false HF_HUB_OFFLINE=1
-ZOO_SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 usage() {
     echo "usage: bash run_inc2_zoo.sh {submit|preflight} --version V [...]" \
