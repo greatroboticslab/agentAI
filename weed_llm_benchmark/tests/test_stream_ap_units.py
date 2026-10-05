@@ -13,7 +13,7 @@ single-seed builds gated on E1-B qualifying, priced from their image-epochs,
 then L23C once, record only; a failed build is a card; one verdict card;
 E2-C, 2026-10-04, later: three builds after E2's six under E2's gate and
 E1-A done, then L23D once after E2's verdict, record only; one attribution
-card), the
+card; on a forked stream version as well), the
 dispositions, the replay gate's stream cases, the
 config and the campaign dispatch, and the lab runner. No network, no GPU, no
 ssh.
@@ -2791,6 +2791,56 @@ def _t_e2c():
     pro = [e.get("child_exp") for e in wb.events("proposed") if e.get("lever") == "L23B"]
     check("  a person builds e2_c_m640_seed0 by hand: the wait ends, e2_c1 is proposed next",
           pro == ["e2_c_m640_seed0", "e2_c_m640_seed1"], pro)
+    _t_e2c_fork()
+
+
+def _fork_ledger(w):
+    """The ledger of a forked stream version (L22's fork starts one of its own): the stream's events re-chained
+    (seq, prev_sha256) without Stage C's feasibility build and read, which the fork never repeats. The campaign's
+    recorded Stage C decision (/stage/stage_c_decided) stays."""
+    p = w.inc / "stream" / w.sid / "ledger.jsonl"
+    raw = b""
+    for x in p.read_text().splitlines():
+        e = json.loads(x) if x.strip() else {}
+        if not e or e.get("event") == "feasibility":
+            continue
+        rec = dict(e, seq=raw.count(b"\n"), prev_sha256=hashlib.sha256(raw).hexdigest())
+        raw += (json.dumps(rec, sort_keys=True) + "\n").encode("utf-8")
+    p.write_bytes(raw)
+    return p
+
+
+def _t_e2c_fork():
+    """E2-C on a forked stream version (the live stream since 2026-10-04 05:57Z): its own ledger holds no
+    feasibility event and the campaign's Stage C decision counts as Stage C built and read (16c56e2), so E2-C's
+    builds and L23D are proposed as on the version that read Stage C."""
+    w = _e2c_world("e2c_fork", e1=False)
+    w.tick(2)
+    ok0 = bool(w.state().get("stage_c")) and not [e for e in w.events("proposed") if e.get("lever") == "L23B"]
+    p = _fork_ledger(w)
+    led = w.stream_ledger()
+    ok1 = SR.chain_check(p)[0] is True and not [e for e in led if e.get("event") == "feasibility"] \
+        and {"init", "arm"} <= {e.get("event") for e in led}
+    w.e1_verdict()
+    w.tick(3)
+    pro = [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"]
+    check("a forked stream version (its ledger without Stage C's feasibility events, the campaign's Stage C "
+          "decided): e2_c0 is proposed once E1's verdict qualifies, L28 (Stage C) is not",
+          ok0 and ok1 and pro == ["e2_c_m640_seed0"]
+          and not [e for e in w.events("proposed") if e.get("lever") == "L28"],
+          (ok0, ok1, pro, [e.get("lever") for e in w.events("proposed")]))
+    for b in _e2c_items(w.dom):
+        _e2_build_step(w, b)
+        w.tick(3)
+    for b in _e2c_items(w.dom):
+        w.experiment(b["exp"], done=True)
+    w.tick(3)
+    pro = [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"]
+    pd = [e for e in w.events("proposed") if e.get("lever") == "L23D"]
+    check("  on the fork: E2-C's three proposed once each, then L23D once (inc_build_e2_attr_v1)",
+          pro == [b["exp"] for b in _e2c_items(w.dom)] and len(pd) == 1
+          and [x["name"] for x in w.submits if "rescore-e2-attr" in x["argv"]] == ["inc_build_e2_attr_v1"],
+          (pro, [e.get("lever") for e in w.events("proposed")]))
 
 
 def _lift_world(tag, quarantined=("src_lift",)):
