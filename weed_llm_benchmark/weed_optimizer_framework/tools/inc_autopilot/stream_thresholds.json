@@ -229,6 +229,12 @@
    "why": "Contract 6.6: the ticker raising on 3 ticks in a row pauses (campaign.ERRORS_TO_PAUSE)."
   }
  },
+ "watchdog": {
+  "stall_ticks": {
+   "value": 12,
+   "why": "A lane stalls when a fired diagnosis calls for a lever on it, nothing holds it (no stop-loss, no diagnosis hold), and no item takes it: the proposal was declined earlier, cannot be rendered, waits for R0, the cut order or a snapshot. After 12 such ticks in a row (2 h at the 10-minute tick) a card names the lane, the levers and the last reason (stream.StreamRun._watchdog; a card, never a pause). The normal waits end within a few ticks: a commit or a quarantine shows in the next snapshot, and a done item's effect too. From 2026-10-04 09:27Z the DATA lane stood idle (about 24 h by 2026-10-05 09:05Z) while D20 called for L16 on rf_a-programlama__ag-programlama every tick: its L16S candidate sync, declined on 2026-10-03 15:36Z, was skipped with no event and no card."
+  }
+ },
  "holds": {
   "deadline_days": {
    "value": 21,

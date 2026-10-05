@@ -2337,7 +2337,8 @@ def t_e2():
     wq.tick(2)
     check("  then done once the job ended and capacity/e2_rescore.json is complete",
           any(e.get("lever") == "L23C" for e in wq.events("item_done")) and not wq.lane("MAINT").get("item"))
-    # the lab stopped between L23C's submission and the state write: the restart meets 'already executed'
+    # the lab stopped between L23C's submission and the state write: the restart takes the run back from the
+    # execution log (stream._adopt_lost_runs, 2026-10-05) and follows its job id; it never submits it again
     for outcome in ("FAILED", "COMPLETED"):
         wk = _e2_world("e2_l23c_kill_%s" % outcome.lower())
         for b in e2:
@@ -2363,9 +2364,10 @@ def t_e2():
         wk.tick(2)
         it = wk.lane("MAINT").get("item") or {}
         ok0 = killed["n"] == 1 and it.get("lever") == "L23C" and it.get("status") == "running" \
-            and it.get("uncertain") and wk.state()["stage"]["r0"].get("e2") == "running" \
+            and it.get("job_ids") and wk.state()["stage"]["r0"].get("e2") == "running" \
             and [x["name"] for x in wk.submits if "rescore-e2" in x["argv"]] == ["inc_build_e2_v1"] \
-            and any(e.get("lever") == "L23C" for e in wk.events("recovered"))
+            and any(e.get("lever") == "L23C" and e.get("job_ids") == it.get("job_ids")
+                    for e in wk.events("adopted_run"))
         wk.job_done("inc_build_e2_v1", state=outcome)
         if outcome == "COMPLETED":
             wk.e2_records()
@@ -2377,10 +2379,10 @@ def t_e2():
         else:
             ok = any(e.get("lever") == "L23C" for e in wk.events("item_done")) and not [
                 c for c in stk.get("cards") or [] if "L23C" in c["title"] and "failed" in c["title"]]
-        check("L23C submitted, then the lab stopped before its state was written: the restart meets 'already "
-              "executed' and follows inc_build_e2_v1 (running, r0.e2 running, one submission); the job %s -> %s"
+        check("L23C submitted, then the lab stopped before its state was written: the restart takes the run back "
+              "from the execution log and follows its job (running, r0.e2 running, one submission); the job %s -> %s"
               % (outcome, "r0.e2 failed with one card" if outcome == "FAILED" else "done"), ok0 and ok,
-              (killed, it.get("lever"), it.get("status"), it.get("uncertain"), stk["stage"]["r0"].get("e2"),
+              (killed, it.get("lever"), it.get("status"), it.get("job_ids"), stk["stage"]["r0"].get("e2"),
                [c["title"] for c in stk.get("cards") or []]))
     # an E2 build the build itself refused: record only (a card), the lane not held, not proposed again, E2's other
     # builds wait, L23C never proposed
