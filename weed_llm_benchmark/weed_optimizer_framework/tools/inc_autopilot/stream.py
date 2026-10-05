@@ -2764,9 +2764,10 @@ class StreamRun(object):
         the lane, so this tick's own D22 is silent), no longer calls for L18:
         a cut submitted then meets a queue below M and is refused 'short'
         (2026-10-05 05:15Z: L18 filed at 05:03Z, submitted at 05:15Z after the
-        snapshot showed Q 319 against M 1,364). A D22 that cannot be read
-        changes nothing, and neither does a filed item whose approval a person
-        denied or ran (_ready follows those)."""
+        snapshot showed Q 319 against M 1,364). A filed item whose approval
+        the ticker cannot close (pending) is kept filed instead (_hold_cut). A
+        D22 that cannot be read changes nothing, and neither does a filed item
+        whose approval a person denied or ran (_ready follows those)."""
         p = it["proposal"]
         a = (ap.get(it["approval_id"]) or {}) if it.get("status") == "filed" and it.get("approval_id") else {}
         if a.get("status") == "denied" or a.get("execution") is not None:
@@ -2779,7 +2780,7 @@ class StreamRun(object):
         d = self._cut_still_called()
         if d is None or d.get("unknown") or (d.get("fired") and "L18" in (d.get("levers") or [])):
             return False
-        self._withdraw_cut(ln, it, "D22 no longer calls for a cut: %s" % _short(d.get("summary"), 300))
+        self._withdraw_cut(ln, it, "D22 no longer calls for a cut: %s" % _short(d.get("summary"), 300), a)
         return True
 
     def _cut_still_called(self):
@@ -2797,19 +2798,56 @@ class StreamRun(object):
             return None
         return DS.by_id(DS.detect(ev, self.dom, self.th, prior=self.prior, only=("D22",))).get("D22")
 
-    def _withdraw_cut(self, ln, it, why):
+    def _withdraw_cut(self, ln, it, why, a=None):
         """A proposed or filed L18 withdrawn before submission (as _adopt_fork
         withdraws an old stream's items). Its id goes to failed_ids, not to
         declined: D22 calls for the same cut (k, exp) again once the queue
         refills, and a declined id would never be proposed again. A filed
-        item's approval, if approved, is closed (_close_unsubmitted)."""
+        item is withdrawn only once its approval is closed (_close_unsubmitted,
+        an approved one); a pending approval, or one that could not be closed,
+        keeps the item filed and unsubmitted (_hold_cut). `a`: the approval as
+        _ready read it this tick."""
         p = it["proposal"]
         aid = it.get("approval_id")
+        if aid and (a or {}).get("status") == "pending":
+            return self._hold_cut(ln, it, why, "its approval %s is pending, and only a person decides an approval"
+                                               % aid)
         closed, cwhy = self._close_unsubmitted(aid, why) if aid else (None, "")
+        if aid and not closed:
+            return self._hold_cut(ln, it, why, "its approval %s could not be closed (%s)" % (aid, cwhy))
         self._ledger("withdrawn", lane=ln, lever=it.get("lever"), approval_id=aid, proposal_id=p["id"],
                      child_exp=p.get("child_exp"), reasons=[why], approval_closed=closed, close_error=cwhy or None)
         self.st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
         self._clear(ln)
+
+    def _hold_cut(self, ln, it, why, held):
+        """A filed L18 that D22 no longer calls for, whose approval the ticker
+        cannot close: not submitted, and kept filed rather than withdrawn. A
+        pending approval stays on the INC page, where a person can approve it
+        and run it (executor.execute_approved); withdrawn, its id in
+        failed_ids, that run (a segment cut, R3) would be followed by no lane,
+        since _adopt_lost_runs reads the id as ended, and D22 would propose
+        another cut beside it. Kept filed, a person's run is followed
+        (_executed_elsewhere), an approval approved and not yet run is closed
+        and the item withdrawn on the next tick that D22 is still silent
+        (_withdraw_cut), and, if D22 calls for the cut again, the item goes on
+        as any filed item (run under the envelope, or once a person approves
+        it). One waiting event and one card per approval."""
+        p = it["proposal"]
+        aid = it.get("approval_id")
+        if self._once("cut_held:%s" % p["id"], [aid, held], "waiting", lane=ln, lever="L18", proposal_id=p["id"],
+                      approval_id=aid, child_exp=p.get("child_exp"),
+                      reasons=[why, "not submitted and kept filed, not withdrawn: %s" % held]) is None:
+            return
+        self._card("escalation", "Filed cut %s not submitted: the queue no longer calls for it (approval %s)"
+                   % (p.get("child_exp"), aid),
+                   "D22 no longer calls for a segment cut (the queue holds fewer than M eligible images), so the "
+                   "filed L18 is not submitted; %s, so the item stays filed and holds TRAIN. Approved and not yet "
+                   "run, it is closed unsubmitted and withdrawn while D22 stays silent; run from the INC page, the "
+                   "lane follows that run, and the cutter refuses it short while the queue is below M. If the queue "
+                   "calls for the cut again, the item goes on as any filed cut (run under the envelope, or once "
+                   "approved)." % held,
+                   lever="L18", trigger=list(p.get("trigger") or []))
 
     def _misplaced_review(self, it):
         """Why an approved source review in its cluster form (L16R: sbatch
