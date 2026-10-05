@@ -13,6 +13,20 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-04 — E2-C, the attribution control, on the platform (no results yet)
+
+**Accuracy (unchanged).**
+- Best sealed cwd12 12-class test: 0.8786 ± 0.0018 (YOLO11m@640, base_v2). Gap to 0.90: 0.021.
+- Training data: the 12-class labels are base_v2's 6,811 images. E2 starts from E1-B, trained on base v3's 44,485 weed-box images.
+
+**Why E2-C.** A qualifying E2 arm differs from b_v2_m640 in two things: the pre-training data and the one-class pre-training stage itself. E2-C is E2-W with E1-A's weights as the init (base_v2's 6,811 images, the same 1.2M pre-training image-epochs), so E2-W against E2-C isolates the data (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04, later).
+
+**What the platform now does.**
+- After E2's six builds it proposes E2-C's three (L23B --e2 C, 6.95 GPU-h each, 20.9 in all), under E2's gate and E1-A done.
+- After E2's verdict it proposes the attribution once (L23D, 2.25 GPU-h, record only): `capacity/e2_attr_v1.json`.
+- Rule (dev): E2's gain is credited to base v3's data when D_data = E2-W − E2-C > 2 pooled sd and > the paired bootstrap SE (`inc2/e2/attribution_se`, 1,000 resamples). Otherwise it is a property of one-class pre-training. E2's own verdict (`e2_v1.json`) is never rewritten, and E2-C can neither qualify nor be chosen.
+- E2-C's sealed test is read once, by a person, with the chosen arm's, and reported beside the headline.
+
 ## 2026-10-04 — E2 pre-registered: the 12-class detector on E1-B's backbone (no results yet)
 
 **Accuracy (unchanged).**
