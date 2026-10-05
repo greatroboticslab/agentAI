@@ -3502,3 +3502,97 @@ Before autonomy is turned on again, these read-only checks are made:
 1. *No E2 dev score exists yet* (the amendment's condition): `capacity/e2_v1.json` and `capacity/e2_rescore.json` are absent, and no `e2_*_m640_seed*/runs/final__base__s*/scores/dev@640.json` exists. No `e2_c_m640_seed*` experiment exists.
 2. *E1-A.* `capacity/e1_v1.json` names `e1_a_m640` as its `reference`. `e1_a_m640/runs/base__s{0,1,2}/run.json` are done and `testing` false; each guard record names the current LOCK v2 with nothing refused; each `weights/final.pt` is a regular file that hashes to its `weights_sha256`. `e1_a_m640/exp.json` is E1's arm A on m640 with cold_budget, built from the summary the verdict records.
 3. *Budget.* The campaign's and the domain's remaining SU cover E2-C's 20.9 GPU-h of builds and L23D's 2.25, on top of E2's 39.9 and the next L18 (about 116).
+
+## Amendment (2026-10-05): E3, two-stage species detection (pre-registered)
+
+Written after E2's dev verdict was recorded (`capacity/e2_v1.json`, decided 2026-10-05: no arm qualifies) and before any E3 classifier, score or number existed, and revised before any build after a review (E3-M's boxes, the emitted rows' limits, the classifier's pin, what the spread measures, the geometry check). Decided by the owner's delegate under the 2026-09-30 grant (`human:harry567566@gmail.com`).
+
+No E3 parameter was chosen from an E3 number or from any test number. E2 has no test read (no arm qualified). E1's sealed test read is part of the motivation, as it was E2's. The embedder was chosen on the semi-supervised Phase A figure (below), which used cwd12 train's 3,669 images: dev's 617 are among them, since dev is whole capture sessions of cwd12 train (`inc/splits.py`). No E3 parameter was tuned on that figure.
+
+**Why.**
+- The best sealed cwd12 test score is 0.8786 ± 0.0018 (b_v2_m640: YOLO11m at 640 on base_v2's 6,811 images; dev 12-class 0.8524 ± 0.0025). The gap to 0.90 is 0.021.
+- On its own boxes b_v2_m640 loses 0.017 on dev (agnostic 0.8695 against 12-class 0.8524) and 0.0115 on test (0.8901 against 0.8786) to naming.
+- E1: one-class boxes from base v3's 44,485 images score agnostic dev 0.8787 ± 0.0033 and sealed test 0.8996 ± 0.0015 (E1-A, base_v2 only: 0.8570 ± 0.0014 and 0.8838 ± 0.0018).
+- E2: a 12-class detector warm-started from E1-B and trained on base_v2's species did not transfer: E2-W 0.8401 ± 0.0034 (D −0.0123), E2-S 0.8479 ± 0.0067 (D −0.0045); E2-W's dev agnostic fell to 0.8589. Learning the species in the same network appears to cost the boxes what E1-B gained.
+- BioCLIP-2 (`hf-hub:imageomics/bioclip-2`, the embedder of inc.audit and the semi-supervised Phase A) names cwd12 ground-truth crops at 0.9858 ± 0.0007 from 61 exemplars (`results/framework/semisup/phaseA/results.json`; the figure includes dev's crops, above).
+
+E3 asks: does a two-stage detector (a one-class box detector, then a crop species classifier) beat the best 12-class detector on the 12-class score, and does E1-B's larger box base help?
+
+**Design.** Nothing is trained but one classifier. Three stage-1 detectors that exist are read; one stage-2 classifier serves all of them.
+
+### Pre-registration
+
+**Arms (stage 1: boxes, no retraining).** Seed s of an arm uses the final EMA weights of an existing base run, `<exp>/runs/base__s<s>/weights/final.pt`, recorded by path and sha256, which must equal that run.json's `weights_sha256` and its final run's (`final__base__s<s>`), seeds 0, 1, 2:
+- **E3-B**: e1_b_m640 (E1-B, one class, base v3);
+- **E3-A**: e1_a_m640 (E1-A, one class, base_v2: the control for data);
+- **E3-M**: b_v2_m640 with its classes collapsed to one (the control: the same classifier on the best 12-class detector's own boxes).
+
+Boxes come from the locked scorer's own inference, unchanged for every arm: 640 px, batch 32 (rect), fp16 on a CUDA device, conf 0.001, IoU 0.7, Ultralytics' default max_det (300), Ultralytics 8.4.37, Ultralytics' own NMS (multi-label, class-aware). Rows at identical coordinates are then reduced to their most confident one (inc/scorer.py `one_per_box`, the reduction the locked agnostic score uses); for E3-M this is how its classes are collapsed. A stage-1 box's confidence q is its row's conf.
+- Each arm's stage-1 box set is therefore exactly the one its run's recorded protocol agnostic dev score was computed on (`final__base__s<s>/scores/dev.json`). Its agnostic AP must reproduce that score within 0.002, for all three arms, or the pass refuses.
+- So E3-M minus the reference is the species stage alone: the same boxes, named by the classifier instead of the detector's head.
+- *Reported beside, never deciding:* E3-M's boxes under class-agnostic NMS (`agnostic_nms`, the one setting departing from the locked scorer's), on dev, with the same classifier (three more dev passes).
+
+**Geometry.** A box is mapped back to the original image by the inverse of the letterbox the validator applied: per axis, the pad and the resize gain of that axis (Ultralytics' `ratio_pad`), clipped to the image, then normalised by its size. In every two-stage pass the ground-truth boxes of every image go through the same code and must equal the exam label's normalised boxes within 1e-3 (each coordinate, the label clipped to the image), or the pass refuses. Only images whose EXIF orientation tag is absent or 1 are read (none other was found in dev, test, ImageWeeds or a 2,500-row sample of base_v2); any other tag refuses. The image's size must equal Ultralytics' `ori_shape`, or the pass refuses.
+
+**Stage 2 (species).**
+- *Crops*: inc.audit's protocol, through the same code: the image opened with PIL, EXIF-transposed, RGB (inc/verify.py `_cut_task`); the square crop of the box with a 10 % margin of its long side, padded with grey (124, 124, 124) off-frame, resized to 224 px bicubic (semisup_labeler `_cut`); BioCLIP-2 image features, fp16 autocast on CUDA (inc/verify.py `BioclipEmbedder`), L2-normalised (`verify._norm`).
+- *Training rows*: the ground-truth boxes of base_v2's rows only.
+  - The manifest is LOCK v2's base_v2 by sha256, and the manifest b_v2_m640 trained on: its exp.json and every base run record that sha256.
+  - Every row passes inc2.train's `check_manifest` and the v2 never-train guard (`guard_rows`, fail closed). No row may be in a test v1 list or its companions (inc2.base3 `prior_test_lists`, by image sha256 and path).
+  - No dev, test, ImageWeeds or test v1 row is read by the fit.
+  - Labels are parsed once, from the bytes `check_manifest` verified (inc2.train `read_label_strict`).
+  - Boxes under 16 px on a side (semisup_labeler `MIN_BOX_PX`) are left out and counted, as `verify crops` leaves them out.
+- *Classifier*: multinomial logistic regression (scikit-learn, lbfgs, max_iter 3000, no class weights) over 13 classes, the 12 cwd12 species and OtherPlant, on the L2-normalised fp32 features (fitted in float64).
+  - C is fixed by 5-fold cross-validation on the training boxes only: folds grouped by the manifest's capture session (GroupKFold, `verify._assign_folds`), grid {0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100}, criterion the pooled held-out multinomial log-loss. A fold whose training part lacks a class gives that class probability 0 for its held-out boxes.
+  - A C value with any fold fit that does not converge is left out of the choice and recorded. A tie goes to the smaller C.
+  - Per-fold class counts are recorded. Two facts known before the fit: Sicklepod's 121 boxes lie in 4 sessions (83 in `20210903_iPhoneSE_YL`), and base_v2's 66 NDSU rows have no session and form one group.
+  - The final fit uses all training boxes and is deterministic (random_state `stable_int("inc2/e3/classifier")`; lbfgs is convex on fixed features). A final fit that does not converge refuses.
+  - Its weights (coefficients, intercepts, classes, the training class prior) are stored as an npz and recorded with their sha256. Probabilities are softmax(X W' + b), checked at fit time against scikit-learn's `predict_proba` within 1e-6. The training features are stored in fp32, so the stored file reproduces the fit.
+- *The pin*: the first fit writes `capacity/e3_classifier_pin.json` once, outside E3's directory: the npz's and the record's sha256, the training boxes' sha256 and the fit's time. A fit is refused while the pin exists, and while any E3 score, verdict or dev ground-truth file exists. Recovery (E3's directory moved aside) copies the pinned files back and checks their sha256s; it never refits. Every scoring job, the verdict and the test read check the classifier against the pin. The classifier is fitted once, before any E3 dev score exists, and the same classifier serves every arm and seed.
+- *Crop-protocol check* (recorded; production refuses otherwise): the fit's fresh features of base_v2's cwd12 train boxes against Step 1's stored features of the same boxes (`step1/crops.csv` core rows, matched by key with the same image sha256, box index, and geometry within 1e-4; `verify.check_fresh`, `load_embeddings`). In production at least 100 boxes must match and the median cosine must be at least 0.99.
+
+**Prediction.** For each stage-1 box with confidence q, the top 3 classes c by p(c | crop) (equal p: the lower class id first) are emitted as three predictions of that box with score q × p(c | crop).
+- The emitted rows keep the locked scorer's own limits: a row whose score is not above 0.001 (its conf) is dropped, and at most max_det (300) rows per image are kept, by score (ties: the lower box index, then the lower class id). The identity path (below) goes through the same filter, where it changes nothing. The rows each rule drops and the images capped are recorded per pass.
+- OtherPlant predictions are kept; the 12-class mean leaves that class out, as the locked scorer does.
+- A box whose square side rounds below 1 px takes the classifier's training class prior as p and is counted. A box under 16 px is cut and classified as any other and counted (the classifier saw none in training).
+
+**Scoring and the equivalence check.**
+- The predictions enter the locked scorer's own matching and AP code. The locked scorer (`inc.scorer.score`, every LOCK, exam, model and settings check unchanged) runs with a subclass of its own validator (through the scorer sidecar's capturing subclass) that replaces each image's predictions after NMS and before Ultralytics' metric update. Ultralytics' matching, `ap_per_class` and the scorer's per-class, species and agnostic definitions are then computed on them, unchanged.
+- *Equivalence*: the same path, fed each b_v2_m640 run's own predictions unchanged (identity mode: every row emitted as itself, through the same emission, filter and conversion code), must reproduce that run's recorded protocol dev score (`final__base__s<s>/scores/dev.json`) within 0.002 for the mAP, the species mean and every class, with the same exam, manifest, key order, weights, GT counts, locked-scorer hash and settings (inc2.scorer_native `compare_with_protocol`), for each of the three seeds.
+- The check is recorded (`twostage/e3_v1/equivalence.json`, with the sha256 of the code it ran). No E3 score is taken and no verdict is decided without it, or on code other than the one it ran.
+
+**Statistic.** Each arm-seed's dev species_map50_95 (the 12-class mean AP50-95) from its E3 dev file. The reference is b_v2_m640's three native dev files at 640 (the files `capacity/e2_v1.json` read, by name and sha256), not rescored.
+
+**Rule (dev only, record only).**
+- D = mean(arm) − mean(b_v2_m640) over seeds 0, 1, 2. An arm qualifies when D > 2 × pooled sd (√((sd_arm² + sd_ref²)/2), sample sd) **and** D > SE(D).
+- SE(D): inc2.baseline `native_bootstrap` unchanged: 1,000 resamples of the dev images under `stable_int("inc2/e3/species_se")`, one draw for every run; per run and resample each species' AP50-95 on the run's tie-broken per-image arrays, the 12-class mean over the species with a GT box in the resample, the mean over seeds per arm, the arm minus the reference; SE is the sample sd over resamples.
+- Choice: the largest qualifying D. A tie goes to E3-M (fewest new parts), then E3-A, then E3-B.
+- Three comparisons share one reference: with 3 seeds per side the 2 pooled sd condition alone passes a null arm about 3.5 % of the time and any of three null arms about 8.6 % (400,000 simulated draws), before the SE condition. The rule is kept as written.
+- *What the spread measures.* The fit is convex and deterministic, so a refit "at another seed" is the same classifier: there is no classifier seed component for the seed sd to miss. Neither side's sd measures sensitivity to the training sample; both are conditional on base_v2. The image bootstrap is the dev-sampling SE of D, given the trained systems.
+- E3-M seed s uses the reference's seed-s detector, so the unpaired pooled-sd condition is conservative for E3-M; its paired per-seed differences are reported beside, not deciding.
+- The verdict is `capacity/e3_v1.json`. A decided verdict is never rewritten: a recomputation whose decision agrees keeps the file byte for byte; one that differs is refused. Qualifying switches nothing.
+
+**Attribution (record only).** D_data = mean(E3-B) − mean(E3-A), its SE by the same construction under `stable_int("inc2/e3/attribution_se")`. E3's box gain is credited to base v3's data when D_data > 2 pooled sd and > SE. It is recorded in `e3_v1.json` and changes neither qualification nor the choice.
+
+**Reported beside, not deciding.** Each stage-1 detector's dev agnostic AP on its own stage-1 box set; E3-M's agnostic-NMS reading; the classifier's top-1 (and top-3) accuracy on dev ground-truth crops (cut through the same geometry code as the detected boxes), overall and per species; per-species dev AP of Carpetweed, SpottedSpurge and Purslane with their bootstrap SE; E3-M's paired per-seed differences; ImageWeeds 12-class and agnostic for every arm and the reference (in the report, for people). After the verdict, optionally, a person may run the sensitivity of the choice to the training sample: the five cross-validation fold classifiers at the chosen C applied to seed 0 of each arm on dev, their spread reported (`inc2.twostage sensitivity`), never deciding.
+
+**Order inside a scoring job.** Every dev pass, and the dev part of the arm's score record, come first. A failure of a reported pass afterwards (ImageWeeds, E3-M's agnostic-NMS reading) is recorded and does not fail the job, so a reported exam cannot hold the deciding verdict.
+
+**The test read (a person's step).** Once per qualifying arm, only after `e3_v1.json` holds a verdict decided under these parameters (the rule, the reference, `inc2/e3/species_se` with 1,000 resamples, `testing_allowed` false). The headline is the chosen arm's.
+- `inc2.twostage test-read --arm X` pins the verdict, the classifier and the three stage-1 weights by sha256 and writes one job argv (`run_inc2_build.sh`).
+- The job (`score-test`) first reproduces b_v2_m640's three recorded test scores through the identity path within 0.002 (or refuses before any E3 test score), then scores the arm's three seeds on test once.
+- `test-report --arm X` reports 12-class and agnostic test, mean ± sd, against b_v2_m640's final test files (12-class 0.8786) with the gap to 0.90, and says whether the arm is the headline.
+- If no arm qualifies, no test is read.
+
+**Platform.** DR0 proposes E3's scoring jobs (L23F, one GPU job per arm, MAINT lane, record only, in the order M, A, B; the first also fits the classifier, takes the dev ground-truth accuracy and runs the equivalence check), once E2's verdict is recorded and decided and b_v2_m640, e1_a_m640 and e1_b_m640 are done; then E3's verdict (L23G, one job, record only); then one card with the result and the exact test-read commands. E2-C's attribution (L23D) goes first: no E3 job is proposed until L23D's record is complete or L23D failed, or one of E2-C's builds failed (L23D can then not be due without a person). The MAINT lane holds one item at a time, so this keeps an E3 job from holding L23D back.
+
+**Pricing.** L23F: 0.25 GPU-h per arm-seed (dev, the reported passes and ImageWeeds), plus 0.75 GPU-h for the classifier fit, the dev ground-truth crops and the equivalence check in the first job: E3-M 1.5, E3-A 0.75, E3-B 0.75. L23G: 0.5 GPU-h. E3 commits 3.5 SU, settled from sacct. A test read is about 0.5 GPU-h per qualifying arm.
+
+**Caveats.**
+- BioCLIP-2's pre-training data (TreeOfLife) may include web images of these species; as far as is recorded it does not include CottonWeedDet12.
+- The classifier is trained on ground-truth crops and applied to detected crops, whose boxes are looser and include false positives.
+- A two-stage system is two models to deploy on the robot.
+- Every arm and the classifier are research-only: b_v2_m640's exp.json lists 6,762 of base_v2's 6,811 rows as research-only, and E1-A and E1-B carry rows of unknown licence. A qualifying E3 arm cannot become a deployed model without a separate licence step.
+- E3-M's agnostic-NMS reading departs from the locked scorer in one setting; its stage-1 agnostic AP is reported, not compared with a recorded score.
+
+**State when this was written.** All six E2-C runs are done and `capacity/e2_attr_rescore.json` does not exist: L23D is due, and E3 waits behind it.
