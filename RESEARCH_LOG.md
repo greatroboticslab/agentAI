@@ -27,7 +27,7 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 - Test v1 and the five evaluation test groups stay the frozen test: their reads of historical checkpoints are sealed in `report_external.*`.
 - Usage: descriptive. Ranked by dev among dev-clean rows only; nothing adopted, called best or quoted from a test-like column; a checkpoint the project wants to use re-qualifies under its own pre-registered dev rule.
 
-**Platform.** Lever L23Z: one chain of five GPU-shared jobs within a 40 GPU-h cap its tasks enforce, proposed once after E2's verdict; record only. A person may submit it once before the lever is deployed.
+**Platform.** Lever L23Z: one chain of five GPU-shared jobs within a 40 GPU-h cap its tasks enforce, proposed once and last, after E2's verdict and E2-C's attribution (the chain holds MAINT for 8-12 h and must delay neither); record only. A person may submit it once before the lever is deployed.
 
 ## 2026-10-04 — E2-C, the attribution control, on the platform (no results yet)
 
