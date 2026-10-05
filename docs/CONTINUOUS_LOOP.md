@@ -3502,3 +3502,201 @@ Before autonomy is turned on again, these read-only checks are made:
 1. *No E2 dev score exists yet* (the amendment's condition): `capacity/e2_v1.json` and `capacity/e2_rescore.json` are absent, and no `e2_*_m640_seed*/runs/final__base__s*/scores/dev@640.json` exists. No `e2_c_m640_seed*` experiment exists.
 2. *E1-A.* `capacity/e1_v1.json` names `e1_a_m640` as its `reference`. `e1_a_m640/runs/base__s{0,1,2}/run.json` are done and `testing` false; each guard record names the current LOCK v2 with nothing refused; each `weights/final.pt` is a regular file that hashes to its `weights_sha256`. `e1_a_m640/exp.json` is E1's arm A on m640 with cold_budget, built from the summary the verdict records.
 3. *Budget.* The campaign's and the domain's remaining SU cover E2-C's 20.9 GPU-h of builds and L23D's 2.25, on top of E2's 39.9 and the next L18 (about 116).
+
+## Amendment (2026-10-04): Z1, the model-zoo audit (pre-registered usage)
+
+Written before any zoo score, conversion or contamination count existed. Decided by the owner's delegate under the 2026-09-30 grant (`human:harry567566@gmail.com`). Not edited afterwards, except for the last line of "How it is verified".
+
+**Why.**
+- From 2026-03 to 2026-10 the project trained about 1,000 detectors. The cluster holds 4,785 .pt files: 805 GB in 1,704 run directories (`~/zoo/allpt_stat.txt`, 2026-10-04, sha256 bf98c064...ec67, one `size mtime ./path` line per file).
+- Their published numbers cannot be compared:
+  - at least four evaluators were used (pycocotools, Ultralytics val, a custom WBF matcher, and since 2026-09-27 the locked scorer);
+  - the cwd12 test was the validation and checkpoint-selection set from 03-15 to 09-26;
+  - some training sets held test copies (2,313 exact, 364 near) and ImageWeeds (old merged pools);
+  - species names were wrong project-wide before 09-21;
+  - about 15 claims were retracted.
+- Z1 builds one table: every detector, scored under one protocol, with its date, method, data, recipe, code version and contamination flags.
+
+**Scope.**
+- The input is the pinned 2026-10-04 list (`zoo_v1.json` records its path and sha256; the audit copies it to `_zoo/v1/inputs/`), plus every INC run done when the audit runs (a fixed-depth glob of `INC_DIR/*/runs/*/weights/final.pt`; 824 such files on 2026-10-04 against 710 in the list).
+- Composition of the list (recounted from the pinned file itself):
+  - 2,078 epochN.pt;
+  - 710 INC final.pt;
+  - 30 INC train/weights best/last (runs in flight);
+  - 1,556 MLflow copies (645 best, 778 last, 133 last_merged);
+  - 378 best/last of 189 other run directories;
+  - 14 classifier files;
+  - 12 stock weights;
+  - 6 third-party files;
+  - 1 models/ copy.
+- Detection models only. Skipped: classifiers, segmentation, pose/OBB, stock releases (by their 80 COCO names, never by file name alone), third-party files, unit-test fixtures, and LoRA adapters that have a merged sibling.
+- Out of scope, counted: checkpoints that are not Ultralytics `.pt` files and so are not in the list. A read-only search (depth 5 under `results/`) found 13 RF-DETR run directories (`.pth`) and 1 Florence-2 fine-tune (`save_pretrained`); the locked scorer validates Ultralytics detectors only. This is a lower bound.
+- Every file of the list gets exactly one decision: keep, skip (with a reason) or unscorable (with a reason). The counts must reconcile with the list or the audit refuses. Nothing is capped silently.
+
+**Checkpoint selection (one rule, applied in this order; the first reason that applies is recorded).**
+1. Skipped at listing, each counted by reason:
+   - a line that is not a .pt (not_checkpoint); a listed file now missing (gone); a file whose size or mtime differs from the list (changed_since_list);
+   - epoch<N>.pt (epoch_snapshot; never opened or hashed);
+   - third-party `datasets/gh_*` (third_party; never opened);
+   - an MLflow copy whose params/project lies under /tmp or /var (test_fixture);
+   - INC runs: train/weights/{best,last}.pt left in a run directory (inc_train_weights), no done run.json (inc_not_done), a testing run (inc_testing), a kind-final symlink (inc_final_link);
+   - INC MLflow copies: best.pt, chosen on a 4-image subset of training (mlflow_inc_best); a last/last_merged whose sha256 is not the run's weights_sha256 (inc_superseded_attempt);
+   - last.pt beside a last_merged.pt (lora_unmerged);
+   - an exact sha256 duplicate of a kept file (sha256_duplicate). The kept copy: INC final.pt, then a run directory's file, then an MLflow copy; within a class, the shortest path, then lexicographic order.
+2. Skipped when the checkpoint is read: classifier, segmentation, other_task (pose, OBB), stock_weights (a release file name with the 80 COCO names), stock_coco (the 80 COCO names under another name).
+3. Kept rows:
+   - INC: weights/final.pt of every done, trained run, and the soups;
+   - Ultralytics run directories: best.pt and last.pt, both kept and labelled (best=last when byte-identical: one row, `also_role`);
+   - an MLflow copy whose source run file is gone, with its project's family.
+   - Rows holding the same weights (sha256 over the class names and every state_dict tensor) are scored once; the others carry `same_weights_as`.
+4. Kept but unscorable, shown as rows with their reason:
+   - cannot be loaded under Ultralytics 8.4.37 (unscorable_load; s3_mamba), or an INC final.pt that no longer hashes as its run.json records;
+   - modules that are neither torch nor Ultralytics and no merged sibling (unscorable_foreign);
+   - a head that is not Ultralytics' Detect or v10Detect (unscorable_head);
+   - a failed conversion check (unscorable_fidelity).
+
+**Exams (the zoo root `INC_DIR/_zoo/v1/root`, its own LOCK recording the locked scorer's sha256 18c00837...).**
+- *dev* (617 images, 8 cwd12 sessions): the decision exam. A byte copy of LOCK v1's manifest; same sha256, key order and exam directory.
+- *ImageWeeds* (3,208): a byte copy of v1. 12-class means Ragweed only (2,010 boxes); OtherPlant 4,922. External.
+- *cwd12 test* (1,977): a byte copy of v1. **Descriptive historical read only.**
+- *test v1* (3,030 images, 16 sources): built from `splits/v3/test_v1/*.jsonl` (summary.json complete, sha256 recorded), each row's written image and class-12 label, bytes checked; agnostic only; key `tv1__` + the sanitised base3 key. **Sealed** (below).
+- *evalgroups_v1*: one combined sample of the five test groups (NDSU, Latvia, sesame, maize, PAGS8; base3_v2.json), agnostic only. **Sealed.**
+- *ooddev_v1*: the same for the two OOD-dev groups (paddy, chilli). External.
+- Evaluation-group labels:
+  - each box's class name has a role in the committed table (`zoo_v1.json` exams.eval.roles, generated by the rule below from each slug's data.yaml, else its registry class names, as read on 2026-10-04); a weed box becomes class 12, a crop box is removed;
+  - the rule fails closed: weed only through `species_of`, the weed keys or suffixes, the `weed:` prefix or the listed weed names; drop through the crop keys; any other name, an ambiguous one (others, plant, object, ...), a number or an empty name is unresolved;
+  - an image holding a box of an unresolved or unnamed class is not read; images without a weed box are dropped, as in base3; a slug whose names are not all in the table, or with no weed class, is not read;
+  - ImageWeeds is left out of NDSU (it is its own exam).
+- The role table (slug: name -> role):
+  - NDSU weed_crop_detection and greenhouse_crop_weed_detection: Horseweed, Kochia, Palmer Amaranth (greenhouse only), Ragweed, Redroot Pigweed, Waterhemp -> weed; Blackbean, Canola, Corn, Field Pea, Flax, Lentil, Soybean, Sugar beet -> drop. imageweeds_aerial: all five (ragweed, waterhemp, horseweed, redrootpigweed, kochia) -> weed.
+  - Latvia crop_weed_detection_latvia, project-5nvic, university-of-peradeniya, vitif246x: weed -> weed, crop -> drop. francesco__weed_crop_aerial: weed -> weed, crop -> drop, 'weed-crop-aerial' unresolved (its boxes, if any, refuse their images). rf_test-8qezo: '0', '1' unresolved (not read). kg_vinayakshanawad: not in the registry (not read).
+  - sesame ravirajsinh45 and leopard-ai: weed -> weed, crop -> drop. srec-dthh0: '0'..'3' unresolved (not read). zbfhf: Alternanthera pungens, Chenopodium, Crab Grass, Euphorbia Prostata, Grass, Leptadenia reticulata, Spermacoce hispida, broadleaf plantain, parthenium hysterophorous, phhyllanthus, ragweed -> weed; Arachius, Crop, Dry leaf -> drop.
+  - maize: weed -> weed, maize -> drop. PAGS8: the eight 'weed: amaranthus palmeri (BBCH ...)' names -> weed.
+  - paddy: weed -> weed. chilli: chilli -> drop, 'others' unresolved: chilli yields no image, so ooddev_v1 is paddy alone.
+- Dedupe: images within 6 dHash bits under the 8 flips and rotations (both directions) of any cwd12 dev or test image are dropped; within and across groups, one image per 6-bit component, the first group by name (case-insensitive) keeps.
+- Sampling: per group, whole capture groups (base3.capture_groups: 6-bit components, the Roboflow export stem across the group) in the order stable_int("inc2/zoo/eval_v1/<group>/<digest>"), until 500 images; a capture group larger than 500 is skipped; at most 2,500 images for evalgroups_v1 and 500 for ooddev_v1.
+- ood22/ood23 are not zoo exams: they are tsw22/tsw23, trained by every v2+ model.
+- Every label convention, whether an exam is agnostic only, its role and its unread slugs are printed in the report.
+
+**What test v1 and the test groups are after Z1.** They stay the frozen multi-source test of every model trained after Z1, and the 0.90 claim is still stated on them. The zoo reads them only for historical non-INC checkpoints (stage B and the shortlist), whose training ended before test v1 existed (2026-10-03), so no choice that produced those checkpoints could use them. Those values are sealed: written only to `report_external.{json,csv}`, never to report.md, report.json's rows or the platform's record, and no recipe, data or model choice may cite them (usage rule 4). An amendment that wants to read them must say so.
+
+**Scoring.**
+- *The scorer.* The locked scorer at its own settings: 640 px, batch 32 rect, conf 0.001, iou 0.7, fp16 on a V100, Ultralytics 8.4.37. inc/scorer.py `score()` is called unchanged, with every check on every call (LOCK, every exam image and label hashed, the INC class space, no foreign module). Exam images may be read from a node-local copy of the zoo root, whose bytes the scorer verifies.
+- *INC rows are read on dev only.* The zoo scores an INC row on dev only, and only when no reusable record exists. Its ImageWeeds and cwd12 test columns are its own runs' records (reused), and it is never read on test v1 or an evaluation group. So P10 ("test reads only at milestone consolidations"), E1's and E2's test-read rules ("read once, after the verdict, by a person"; "E2 does not read test v1") and the capacity and measurement arms' "never read test" are untouched: Z1 reads no test of an INC model, before or after E2's person-step read.
+- *Agnostic always.* agnostic_map50_95 for every scored row and exam. For test v1 and the evaluation groups, the per-source and per-group agnostic AP comes from the same pass (scorer_agnostic.capture) and must reproduce the pass's agnostic AP within 1e-9. A 12-class value or image_correct is never kept for an agnostic-only exam.
+- *12-class only where the classes map to cwd12 species.* The class map is read from the whole model.names list (cwd12_species, read-only):
+  - R0: INC's 13 names; nothing converted.
+  - R1: CWD12_LEGACY_LABELS or CWD12_SPECIES (cwd12 id order); id i -> INC i.
+  - R2: TRAINER_SLOT_LEGACY or TRAINER_SLOT_SPECIES, optionally followed by aux_<k>. Slot j -> its species' INC id; every aux slot -> 12.
+  - R3: the first 8 trainer slots plus novel names. 8 species; the novel channels -> 12.
+  - R4: every name resolves (species_of -> its INC id; a weed name of the table -> 12; a crop or non-plant name -> dropped). A list holding a legacy-only label (Carpetweeds, Crabgrass, Morningglory, Nutsedge) never resolves. A checkpoint dated before 2026-09-21 (v3.60.0), or undated, resolves no name of CWD12_LEGACY_LABELS one by one: in the legacy vocabulary 'Ragweed' is Sicklepod and 'Purslane' is Palmer amaranth; such a list is R5.
+  - R5: anything else that is not COCO: every channel -> 12, agnostic columns only.
+  - *legacy_join.* An R1, R2 or R3 head dated before 2026-09-21 whose training list is unknown, holds cottonweed_holdout images, or holds any image that is not a cwd12 image: its slots mixed species (external ragweed in the Sicklepod slot, CottonWeedID15's crabgrass and nutsedge in MorningGlory's and Ragweed's, cottonweed_holdout's ids 4-11 deleted; CHANGELOG 10243-10262). Its species columns and ImageWeeds Ragweed are shown as not interpretable.
+- *Head conversion* (R1-R5). The classification head is rewritten into 13 channels:
+  - the last Conv2d of every cv3[i], and of one2one_cv3[i] on end2end heads, becomes Conv2d(c3, 13*K) -> Unflatten(1, (13, K)) -> MaxPool3d((K,1,1)) -> Flatten(2,3); a group of K source channels gives the maximum of their logits (the maximum of their sigmoids); empty slots weight 0 and bias -1e4; box branches untouched; nc = 13, no = 13 + 4*reg_max, yaml nc 13, names = INC's; single_cls set false (Ultralytics keeps it from a checkpoint), the original value recorded.
+  - The converted file is content-addressed by the source sha256, saved in the source's dtype and written once. It is scored only when both files, loaded as the scorer loads them (`S.load_model`, fp32, fused as the validator's AutoBackend fuses them), give on 4 dev images head outputs with equal boxes, every INC channel's score the maximum of its source group's within 1e-4 and every empty channel's at most 1e-4, and when `S._check_model` accepts the converted file.
+  - Before any conversion the inventory converts three synthetic heads (yolo11n R1, yolo26n end2end R2 of 100 classes, yolo11n R3) under the job's Ultralytics and refuses (exit 2) unless each passes. A converter exception with one normalised message on three models refuses as well (systemic); a tolerance miss is that row's unscorable_fidelity.
+  - Converted rows are labelled with their rule. Max-merging changes per-class NMS relative to the native head; that is part of "the model read in INC space".
+- *Columns (report.md).* dev: species_map50_95 (12-class, over the GT species), agnostic, and the mean of per_class over the species channels the model has; ImageWeeds: Ragweed AP and agnostic; ooddev_v1 agnostic; cwd12 test: species and agnostic, marked descriptive; trained imgsz (every read is at 640). Species columns are empty for R5, for 1-class R4 heads, for INC runs whose training had no species box (E1), and for legacy_join rows. Test v1 and evalgroups_v1 (with per source and per group) only in report_external.
+- *Reuse.* An INC run's recorded score (`runs/*/scores/<exam>.json` of any run whose weights are the row's: its own and its kind-final links) is copied into the zoo as "reused", never re-scored, when all of these hold: production true; scorer_sha256 equals the zoo LOCK's; manifest_sha256 equals the zoo LOCK's entry for the exam; weights_sha256 equals the file's sha256; settings are the protocol's; Ultralytics 8.4.37.
+- Every zoo score record carries production false and the stamp `ZOO-<locked sha>`. Records live only under `INC_DIR/_zoo/v1/scores/`, never in a run directory, so no gate, milestone or evidence reader can take one for a protocol score.
+
+**Contamination flags (per row and exam: dev, cwd12 test, ImageWeeds, test v1, evalgroups_v1, ooddev_v1, plus each evaluation group as a whole).**
+- *Training list per row, with its rating:*
+  - *exact*: INC run.json train_manifest, sha256 checked;
+  - *listed_exact*: the data.yaml train entries of an Ultralytics run, listed as Ultralytics lists them (`path:` as check_det_dataset resolves it; a directory by a recursive walk that follows symlinked directories, skips hidden names and ends symlink loops; a .txt list by its lines), with symlinks resolved, when neither the yaml nor any listed entry (its own lstat mtime) is newer than the run's start (args.yaml mtime) and args.yaml is not newer than the checkpoint;
+  - *listed_after_rebuild*: the same, failing one of those dates, or without a start date;
+  - *derived_superset*: no yaml; the pinned code-derived superset (yolo_iter: leave4out dataset_8species/train ∪ dataset_holdout/train, tools/yolo_trainer.py);
+  - *inherits*: a soup, or an INC run without a training manifest of its own: its parents' states only;
+  - *none*: nothing recoverable (a gone yaml or list, a relative `path:`, a changed manifest).
+- *Checks per training image* (each distinct image hashed once, cached; stored hashes first: the Step 1 pool, splits v3's and v2's provenance, INC manifests' sha256, the registry's dHash cache):
+  - the same real path, or the same sha256 (exact; test v1 also by its originals' sha256): stored, or read for every training image whose size is an exam image's (a byte copy has its original's size);
+  - a dHash within 6 bits under the 8 flips and rotations, in both directions (near; base3.cross_nearest); an image without a hash is never compared as dHash 0: it is counted unhashed;
+  - dev only: a cwd12 train image of one of dev's 8 sessions (session);
+  - test v1 only: a hit on a test_v1_companions row (companion).
+  - Hashing has a budget (4 h of the inventory job, timed on a sample first); images not reached stay unhashed.
+- *State per exam:*
+  - **Y**: one or more exact, near or companion hits, on an exact or listed_exact list;
+  - **P** (possible): any listed_after_rebuild or derived_superset list, or no hit while more than 1 % of the list could not be hashed;
+  - **N**: no hit on a complete, non-empty list;
+  - **U**: no list, or an empty one.
+  - Session-only dev hits are shown beside the state, not in it.
+- *Inherited.* A row inherits its init's states (train_args.model, or a `pretrained` path, or run.json init resolved to another row; soups: every member). An init that cannot be resolved to a row is U. Its state is the worse of its own and the inherited one (Y > P > U > N); stock and yaml inits inherit nothing.
+- *Selection.*
+  - selected_on, from the yaml's val: cwd12_test (the sealed 1,977 or a cwd12_holdout copy), cwd12_test_part (leave4out valid), dev (INC dev staged as val), own_split (a val under the dataset's own root), train_subset (INC), unknown;
+  - the val list is checked like a training list: an own_split val holding cwd12 test images makes best.pt `best_partial`, holding dev images makes it dev_selected;
+  - test_selected: best (best.pt chosen on cwd12 test), best_partial, early_stop (last.pt of a run that stopped early: fewer results.csv rows than its epochs, patience below the epochs, at least `patience` epochs after its best fitness, no time limit), none, unknown; inherited through the init chain (shown as s);
+  - dev_selected: best.pt chosen on dev;
+  - dev_gated: an INC row whose data or init a dev gate chose (a stream pool after an accepted increment; a pilot or real-loop candidate or soup; any row initialised from an INC row).
+- Every row from before INC (09-27) whose list contains cwd12 train images carries the note "trained on cwd12 train; dev is 8 sessions of it". Pilot rows trained on the Bswap increment (40 % of its boxes relabelled on purpose, inc/pilot.py) are flagged planted_noise.
+
+**Usage rule (binding).**
+1. The zoo table is descriptive. No checkpoint is adopted, called "best", ranked as a result, or quoted as a model's accuracy from its cwd12 test, test v1 or evaluation-group number. RESEARCH_LOG, CHANGELOG, README and posters may cite the zoo only as "the historical record under one protocol", with its flags.
+2. The only ranking is by dev, among dev-clean rows (dev state N, not selected on dev, not dev-gated), within 12-species, partial-species and agnostic-only rows separately. External exams are shown beside it and never re-order it. Rows that are not dev-clean are listed by family and date, unranked.
+3. A checkpoint the project wants to use (an init, an incumbent, a deployable or robot model) re-qualifies under a dev rule pre-registered in its own amendment, as E1 and E2 did. A row that is not dev-clean cannot re-qualify on dev.
+4. The zoo's test v1 and evaluation-group reads are sealed descriptive reads of historical checkpoints (report_external.*): no recipe, data or model choice may cite them, they are no model's pre-registered test read, and no zoo checkpoint becomes a candidate through them; test v1 and the five test groups stay the frozen test of every model trained after Z1.
+5. A retracted claim is not reinstated by its zoo row. The row shows the claim's citation.
+
+**Shortlist (stage C; computed from dev and provenance only, never from an external exam; non-INC rows, at most one per run directory, one per weights digest).** Rules, in order:
+1. every checkpoint matched by zoo_v1.json "claims" (18 entries: run paths quoted in RESEARCH_LOG.md, CHANGELOG.md, README.md or docs/, resolved by `zoo claims` against the pinned list);
+2. per family, the 3 highest by dev among dev-clean rows (12-species rows by dev species, the others by dev agnostic); a family with fewer than 3 clean rows is filled selection-free (rows evenly spaced by date), never by a contaminated dev;
+3. per family, the latest by date.
+At most 120 checkpoints: rule-3 entries are dropped first, then rule-2 fills, from the family with the most entries (ties by family name). Exams: test v1 when stage B did not score it, then evalgroups_v1, ooddev_v1, ImageWeeds, cwd12 test. The retracted claims (`zoo_v1.json` "retracted": v3.0.24-v3.0.27's cwd12 holdout numbers, the tier ladder v1's 0.27 cost) are flagged on their rows.
+
+**Outputs.**
+- People: `INC_DIR/_zoo/v1/report.{json,csv,md}`, `report_external.{json,csv}` (the sealed reads), plus every per-file record.
+- The platform: `INC_DIR/capacity/zoo_v1.json`. Status, job ids, counts and sha256s only: no exam names as keys, no score paths, no metric.
+
+**Cost (inference only; cap 40 GPU-h, all GPU-shared V100).**
+- *I, inventory:* list, load, provenance, conversion, exams, contamination hashing, pilot, plan. One job, about 3-6 h (hashing at most 4 h of it).
+- *A:* dev for every scorable non-INC row (about 372) and any INC row without a reusable dev record. About 0.23M image passes, about 4 GPU-h.
+- *B:* test v1 for every scorable non-INC row (about 372). About 1.1M passes, at most 20 GPU-h. What does not fit is "not_scored_budget", counted.
+- *select:* at most 0.5. *C:* the shortlist on what is left of the cap after I, A, B and a 1 GPU-h report reserve (about 8). *report:* at most 1.
+- *Planning:* each item is priced from a pilot (one non-INC checkpoint per size class, S ≤ 10M, M ≤ 40M, L > 40M parameters, on every exam, kept as real records) × 1.2. The inventory refuses (exit 2, record refused) before any scoring task when stage A alone does not fit.
+- *Enforcement.* A ledger under `_zoo/v1/ledger/` holds every attempt of every job (started at the job's own start, SLURM_JOB_START_TIME, so the exam copy and start-up count). Before each item a task stops when the chain's total plus the item's price would pass the cap (less the report reserve; stage A also keeps the select reserve), when its own time passes twice its shard's price (at least 30 min), or at its deadline (4 h less 15 min); the rest are not_scored_budget or not_scored_time. A resubmission adds to the same ledger, so the cap holds across attempts. Real spend is settled from sacct.
+
+**Platform flow.**
+- *Lever L23Z* (zoo_audit, MAINT lane, phase ZOO, R3 within the envelope, record only, policy action inc_audit_zoo, price: the cap, 40).
+- *When DR0 proposes it:* once, last in DR0, when MAINT and DATA have nothing due, the lock exists, the stream's arm is adopted, Stage C was read, /stage/e2 is done (E2's rescore and verdict) and /stage/zoo is missing. Since an INC row is never read on a test by the zoo, it does not wait for E2's person-step test read.
+- *What it submits:* `bash run_inc2_zoo.sh submit` on the login node writes `capacity/zoo_v1.json` (submitting, with each id as it is obtained, then submitted) and submits five jobs, none held: inventory; score array A, afterok:inventory; select, afterany:A; score array C, afterok:select; report, afterany:C (`--kill-on-invalid-dep=yes` on the four dependents). An sbatch failure cancels everything submitted and restores the earlier record. A submission that times out part-way is an unknown outcome: what it queued runs, and the jobs write the record.
+- *Following it:* by the five job ids, array tasks folded into one sacct entry per array (RUNNING while a task is live, else COMPLETED when every task completed, else the first other state; elapsed summed), and after an unknown outcome by the five job names and the record.
+- *Done:* when all five completed; /stage/zoo is done once the record says complete, partial when it says partial (an escalation card naming the failed shards and the rerun commands).
+- *Failure:* a person's card with the rerun commands. L23Z is never proposed again. A failed submission before anything stayed queued is the lane's ordinary failure and is proposed again.
+- *Stale:* a live record with no zoo job queued and no platform item following it (a person's submission or a killed submission that stopped part-way) is /stage/zoo stale: one card, never a second proposal.
+- *A person's run:* the same submit command may be run once by a person under the grant before the lever is deployed. Its record keeps the platform from proposing a second run. A person may resubmit after a stale, partial or failed record (written records are kept: resumable); a complete record refuses, and so does another --shards-a or --shards-c than the plan's.
+
+### Implementation
+
+- `inc2/zoo.py` (new): the verbs (preflight, submit, status, eval-names on the login node; inventory, exam-root, score, select, report as jobs; claims, codever anywhere; the inventory's steps one at a time). Imports at load: the standard library, `inc.common` and `cwd12_species`; numpy, torch, ultralytics, PIL, yaml, `inc.scorer`, `inc.splits`, `inc2.base3`, `inc2.guard` and `inc2.scorer_agnostic` are imported where used (submit never imports torch). Everything it writes lies under `INC_DIR/_zoo/v1/` and `capacity/zoo_v1.json`; a step whose marker says done under the same config sha256 is kept; per-item records are written once (tmp + `os.link`).
+- `inc2/zoo_v1.json` (new): the config, recorded by sha256 in every record: the pinned list, the families, the class-map tables, the conversion tolerances, the exams (the evaluation role table generated by the rule above from `zoo eval-names`-equivalent reads of 2026-10-04), the contamination tables, the stages' budget, the shortlist's 18 claims and 5 retracted-claim patterns, the out-of-scope count. Any change is a v2.
+- `run_inc2_zoo.sh` (new): GPU-shared, one v100-32, 5 CPUs, 45 GB, 12 h (the score arrays and select/report pass shorter `--time`). submit and preflight refuse inside a job, the job modes outside one. The outer copy runs; a module that differs from the nested copy stops the job (`INC_BUILD_ALLOW_DRIFT=1` runs it, recorded). Its module list is the import and config closure of a full test-world run (every inventory step and a score), the package `__init__`'s agent-framework imports included. Provenance and locks under `_zoo/v1/`, never `_campaign/`.
+- The platform: `inc_autopilot/{stream.py, diagnose_stream.py, executor.py, stream_remote.py, levers_stream.py, evidence.py, stream_levers.json, stream_domains/weed.json}`, `brain/{policy_actions.json, approvals.py}`; `deploy/deploy_funnel.sh` ships `run_inc2_zoo.sh`. `stream_remote.sacct` now asks for `JobID` first and folds an array's tasks into its id (a plain job is unchanged).
+
+### How it is verified
+
+- `tests/test_inc2_zoo.py` (new; CPU, no scoring pass): the list's decisions per fixture and their reconciliation (a list of another sha256 and a dropped decision refuse); the class maps R0-R5, the legacy-vocabulary rule and legacy_join; meta's skips and unscorables; the converter on R1, R2 (yolo26n end2end, one2one_cv3 included), R3, R4 and R5 heads, its self-test, written once, a planted wrong weight row failing the fidelity check; provenance (exact, listed_exact with oversampled symlinks counted once, listed_after_rebuild, none, derived_superset, init resolution, a changed manifest, a symlinked subdirectory, a loop, a relative `path:`), codever; the exams (LOCK, byte copies, test v1 keys and labels, a changed label refusing, the maize slug read with its crop box removed and its crop-only and dev-copy images dropped, unread slugs with their reasons, a deterministic sample, `exam_problems` empty, `splits/` untouched, a never-train mismatch refusing); contamination (exact, near only through the 8 variants, session, companion, P, U, inheritance, an unknown init U, the unhashed tolerance, an empty list U, the weights digest); the plan (reuse, stage A whole, B cut, A over the cap refusing with no shard, LPT, written once); select (claims, top-k among dev-clean rows, the selection-free fill, the cap, exam order, budget_c, no plan refusing); the report (partial naming the shard, complete, the usage rule verbatim, every reason's count, sections and ranking, the CSV columns, the sealed values only in report_external, the platform record passing the dev-only scrub); submit (five argvs without a hold, the chain's dependencies, the record, the INCZOO line, a third sbatch failing cancelling two and keeping the earlier record, a queued name, a complete record, a Slurm job, another shard count, no torch import); the job script (bash -n, partition and GPU, no package copy, modes refusing in the wrong place, exam-root then score with the right INC_DIR, the MODULES list against the computed closure); the pinned modules unchanged against git HEAD.
+- `tests/test_inc2_zoo_score.py` (new; real Ultralytics passes on the CPU in test mode): records stamped TEST-ZOO-<scorer>, production false, equal to a direct `S.score` under the zoo root within 1e-9; test v1's per-source APs recomputing the pass; a second run scoring nothing; a refusal final, an error retried once then final, one message on three models stopping the task; the deadline; the chain's GPU-hour cap with an earlier attempt's spend, and a task's allowance; the root checks; a node-local exam root equal to the Lustre root; `score --item`; nothing written under any run directory.
+- `tests/test_stream_ap_units.py` (`t_zoo`), `test_stream_ap_replay.py` (stream_r0 ends with L23Z, once, within the envelope), `test_stream_ap_world.py` (the zoo's submit, record and end).
+- Both zoo test files pass under Ultralytics 8.4.22 (local), 8.4.37 (the cluster's release, with torch 2.10) and 8.4.129 (the lab).
+- Full suite on the lab (Ultralytics 8.4.129, the repository's files without git): 144 files, 116 pass. The 28 that fail fail the same way on main's tree there (142 files, 30 fail), except `test_inc2_zoo.py` and `test_inc2_zoo_score.py`, which build their world with the pinned scorer: it reads `args.half`, which 8.4.129 no longer has, as every scorer-based test does; both pass on the lab under 8.4.37. The shared causes: the pinned scorer under 8.4.129, no pytest, no git, the job-script tests' system python without numpy, the lab's GPU and services, and `test_brain_api.py`, which fails on main.
+
+### Deploy
+
+- These files change `executor.code_hash()` and the stream rules version: record-replay must pass before envelope grants resume.
+- `run_inc2_job.sh` globs the nested `inc2/*.py` and exits when an outer twin is missing, so `inc2/zoo.py` (and `zoo_v1.json`) reach the outer copy before, or together with, the nested one. Adding `zoo.py` changes the module list every later `inc2.train` run records; this is harmless.
+- `remote.sync_outer` waits while zoo jobs are queued.
+- Before autonomy: the campaign's `remaining_su` and `domain_remaining_su` must each be at least the zoo's 40 GPU-h estimate plus the next L18; otherwise "left in the campaign envelope" pauses the stream.
+- A person's run before the lever is deployed: `bash run_inc2_zoo.sh preflight --version v1`, then `INCAP_DECIDED_BY=human:harry567566@gmail.com INCAP_TRIGGER=Z1 bash run_inc2_zoo.sh submit --version v1 --shards-a 32 --shards-c 16 --concurrency 4 --max-gpu-hours 40` from `$REPO/weed_llm_benchmark` on the login node.
+
+### Open items
+
+- Converted rows read a 100-class or 9-class detector through a max-merged head. Aux slots of mega, m1, rnd, ctl and s3 held crops and pests as well as weeds, so their agnostic reads count crop detections against weed-only exams. Agnostic AP also penalises a multi-class head against a one-class head (cross-class duplicates at different anchors survive per-class NMS); the legend says so.
+- Training lists of 78 yolo_iter runs, 3 hyperagent, 4 agent_optimizer and yolo_lora are gone. Their flags are P or U, never N.
+- Merged directories were rebuilt per project. Runs before a project's last merge are listed_after_rebuild (P).
+- Code versions outside INC are approximate (main@<last commit before the run started>). INC rows map their per-module sha256 to commits with `zoo codever`, run where git history exists.
+- The audit occupies MAINT for the whole chain (about 8-12 h plus queue). L20, LC and L21 wait behind it; L21 is not exempted.
+- A person's chain that ends outside the platform is not charged to the campaign's SU ledger; the platform charges only a chain it submitted (sacct, per job, array tasks summed).
+- The evaluation-group samples are not filtered against base_v2, arm B or the stream's pools: no INC row is read on them, and the non-INC rows predate those pools. A later read of an INC lineage on them would need that filter.
+- The 8-variant hashes decode each image twice (`inc2.guard.image_hashes`, shared); the hashing budget bounds the time, and images it does not reach stay unhashed (P when over 1 %).
+- L23N's native-resolution reads of the measurement arms are pointed to from the legend (`capacity/native_v1.json`), not joined to their rows.
+- Only a reread through `zoo eval-names` shows a role table change since 2026-10-04: a slug whose names no longer match the committed table is not read, with its reason.

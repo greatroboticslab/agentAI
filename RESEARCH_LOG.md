@@ -13,6 +13,22 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-04 — Z1 pre-registered: the model-zoo audit (no results yet)
+
+**Accuracy (unchanged).** Best sealed cwd12 12-class test 0.8786 ± 0.0018 (YOLO11m@640, base_v2); gap to 0.90: 0.021.
+
+**Why.** About 1,000 detectors were trained from 2026-03 to 2026-10 (4,785 .pt files, 805 GB). Their numbers came from four evaluators, the cwd12 test was the selection set until 09-26, some training sets held test copies, and species names were wrong before 09-21. Nothing in that history can be compared with today's protocol numbers.
+
+**Design (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04 Z1).**
+- One decision per listed file by a pre-registered rule; detectors only; every skip counted.
+- The locked scorer, unchanged, at 640: dev (the decision exam), ImageWeeds, ooddev_v1 (paddy) and cwd12 test (descriptive). Heads outside the INC class space are read through a max-merged 13-channel copy, checked against the original.
+- INC models are read on dev only; their other columns are their own records.
+- Contamination flags per row and exam (exact, 8-variant near, dev session, test v1 companion; Y/P/U/N, inherited through inits).
+- Test v1 and the five evaluation test groups stay the frozen test: their reads of historical checkpoints are sealed in `report_external.*`.
+- Usage: descriptive. Ranked by dev among dev-clean rows only; nothing adopted, called best or quoted from a test-like column; a checkpoint the project wants to use re-qualifies under its own pre-registered dev rule.
+
+**Platform.** Lever L23Z: one chain of five GPU-shared jobs within a 40 GPU-h cap its tasks enforce, proposed once after E2's verdict; record only. A person may submit it once before the lever is deployed.
+
 ## 2026-10-04 — E2-C, the attribution control, on the platform (no results yet)
 
 **Accuracy (unchanged).**
