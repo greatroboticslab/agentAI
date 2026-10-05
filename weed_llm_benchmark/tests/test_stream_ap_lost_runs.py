@@ -24,6 +24,15 @@ lab runner whose sync jobs succeed):
     job instead of being declined;
   * the live condition (the id already declined): it is taken back on the
     next tick, not skipped;
+  * a run a lane already followed to its end is never taken back: a second
+    discovery (L15) with the same classes runs under a new id (its result is
+    never the first one's read again), and on a state written before L15 got
+    a new attempt when it finished, the repeat refused as already run (or
+    declined so) is proposed again under a new id; a run taken back once is
+    never taken back twice;
+  * the first tick on a state written before ended_ids existed (a deploy)
+    takes back no run the lanes followed (an L24 quarantine is done once,
+    whatever the executor's clock says), and still takes back one they lost;
   * a declined proposal with no run to take back writes exactly one
     not_taken, and after watchdog stall_ticks ticks a card names the lane;
   * D20 never proposes a candidate whose estimate is 0 target boxes: with only
@@ -37,7 +46,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import test_stream_ap_world as W  # noqa: E402
-from test_stream_ap_world import DAY, LS, NAME, S, World, check  # noqa: E402
+from test_stream_ap_world import DAY, LS, NAME, S, X, World, check  # noqa: E402
 
 SRC = "rf_ag_prog"
 CAND = {"id": SRC, "provider": "roboflow", "licence": "CC BY 4.0", "target_classes": ["PricklySida"],
@@ -155,6 +164,22 @@ def t_recovered():
           pid2 in run.st["declined"] and run.st["lanes"]["DATA"]["item"] is None
           and any(c.get("kind") == "platform" and "already ran" in c["title"] for c in run.st["cards"]),
           run.st["cards"][-1:])
+    # a run taken back once (adopted_runs) and not followed since: never taken back a second time
+    w3 = world("recovered_twice")
+    pid3, rec3 = lost_tick(w3)
+    run = W.S.StreamRun(NAME, w3.config(), W.C.Paths(str(w3.lab)), W.C._SshBudget(None), w3.clock, w3.log, w3.hooks,
+                        lambda: W.RES, None, None, None)
+    run.st, run.dom, run.th = w3.state(), LS.load_domain("weed"), LS.load_thresholds()
+    run.st["adopted_runs"] = [rec3["run_id"]]
+    it = {"proposal": {"id": pid3, "policy_action": "inc_stream_sync", "follow": "lab", "params": {"source": SRC},
+                       "trigger": ["D20"]}, "lever": "L16S", "status": "proposed"}
+    run.st["lanes"]["DATA"]["item"] = it
+    run._on_result("DATA", it, {"status": "refused", "reasons": ["proposal %s already ran (executed at x); a proposal "
+                                                                 "runs once" % pid3]})
+    check("  a run taken back once already is not taken back again: declined with a card",
+          pid3 in run.st["declined"] and run.st["lanes"]["DATA"]["item"] is None
+          and run.st["adopted_runs"] == [rec3["run_id"]]
+          and any("taken back once already" in c.get("detail", "") for c in run.st["cards"]), run.st["cards"][-1:])
 
 
 def t_live_declined():
@@ -259,8 +284,149 @@ def t_zero_estimate():
           and d20["detail"]["zero_estimate"]["sources"] == ["rf_zero"], d20["detail"].get("ranked"))
 
 
+def discoveries(w):
+    return [x for x in w.runner.launched if "plan" in x["argv"]]
+
+
+def l15_world(tag):
+    """No candidate at all: D20 takes the discovery path (L15); the first
+    discovery runs, finds nothing, and the DATA lane waits (D29, WAIT_DATA).
+    Returns the world and the first L15's proposal id."""
+    w = World(tag, floors=(5.0, 10.0))
+    w.ready_r0()
+    w.queue(0)
+    w.candidates([])
+    for _ in range(6):
+        w.tick(1)
+        if discoveries(w):
+            break
+    pid = [e for e in w.events("proposed") if e.get("lever") == "L15"][-1]["proposal_id"]
+    w.runner.finish(ok=True)
+    w.tick(2)
+    return w, pid
+
+
+def l15_ids(w):
+    return [e.get("proposal_id") for e in w.events("proposed") if e.get("lever") == "L15"]
+
+
+def t_l15_again():
+    print("a second discovery (L15) with the same classes runs under a new id; the first run is never read again")
+    w, pid = l15_world("l15_again")
+    d = w.state()["discover"]
+    check("the first discovery ran once and found nothing: runs 1, DATA waits (WAIT_DATA)",
+          len(discoveries(w)) == 1 and d.get("runs") == 1 and w.lane("DATA").get("phase") == "WAIT_DATA",
+          (d, w.lane("DATA")))
+    w.advance(8 * DAY)
+    w.tick(2)
+    ids = l15_ids(w)
+    st = w.state()
+    check("after the wait D20 calls for L15 with the same classes: proposed under a new id and launched again; no "
+          "run taken back, nothing refused as already run",
+          len(ids) == 2 and ids[1] != pid and len(discoveries(w)) == 2 and not w.events("adopted_run")
+          and not w.events("recovered") and (st["discover"] or {}).get("runs") == 1,
+          (ids, len(discoveries(w)), st["discover"]))
+    w.runner.finish(ok=True)
+    w.tick(2)
+    d = w.state()["discover"]
+    check("  its own result ends it: runs 2, empty_runs 2, one card for each wait at most",
+          d.get("runs") == 2 and d.get("empty_runs") == 2 and len(discoveries(w)) == 2, d)
+
+
+def _repeat_old_state(w, pid, declined=False):
+    """The state as the code before this fix left it after an L15: no new
+    attempt for its step (the repeat gets the same id), and with `declined`
+    the repeat already refused as run and declined (main's 'recovered')."""
+    def fn(st):
+        st["attempts"] = {k: v for k, v in (st.get("attempts") or {}).items() if not k.startswith("L15:")}
+        if declined:
+            st["declined"] = list(st.get("declined") or []) + [pid]
+    edit_state(w, fn)
+
+
+def t_followed_not_taken_back():
+    print("a repeat of a run a lane followed is proposed again under a new id, never taken back")
+    for declined in (False, True):
+        tag = "declined" if declined else "refused"
+        w, pid = l15_world("followed_%s" % tag)
+        _repeat_old_state(w, pid, declined)
+        w.advance(8 * DAY)
+        w.tick(1)
+        st = w.state()
+        nt = [e for e in w.events("not_taken") if e.get("proposal_id") == pid]
+        check("%s: the repeat of L15 (same id, its run followed to item_done) is not taken back: no adopted_run, "
+              "the first run's result not read again (runs 1), not declined anew, no card" % tag,
+              not w.events("adopted_run") and (st["discover"] or {}).get("runs") == 1
+              and (declined or pid not in (st.get("declined") or []))
+              and not [c for c in st.get("cards") or [] if "already ran" in c.get("title", "")]
+              and nt and "new id" in str(nt[-1].get("reasons")), (w.events("adopted_run"), st["discover"], nt))
+        w.tick(2)
+        ids = l15_ids(w)
+        check("  %s: the next tick proposes L15 under a new id and launches it" % tag,
+              ids[-1] != pid and len(discoveries(w)) == 2, (ids, len(discoveries(w))))
+
+
+def _lagged(lag):
+    """X.Context with the executor's clock `lag` seconds ahead of the ticker's
+    (in production a run's record is written after the tick started)."""
+    orig = X.Context
+
+    class Lagged(orig):
+        def __init__(self, *a, **kw):
+            c = kw.get("clock")
+            if callable(c):
+                kw["clock"] = lambda c=c: c() + lag
+            orig.__init__(self, *a, **kw)
+    return orig, Lagged
+
+
+def t_first_tick_after_deploy():
+    print("the first tick on a state written before ended_ids existed takes back no run the lanes followed")
+    for lag in (0.0, 20.0):
+        orig, lagged = _lagged(lag)
+        X.Context = lagged
+        try:
+            w = World("deploy_lag%d" % lag)
+            w.ready_r0()
+            w.queue(4 * w.M, boxes={"Purslane": 900}, oldest_utc=W.utc(w.t[0] - 2 * DAY))
+            w.tick(2)
+            w.segment(1, [("I2", "ACCEPT", 0.9, [], "helps", ["src_a"]),
+                          ("I3", "REJECT", 0.1, ["regression"], "hurts", ["src_b"]),
+                          ("I4", "REJECT", 0.1, ["regression"], "hurts", ["src_b"])], done=True)
+            for _ in range(10):
+                w.tick(1)
+                if [e for e in w.events("item_done") if e.get("lever") == "L24"]:
+                    break
+            done = [e for e in w.events("item_done") if e.get("lever") == "L24"]
+            qu = ((w.state().get("sources") or {}).get("src_b") or {}).get("quarantined_utc")
+            rec = [r for r in w.executions() if r.get("lever") == "L24" and r.get("status") == "executed"]
+            check("lag %ds: L24 quarantined src_b and was done in its tick (the record's ts %s, the tick %s)"
+                  % (lag, rec and rec[-1].get("ts"), qu), len(done) == 1 and qu and rec, done)
+            edit_state(w, lambda st: st.pop("ended_ids", None))
+            w.tick(1)
+            st = w.state()
+            check("  lag %ds: the next tick on that state without ended_ids takes back nothing: one item_done of L24, "
+                  "quarantined_utc unchanged, ended_ids taken from the campaign ledger" % lag,
+                  not w.events("adopted_run")
+                  and len([e for e in w.events("item_done") if e.get("lever") == "L24"]) == 1
+                  and ((st.get("sources") or {}).get("src_b") or {}).get("quarantined_utc") == qu
+                  and done[0]["proposal_id"] in (st.get("ended_ids") or []),
+                  (w.events("adopted_run"), st.get("ended_ids")))
+        finally:
+            X.Context = orig
+    # a run the lanes lost on such a state is still taken back
+    w = world("deploy_lost")
+    pid, _rec = lost_tick(w)
+    edit_state(w, lambda st: st.pop("ended_ids", None))
+    w.tick(1)
+    check("  a run lost on a state without ended_ids is still taken back (adopted_run, running)",
+          [e.get("proposal_id") for e in w.events("adopted_run")] == [pid]
+          and (w.lane("DATA").get("item") or {}).get("status") == "running", w.events("adopted_run"))
+
+
 def main():
-    for fn in (t_replay_lost_tick, t_recovered, t_live_declined, t_declined_watchdog, t_zero_estimate):
+    for fn in (t_replay_lost_tick, t_recovered, t_live_declined, t_declined_watchdog, t_zero_estimate,
+               t_l15_again, t_followed_not_taken_back, t_first_tick_after_deploy):
         W.run_case(fn.__name__, fn)
     return W.closing()
 

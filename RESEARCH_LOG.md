@@ -25,7 +25,7 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 - On 2026-10-05 a quarantine (L24) and a segment cut (L18) were proposed in the same tick; the cut ran after Q had fallen to 319 and the cutter refused it 'short', which TRAIN counted as a failed step.
 
 **What the platform now does** (docs/CONTINUOUS_LOOP.md, "Fix (2026-10-05)").
-- Runs a restart lost are taken back from the execution log at the next tick; a lab item met as "already ran" follows its recorded lab job.
+- Runs a restart lost are taken back from the execution log at the next tick; a lab item met as "already ran" follows its recorded lab job. A run a lane already followed is never taken back: the same work runs again under a new id, and a discovery (L15) takes a new id when it finishes.
 - A declined proposal is never skipped silently: one `not_taken`, and a `stall` card after 12 idle ticks.
 - No fetch of a zero-estimate candidate. Names-pending candidates get their names resolved first (L26, lab only, one per DATA item), so the next discovery (L15, once none is pending; its 7-day interval ends 2026-10-06 17:39Z) can estimate them again.
 - A cut refused short while Q < M is not a failure; a cut waits for a pending quarantine and is withdrawn when the queue no longer calls for it.

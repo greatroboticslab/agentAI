@@ -218,6 +218,10 @@ ENDED_KEEP = 200
 # build: "nothing cut for <exp>: short", or short_after_guard once the guard
 # excluded rows): no failure while the queue holds fewer than M (_cut_short).
 SHORT_RE = re.compile(r"nothing cut for \S+: (short|short_after_guard)\b")
+# The campaign ledger's events that end a lane item and name its proposal
+# (with lab_job_finished, which names the lab job): a run with one was followed
+# to its end and is never taken back (_ledger_ended, _seed_ended, _run_followed)
+ENDED_EVENTS = ("item_done", "failed", "withdrawn", "intake_names_pending")
 # Login verbs done when they ran (_on_result; a lost run of one, _adopt_run)
 DONE_AT_ONCE = ("inc_stream_commit", "inc_stream_rollback", "inc_stream_quarantine", "inc_stream_release",
                 "inc_unblock_transient")
@@ -743,6 +747,7 @@ class StreamRun(object):
         self.domain_budget = domain_budget
         self.preamble = preamble
         self._execs = None                       # this campaign's execution records, read once a tick (_executions)
+        self._ended = None                       # the items the campaign ledger records ended (_ledger_ended)
         self._ctx = self._payload = None
         self.xctx = X.Context(slurm_sh=ssh, resources=resources, domain_budget=domain_budget, clock=clock,
                               lab_repo=paths.lab_repo, preamble=preamble, domain=self.domain,
@@ -1060,6 +1065,7 @@ class StreamRun(object):
     def _step(self):
         st = self.st
         st["ticks"] = int(st.get("ticks") or 0) + 1
+        self._seed_ended()
         self._resumed()
         self._reopen_sources()
         why = self._paused_reason()
@@ -2458,11 +2464,13 @@ class StreamRun(object):
         effect (candidate_synced) was never recorded. An executed record of a
         lane lever is adopted when its proposal id is in no lane (or in its
         lane still 'proposed', which takes it in place), no item ended with it
-        (ended_ids, done_keys, failed_ids, declined), no person's parked item
-        holds it, and its run was not adopted before. Only records at or after
-        the state's last successful write (updated_utc) are read: an earlier
-        run was seen by a tick whose state was written. A lost run whose lane
-        is busy waits for it (adopt_from_utc keeps the horizon)."""
+        (ended_ids, failed_ids, declined), no person's parked item holds it,
+        and its run was not adopted before. Only records at or after the
+        state's last successful write (updated_utc) are read: an earlier run
+        was seen by a tick whose state was written. A lost run whose lane is
+        busy waits for it (adopt_from_utc keeps the horizon). A state written
+        before ended_ids existed takes them from the campaign ledger first
+        (_seed_ended)."""
         st = self.st
         horizon = str(st.get("adopt_from_utc") or st.get("updated_utc") or "")
         if not horizon:
@@ -2476,15 +2484,11 @@ class StreamRun(object):
         gone = set(st.get("ended_ids") or []) | set(self._failed_ids()) | set(st.get("declined") or []) \
             | set(st.get("person_items") or {})
         adopted = set(st.get("adopted_runs") or [])
-        dk = st.get("done_keys") or {}
         waiting = []
         for rec in self._executions():
             pid, lever, ts = rec.get("proposal_id"), rec.get("lever"), str(rec.get("ts") or "")
             if rec.get("status") != "executed" or not pid or lever not in LANE_OF or lever in PERSON_LEVERS \
                     or ts < horizon or pid in gone or (rec.get("run_id") or pid) in adopted:
-                continue
-            done_at = dk.get(_sha([lever, dict(rec.get("params") or {}, **(rec.get("meta_params") or {}))])[:16])
-            if done_at and str(done_at) >= ts:
                 continue
             if pid in held:
                 ln, it = held[pid]
@@ -2505,6 +2509,89 @@ class StreamRun(object):
             st["adopt_from_utc"] = min(waiting)
         else:
             st.pop("adopt_from_utc", None)
+
+    def _ledger_ended(self):
+        """({proposal id: utc}, {lab job: utc}) of the items the lanes followed
+        to an end, from the campaign ledger (ENDED_EVENTS name the proposal,
+        lab_job_finished the lab job; the latest utc of each), read once a
+        tick; None when the ledger cannot be read."""
+        if self._ended is None:
+            pids, jobs = {}, {}
+            try:
+                with open(str(self.paths.ledger), "r", encoding="utf-8") as fh:
+                    for line in fh:
+                        if not any('"%s"' % e in line for e in ENDED_EVENTS + ("lab_job_finished",)):
+                            continue
+                        try:
+                            r = json.loads(line)
+                        except ValueError:
+                            continue
+                        if not isinstance(r, dict) or r.get("campaign") != self.name:
+                            continue
+                        if r.get("event") in ENDED_EVENTS and r.get("proposal_id"):
+                            pids[str(r["proposal_id"])] = str(r.get("utc") or "")
+                        elif r.get("event") == "lab_job_finished" and r.get("lab_job"):
+                            jobs[str(r["lab_job"])] = str(r.get("utc") or "")
+            except FileNotFoundError:
+                pass
+            except OSError:
+                return None
+            self._ended = (pids, jobs)
+        return self._ended
+
+    def _seed_ended(self):
+        """A state written before ended_ids existed (the first tick after the
+        deploy that added them) takes them once from the campaign ledger: the
+        items that ended at or after the state's horizon (_adopt_lost_runs),
+        by proposal id, or by the lab job their run recorded. Without this,
+        every run of the last tick that wrote the state, held by no lane (an
+        L24 done when it ran), read as lost, and its effect was applied a
+        second time. A ledger that cannot be read: no run before this tick is
+        taken back (the horizon moves to it)."""
+        st = self.st
+        if isinstance(st.get("ended_ids"), list):
+            return
+        horizon = str(st.get("adopt_from_utc") or st.get("updated_utc") or "")
+        led = self._ledger_ended() if horizon else ({}, {})
+        if led is None:
+            st["ended_ids"] = []
+            st["adopt_from_utc"] = self.utc
+            self._ledger("ended_ids_seeded", ids=0, reasons=["the campaign ledger cannot be read: runs before %s are "
+                                                             "not taken back" % self.utc])
+            return
+        pids, jobs = led
+        ids = {p for p, u in pids.items() if u >= horizon}
+        jobs = {j for j, u in jobs.items() if u >= horizon}
+        if jobs:
+            ids |= {r["proposal_id"] for r in self._executions() if r.get("proposal_id") and self._lab_job_of(r) in jobs}
+        st["ended_ids"] = sorted(ids)[-ENDED_KEEP:]
+        if horizon:
+            self._ledger("ended_ids_seeded", ids=len(st["ended_ids"]), since_utc=horizon)
+
+    def _run_followed(self, rec):
+        """True when a lane followed run `rec` to its end: its proposal id
+        left a lane (ended_ids), or the campaign ledger records its item's end
+        or its lab job's (_ledger_ended). A ledger that cannot be read counts
+        as followed: a run is never taken back twice."""
+        pid = (rec or {}).get("proposal_id")
+        if pid in (self.st.get("ended_ids") or []):
+            return True
+        led = self._ledger_ended()
+        if led is None:
+            return True
+        job = self._lab_job_of(rec)
+        return pid in led[0] or bool(job and job in led[1])
+
+    def _renew(self, ln, lever, p, rec, how):
+        """The step of proposal p runs again under a new id (the executor runs
+        an id once): its earlier run was followed to its end, so it is neither
+        taken back nor declined. The step's attempt count rises past p's."""
+        key = step_key(lever, p.get("params"))
+        att = self.st.setdefault("attempts", {})
+        att[key] = max(int(att.get(key) or 0), int(p.get("attempt") or 0)) + 1
+        self._ledger("not_taken", lane=ln, lever=lever, proposal_id=p["id"], run_id=(rec or {}).get("run_id"),
+                     lab_job=self._lab_job_of(rec), attempt=att[key],
+                     reasons=["%s; the same step runs again under a new id (attempt %d)" % (_short(how, 400), att[key])])
 
     def _proposal_of(self, rec):
         """A lost run's proposal rebuilt from its execution record (the
@@ -2551,14 +2638,31 @@ class StreamRun(object):
         """A lab item refused as already run (its id ran before the state that
         holds the item was written): the lane takes that run back by its
         recorded lab job (_adopt_run), so its result is read and its effect
-        recorded, or it fails and is proposed again under a new id. Declined,
-        with a card, only when no lab job of it was recorded (the restart came
-        before the hook launched it) or its run was taken back once already.
-        Before this, every such item was declined as if its effect showed in
-        the snapshots, which an L16S candidate sync's never does."""
+        recorded, or it fails and is proposed again under a new id. A run a
+        lane already followed to its end (_run_followed: a deterministic id
+        proposed again for the same work, as an L15 with the same classes was
+        before L15 took a new attempt when it finished) is never taken back,
+        or its old result would be read as new: the step runs again under a
+        new id (_renew). Declined, with a card, only when no lab job of it was
+        recorded (the restart came before the hook launched it) or its run was
+        taken back once already. Before this, every such item was declined as
+        if its effect showed in the snapshots, which an L16S candidate sync's
+        never does."""
         st, p = self.st, it["proposal"]
         rec = X._prior_run(self._executions(), p["id"])
         job = self._lab_job_of(rec)
+        if job and self._run_followed(rec):
+            self._renew(ln, p.get("lever") or it["lever"], p, rec,
+                        "refused as already run (%s); that run (lab job %s) was followed to its end, so it is not "
+                        "taken back" % (_short(why, 200), job))
+            lane = st["lanes"][ln]
+            # an L15 is taken out of D29's wait once its date passed: the lane goes back to that wait (no new
+            # wait starts) and the renewed discovery is proposed on the next tick
+            wait = it["lever"] == "L15" and lane.get("until_utc") and (_secs(lane["until_utc"]) or 0) <= self.now
+            self._clear(ln)
+            if wait:
+                lane["phase"] = "WAIT_DATA"
+            return
         if job and (rec.get("run_id") or p["id"]) not in (st.get("adopted_runs") or []):
             return self._adopt_run(ln, it, rec, "refused as already run (%s): its lab job %s is followed"
                                    % (_short(why, 200), job))
@@ -2575,13 +2679,23 @@ class StreamRun(object):
         self._clear(ln)
 
     def _adopt_declined(self, ln, lever, p, did, d):
-        """True when a declined lab proposal's earlier run is taken back into
-        idle lane ln instead of being skipped: an executed run with a recorded
-        lab job, not adopted before. This recovers an item _on_result declined
-        before _recover_lab existed (live: the L16S 22b59a187f1c00415b9c2d70a0858c3f,
+        """True when a declined lab proposal is not skipped: its earlier run
+        (an executed run with a recorded lab job) is taken back into idle lane
+        ln when no lane followed it and it was not adopted before, and the
+        step runs again under a new id (_renew) when a lane followed it to its
+        end (a repeat _on_result declined as already run, e.g. an L15 with the
+        same classes). This recovers an item _on_result declined before
+        _recover_lab existed (live: the L16S 22b59a187f1c00415b9c2d70a0858c3f,
         declined on 2026-10-03 15:36Z) without editing the state."""
         rec = X._prior_run(self._executions(), p["id"])
-        if not self._lab_job_of(rec) or (rec.get("run_id") or p["id"]) in (self.st.get("adopted_runs") or []):
+        if not self._lab_job_of(rec):
+            return False
+        if self._run_followed(rec):
+            self._renew(ln, p.get("lever") or lever, p, rec,
+                        "%s was declined as already run; that run (lab job %s) was followed to its end"
+                        % (p["id"], self._lab_job_of(rec)))
+            return True
+        if (rec.get("run_id") or p["id"]) in (self.st.get("adopted_runs") or []):
             return False
         it = {"proposal": p, "lever": p.get("lever") or lever, "status": "proposed", "since_utc": self.utc,
               "attempt": p.get("attempt", 0), "trigger": did, "diagnoses": [d]}
@@ -3110,6 +3224,10 @@ class StreamRun(object):
             for k in sorted(dk, key=lambda k: dk[k])[:len(dk) - 64]:
                 dk.pop(k, None)
         if lever == "L15":
+            # the next discovery runs under a new id even with the same classes (the executor runs an id once; a
+            # repeat under this one was refused as already run, and once taken back as if this run were new)
+            key, att = step_key(lever, params), st.setdefault("attempts", {})
+            att[key] = max(int(att.get(key) or 0), int(p.get("attempt") or 0)) + 1
             before = set(st["discover"].pop("before", []) or [])
             after = set(c.get("id") for c in self._candidates())
             new = len(after - before)
