@@ -58,8 +58,10 @@ re-scores, and the atomic run.json. What differs from inc/train.py:
     runs trained in (Ultralytics and torch versions, as the record holds
     them); x1b trains a base run only there (E2-S); and at Ultralytics' setup,
     before the first step, every tensor of the model it trains must equal
-    the init's (init_transfer: the init loaded whole). A production run
-    refuses every departure; a testing run records it;
+    the init's (init_transfer: the init loaded whole). E2-C (--e2 C,
+    amendment 2026-10-04, later) starts from E1-A's recorded weights under
+    the same checks, E1's verdict decided and naming E1-A as its arm A. A
+    production run refuses every departure; a testing run records it;
   * CODE_MODULES adds every tools/inc2/*.py module present and
     tools/funnel/leak.py (the dHash variants) with the two funnel modules it
     imports (__init__.py, embed.py);
@@ -454,15 +456,19 @@ def e2_problems(data):
     """How an exp.json with an e2 record fails to be one of E2's
     pre-registered experiments now ([] when it is one): its arm and seed,
     the experiment's name, the arm's recipe, no test among the finals, the
-    init the record names (E1-B's run of the same seed), the reference's
-    manifest; E1's verdict still decided, qualifying and the decision the
-    record holds (by its decision keys: e1_verdict rewrites generated_utc
-    whenever it runs, so the file's sha256 is not compared); E1-B's run
-    still done and recording the weights E2 starts from."""
+    init the record names (E1-B's run of the same seed; for E2-C, arm C,
+    E1-A's), the reference's manifest; E1's verdict still decided, the
+    decision the record holds (by its decision keys: e1_verdict rewrites
+    generated_utc whenever it runs, so the file's sha256 is not compared)
+    and naming the init's experiment (as its qualifying E1-B for W and S, as
+    its arm A, the pre-registered e1_a_m640, for C); that E1 run still done
+    and recording the weights the experiment starts from."""
     e2 = data.get("e2")
-    if not isinstance(e2, dict) or e2.get("arm") not in RC.E2_ARMS:
-        return ["e2.arm %r is not one of %s" % (e2.get("arm") if isinstance(e2, dict) else e2, sorted(RC.E2_ARMS))]
+    if not isinstance(e2, dict) or e2.get("arm") not in RC.E2_BUILD_ARMS:
+        return ["e2.arm %r is not one of %s" % (e2.get("arm") if isinstance(e2, dict) else e2,
+                                                sorted(RC.E2_BUILD_ARMS))]
     letter = e2["arm"]
+    e1x = "E1-%s" % RC.E2_INIT_ARM[letter]
     probs = []
     if data.get("type") != "baseline":
         probs.append("an E2 experiment is a baseline, not a %r one" % (data.get("type"),))
@@ -475,32 +481,38 @@ def e2_problems(data):
     elif data.get("exp") != RC.e2_exp(letter, seed):
         probs.append("experiment %r is not E2-%s seed %d's pre-registered %s" % (data.get("exp"), letter, seed,
                                                                                RC.e2_exp(letter, seed)))
-    if (data.get("recipe_name") or RC.COLD_NAME) != RC.E2_ARMS[letter] \
+    if (data.get("recipe_name") or RC.COLD_NAME) != RC.E2_BUILD_ARMS[letter] \
             or (data.get("base") or {}).get("recipe") != RC.e2_recipe(letter):
-        probs.append("base.recipe is not E2-%s's %s" % (letter, RC.E2_ARMS[letter]))
+        probs.append("base.recipe is not E2-%s's %s" % (letter, RC.E2_BUILD_ARMS[letter]))
     if "test" in (data.get("final_exams") or []):
         probs.append("an E2 experiment's finals never read test (it is read once, after the verdict, by a person)")
     init = e2.get("init") if isinstance(e2.get("init"), dict) else {}
     if not init.get("path") or data.get("init_weights") != init.get("path"):
         probs.append("init_weights %r is not the e2 record's init %r" % (data.get("init_weights"), init.get("path")))
     if _is_int(seed) and init.get("run_id") != RC.E2_INIT_RUN % seed:
-        probs.append("the e2 record's init is E1-B's %r, not %s (seed s starts from E1-B's seed s)"
-                     % (init.get("run_id"), RC.E2_INIT_RUN % seed))
+        probs.append("the e2 record's init is %s's %r, not %s (seed s starts from %s's seed s)"
+                     % (e1x, init.get("run_id"), RC.E2_INIT_RUN % seed, e1x))
     ref = e2.get("reference") if isinstance(e2.get("reference"), dict) else {}
     if (data.get("base") or {}).get("manifest_sha256") != ref.get("manifest_sha256"):
         probs.append("its base manifest is not the reference's (%s)" % str(ref.get("manifest_sha256"))[:12])
     vp = e1_verdict_path()
     v = _read_json(vp)
+    control = letter == RC.E2C_ARM
     if not isinstance(v, dict) or v.get("format") != RC.E2_E1_FORMAT or v.get("status") != "decided" \
-            or v.get("qualifies") is not True:
-        probs.append("%s is not a decided verdict that qualifies E1-B" % vp)
+            or (not control and v.get("qualifies") is not True):
+        probs.append("%s is not a decided verdict%s" % (vp, "" if control else " that qualifies E1-B"))
     else:
         now = {k: v.get(k) for k in RC.E2_E1_DECISION_KEYS}
         was = (e2.get("e1_verdict") or {}).get("decision") if isinstance(e2.get("e1_verdict"), dict) else None
         if now != was:
             probs.append("E1's verdict changed since this experiment was built (%s differ)"
                          % ", ".join(k for k in RC.E2_E1_DECISION_KEYS if (was or {}).get(k) != now.get(k)))
-        if v.get("exp") != init.get("exp"):
+        if control:
+            # E2-C (amendment 2026-10-04, later): E1-A is the verdict's arm A, the pre-registered e1_a_m640
+            if v.get("reference") != init.get("exp") or init.get("exp") != RC.E2C_INIT_EXP:
+                probs.append("E1's verdict names %s as its arm A, the init's experiment is %s (E2-C starts from %s)"
+                             % (v.get("reference"), init.get("exp"), RC.E2C_INIT_EXP))
+        elif v.get("exp") != init.get("exp"):
             probs.append("E1's verdict qualifies %s, not the init's experiment %s" % (v.get("exp"), init.get("exp")))
     ie, ir = init.get("exp"), init.get("run_id")
     if not (isinstance(ie, str) and NAME_RE.fullmatch(ie) and isinstance(ir, str) and NAME_RE.fullmatch(ir)):
@@ -508,8 +520,8 @@ def e2_problems(data):
     else:
         rj = _read_json(C.INC_DIR / ie / "runs" / ir / RUN_JSON)
         if not isinstance(rj, dict) or rj.get("status") != "done" or rj.get("weights_sha256") != init.get("sha256"):
-            probs.append("E1-B's %s/%s no longer records the weights E2 starts from (%s, weights %s; the record %s)"
-                         % (ie, ir, (rj or {}).get("status") if isinstance(rj, dict) else "no run.json",
+            probs.append("%s's %s/%s no longer records the weights E2-%s starts from (%s, weights %s; the record %s)"
+                         % (e1x, ie, ir, letter, (rj or {}).get("status") if isinstance(rj, dict) else "no run.json",
                             str((rj or {}).get("weights_sha256") if isinstance(rj, dict) else None)[:12],
                             str(init.get("sha256"))[:12]))
     return probs
@@ -669,8 +681,8 @@ def init_check(kind, init_path, arm, e2=None, seed=None):
             out.append("init %s hashes to %s, E2 records %s" % (init_path, (sha or "none")[:12],
                                                                str(init.get("sha256"))[:12]))
         if seed is not None and seed != e2.get("seed"):
-            out.append("the run's seed %s is not E2's seed %s (seed s starts from E1-B's seed s)"
-                       % (seed, e2.get("seed")))
+            out.append("the run's seed %s is not E2's seed %s (seed s starts from E1-%s's seed s)"
+                       % (seed, e2.get("seed"), RC.E2_INIT_ARM.get(e2.get("arm"), "B")))
         return out
     out = []
     p = Path(init_path)
@@ -2402,7 +2414,7 @@ def _run(spec, spec_path, out_dir, rec, prev, resume_from, ctx, lock):
                            "one departs from it in %s" % (kind, arm["id"], devs))
         e2 = experiment_e2(spec["exp"])
         if e2 is not None:
-            # E2 (amendment 2026-10-04): the base runs start from E1-B's recorded weights
+            # E2 (amendment 2026-10-04): the base runs start from E1-B's recorded weights (E2-C's from E1-A's)
             e2_init = e2.get("init") if isinstance(e2.get("init"), dict) else {}
             rec["e2"] = {"arm": e2.get("arm"), "seed": e2.get("seed"), "init_exp": e2_init.get("exp"),
                          "init_sha256": e2_init.get("sha256")}
@@ -2410,8 +2422,9 @@ def _run(spec, spec_path, out_dir, rec, prev, resume_from, ctx, lock):
         rec["init_check"] = {"passed": not departs, "departures": departs}
         if departs and testing is None:
             if e2 is not None:
-                raise RunError("recipe", "a production run of an E2 experiment starts from E1-B's recorded weights "
-                                         "(its base runs only): %s" % departs)
+                raise RunError("recipe", "a production run of an E2 experiment starts from E1-%s's recorded weights "
+                                         "(its base runs only): %s"
+                               % (RC.E2_INIT_ARM.get(e2.get("arm"), "B"), departs))
             raise RunError("recipe", "a production %s run starts from its arm's checkpoint (%s): %s"
                            % (kind, arm["id"], departs))
         if e2 is not None:

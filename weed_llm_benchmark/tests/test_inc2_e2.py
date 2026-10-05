@@ -68,6 +68,35 @@ What is pinned:
 - the CLI's refusals and a build through it.
 rescore_native after the _native_one refactor: tests/test_inc2_native.py.
 
+E2-C, the attribution control (docs/CONTINUOUS_LOOP.md, "Amendment
+(2026-10-04, later): E2-C, the attribution control (pre-registered)"). E1-A
+is a fixture as E1-B is (e1_a_m640: E1's arm A, known clean). Pinned:
+- the constants (arm C cold, e2_c_m640_seed0..2, from e1_a_m640; E2's own
+  arms W and S unchanged; the seed text inc2/e2/attribution_se, 1,000
+  resamples) and e2_cost as E2-W's;
+- build --e2 C: E2-W's definition exactly but the init (E1-A's base__s0 by
+  absolute path and run.json sha256), research-only from E1-A, and each
+  refusal (the name, the seeds, the role, the arm, the finals, the reference's
+  recipe, manifest and LOCK v2, E1's verdict missing, pending, naming another
+  arm A or built from another summary, E1-A not arm A, its run not done, its
+  final.pt missing, a symlink or modified) leaving no directory; a decided E1
+  verdict that does not qualify E1-B still builds it;
+- inc2.train in production for E2-C (stops at device), its refusals at stage
+  recipe (x1b, E1-B's or the arm's weights, another seed, E1-A's run.json
+  changed, E1's verdict naming another arm A, another environment), and a
+  real 1-epoch CPU run from E1-A's weights loading whole;
+- the attribution on synthetic native files: D_data and pooled sd, the SE
+  equal to an independent recomputation under its own seed text, each
+  condition alone not crediting, E2-S - E2-C only when E2 chose S (labelled
+  confounded), what is reported beside, pending, every refusal; the record
+  dev only, never rewriting e2_v1.json, kept byte for byte, refused under
+  other parameters;
+- rescore-e2-attr end to end with real CPU passes;
+- e2-test-read --e2 C only after E2-W's read (the choice) was prepared, on a
+  decided attribution under its parameters on that verdict, once; the
+  report beside the headline, never the headline;
+- the CLI.
+
 Run:  python3 tests/test_inc2_e2.py
 """
 import contextlib
@@ -100,6 +129,7 @@ FAILURES = W.FAILURES
 check = W.check
 CPU32 = {"batch": 32, "device": "cpu"}
 E1B = "e1_b_m640"
+E1A = "e1_a_m640"
 REF = RC.E2_REFERENCE_EXP
 
 
@@ -178,14 +208,14 @@ def write_e1_verdict(**over):
     return p
 
 
-def e1b_run(seed, path=None, nc=None):
-    """E1-B's base__s<seed>: its final.pt (a real checkpoint) and a done production run.json under the world's
-    LOCK v2 with a clean guard."""
-    rd = C.INC_DIR / E1B / "runs" / ("base__s%d" % seed)
+def e1b_run(seed, path=None, nc=None, exp=E1B):
+    """E1-B's base__s<seed> (exp E1A: E1-A's): its final.pt (a real checkpoint) and a done production run.json
+    under the world's LOCK v2 with a clean guard."""
+    rd = C.INC_DIR / exp / "runs" / ("base__s%d" % seed)
     w = rd / "weights" / "final.pt"
     if w.exists() or w.is_symlink():
         w.unlink()
-    named_checkpoint(w, seed=50 + seed, nc=nc)
+    named_checkpoint(w, seed=(50 if exp == E1B else 60) + seed, nc=nc)
     lock, idx = lock_shas()
     (rd / "run.json").write_text(json.dumps({
         "status": "done", "testing": False, "weights_sha256": W.sha(w), "weights_epoch": 39,
@@ -193,19 +223,24 @@ def e1b_run(seed, path=None, nc=None):
     return w
 
 
-def make_e1b(flag=True):
-    root = C.INC_DIR / E1B
+def make_e1b(flag=True, exp=E1B, arm="B"):
+    """E1-B (exp E1A, arm A: E1-A, base_v2 as one class, known clean) as E1's arm on m640 with cold_budget."""
+    root = C.INC_DIR / exp
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True)
-    defn = {"exp": E1B, "type": "baseline", "role": "baseline", "seeds": [0, 1, 2], "testing": False,
+    defn = {"exp": exp, "type": "baseline", "role": "baseline", "seeds": [0, 1, 2], "testing": False,
             "final_exams": ["dev", "imageweeds"], "recipe_name": RC.BUDGET_NAME, "base": {"n_images": 300},
-            "e1": {"arm": "B", "summary_sha256": "5" * 64}, "research_only": {"flag": flag, "basis": "rows of "
-                                                                              "unknown licence"}}
+            "e1": {"arm": arm, "summary_sha256": "5" * 64},
+            "research_only": {"flag": flag, "basis": "rows of unknown licence" if flag else "base_v2's rows"}}
     defn.update(RC.stamp(RC.resolve_arm("m640", require_weights=False)))
     (root / "exp.json").write_text(json.dumps(defn))
     for s in (0, 1, 2):
-        e1b_run(s)
+        e1b_run(s, exp=exp)
+
+
+def make_e1a():
+    make_e1b(flag=False, exp=E1A, arm="A")
 
 
 def make_reference():
@@ -225,6 +260,7 @@ def make_reference():
 
 def setup_world():
     make_e1b()
+    make_e1a()
     write_e1_verdict()
     make_reference()
 
@@ -640,7 +676,8 @@ def _e2_exp_doc(exp, letter, seed, init_sha="1" * 64, ref_man=REF_MAN, decision=
     d = {"exp": exp, "type": "baseline", "role": "baseline", "seeds": [seed], "final_exams": ["dev", "imageweeds"],
          "testing": testing, "base": {"manifest_sha256": ref_man},
          "e2": {"arm": letter, "seed": seed,
-                "init": {"exp": E1B, "run_id": "base__s%d" % seed, "sha256": init_sha},
+                "init": {"exp": E1A if letter == RC.E2C_ARM else E1B, "run_id": "base__s%d" % seed,
+                         "sha256": init_sha},
                 "e1_verdict": {"decision": decision or {k: E1_DECISION.get(k) for k in RC.E2_E1_DECISION_KEYS}},
                 "reference": {"manifest_sha256": ref_man, "training_env": local_env()}}}
     d.update(RC.stamp(RC.resolve_arm("m640", require_weights=False)))
@@ -883,7 +920,7 @@ def real_e2(exp, letter, seed, wseed, done=True, testing=CPU32):
     rd = N.make_final(exp, seed, wseed, protocol=True, done=done)
     w = root / "runs" / ("base__s%d" % seed) / "weights" / "final.pt"
     (root / "runs" / ("base__s%d" % seed) / "run.json").write_text(json.dumps(dict({
-        "status": "done", "init_sha256": "1" * 64, "recipe_name": RC.E2_ARMS[letter], "weights_sha256": W.sha(w),
+        "status": "done", "init_sha256": "1" * 64, "recipe_name": RC.E2_BUILD_ARMS[letter], "weights_sha256": W.sha(w),
         "testing": True}, **local_env())))
     return rd
 
@@ -936,6 +973,7 @@ def test_rescore():
     nat = json.loads((C.INC_DIR / "e2r_w0" / "runs" / "final__base__s0" / "scores" / "dev@640.json").read_text())
     check("each native file reproduced the run's protocol dev score (vs_protocol_score compared)",
           (nat.get("vs_protocol_score") or {}).get("compared") is True, nat.get("vs_protocol_score"))
+    return exps, ref, out
 
 
 # ------------------------------------------------------------------ 12, 13: the test read
@@ -1138,6 +1176,607 @@ def test_test_read():
           and E.allowed("capacity/e2_v1.json") and E.allowed("capacity/e2_rescore.json"))
 
 
+# ------------------------------------------------------------------ 15-20: E2-C, the attribution control
+def test_c_constants():
+    print("E2-C's constants (amendment 2026-10-04, later)")
+    check("arm C: E2-W's cold recipe, experiments e2_c_m640_seed0..2, from the pre-registered e1_a_m640 (E1's arm A); "
+          "E2's own arms unchanged (W, S: the only arms its verdict reads), e2_exps W and S only",
+          RC.E2_BUILD_ARMS == {"W": "cold", "S": "x1b", "C": "cold"} and RC.E2_ARMS == {"W": "cold", "S": "x1b"}
+          and [RC.e2_exp("C", s) for s in (0, 1, 2)] == ["e2_c_m640_seed0", "e2_c_m640_seed1", "e2_c_m640_seed2"]
+          and RC.e2_recipe("C") == RC.e2_recipe("W") == RC.cold("m640") and RC.E2C_INIT_EXP == E1A
+          and RC.E2_INIT_ARM == {"W": "B", "S": "B", "C": "A"} and sorted(B.e2_exps()) == ["S", "W"]
+          and refused(RC.e2_exp, "C", 3) is not None)
+    check("the attribution's bootstrap: E2's (native_bootstrap) under its own seed text inc2/e2/attribution_se, "
+          "1,000 resamples; the record capacity/e2_attr_v1.json beside e2_v1.json",
+          B.E2_ATTR_SEED_TEXT == "inc2/e2/attribution_se" and B.E2_ATTR_RESAMPLES == 1000
+          and B.E2_ATTR_NAME == "e2_attr_v1" and B.E2_ATTR_SEED_TEXT != B.E2_SEED_TEXT)
+    cw = RC.e2_cost(6811, "W", [0], ["dev", "imageweeds"])
+    cc = RC.e2_cost(6811, "C", [0], ["dev", "imageweeds"])
+    check("e2_cost: an E2-C experiment is priced as an E2-W one (681,100 image-epochs, cold)",
+          cc == cw, (cc, cw))
+
+
+def test_c_build():
+    print("inc2.baseline build --e2 C: every check of E2-W's build, E1-A in place of E1-B")
+    c0 = RC.e2_exp("C", 0)
+    root = C.INC_DIR / c0
+    cases = []
+
+    def refuse(what, frag=None, exp=c0, seed=0, **kw):
+        e = refused(e2_build, kw.pop("letter", "C"), seed, exp=exp, **kw)
+        ok = e is not None and (frag is None or frag in str(e)) and not (C.INC_DIR / exp).exists()
+        cases.append((what, ok, str(e)[:240]))
+        drop(exp)
+    refuse("a wrong experiment name", exp="e2_c_m640_s0", frag="pre-registered")
+    refuse("E2-W's experiment name under --e2 C", exp=RC.e2_exp("W", 2), seed=2, frag="pre-registered")
+    refuse("seeds 0,1", seeds="0,1", frag="one seed")
+    refuse("role capacity", role="capacity", frag="role baseline")
+    refuse("--arm s640", arm="s640", frag="m640 only")
+    refuse("dev only", final_exams=["dev"], frag="E2's finals")
+    rp = C.INC_DIR / REF / "exp.json"
+    with saved(rp):
+        x = json.loads(rp.read_text())
+        x["base"]["recipe"]["epochs"] = 99
+        rp.write_text(json.dumps(x))
+        refuse("b_v2_m640's recipe changed (epochs 99): C, cold key for key as W, refused", frag="key for key")
+    with saved(rp):
+        x = json.loads(rp.read_text())
+        x["base"]["manifest_sha256"] = "0" * 64
+        rp.write_text(json.dumps(x))
+        refuse("b_v2_m640 built on another manifest", frag="base.manifest_sha256")
+    with saved(rp):
+        x = json.loads(rp.read_text())
+        x["splits_v2"]["lock_sha256"] = "0" * 64
+        rp.write_text(json.dumps(x))
+        refuse("b_v2_m640 built under another LOCK v2", frag="splits_v2.lock_sha256")
+    vp = T.e1_verdict_path()
+    with saved(vp):
+        vp.unlink()
+        refuse("e1_v1.json missing", frag="not a decided E1 verdict")
+        write_e1_verdict(status="pending")
+        refuse("e1_v1.json pending", frag="not a decided E1 verdict")
+        write_e1_verdict(reference="e1_a_other")
+        refuse("E1's verdict naming another arm A than e1_a_m640", frag="as its arm A")
+        write_e1_verdict(summary_sha256="6" * 64)
+        refuse("E1-A built from another splits v3 summary than E1's verdict was decided on", frag="splits v3 summary")
+    ap_ = C.INC_DIR / E1A / "exp.json"
+    with saved(ap_):
+        x = json.loads(ap_.read_text())
+        x["e1"]["arm"] = "B"
+        ap_.write_text(json.dumps(x))
+        refuse("E1-A's exp.json says arm B", frag="is not E1's arm A")
+    rj = C.INC_DIR / E1A / "runs" / "base__s0" / "run.json"
+    w0 = C.INC_DIR / E1A / "runs" / "base__s0" / "weights" / "final.pt"
+    with saved(rj):
+        rj.write_text(json.dumps(dict(json.loads(rj.read_text()), status="running")))
+        refuse("E1-A's base__s0 not done", frag="is not done")
+    with saved(w0):
+        w0.unlink()
+        refuse("its final.pt missing", frag="is missing")
+    with saved(w0):
+        w0.unlink()
+        os.symlink(str(C.INC_DIR / E1A / "runs" / "base__s1" / "weights" / "final.pt"), str(w0))
+        refuse("its final.pt a symlink", frag="symlink")
+    with saved(w0):
+        w0.write_bytes(w0.read_bytes() + b"x")
+        refuse("its final.pt modified", frag="its run.json records")
+    bad = [(w, d) for w, ok, d in cases if not ok]
+    check("each refusal names its reason and leaves no directory of the experiment (%d cases)" % len(cases), not bad,
+          bad)
+    with saved(vp):
+        write_e1_verdict(qualifies=False)
+        e = refused(e2_build, "C", 0)
+        built = (root / "exp.json").is_file()
+        drop(c0)
+    check("E1's verdict decided but not qualifying E1-B: E2-C's build needs a decided verdict naming E1-A only "
+          "(the platform proposes it only under E2's gate)", e is None and built, e)
+
+    print("inc2.baseline build --e2 C: success")
+    summ, _defn, _res = e2_build("C", 0)
+    d0 = json.loads((root / "exp.json").read_text())
+    e2 = d0["e2"]
+    rj0 = json.loads(rj.read_text())
+    check("E2-C seed 0: init_weights is the absolute path of E1-A's base__s0 final.pt, hashing as its run.json records",
+          d0["init_weights"] == str(w0.resolve()) == e2["init"]["path"] and e2["init"]["exp"] == E1A
+          and e2["init"]["sha256"] == rj0["weights_sha256"] == W.sha(w0) and e2["init"]["run_id"] == "base__s0"
+          and e2["arm"] == "C" and e2["seed"] == 0, e2.get("init"))
+    w_ = RC.e2_exp("W", 0)
+    dw = json.loads((C.INC_DIR / w_ / "exp.json").read_text())
+    same = {k: (d0.get(k), dw.get(k)) for k in ("type", "role", "seeds", "final_exams", "arm", "decision_exam",
+                                                 "splits_v2", "protocol", "protocol_package", "splits_version",
+                                                 "recipe_name") if d0.get(k) != dw.get(k)}
+    check("E2-W's definition exactly but the init: the same manifest, recipe (cold, no recipe_name), finals, arm, "
+          "LOCK v2 and stamps as E2-W seed 0; the e2 record compares the reference's recipe and differs from it in "
+          "init_weights only; pre-registered by E2-C's amendment",
+          not same and d0["base"]["recipe"] == dw["base"]["recipe"] == RC.cold("m640")
+          and d0["base"]["manifest_sha256"] == dw["base"]["manifest_sha256"] and "recipe_name" not in d0
+          and e2["differs_from_reference"] == ["init_weights"] and "base.recipe" in e2["compared"]
+          and e2["reference"] == dw["e2"]["reference"] and e2["e1_verdict"]["decision"] == dw["e2"]["e1_verdict"][
+              "decision"] and e2["decided_by"] == RC.E2C_DECIDED_BY and e2["recipe_name"] == "cold"
+          and d0["init_weights"] != dw["init_weights"] and summ["e2"] == e2, same)
+    check("research_only: base_v2's flag OR E1-A's (known clean here), recorded as E1-A's",
+          d0["research_only"]["init_research_only"]["exp"] == E1A
+          and d0["research_only"]["init_research_only"]["flag"] is False and "E1-A" in d0["research_only"]["note"],
+          d0["research_only"])
+    sp = json.loads((root / "runs" / "base__s0" / "spec.json").read_text())
+    check("the pinned driver's base__s0 spec starts from E1-A's base__s0 with seed 0",
+          sp["init"] == str(w0.resolve()) and sp["recipe"]["seed"] == 0 and sp["kind"] == "base", sp)
+    check("inc2.train's e2_problems accepts it as written (E1's verdict naming E1-A, its run recording the weights)",
+          T.e2_problems(d0) == [], T.e2_problems(d0))
+    x = json.loads(json.dumps(d0))
+    x["e2"]["init"]["exp"] = E1B
+    check("  and refuses an E2-C record whose init is E1-B's", any("arm A" in p_ for p_ in T.e2_problems(x)),
+          T.e2_problems(x))
+
+
+def test_c_train():
+    print("inc2.train in production: E2-C's base runs (E1-A's init)")
+    import torch
+    c0 = RC.e2_exp("C", 0)
+    dc = _prod(c0)
+    init = dc["init_weights"]
+    man = dc["base"]["manifest"]
+
+    def go(exp, run_id, recipe, kind="base", init_=None, **kw):
+        if kind != "final":
+            kw.update(train_manifest=man, recipe=recipe)
+        p = W.spec(run_id, kind, exp=exp, init=init_ or init, **kw)
+        rc = W.run(p)
+        return rc, W.run_json(p)
+    if torch.cuda.is_available():
+        print("  NOTE a CUDA device is present; the production device stage is not exercised")
+    else:
+        rc, rj = go(c0, "base__s0", dict(RC.e2_recipe("C"), seed=0))
+        check("E2-C base__s0 from E1-A's recorded weights passes stage recipe (recipe cold) and stops at device; the "
+              "init check and the environment check passed",
+              rc == 1 and rj.get("stage") == "device" and rj.get("recipe_name") == "cold"
+              and (rj.get("init_check") or {}).get("passed") is True and rj.get("e2", {}).get("arm") == "C"
+              and rj["e2"].get("init_exp") == E1A and rj["e2"].get("init_sha256") == dc["e2"]["init"]["sha256"]
+              and (rj.get("training_env_check") or {}).get("passed") is True,
+              (rj.get("stage"), (rj.get("error") or "")[-400:]))
+        out = {}
+        out["E2-C with x1b"] = go(c0, "base__s0", dict(RC.e2_recipe("S"), seed=0))
+        out["E1-B's weights as init"] = go(c0, "base__s0", dict(RC.e2_recipe("C"), seed=0),
+                                           init_=str(C.INC_DIR / E1B / "runs" / "base__s0" / "weights" / "final.pt"))
+        out["the arm's checkpoint as init"] = go(c0, "base__s0", dict(RC.e2_recipe("C"), seed=0), init_="yolo11m.pt")
+        out["spec seed 1 under e2 seed 0"] = go(c0, "base__s0", dict(RC.e2_recipe("C"), seed=1))
+        rjp = C.INC_DIR / E1A / "runs" / "base__s0" / "run.json"
+        with saved(rjp):
+            rjp.write_text(json.dumps(dict(json.loads(rjp.read_text()), weights_sha256="1" * 64)))
+            out["E1-A's run.json records other weights"] = go(c0, "base__s0", dict(RC.e2_recipe("C"), seed=0))
+        vp = T.e1_verdict_path()
+        with saved(vp):
+            write_e1_verdict(reference="e1_a_other")
+            out["E1's verdict naming another arm A"] = go(c0, "base__s0", dict(RC.e2_recipe("C"), seed=0))
+        ep = C.INC_DIR / c0 / "exp.json"
+        with saved(ep):
+            x = json.loads(ep.read_text())
+            x["e2"]["reference"]["training_env"]["ultralytics_version"] = "0.0.1"
+            ep.write_text(json.dumps(x))
+            out["another training environment than the reference's"] = go(c0, "base__s0",
+                                                                           dict(RC.e2_recipe("C"), seed=0))
+        bad = {k: (rj_.get("stage"), (rj_.get("error") or "")[-200:]) for k, (rc_, rj_) in out.items()
+               if not (rc_ == 1 and rj_.get("stage") == "recipe")}
+        check("refused at stage recipe: %s" % ", ".join(out), not bad, bad)
+        check("  the arm's checkpoint as init names E1-A's recorded weights",
+              "E1-A's recorded weights" in (out["the arm's checkpoint as init"][1].get("error") or ""),
+              (out["the arm's checkpoint as init"][1].get("error") or "")[-300:])
+    for p in (C.INC_DIR / c0 / "runs").glob("*/run.json"):
+        p.unlink()
+    x = json.loads((C.INC_DIR / c0 / "exp.json").read_text())
+    x["testing"] = W.TESTING
+    (C.INC_DIR / c0 / "exp.json").write_text(json.dumps(x))
+
+    print("the whole load on a real CPU run (1 epoch from E1-A's weights, test mode)")
+    t0 = time.time()
+    sp = W.spec("base__s0", "base", exp=c0, init=init, train_manifest=man, recipe=W.recipe(seed=0))
+    rc = W.run(sp)
+    rj = W.run_json(sp)
+    it = rj.get("init_transfer") or {}
+    check("E2-C's run is done (%.0fs); init_transfer: every tensor of the trained model equal to E1-A's at setup, the "
+          "init and environment checks passed" % (time.time() - t0),
+          rc == 0 and rj.get("status") == "done" and it.get("whole") is True and it.get("equal") == it.get("tensors") > 0
+          and (rj.get("init_check") or {}).get("passed") is True
+          and (rj.get("training_env_check") or {}).get("passed") is True and rj.get("e2", {}).get("arm") == "C",
+          (rc, rj.get("stage"), (rj.get("error") or "")[-600:], it))
+
+
+def attr_world(tag, wv, sv, cv, carr=None, skip_c=(), c_over=None, **kw):
+    """rule_world's six E2 experiments and reference, and E2-C's three (from E1-A, init sha '2' * 64)."""
+    ex = rule_world(tag, wv, sv, **kw)
+    ref = N.synth_arrays(seed=1)
+    ex["C"] = []
+    for s in (0, 1, 2):
+        e = "%s_c%d" % (tag, s)
+        (C.INC_DIR / e).mkdir(parents=True)
+        (C.INC_DIR / e / "exp.json").write_text(json.dumps(_e2_exp_doc(e, "C", s, init_sha="2" * 64)))
+        fake_run_files(e, s, cv[s], (carr or [ref] * 3)[s], "c%d" % s * 32, recipe_name="cold", init_sha="2" * 64,
+                       skip=s in skip_c, **dict((c_over or {}).get(s) or {}))
+        ex["C"].append(e)
+    return ex
+
+
+def e2_decided(ex, out, resamples=20, preregistered=True):
+    """E2's verdict on the world's files (e2_verdict), in out/e2_v1.json; preregistered: its bootstrap record set to
+    the pre-registered 1,000 resamples (the attribution reads only the choice and the inputs, and refuses a verdict
+    decided under other parameters)."""
+    shutil.rmtree(str(out), ignore_errors=True)
+    B.e2_verdict(ex, reference=RULE_REF, out_dir=out, resamples=resamples)
+    vp = out / "e2_v1.json"
+    if preregistered:
+        x = json.loads(vp.read_text())
+        x["bootstrap"]["resamples"] = B.E2_RESAMPLES
+        vp.write_text(json.dumps(x))
+    return vp
+
+
+WV, SV, CV = [0.861, 0.862, 0.860], [0.851, 0.852, 0.850], [0.855, 0.856, 0.854]
+
+
+def test_attr_rule():
+    print("E2-C's attribution rule on synthetic native files")
+    out = C.INC_DIR / "cap_attr"
+    ex = attr_world("e2a", WV, SV, CV)
+    vp = e2_decided(ex, out)
+    v0 = W.sha(vp)
+    d = B.e2_attr_decision(ex, reference=RULE_REF, verdict_path=vp, resamples=20)
+    a = d["data"]
+    sw, sc = statistics.stdev(WV), statistics.stdev(CV)
+    check("E2 chose W; D_data = mean(E2-W) - mean(E2-C) = %.4f > 2 pooled sd %.4f and > SE %s: credited to base v3's "
+          "data; no E2-S - E2-C (E2 did not choose S)" % (a["diff"], a["two_pooled_sd"], a["se_diff"]),
+          d["status"] == "decided" and abs(a["diff"] - 0.006) < 1e-9 and d["credited_to_data"] is True
+          and a["conditions"] == {"above_2_pooled_sd": True, "above_se": True}
+          and abs(a["pooled_sd"] - math.sqrt((sw ** 2 + sc ** 2) / 2.0)) < 1e-12 and a["comparison"] == "E2-W - E2-C"
+          and d["chosen_vs_control"] is None and d["e2_verdict"]["chosen"] == "W" and sorted(d["arms"]) == ["C", "W"]
+          and d["e2_verdict"]["sha256"] == v0 and W.sha(vp) == v0, (a.get("conditions"), d.get("e2_verdict")))
+    r = d["reported"]
+    check("reported beside, not deciding: E2-C - b_v2_m640 (here the rule's reference) %.4f with its SE, E2-C's dev "
+          "agnostic, Carpetweed / SpottedSpurge / Purslane (E2-C's mean, W - C and C - reference with their SE)"
+          % r["control_vs_reference"]["diff"],
+          abs(r["control_vs_reference"]["diff"] - (statistics.fmean(CV) - 0.850)) < 1e-9
+          and r["control_vs_reference"]["se_diff"] is not None and r["control"]["agnostic"]["n"] == 3
+          and sorted(r["control"]["species"]) == sorted(B.E2_REPORTED_SPECIES)
+          and all(x["mean"] is not None and x["w_minus_c_se"] is not None and x["c_minus_reference_se"] is not None
+                  for x in r["control"]["species"].values()), r)
+    arrs = [N.synth_arrays(seed=10 + i) for i in range(3)]
+    carrs = [N.synth_arrays(seed=20 + i) for i in range(3)]
+    exb = attr_world("e2a", WV, SV, CV, warr=arrs, carr=carrs)
+    vpb = e2_decided(exb, out)
+    db = B.e2_attr_decision(exb, reference=RULE_REF, verdict_path=vpb, resamples=30)
+    ind = N.independent_se(arrs, carrs, 30, "inc2/e2/attribution_se")
+    nat = B.native_bootstrap(arrs, carrs, resamples=30, seed_text=B.E2_SEED_TEXT)
+    check("SE(D_data) is E2's paired image bootstrap under inc2/e2/attribution_se (%.6f, independent %.6f), another "
+          "draw than E2's species_se" % (db["data"]["se_diff"], ind),
+          abs(db["data"]["se_diff"] - ind) < 1e-9 and nat["se"] != db["data"]["se_diff"]
+          and db["bootstrap"]["seed_text"] == "inc2/e2/attribution_se", (db["data"]["se_diff"], ind, nat["se"]))
+    old = B.native_bootstrap
+    B.native_bootstrap = lambda *x, **k: {"se": 1.0, "n_valid": 20, "per_species": {}}
+    try:
+        d2 = B.e2_attr_decision(ex, reference=RULE_REF, verdict_path=vp, resamples=20)
+    finally:
+        B.native_bootstrap = old
+    check("only D_data > 2 pooled sd (SE 1.0): not credited; read as a property of one-class pre-training",
+          d2["data"]["conditions"] == {"above_2_pooled_sd": True, "above_se": False} and d2["credited_to_data"] is False
+          and "one-class pre-training" in d2["reading"], d2["data"]["conditions"])
+    ex3 = attr_world("e2a", WV, SV, [0.840, 0.870, 0.855])
+    vp3 = e2_decided(ex3, out)
+    d3 = B.e2_attr_decision(ex3, reference=RULE_REF, verdict_path=vp3, resamples=20)
+    check("only D_data > SE (E2-C's seed sd large: D %.4f under 2 pooled sd %.4f): not credited"
+          % (d3["data"]["diff"], d3["data"]["two_pooled_sd"]),
+          d3["data"]["conditions"] == {"above_2_pooled_sd": False, "above_se": True} and d3["credited_to_data"] is False,
+          d3["data"]["conditions"])
+    ex4 = attr_world("e2a", WV, [0.871, 0.872, 0.870], CV)
+    vp4 = e2_decided(ex4, out)
+    v4 = json.loads(vp4.read_text())
+    d4 = B.e2_attr_decision(ex4, reference=RULE_REF, verdict_path=vp4, resamples=20)
+    c4 = d4["chosen_vs_control"] or {}
+    check("E2 chose S: D_data still E2-W - E2-C (%.4f, credited %s), and E2-S - E2-C (%.4f) computed the same way, "
+          "labelled confounded by the recipe; the attribution never makes C qualify or chosen"
+          % (d4["data"]["diff"], d4["credited_to_data"], c4.get("diff") or -1),
+          v4["chosen"] == "S" and abs(d4["data"]["diff"] - 0.006) < 1e-9 and c4.get("diff") is not None
+          and abs(c4["diff"] - 0.016) < 1e-9 and "recipe" in (c4.get("confounded_by") or "")
+          and c4.get("comparison") == "E2-S - E2-C"
+          and sorted(d4["arms"]) == ["C", "S", "W"] and "C" not in (v4["qualifying"] or [])
+          and json.loads(vp4.read_text()) == v4, c4)
+    # pending
+    pend = {}
+    shutil.rmtree(str(out), ignore_errors=True)
+    pend["E2's verdict missing"] = B.e2_attr_decision(ex, reference=RULE_REF, verdict_path=out / "e2_v1.json",
+                                                      resamples=10)
+    exp_ = attr_world("e2a", WV, SV, CV, skip_c=(2,))
+    vpp = e2_decided(exp_, out)
+    pend["one E2-C native file missing"] = B.e2_attr_decision(exp_, reference=RULE_REF, verdict_path=vpp, resamples=10)
+    os.remove(str(C.INC_DIR / "e2a_c1" / "exp.json"))
+    pend["E2-C seed 1 not built"] = B.e2_attr_decision(exp_, reference=RULE_REF, verdict_path=vpp, resamples=10)
+    check("pending (no decision, nothing credited): %s" % ", ".join(pend),
+          all(x["status"] == "pending" and x.get("credited_to_data") is None and x["pending"] for x in pend.values())
+          and "e2a_c2/final__base__s2" in pend["one E2-C native file missing"]["pending"][0]
+          and "not built" in pend["E2-C seed 1 not built"]["pending"][0], {k: x["pending"] for k, x in pend.items()})
+    # refusals
+    cases = {}
+
+    def refuse(name, frag, setup=None, prereg=True, **kw):
+        exr = attr_world("e2a", WV, SV, CV, **kw)
+        vpr = e2_decided(exr, out, preregistered=prereg)
+        if setup:
+            setup(exr)
+        e = refused(B.e2_attr_decision, exr, reference=RULE_REF, verdict_path=vpr, resamples=10)
+        cases[name] = (e is not None and frag in str(e), str(e)[:220])
+
+    def edit(path, fn):
+        x = json.loads(path.read_text())
+        fn(x)
+        path.write_text(json.dumps(x))
+
+    def nat(exp, s):
+        return C.INC_DIR / exp / "runs" / ("final__base__s%d" % s) / "scores" / "dev@640.json"
+    refuse("E2's verdict decided under other parameters (20 resamples)", "pre-registered parameters", prereg=False)
+    refuse("an E2-W native file changed after E2's verdict read it", "not the ones E2's verdict",
+           setup=lambda exr: edit(nat("e2a_w1", 1), lambda x: x.update(species_map50_95=0.8615)))
+    refuse("an E2-C stamp mismatch (Ultralytics' version)", "ultralytics_version", c_over={1: {"ultra": "8.4.38"}})
+    refuse("a test-mode E2-C file in production", "test-mode", c_over={0: {"production": False}})
+    refuse("an E2-C file not checked against its protocol score", "protocol score", c_over={2: {"compared": False}})
+    refuse("an E2-C base run that did not start from the recorded init", "recorded init",
+           setup=lambda exr: edit(C.INC_DIR / "e2a_c0" / "runs" / "base__s0" / "run.json",
+                                  lambda x: x.update(init_sha256="7" * 64)))
+    refuse("an E2-C native score naming other weights than its base run's", "names weights",
+           setup=lambda exr: edit(nat("e2a_c2", 2), lambda x: x.update(weights_sha256="9" * 64)))
+    refuse("E2-C's three built from another E1 verdict than E2-W's", "different E1 verdicts",
+           setup=lambda exr: [edit(C.INC_DIR / e / "exp.json", lambda x: x["e2"]["e1_verdict"]["decision"].update(
+               diff=0.03)) for e in exr["C"]])
+    refuse("one E2-C experiment from another E1 record", "different E1 records",
+           setup=lambda exr: edit(C.INC_DIR / "e2a_c1" / "exp.json",
+                                  lambda x: x["e2"]["e1_verdict"]["decision"].update(diff=0.03)))
+    refuse("E2-C started from E1-B", "not the E1-A",
+           setup=lambda exr: [edit(C.INC_DIR / e / "exp.json", lambda x: x["e2"]["init"].update(exp=E1B))
+                              for e in exr["C"]])
+    refuse("E2-C built against another reference manifest", "another manifest",
+           setup=lambda exr: edit(C.INC_DIR / "e2a_c1" / "exp.json",
+                                  lambda x: x["e2"]["reference"].update(manifest_sha256="0" * 64)))
+    exr = attr_world("e2a", WV, SV, CV)
+    vpr = e2_decided(exr, out)
+    e = refused(B.e2_attr_decision, dict(exr, C=[exr["C"][0], exr["C"][0], exr["C"][1]]), reference=RULE_REF,
+                verdict_path=vpr, resamples=10)
+    cases["two E2-C experiments of one seed"] = (e is not None and "two experiments" in str(e), str(e)[:200])
+    bad = {k: v[1] for k, v in cases.items() if not v[0]}
+    check("refused: %s" % "; ".join(cases), not bad, bad)
+
+
+def test_attr_file():
+    print("e2_attr_verdict: capacity/e2_attr_v1.json, dev only, kept byte for byte once decided")
+    out = C.INC_DIR / "cap_attr_file"
+    ex = attr_world("e2f", WV, SV, CV)
+    vp = e2_decided(ex, out)
+    v0 = W.sha(vp)
+    d = B.e2_attr_verdict(ex, reference=RULE_REF, out_dir=out, resamples=20)
+    ap = out / "e2_attr_v1.json"
+    doc = json.loads(ap.read_text())
+    vals = list(N.walk_values(doc))
+    check("written beside e2_v1.json (never rewriting it): dev only (no imageweeds or test key or value, no score "
+          "path; the autopilot's scrub drops nothing), the rule and the bootstrap recorded, E2's verdict named by "
+          "sha256; the report for people",
+          d["status"] == "decided" and W.sha(vp) == v0 and not BP.dev_leaks(doc) and not E.scrub(doc)[1]
+          and not E.leaks(doc) and not [x for x in vals if x in ("test", "imageweeds")]
+          and doc["rule"] == B.E2_ATTR_RULE and doc["bootstrap"]["seed_text"] == "inc2/e2/attribution_se"
+          and doc["e2_verdict"]["sha256"] == v0 and "out" not in doc and (out / "e2_attr_v1_report.md").is_file()
+          and E.allowed("capacity/e2_attr_v1.json") and E.allowed("capacity/e2_attr_rescore.json")
+          and not E.allowed("capacity/e2_attr_v1_report.md") and not E.allowed("capacity/e2_test_C.json"),
+          (BP.dev_leaks(doc), E.scrub(doc)[1]))
+    a0 = W.sha(ap)
+
+    def again(**kw):
+        try:
+            return B.e2_attr_verdict(ex, reference=RULE_REF, out_dir=out, **dict({"resamples": 20}, **kw)), None
+        except B.BaselineError as e:
+            return {}, e
+    d2, err = again()
+    check("a second e2_attr_verdict keeps it byte for byte", err is None and d2.get("kept") is True and W.sha(ap) == a0,
+          err)
+    for name, kw in (("with 10 resamples", {"resamples": 10}), ("admitting test-mode files", {"testing_ok": True})):
+        _d, e = again(**kw)
+        check("a recomputation %s refuses (the parameters are part of the decision), the file unchanged" % name,
+              e is not None and "never rewritten" in str(e) and W.sha(ap) == a0, e)
+    p = C.INC_DIR / "e2f_c1" / "runs" / "final__base__s1" / "scores" / "dev@640.json"
+    x = json.loads(p.read_text())
+    x["species_map50_95"] = 0.80
+    p.write_text(json.dumps(x))
+    _d, e = again()
+    check("a recomputation whose decision differs (an E2-C score changed) refuses, the file unchanged, e2_v1.json "
+          "unchanged", e is not None and "never rewritten" in str(e) and W.sha(ap) == a0 and W.sha(vp) == v0, e)
+    out2 = C.INC_DIR / "cap_attr_pend"
+    full = attr_world("e2f", WV, SV, CV)
+    vpf = e2_decided(full, out2)
+    c0j = C.INC_DIR / "e2f_c0" / "exp.json"
+    with saved(c0j):
+        c0j.unlink()
+        B.e2_attr_verdict(full, reference=RULE_REF, out_dir=out2, resamples=10)
+        s1 = json.loads((out2 / "e2_attr_v1.json").read_text())["status"]
+    B.e2_attr_verdict(full, reference=RULE_REF, out_dir=out2, resamples=10)
+    s2 = json.loads((out2 / "e2_attr_v1.json").read_text())["status"]
+    check("a pending file (E2-C seed 0 not built) is overwritten by a decided one", (s1, s2) == ("pending", "decided")
+          and vpf.is_file(), (s1, s2))
+
+
+def test_attr_rescore(exps, ref, out):
+    print("rescore-e2-attr end to end (real CPU passes, test mode)")
+    for s in (0, 1, 2):
+        e = "e2r_c%d" % s
+        real_e2(e, "C", s, 100 + s)
+        exps.setdefault("C", []).append(e)
+    vp = out / "e2_v1.json"
+    x = json.loads(vp.read_text())
+    x["bootstrap"]["resamples"] = B.E2_RESAMPLES       # as if decided under the pre-registered parameters
+    vp.write_text(json.dumps(x))
+    v0 = W.sha(vp)
+    fresh = C.INC_DIR / "cap_attr_none"
+    shutil.rmtree(str(fresh), ignore_errors=True)
+    e = refused(B.rescore_e2_attr, exps, reference=ref, out_dir=fresh, resamples=20)
+    written = [str(p) for p in C.INC_DIR.glob("e2r_c*/runs/*/scores/*@640.json")]
+    check("without E2's decided verdict: refused before anything is scored", e is not None
+          and "not a decided E2 verdict" in str(e) and not written and not fresh.exists(), (e, written))
+    with saved(vp):
+        x = json.loads(vp.read_text())
+        x["bootstrap"]["resamples"] = 200
+        vp.write_text(json.dumps(x))
+        e = refused(B.rescore_e2_attr, exps, reference=ref, out_dir=out, resamples=20)
+        written = [str(p) for p in C.INC_DIR.glob("e2r_c*/runs/*/scores/*@640.json")]
+    check("E2's verdict decided under other parameters (200 resamples): refused before anything is scored",
+          e is not None and "pre-registered parameters" in str(e) and not written
+          and not (out / "e2_attr_v1.json").exists(), (e, written))
+    fj = C.INC_DIR / "e2r_c2" / "runs" / "final__base__s2" / "run.json"
+    with saved(fj):
+        fj.write_text(json.dumps(dict(json.loads(fj.read_text()), status="running")))
+        e = refused(B.rescore_e2_attr, exps, reference=ref, out_dir=out, resamples=20)
+        written = [str(p) for p in C.INC_DIR.glob("e2r_c*/runs/*/scores/*@640.json")]
+    check("an undone E2-C final run refuses before anything is written",
+          e is not None and "not done" in str(e) and not written and not (out / "e2_attr_v1.json").exists(),
+          (e, written))
+    t0 = time.time()
+    rec = B.rescore_e2_attr(exps, reference=ref, out_dir=out, resamples=20)
+    doc = json.loads((out / "e2_attr_rescore.json").read_text())
+    ap = out / "e2_attr_v1.json"
+    att = json.loads(ap.read_text())
+    check("rescore-e2-attr (%.0fs): E2-C's three final runs scored on dev at 640 (written), E2-W's and the "
+          "reference's kept, then the record (decided) and capacity/e2_attr_rescore.json (complete, names and sha256s, "
+          "no path); e2_v1.json untouched" % (time.time() - t0),
+          rec["status"] == "complete" and doc == json.loads(json.dumps(rec))
+          and [r["status"] for r in doc["arms"]["C"]] == ["written"] * 3
+          and all(r["status"] == "kept" for r in doc["arms"]["W"]) and len(doc["arms"]["W"]) == 3
+          and all(r["status"] == "kept" for r in doc["reference"]["scores"])
+          and doc["attribution"]["sha256"] == W.sha(ap) and att["status"] == "decided"
+          and att["e2_verdict"]["sha256"] == v0 == W.sha(vp)
+          and "/" not in json.dumps({k: doc[k] for k in ("arms", "reference", "attribution", "e2_verdict")}), doc)
+    a0 = W.sha(ap)
+    rec2 = B.rescore_e2_attr(exps, reference=ref, out_dir=out, resamples=20)
+    check("a second run scores nothing and keeps e2_attr_v1.json byte for byte",
+          all(r["status"] == "kept" for k in rec2["arms"] for r in rec2["arms"][k]) and W.sha(ap) == a0
+          and rec2["attribution"]["sha256"] == a0)
+
+
+def read_world_c(tag, qualifying=("W",), chosen="W", attr_over=None, **over):
+    """read_world's six E2 experiments and verdict, E2-C's three with base weights (bytes), and a decided
+    attribution record beside the verdict naming them, decided under the pre-registered parameters on that
+    verdict unless attr_over replaces a field."""
+    ex, vp = read_world(tag, qualifying=qualifying, chosen=chosen, **over)
+    inputs = []
+    ex["C"] = []
+    for s in (0, 1, 2):
+        e = "%s_c%d" % (tag, s)
+        drop(e)
+        (C.INC_DIR / e).mkdir(parents=True)
+        (C.INC_DIR / e / "exp.json").write_text(json.dumps(_e2_exp_doc(e, "C", s)))
+        w = C.INC_DIR / e / "runs" / ("base__s%d" % s) / "weights" / "final.pt"
+        w.parent.mkdir(parents=True)
+        w.write_bytes(os.urandom(256))
+        inputs.append({"exp": e, "run_id": "final__base__s%d" % s, "sha256": "n" * 64, "images_sha256": "i" * 64,
+                       "weights_sha256": W.sha(w), "init_sha256": "1" * 64})
+        ex["C"].append(e)
+    ap = vp.parent / "e2_attr_v1.json"
+    doc = {"format": B.E2_ATTR_FORMAT, "status": "decided", "rule": B.E2_ATTR_RULE,
+           "reference": {"exp": READ_REF}, "bootstrap": {"seed_text": B.E2_ATTR_SEED_TEXT, "resamples": B.E2_ATTR_RESAMPLES},
+           "testing_allowed": False, "e2_verdict": {"name": vp.name, "sha256": W.sha(vp)},
+           "arms": {"C": {"status": "decided", "inputs": inputs}}, "data": {"diff": 0.004}, "credited_to_data": False}
+    doc.update(attr_over or {})
+    ap.write_text(json.dumps(doc))
+    return ex, vp, ap
+
+
+def test_c_test_read():
+    print("e2-test-read --e2 C: once, with the chosen arm's and after it, beside the headline")
+    ex, vp, ap = read_world_c("e2c", qualifying=("W", "S"), chosen="W")
+    out = {}
+    out["before the chosen arm's read is prepared"] = (refused(B.e2_test_read, "C", verdict_path=vp,
+                                                               reference=READ_REF), "is not prepared")
+    exq, vpq, _apq = read_world_c("e2q", qualifying=(), chosen=None)
+    out["no E2 arm qualifies"] = (refused(B.e2_test_read, "C", verdict_path=vpq, reference=READ_REF),
+                                  "no E2 arm qualifies")
+    if not no_specs(exq, "C"):
+        out["no E2 arm qualifies (nothing written)"] = (None, "")
+    exo, vpo, _apo = read_world_c("e2o", qualifying=("W",), chosen="W", testing_allowed=True)
+    out["E2's verdict decided under other parameters"] = (refused(B.e2_test_read, "C", verdict_path=vpo,
+                                                                  reference=READ_REF), "pre-registered parameters")
+    bad = {k: str(e)[:200] for k, (e, frag) in out.items() if e is None or frag not in str(e)}
+    check("refused: %s; no spec written" % ", ".join(out), not bad and no_specs(ex, "C"), bad)
+    B.e2_test_read("W", verdict_path=vp, reference=READ_REF)
+    out = {}
+    with saved(ap):
+        ap.unlink()
+        out["no attribution record"] = (refused(B.e2_test_read, "C", verdict_path=vp, reference=READ_REF),
+                                        "not a decided attribution record")
+    for name, over in (("200 resamples", {"bootstrap": {"seed_text": B.E2_ATTR_SEED_TEXT, "resamples": 200}}),
+                       ("E2's seed text", {"bootstrap": {"seed_text": B.E2_SEED_TEXT, "resamples": 1000}}),
+                       ("testing_allowed true", {"testing_allowed": True}),
+                       ("another rule", {"rule": B.E2_ATTR_RULE + " (edited)"}),
+                       ("pending", {"status": "pending"})):
+        with saved(ap):
+            ap.write_text(json.dumps(dict(json.loads(ap.read_text()), **over)))
+            out["an attribution record with %s" % name] = (
+                refused(B.e2_test_read, "C", verdict_path=vp, reference=READ_REF),
+                "not a decided" if name == "pending" else "pre-registered parameters")
+    with saved(ap):
+        ap.write_text(json.dumps(dict(json.loads(ap.read_text()), e2_verdict={"sha256": "0" * 64})))
+        out["an attribution decided on another E2 verdict"] = (refused(B.e2_test_read, "C", verdict_path=vp,
+                                                                       reference=READ_REF), "another E2 verdict")
+    w2 = C.INC_DIR / ex["C"][2] / "runs" / "base__s2" / "weights" / "final.pt"
+    with saved(w2):
+        w2.write_bytes(os.urandom(256))
+        out["E2-C's base weights replaced since the attribution read them"] = (
+            refused(B.e2_test_read, "C", verdict_path=vp, reference=READ_REF), "the attribution record read")
+    bad = {k: str(e)[:200] for k, (e, frag) in out.items() if e is None or frag not in str(e)}
+    check("after E2-W's read was prepared, still refused: %s; no spec written" % ", ".join(out),
+          not bad and no_specs(ex, "C"), bad)
+    res = B.e2_test_read("C", verdict_path=vp, reference=READ_REF)
+    specs = [json.loads(pathlib.Path(r["specs"][0]).read_text()) for r in res.values()]
+    for sp in specs:
+        T.validate_spec(sp, pathlib.Path(sp["out_dir"]) / "spec.json")
+    recs = [json.loads((C.INC_DIR / e / B.E2_TEST_RECORD).read_text()) for e in ex["C"]]
+    check("then E2-C: three kind-final specs on test from its base weights (the v2 executor accepts each), three "
+          "argvs; each record names arm C, the chosen arm it sits beside, never the headline, and the attribution "
+          "record by sha256",
+          sorted(res) == sorted(ex["C"]) and len(specs) == 3
+          and all(sp["kind"] == "final" and sp["exams"] == ["test"] and sp["run_id"].startswith("e2test__s")
+                  for sp in specs)
+          and all(r["arm"] == "C" and r["headline"] is False and r["beside"] == "W" and r["chosen"] == "W"
+                  and r["attribution_sha256"] == W.sha(ap) and r["verdict_sha256"] == W.sha(vp) for r in recs)
+          and all(r["argv"][3] == "--job-name=inc_%s_e2test" % e for e, r in res.items()), recs[:1])
+    e = refused(B.e2_test_read, "C", verdict_path=vp, reference=READ_REF)
+    check("a second call is refused, naming the recorded argv", e is not None and "prepared once" in str(e), e)
+
+    print("e2-test-report --e2 C")
+    rep = B.e2_test_report("C", verdict_path=vp, out_dir=vp.parent, reference=READ_REF)
+    check("pending while E2-C's test scores are missing", rep["status"] == "pending"
+          and len([m for m in rep["missing"] if m.startswith("e2c_c")]) == 3, rep)
+    wsha = {}
+    for e in ex["C"]:
+        s = int(e[-1])
+        wsha[e] = json.loads((C.INC_DIR / e / B.E2_TEST_RECORD).read_text())["weights_sha256"]
+        _test_score(e, s, 0.880 + 0.001 * s, wsha[e])
+        q = C.INC_DIR / READ_REF / "runs" / ("final__base__s%d" % s) / "scores" / "test.json"
+        rw = json.loads((C.INC_DIR / READ_REF / "runs" / ("final__base__s%d" % s) / "run.json").read_text())
+        q.write_text(json.dumps(dict({"exam": "test", "production": True, "species_map50_95": 0.8786 + 0.001 * (s - 1),
+                                      "agnostic_map50_95": 0.8901, "weights_sha256": rw["weights_sha256"]},
+                                     **TEST_STAMPS)))
+    rep = B.e2_test_report("C", verdict_path=vp, out_dir=vp.parent, reference=READ_REF)
+    md = (vp.parent / "e2_test_C.md").read_text()
+    check("complete: E2-C's 12-class test %.4f +- %.4f against the reference's, reported beside E2-W's headline, "
+          "never the headline" % (rep["arm_scores"]["twelve"]["mean"], rep["arm_scores"]["twelve"]["sd"]),
+          rep["status"] == "complete" and abs(rep["arm_scores"]["twelve"]["mean"] - 0.881) < 1e-9
+          and rep["headline"] is False and rep["beside"] == "W" and rep["chosen"] == "W"
+          and "beside E2-W's headline" in md and "never the headline" in md
+          and not E.allowed("capacity/e2_test_C.json"), rep.get("headline"))
+    p0 = C.INC_DIR / ex["C"][0] / "runs" / "e2test__s0" / "scores" / "test.json"
+    with saved(p0):
+        _test_score(ex["C"][0], 0, 0.95, "f" * 64)
+        e = refused(B.e2_test_report, "C", verdict_path=vp, out_dir=vp.parent, reference=READ_REF)
+    check("a test score from other weights than the prepared read's is refused, not averaged",
+          e is not None and "not the verdict's model" in str(e), e)
+    with saved(ap):
+        ap.write_text(json.dumps(dict(json.loads(ap.read_text()), testing_allowed=True)))
+        e = refused(B.e2_test_report, "C", verdict_path=vp, out_dir=vp.parent, reference=READ_REF)
+    check("  and an attribution record that admitted test-mode files, in production",
+          e is not None and "pre-registered parameters" in str(e), e)
+
+
 # ------------------------------------------------------------------ 14
 def test_cli():
     print("the CLI")
@@ -1150,6 +1789,24 @@ def test_cli():
     check("rescore-e2 and e2-verdict refuse --exp (pre-registered), e2-test-read needs --e2: exit 1",
           rc1 == 1 and rc2 == 1 and rc3 == 1 and "pre-registered" in err.getvalue() and "needs --e2" in err.getvalue(),
           (rc1, rc2, rc3, err.getvalue()[-400:]))
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        rc4 = B.main(["rescore-e2-attr", "--exp", "x"])
+        rc5 = B.main(["e2-attr-verdict", "--exp", "x"])
+        rc6 = B.main(["e2-test-report"])
+    check("rescore-e2-attr and e2-attr-verdict refuse --exp (pre-registered), e2-test-report needs --e2 (W, S or C): "
+          "exit 1", rc4 == 1 and rc5 == 1 and rc6 == 1 and err.getvalue().count("pre-registered") == 2
+          and "or C" in err.getvalue(), (rc4, rc5, rc6, err.getvalue()[-400:]))
+    exp = RC.e2_exp("C", 2)
+    drop(exp)
+    rc = B.main(["build", "--exp", exp, "--manifest", str(base_v2()), "--seeds", "2", "--arm", "m640", "--role",
+                 "baseline", "--e2", "C", "--testing-settings", json.dumps(W.TESTING), "--no-init"])
+    s = json.loads((C.INC_DIR / exp / B.BUILD_SUMMARY).read_text()) if (C.INC_DIR / exp / B.BUILD_SUMMARY).exists() \
+        else {}
+    check("build --e2 C through the CLI (testing): E2-C seed 2 from E1-A's base__s2",
+          rc == 0 and (s.get("e2") or {}).get("init", {}).get("exp") == E1A
+          and (s.get("e2") or {}).get("init", {}).get("run_id") == "base__s2", (rc, s.get("e2")))
+    drop(exp)
     exp = RC.e2_exp("W", 2)
     drop(exp)
     rc = B.main(["build", "--exp", exp, "--manifest", str(base_v2()), "--seeds", "2", "--arm", "m640", "--role",
@@ -1170,11 +1827,18 @@ def main():
         test_build()
         test_train_production()
         test_whole_load()
+        test_c_constants()
+        test_c_build()
+        test_c_train()
         test_bootstrap()
         ex, out = test_rule()
         test_verdict_file(ex, out)
-        test_rescore()
+        test_attr_rule()
+        test_attr_file()
+        exps, ref, out = test_rescore()
+        test_attr_rescore(exps, ref, out)
         test_test_read()
+        test_c_test_read()
         test_cli()
     finally:
         shutil.rmtree(W.TMP, ignore_errors=True)

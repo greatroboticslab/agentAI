@@ -19,8 +19,12 @@ B_v2, its capacity arms, the canary, B0 u tsw and the stream's milestones.
         --manifest INC_DIR/splits/v2/base_v2.jsonl --seeds 0 --arm m640 --role baseline --e2 W
     python -m weed_optimizer_framework.tools.inc2.baseline rescore-e2 [--out-dir DIR]
     python -m weed_optimizer_framework.tools.inc2.baseline e2-verdict [--out-dir DIR]
-    python -m weed_optimizer_framework.tools.inc2.baseline e2-test-read --e2 W|S
-    python -m weed_optimizer_framework.tools.inc2.baseline e2-test-report --e2 W|S [--out-dir DIR]
+    python -m weed_optimizer_framework.tools.inc2.baseline e2-test-read --e2 W|S|C
+    python -m weed_optimizer_framework.tools.inc2.baseline e2-test-report --e2 W|S|C [--out-dir DIR]
+    python -m weed_optimizer_framework.tools.inc2.baseline build --exp e2_c_m640_seed0
+        --manifest INC_DIR/splits/v2/base_v2.jsonl --seeds 0 --arm m640 --role baseline --e2 C
+    python -m weed_optimizer_framework.tools.inc2.baseline rescore-e2-attr [--out-dir DIR]
+    python -m weed_optimizer_framework.tools.inc2.baseline e2-attr-verdict [--out-dir DIR]
 
 build writes a 'baseline' experiment for the pinned driver (inc/driver.py,
 unchanged): one cold base run per seed (the arm's Protocol v3 cold recipe,
@@ -217,6 +221,39 @@ that is not the choice, and a second time. e2-test-report --e2 X reports
 12-class and agnostic test against b_v2_m640's (12-class 0.8786) with the gap
 to 0.90 in capacity/e2_test_<X>.{json,md}, which the platform's evidence
 does not admit.
+
+E2-C, the attribution control (docs/CONTINUOUS_LOOP.md, "Amendment
+(2026-10-04, later): E2-C, the attribution control (pre-registered)"):
+build --e2 C builds e2_c_m640_seed<k>, E2-W's definition exactly (every
+check of build --e2 W and of inc2.train) except the init, E1-A's
+base__s<k>/weights/final.pt by path and sha256 (that run.json's
+weights_sha256): capacity/e1_v1.json must be decided and name e1_a_m640 as
+its arm A (its `reference`), E1-A must be E1's arm A on m640 with
+cold_budget built from the summary the verdict was decided on, and its run
+done, production, under the current LOCK v2 with a clean guard. Its
+research_only is base_v2's OR E1-A's.
+
+rescore-e2-attr (lever L23D, one GPU job of run_inc2_build.sh): once E2's
+verdict is decided, E2-C's final runs (and any missing E2-W, E2-S when
+chosen, or reference file) scored on dev at 640 by inc2.scorer_native, then
+e2-attr-verdict, then capacity/e2_attr_rescore.json (complete; names and
+sha256s, the record's sha256, no path). e2-attr-verdict: E2_ATTR_RULE on
+the native dev files: D_data = mean(E2-W) - mean(E2-C) on seeds 0, 1, 2,
+its SE from E2's paired image bootstrap (native_bootstrap, unchanged) under
+stable_int('inc2/e2/attribution_se'), 1,000 resamples; credited_to_data
+when D_data > 2 pooled sd AND D_data > SE; E2-S - E2-C the same way when
+E2's verdict chose S, labelled confounded by the recipe; reported beside:
+E2-C - b_v2_m640 and E2-C's dev agnostic and Carpetweed, SpottedSpurge,
+Purslane. It reads E2-W's (E2-S's) and the reference's native files only as
+E2's verdict read them, and capacity/e2_v1.json only to read its choice: it
+never rewrites it. capacity/e2_attr_v1.json (dev only) is kept byte for
+byte once decided, as e2_v1.json is; e2_attr_v1_report.md is for people.
+
+e2-test-read --e2 C, e2-test-report --e2 C: E2-C's sealed test, read once
+and only when E2's verdict (decided under its pre-registered parameters)
+has a qualifying choice whose read was prepared, from the weights the
+attribution record (decided under its own parameters on that verdict) read;
+reported beside the headline, never the headline; E2's refusals otherwise.
 """
 from __future__ import annotations
 
@@ -632,23 +669,33 @@ def e1_record(manifest_sha, role, arm):
 E2_GUARD_KEYS = ("lock_sha256", "index_sha256", "checked", "refused", "crosscheck_hits")
 
 
+def _e2_arm_refusal(letter):
+    return ("--e2 %r: E2's arms are W (b_v2_m640's cold recipe) and S (x1b), and its attribution control C (E2-W "
+            "from E1-A's weights), pre-registered (docs/CONTINUOUS_LOOP.md, Amendments 2026-10-04)" % (letter,))
+
+
 def e2_record(letter, exp, manifest_sha, n_images, locked, role, arm_rec, seeds, exams, lock, testing=False):
     """E2 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04): the e2 record
-    exp.json carries for arm `letter` (W or S) of seed seeds[0], after every
-    check that defines the experiment (module docstring, build --e2), none
-    of which writes anything. The init is E1-B's base run of the same seed,
-    by its resolved absolute path and its sha256; E1-B is the experiment the
-    decided, qualifying capacity/e1_v1.json names. Refusals that only a
-    production build must meet (a testing reference, verdict or E1-B run, a
-    reference without recorded runs) are warnings in a testing build."""
+    exp.json carries for arm `letter` (W, S, or E2-C's C) of seed seeds[0],
+    after every check that defines the experiment (module docstring, build
+    --e2), none of which writes anything. The init is E1-B's base run of the
+    same seed, by its resolved absolute path and its sha256; E1-B is the
+    experiment the decided, qualifying capacity/e1_v1.json names. For E2-C
+    (amendment 2026-10-04, later) the init is E1-A's base run of the same
+    seed instead, E1-A being the decided verdict's arm A (its `reference`),
+    the pre-registered e1_a_m640, and every other check is E2-W's with
+    E1-A in place of E1-B. Refusals that only a production build must meet
+    (a testing reference, verdict or E1 run, a reference without recorded
+    runs) are warnings in a testing build."""
     def soft(msg):
         if not testing:
             raise BaselineError(msg)
         log("WARNING: %s (testing build)" % msg)
 
-    if letter not in RC.E2_ARMS:
-        raise BaselineError("--e2 %r: E2's arms are W (b_v2_m640's cold recipe) and S (x1b), pre-registered "
-                            "(docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04)" % (letter,))
+    if letter not in RC.E2_BUILD_ARMS:
+        raise BaselineError(_e2_arm_refusal(letter))
+    control = letter == RC.E2C_ARM
+    e1x = "E1-%s" % RC.E2_INIT_ARM[letter]
     if role != "baseline":
         raise BaselineError("an E2 experiment is built as role baseline (finals dev and imageweeds; its sealed test is "
                             "read once, after the verdict, by e2-test-read), not %s" % role)
@@ -657,7 +704,7 @@ def e2_record(letter, exp, manifest_sha, n_images, locked, role, arm_rec, seeds,
     seeds = list(seeds)
     if len(seeds) != 1:
         raise BaselineError("an E2 experiment trains one seed (got %s): the pinned driver gives every base run of an "
-                            "experiment one init, and seed s starts from E1-B's seed s" % seeds)
+                            "experiment one init, and seed s starts from %s's seed s" % (seeds, e1x))
     s = seeds[0]
     if s not in RC.E2_SEEDS:
         raise BaselineError("E2's seeds are %s (pre-registered), not %s" % (list(RC.E2_SEEDS), s))
@@ -694,11 +741,11 @@ def e2_record(letter, exp, manifest_sha, n_images, locked, role, arm_rec, seeds,
     if diff:
         raise BaselineError("this build differs from %s in %s; E2 differs from it in the init (and E2-S in the recipe) "
                             "only" % (rname, ", ".join(diff)))
-    if letter == "W":
+    if letter in ("W", RC.E2C_ARM):
         compared.append("base.recipe")
-        if rb.get("recipe") != RC.cold(RC.E2_ARM) or RC.cold(RC.E2_ARM) != RC.e2_recipe("W"):
+        if rb.get("recipe") != RC.cold(RC.E2_ARM) or RC.cold(RC.E2_ARM) != RC.e2_recipe(letter):
             raise BaselineError("%s's base recipe is not inc2.recipes.cold('%s') (the table changed since it was "
-                                "built): E2-W cannot train it key for key" % (rname, RC.E2_ARM))
+                                "built): E2-%s cannot train it key for key" % (rname, RC.E2_ARM, letter))
     if ref.get("testing"):
         soft("the reference %s is a testing experiment" % rname)
     # the environment its base runs trained in (Ultralytics, torch): an E2 run trains in the same one
@@ -713,31 +760,37 @@ def e2_record(letter, exp, manifest_sha, n_images, locked, role, arm_rec, seeds,
         soft("%s's base runs do not share one recorded training environment (%s): E2 trains in the reference's"
              % (rname, envs))
     training_env = json.loads(one.pop()) if len(one) == 1 else None
-    # E1's verdict: decided, and E1-B qualified
+    # E1's verdict: decided, and E1-B qualified (E2-C: decided, naming the pre-registered E1-A as its arm A)
     vp = T.e1_verdict_path()
     v = _read_json(vp)
     if not isinstance(v, dict) or v.get("format") != RC.E2_E1_FORMAT or v.get("status") != "decided":
-        raise BaselineError("%s is missing or is not a decided E1 verdict: E2 starts only from an E1-B that qualified"
-                            % vp)
-    if v.get("qualifies") is not True:
+        raise BaselineError("%s is missing or is not a decided E1 verdict: %s" % (
+            vp, "E2-C starts only from the E1-A of a decided E1 verdict" if control
+            else "E2 starts only from an E1-B that qualified"))
+    if control:
+        if v.get("reference") != RC.E2C_INIT_EXP:
+            raise BaselineError("E1's verdict names %r as its arm A, not %s: E2-C starts from %s (pre-registered)"
+                                % (v.get("reference"), RC.E2C_INIT_EXP, RC.E2C_INIT_EXP))
+    elif v.get("qualifies") is not True:
         raise BaselineError("E1's verdict does not qualify E1-B (D %s, 2 x pooled sd %s, SE %s): E2 is not built"
                             % (v.get("diff"), v.get("two_pooled_sd"), v.get("se_diff")))
     if v.get("testing_allowed"):
         soft("%s was decided with test-mode scores allowed" % vp)
-    e1b = v.get("exp")
+    e1k = RC.E2_INIT_ARM[letter]
+    e1b = v.get("reference") if control else v.get("exp")
     bdefn = _read_json(C.INC_DIR / e1b / "exp.json") if isinstance(e1b, str) and T.NAME_RE.fullmatch(e1b) else None
     if not (isinstance(bdefn, dict) and bdefn.get("type") == "baseline"
-            and (bdefn.get("e1") or {}).get("arm") == "B" and bdefn.get("recipe_name") == RC.BUDGET_NAME
+            and (bdefn.get("e1") or {}).get("arm") == e1k and bdefn.get("recipe_name") == RC.BUDGET_NAME
             and (bdefn.get("arm") or {}).get("id") == RC.E2_ARM and s in (bdefn.get("seeds") or [])):
-        raise BaselineError("%s (the verdict's E1-B) is not E1's arm B on %s with %s and seed %d"
-                            % (e1b, RC.E2_ARM, RC.BUDGET_NAME, s))
+        raise BaselineError("%s (the verdict's %s) is not E1's arm %s on %s with %s and seed %d"
+                            % (e1b, e1x, e1k, RC.E2_ARM, RC.BUDGET_NAME, s))
     if bdefn.get("testing"):
-        soft("%s (E1-B) is a testing experiment" % e1b)
+        soft("%s (%s) is a testing experiment" % (e1b, e1x))
     if (bdefn.get("e1") or {}).get("summary_sha256") != v.get("summary_sha256"):
         raise BaselineError("%s was built from splits v3 summary %s; E1's verdict was decided on %s"
                             % (e1b, str((bdefn.get("e1") or {}).get("summary_sha256"))[:12],
                                str(v.get("summary_sha256"))[:12]))
-    # E1-B's base run of this seed: done, its own final.pt, hashing as its run.json records
+    # the E1 arm's base run of this seed: done, its own final.pt, hashing as its run.json records
     run_id = RC.E2_INIT_RUN % s
     rd = C.INC_DIR / e1b / "runs" / run_id
     rj = _read_json(rd / "run.json")
@@ -754,8 +807,8 @@ def e2_record(letter, exp, manifest_sha, n_images, locked, role, arm_rec, seeds,
     if wsha != rj.get("weights_sha256"):
         raise BaselineError("%s hashes to %s, its run.json records %s" % (w, str(wsha)[:12],
                                                                          str(rj.get("weights_sha256"))[:12]))
-    # the leak guard E1-B's run trained under: the current LOCK v2, nothing refused (E2's dev verdict and test
-    # read inherit that judgement, including the sources a person un-quarantined)
+    # the leak guard E1-B's run (E2-C: E1-A's) trained under: the current LOCK v2, nothing refused (E2's dev
+    # verdict and test read inherit that judgement, including the sources a person un-quarantined)
     g = rj.get("guard") if isinstance(rj.get("guard"), dict) else {}
     gbad = [k for k, want in (("lock_sha256", lock["lock_sha256"]), ("index_sha256", lock["index_sha256"]),
                               ("refused", 0), ("crosscheck_hits", 0)) if g.get(k) != want]
@@ -764,7 +817,7 @@ def e2_record(letter, exp, manifest_sha, n_images, locked, role, arm_rec, seeds,
              % (e1b, run_id, ", ".join(gbad)))
     ro = bdefn.get("research_only") if isinstance(bdefn.get("research_only"), dict) else {}
     decision = {k: v.get(k) for k in RC.E2_E1_DECISION_KEYS}
-    return {"arm": letter, "seed": s, "recipe_name": RC.E2_ARMS[letter],
+    return {"arm": letter, "seed": s, "recipe_name": RC.E2_BUILD_ARMS[letter],
             "init": {"exp": e1b, "run_id": run_id, "path": str(w.resolve()), "sha256": wsha,
                      "run_json_sha256": _sha(rd / "run.json"), "exp_json_sha256": _sha(C.INC_DIR / e1b / "exp.json"),
                      "weights_epoch": rj.get("weights_epoch"),
@@ -781,24 +834,25 @@ def e2_record(letter, exp, manifest_sha, n_images, locked, role, arm_rec, seeds,
             "declared": {"role": [ref.get("role"), "baseline"],
                          "final_exams": [list(ref.get("final_exams") or []), list(RC.E2_FINAL_EXAMS)],
                          "seeds": [list(ref.get("seeds") or []), [s]]},
-            "decided_by": RC.E2_DECIDED_BY}
+            "decided_by": RC.E2C_DECIDED_BY if control else RC.E2_DECIDED_BY}
 
 
 def e2_research_only(base_rec, e2rec):
-    """An E2 model's research-only flag (8, P6): base_v2's flag OR E1-B's, as
-    the e2 record holds it. An E1-B flag that is missing or 'unknown' counts
-    as true (fail closed)."""
+    """An E2 model's research-only flag (8, P6): base_v2's flag OR its init's
+    (E1-B's; E2-C's E1-A's), as the e2 record holds it. An init flag that is
+    missing or 'unknown' counts as true (fail closed)."""
     ro = (e2rec.get("init") or {}).get("research_only") or {}
+    e1x = "E1-%s" % RC.E2_INIT_ARM.get(e2rec.get("arm"), "B")
     e1b_flag = ro.get("flag", "unknown")
     flag = bool(base_rec.get("flag")) or e1b_flag is not False
     basis = "; ".join(x for x in (
         "base_v2: %s" % base_rec.get("basis") if base_rec.get("flag") else None,
-        "E1-B (%s): %s" % ((e2rec.get("init") or {}).get("exp"), ro.get("basis") or "flag %r" % (e1b_flag,))
-        if e1b_flag is not False else None) if x) or "base_v2 and E1-B both known clean"
+        "%s (%s): %s" % (e1x, (e2rec.get("init") or {}).get("exp"), ro.get("basis") or "flag %r" % (e1b_flag,))
+        if e1b_flag is not False else None) if x) or "base_v2 and %s both known clean" % e1x
     return dict(base_rec, flag=flag, basis=basis,
                 init_research_only={"exp": (e2rec.get("init") or {}).get("exp"), "flag": e1b_flag,
                                     "basis": ro.get("basis")},
-                note="a model trained from E1-B's weights inherits E1-B's research-only status (8, P6)")
+                note="a model trained from %s's weights inherits %s's research-only status (8, P6)" % (e1x, e1x))
 
 
 def _e2_view(exp, letter, arm_rec, seeds, exams, sha, e2rec):
@@ -830,9 +884,8 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
     if (manifest is None) == (not union):
         raise BaselineError("give exactly one of --manifest and --union")
     if e2 is not None:
-        if e2 not in RC.E2_ARMS:
-            raise BaselineError("--e2 %r: E2's arms are W (b_v2_m640's cold recipe) and S (x1b), pre-registered "
-                                "(docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04)" % (e2,))
+        if e2 not in RC.E2_BUILD_ARMS:
+            raise BaselineError(_e2_arm_refusal(e2))
         if union:
             raise BaselineError("E2 trains LOCK v2's base_v2 (--manifest), never a union")
     try:
@@ -924,8 +977,9 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         defn.update(recipe_name=RC.BUDGET_NAME, budget=RC.budget_record(arm_rec["id"], len(rows)), e1=e1)
     defn.update(RC.stamp(arm_rec))
     if e2rec is not None:
-        # E2: seed s starts from E1-B's seed-s weights (the pinned driver passes init_weights into the base run's
-        # spec unchanged); E2-S names x1b for its base runs; the model inherits E1-B's research-only status
+        # E2: seed s starts from E1-B's seed-s weights (E2-C: E1-A's; the pinned driver passes init_weights into
+        # the base run's spec unchanged); E2-S names x1b for its base runs; the model inherits the init's
+        # research-only status
         defn["init_weights"] = e2rec["init"]["path"]
         defn["e2"] = e2rec
         if e2 == "S":
@@ -2033,8 +2087,9 @@ def _e2_base_run(exp, defn, testing_ok):
     if rj.get("init_sha256") != (e2.get("init") or {}).get("sha256"):
         probs.append("it did not start from the recorded init (%s, the record %s)"
                      % (str(rj.get("init_sha256"))[:12], str((e2.get("init") or {}).get("sha256"))[:12]))
-    if rj.get("recipe_name") != RC.E2_ARMS[e2["arm"]]:
-        probs.append("it trained %r, not E2-%s's %s" % (rj.get("recipe_name"), e2["arm"], RC.E2_ARMS[e2["arm"]]))
+    if rj.get("recipe_name") != RC.E2_BUILD_ARMS[e2["arm"]]:
+        probs.append("it trained %r, not E2-%s's %s" % (rj.get("recipe_name"), e2["arm"],
+                                                         RC.E2_BUILD_ARMS[e2["arm"]]))
     if not testing_ok:
         if rj.get("testing") is not False:
             probs.append("it is not a production run")
@@ -2432,7 +2487,7 @@ def _e2_verdict_doc(verdict_path=None, reference=E2_REFERENCE, testing_ok=False)
     return vp, v
 
 
-def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN, reference=E2_REFERENCE):
+def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN, reference=E2_REFERENCE, attr_path=None):
     """The one read of a qualifying E2 arm's sealed test (amendment
     2026-10-04, P10), by a person: for an arm the decided verdict qualified
     (each qualifying arm is read once; E2's headline test number is the
@@ -2444,17 +2499,32 @@ def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN, reference=E2_RE
     other parameters, _e2_verdict_doc), for an arm that did not qualify, once
     a read was prepared (or a run, attempt or test score exists), and when
     the base weights no longer hash as the verdict read them. Returns {exp:
-    record}."""
-    if letter not in RC.E2_ARMS:
-        raise BaselineError("--e2 %r is not one of E2's arms %s" % (letter, ", ".join(sorted(RC.E2_ARMS, reverse=True))))
+    record}.
+
+    E2-C (letter C, amendment 2026-10-04, later) is read once, with the
+    chosen arm's and beside it, never as the headline: only on a verdict
+    decided under the pre-registered parameters that has a qualifying
+    choice, once the chosen arm's read was prepared, and from the weights
+    the attribution record (capacity/e2_attr_v1.json beside the verdict,
+    decided under its own pre-registered parameters on this verdict) read
+    (_e2c_gate); the same refusals as E2's otherwise."""
+    if letter not in RC.E2_BUILD_ARMS:
+        raise BaselineError("--e2 %r is not one of E2's arms %s or its attribution control %s"
+                            % (letter, ", ".join(sorted(RC.E2_ARMS, reverse=True)), RC.E2C_ARM))
     vp, v = _e2_verdict_doc(verdict_path, reference=reference)
     vsha = _sha(vp)
-    if letter not in (v.get("qualifying") or []):
-        raise BaselineError("E2-%s did not qualify (qualifying: %s): its test is not read (pre-registered)"
-                            % (letter, v.get("qualifying") or "none"))
-    inputs = ((v.get("arms") or {}).get(letter) or {}).get("inputs") or []
-    if not inputs:
-        raise BaselineError("%s names no input of E2-%s" % (vp, letter))
+    extra = {}
+    if letter == RC.E2C_ARM:
+        inputs, ap, a = _e2c_gate(v, vp, attr_path=attr_path, reference=reference)
+        extra = {"attribution": str(ap), "attribution_sha256": _sha(ap), "attribution_diff": (a.get("data") or {})
+                 .get("diff"), "headline": False, "beside": v.get("chosen")}
+    else:
+        if letter not in (v.get("qualifying") or []):
+            raise BaselineError("E2-%s did not qualify (qualifying: %s): its test is not read (pre-registered)"
+                                % (letter, v.get("qualifying") or "none"))
+        inputs = ((v.get("arms") or {}).get(letter) or {}).get("inputs") or []
+        if not inputs:
+            raise BaselineError("%s names no input of E2-%s" % (vp, letter))
     plan = []
     for inp in inputs:
         exp = inp.get("exp")
@@ -2476,8 +2546,9 @@ def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN, reference=E2_RE
         w = root / "runs" / ("base__s%d" % s) / "weights" / "final.pt"
         wsha = _sha(w)
         if wsha is None or wsha != inp.get("weights_sha256"):
-            raise BaselineError("%s's base weights hash to %s; the verdict was decided on %s"
-                                % (exp, str(wsha)[:12], str(inp.get("weights_sha256"))[:12]))
+            raise BaselineError("%s's base weights hash to %s; %s %s"
+                                % (exp, str(wsha)[:12], "the attribution record read" if letter == RC.E2C_ARM
+                                   else "the verdict was decided on", str(inp.get("weights_sha256"))[:12]))
         spec = {"exp": exp, "run_id": rid, "kind": "final", "init": str(w.resolve()), "exams": ["test"],
                 "out_dir": str(out_d)}
         try:
@@ -2502,6 +2573,10 @@ def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN, reference=E2_RE
                "list": str(lst), "argv": argv, "written_utc": D._utc(),
                "note": "the one read of this qualifying arm's sealed test, after the dev verdict; a person submits "
                        "the argv; the scores stay off the platform's evidence"}
+        if extra:
+            rec.update(extra, note="the one read of E2-C's sealed test (the attribution control), with E2-%s's and "
+                                   "beside it, never the headline; a person submits the argv; the scores stay off "
+                                   "the platform's evidence" % v.get("chosen"))
         _write_json(root / E2_TEST_RECORD, rec)
         out[exp] = rec
     return out
@@ -2510,7 +2585,8 @@ def e2_test_read(letter, verdict_path=None, run_fmt=E2_TEST_RUN, reference=E2_RE
 E2_TEST_STAMPS = ("scorer_sha256", "manifest_sha256", "key_order_sha256")
 
 
-def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, reference=E2_REFERENCE):
+def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, reference=E2_REFERENCE,
+                   attr_path=None):
     """A qualifying arm's test read, for people: 12-class (species_map50_95)
     and agnostic test, mean +- sd over its seeds, against the reference's
     final test files of the same seeds, with the gap to 0.90; pending while
@@ -2522,17 +2598,23 @@ def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, re
     order (E2_TEST_STAMPS). The headline is the verdict's choice: a
     qualifying arm that was not chosen is reported as such. Writes
     capacity/e2_test_<letter>.{json,md} (never on the platform's evidence),
-    with the sha256s it read."""
-    if letter not in RC.E2_ARMS:
-        raise BaselineError("--e2 %r is not one of E2's arms" % (letter,))
+    with the sha256s it read. E2-C (letter C) is reported beside the chosen
+    arm's headline, never as the headline, its inputs the attribution
+    record's (_e2c_gate)."""
+    if letter not in RC.E2_BUILD_ARMS:
+        raise BaselineError("--e2 %r is not one of E2's arms or its attribution control" % (letter,))
     vp, v = _e2_verdict_doc(verdict_path, reference=reference, testing_ok=testing_ok)
-    if letter not in (v.get("qualifying") or []):
-        raise BaselineError("E2-%s did not qualify (qualifying: %s): its test was not read"
-                            % (letter, v.get("qualifying") or "none"))
     vsha = _sha(vp)
-    inputs = ((v.get("arms") or {}).get(letter) or {}).get("inputs") or []
-    if not inputs:
-        raise BaselineError("%s names no input of E2-%s" % (vp, letter))
+    if letter == RC.E2C_ARM:
+        inputs, _ap, _a = _e2c_gate(v, vp, attr_path=attr_path, reference=reference, testing_ok=testing_ok,
+                                    prepared=False)
+    else:
+        if letter not in (v.get("qualifying") or []):
+            raise BaselineError("E2-%s did not qualify (qualifying: %s): its test was not read"
+                                % (letter, v.get("qualifying") or "none"))
+        inputs = ((v.get("arms") or {}).get(letter) or {}).get("inputs") or []
+        if not inputs:
+            raise BaselineError("%s names no input of E2-%s" % (vp, letter))
     missing, arm_rows, ref_rows, arm_in, ref_in, stamps = [], [], [], [], [], {}
 
     def read(path, what):
@@ -2593,6 +2675,7 @@ def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, re
     chosen = v.get("chosen")
     rep = {"format": E2_TEST_REPORT_FORMAT, "status": status, "arm": letter, "verdict_sha256": vsha,
            "chosen": chosen, "headline": letter == chosen,
+           "beside": chosen if letter == RC.E2C_ARM else None,
            "missing": missing, "arm_scores": a, "inputs": arm_in, "stamps": dict(stamps) or None,
            "reference": {"exp": reference, "scores": r, "inputs": ref_in},
            "d_test": {"twelve": (am - rm) if None not in (am, rm) else None,
@@ -2620,6 +2703,9 @@ def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, re
                                                          " (missing %s)" % ", ".join(missing) if missing else ""),
           "",
           ("E2-%s is the verdict's choice: this is E2's headline test number." % letter) if letter == chosen else
+          ("E2-C is the attribution control (E2-W's definition from E1-A's weights): reported beside E2-%s's "
+           "headline test number, never the headline; no decision rests on it." % chosen)
+          if letter == RC.E2C_ARM else
           ("E2-%s qualified, but the verdict chose E2-%s (the larger D): E2's headline test number is E2-%s's."
            % (letter, chosen, chosen))]
     p = d / ("e2_test_%s.md" % letter)
@@ -2631,13 +2717,481 @@ def e2_test_report(letter, verdict_path=None, out_dir=None, testing_ok=False, re
     return rep
 
 
+# ----------------------------------------------- E2-C, the attribution control (amendment 2026-10-04, later)
+E2_ATTR_FORMAT = "inc2-e2-attribution/1"
+E2_ATTR_NAME = "e2_attr_v1"
+E2_ATTR_RESCORE_FORMAT = "inc2-e2-attr-rescore/1"
+E2_ATTR_RESCORE_NAME = "e2_attr_rescore.json"       # in capacity/, beside the record
+E2_ATTR_SEED_TEXT = "inc2/e2/attribution_se"
+E2_ATTR_RESAMPLES = 1000
+E2_ATTR_RULE = ("D_data = mean(E2-W's dev species_map50_95) - mean(E2-C's), on the seeds both share (0, 1, 2), each "
+                "final run's dev score at 640 by inc2.scorer_native (the locked scorer's code as a library); E2's gain "
+                "is credited to base v3's data when D_data > 2 x pooled sd (sqrt((sd_W^2 + sd_C^2) / 2), sample sd) "
+                "AND D_data > the paired image-bootstrap SE of D_data (E2's bootstrap, inc2.baseline.native_bootstrap: "
+                "1,000 resamples of the dev images under stable_int('inc2/e2/attribution_se'), one draw for every "
+                "run); otherwise E2's result is a property of one-class pre-training, not of data scale; when E2's "
+                "verdict chose E2-S, E2-S - E2-C is computed the same way and reported as confounded by the recipe; "
+                "reported beside, not deciding: E2-C - b_v2_m640 and E2-C's dev agnostic and Carpetweed, "
+                "SpottedSpurge and Purslane; record only: capacity/e2_v1.json is never rewritten, and E2-C can "
+                "neither qualify nor be chosen")
+# What a recomputation must reproduce of a decided e2_attr_v1.json (e2_attr_verdict), as E2_DECISION_KEYS for E2's:
+# the decision, the parameters it was decided under, E2's verdict it read (its qualifying arms and choice), each
+# comparison under the rule (W - C; S - C when E2 chose S) and every input's sha256s; never what is reported beside
+E2_ATTR_DECISION_KEYS = ("status", "credited_to_data", "testing_allowed")
+E2_ATTR_VERDICT_KEYS = ("qualifying", "chosen")
+E2_ATTR_PAIR_KEYS = ("status", "seeds", "dev", "other_dev", "diff", "pooled_sd", "se_diff", "conditions")
+E2_ATTR_CONFOUND = "the recipe: E2-S trains x1b, E2-C the cold recipe (E2-S - E2-C is not the data alone)"
+
+
+def e2_attr_exps():
+    """{'W': [...], 'S': [...], 'C': [...]}: the experiments the attribution
+    reads (E2-S's only when E2's verdict chose it)."""
+    return {k: [RC.e2_exp(k, s) for s in RC.E2_SEEDS] for k in ("W", "S", RC.E2C_ARM)}
+
+
+def _e2_attr_side(letter, exps, ref_manifest, testing_ok):
+    """One arm of the attribution: {'status': 'pending', ...} while an
+    experiment is unbuilt or a native dev file missing; else {'status':
+    'ready', 'files': {seed: (native doc, arrays, input record)}, 'base':
+    {seed: _e2_base_run}, 'starts': {(init exp, E1 decision)}} after every
+    check E2's verdict makes of its own arms (_e2_defn, the reference's
+    manifest, one experiment per seed, the base run, the weights)."""
+    items = []
+    for e in exps or []:
+        if not (C.INC_DIR / e / "exp.json").is_file():
+            items.append((e, None))
+            continue
+        d = _e2_defn(e, letter)
+        if (d["e2"].get("reference") or {}).get("manifest_sha256") != ref_manifest:
+            raise BaselineError("%s was built against another manifest than the reference's" % e)
+        items.append((e, d))
+    unbuilt = [e for e, d in items if d is None]
+    if not items or unbuilt:
+        return {"status": "pending", "why": "not built: %s" % (", ".join(unbuilt) or "no experiment")}
+    seeds = [int(d["e2"]["seed"]) for _e, d in items]
+    if len(set(seeds)) != len(seeds):
+        raise BaselineError("E2-%s holds two experiments of one seed (%s)" % (letter, seeds))
+    by_seed = {int(d["e2"]["seed"]): (e, d) for e, d in items}
+    got, missing = {}, []
+    for s, (e, _d) in sorted(by_seed.items()):
+        f, miss = _native_files(e, [s], E2_IMGSZ, testing_ok)
+        missing += ["%s/%s" % (e, r) for r in miss]
+        if s in f:
+            got[s] = f[s]
+    if missing:
+        return {"status": "pending", "seeds": sorted(by_seed), "missing": missing}
+    files, base, starts = {}, {}, set()
+    for s, (e, d) in sorted(by_seed.items()):
+        br = _e2_base_run(e, d, testing_ok)
+        dn = got[s][0]
+        if dn.get("weights_sha256") != br["weights_sha256"]:
+            raise BaselineError("%s %s's native score names weights %s, its base run trained %s"
+                                % (e, _final_id(s), str(dn.get("weights_sha256"))[:12], br["weights_sha256"][:12]))
+        base[s] = br
+        files[s] = (dn, got[s][1], dict(got[s][2], exp=e, weights_sha256=br["weights_sha256"],
+                                        init_sha256=br["init_sha256"]))
+        starts.add(json.dumps([(d["e2"].get("init") or {}).get("exp"), (d["e2"].get("e1_verdict") or {})
+                               .get("decision")], sort_keys=True))
+    return {"status": "ready", "files": files, "base": base, "starts": starts}
+
+
+def _e2_attr_pair(a_files, b_files, seeds, resamples, seed_text, species=E2_REPORTED_SPECIES):
+    """A minus B on the seeds both share (E2's statistic, E2's bootstrap
+    under seed_text): the means, pooled sd, SE and the rule's two
+    conditions, and each reported species' difference with its SE."""
+    av = [float(a_files[s][0]["species_map50_95"]) for s in seeds]
+    bv = [float(b_files[s][0]["species_map50_95"]) for s in seeds]
+    ma, sa = _mean_sd(av)
+    mb, sb = _mean_sd(bv)
+    pooled = math.sqrt((sa ** 2 + sb ** 2) / 2.0)
+    diff = ma - mb
+    boot = native_bootstrap([a_files[s][1] for s in seeds], [b_files[s][1] for s in seeds], resamples=resamples,
+                            seed_text=seed_text)
+    se = boot["se"]
+    sp = {}
+    for name in species:
+        pa = [(a_files[s][0].get("per_class") or {}).get(name) for s in seeds]
+        pb = [(b_files[s][0].get("per_class") or {}).get(name) for s in seeds]
+        if any(x is None for x in pa + pb):
+            sp[name] = {"mean": None, "other_mean": None, "diff": None, "se": None}
+            continue
+        am, bm = statistics.fmean(float(x) for x in pa), statistics.fmean(float(x) for x in pb)
+        sp[name] = {"mean": am, "other_mean": bm, "diff": am - bm,
+                    "se": boot["per_species"].get(name, {}).get("se"),
+                    "n_valid": boot["per_species"].get(name, {}).get("n_valid")}
+    return {"status": "decided", "seeds": list(seeds), "dev": av, "mean": ma, "sd": sa, "other_dev": bv,
+            "other_mean": mb, "other_sd": sb, "diff": diff, "pooled_sd": pooled, "two_pooled_sd": 2.0 * pooled,
+            "se_diff": se, "n_valid": boot["n_valid"],
+            "conditions": {"above_2_pooled_sd": diff > 2.0 * pooled, "above_se": se is not None and diff > se},
+            "species": sp}
+
+
+def _e2_verdict_path(out_dir=None, verdict_path=None):
+    return Path(verdict_path) if verdict_path else (Path(out_dir) if out_dir else C.INC_DIR / "capacity") / (
+        "%s.json" % E2_NAME)
+
+
+def e2_attr_decision(exps=None, reference=E2_REFERENCE, verdict_path=None, testing_ok=False,
+                     resamples=E2_ATTR_RESAMPLES, seed_text=E2_ATTR_SEED_TEXT):
+    """E2_ATTR_RULE on the native dev files of E2-W's and E2-C's final runs
+    (E2-S's too when E2's verdict chose it) and, reported beside, the
+    reference's (dev only). Reads E2's verdict (decided under its
+    pre-registered parameters, _e2_verdict_doc; its choice decides whether
+    E2-S - E2-C is computed), the experiments' exp.json, their base and
+    final runs' run.json and the native dev@640 files and arrays. Pending
+    while E2's verdict is not decided, an experiment is unbuilt or a file is
+    missing. Refuses what E2's verdict refuses of its arms, and also native
+    files of E2-W (or E2-S, or the reference) that are not the ones E2's
+    verdict read, and E2-W and E2-C built from different E1 verdicts (or
+    from another E1 arm than E1-B and E1-A). It opens no other exam."""
+    exps = exps or e2_attr_exps()
+    rdefn, raid, rimgsz = _native_arm(reference, measure=False)
+    if rimgsz != E2_IMGSZ:
+        raise BaselineError("the reference %s is read at %d px, not %d" % (reference, rimgsz, E2_IMGSZ))
+    rseeds = sorted(int(x) for x in rdefn.get("seeds") or [])
+    rman = (rdefn.get("base") or {}).get("manifest_sha256")
+    base = {"format": E2_ATTR_FORMAT, "name": E2_ATTR_NAME, "rule": E2_ATTR_RULE, "pre_registered": RC.E2C_DECIDED_BY,
+            "exam": E2_EXAM, "imgsz": E2_IMGSZ, "reference": {"exp": reference, "arm": raid, "seeds": rseeds},
+            "bootstrap": {"seed_text": seed_text, "seed": C.stable_int(seed_text), "resamples": int(resamples),
+                          "paired": "one draw of the dev images for every run", "ddof": 1,
+                          "statistic": "the 12-class mean AP50-95 over the species with a GT box in the resample, "
+                                       "averaged over seeds per arm; one arm minus the other"},
+            "testing_allowed": bool(testing_ok),
+            "on_decision": "record only: nothing switches; capacity/e2_v1.json is never rewritten; E2-C's sealed "
+                           "test is read once, with E2's chosen arm's and beside it, never as the headline",
+            "note": "dev only: the native dev files of the final runs at 640"}
+    vp = _e2_verdict_path(verdict_path=verdict_path)
+    vraw = _read_json(vp)
+    if not isinstance(vraw, dict) or vraw.get("format") != E2_FORMAT or vraw.get("status") != "decided":
+        return dict(base, status="pending", e2_verdict={"name": vp.name, "status": (vraw or {}).get("status")
+                                                        if isinstance(vraw, dict) else None},
+                    pending=["E2's verdict (%s) is not decided: whether E2-S - E2-C is computed rests on its choice"
+                             % vp.name])
+    vp, v = _e2_verdict_doc(vp, reference=reference, testing_ok=testing_ok)
+    chosen = v.get("chosen")
+    letters = ["W", RC.E2C_ARM] + (["S"] if chosen == "S" else [])
+    e2v = {"name": vp.name, "sha256": _sha(vp), "status": v.get("status"), "qualifying": list(v.get("qualifying") or []),
+           "chosen": chosen}
+    sides, pending = {}, []
+    for k in letters:
+        sides[k] = _e2_attr_side(k, exps.get(k), rman, testing_ok)
+        if sides[k]["status"] != "ready":
+            pending.append("E2-%s: %s" % (k, sides[k].get("why") or ", ".join(sides[k].get("missing") or [])))
+    arms_out = {k: {f: x.get(f) for f in ("status", "why", "seeds", "missing") if x.get(f) is not None}
+                for k, x in sides.items() if x["status"] != "ready"}
+    # one E1 verdict under both: E2-W from its E1-B, E2-C from its E1-A (the decision each experiment recorded)
+    init = {}
+    for k in letters:
+        st = sides[k].get("starts") or set()
+        if len(st) > 1:
+            raise BaselineError("E2-%s's experiments start from different E1 records" % k)
+        if st:
+            ie, dec = json.loads(next(iter(st)))
+            want = (dec or {}).get("reference") if k == RC.E2C_ARM else (dec or {}).get("exp")
+            if ie != want or (k == RC.E2C_ARM and ie != RC.E2C_INIT_EXP):
+                raise BaselineError("E2-%s starts from %s, not the E1-%s its E1 verdict names (%s)"
+                                    % (k, ie, RC.E2_INIT_ARM[k], want))
+            init[k] = {"exp": ie, "e1_decision": dec}
+    decs = {json.dumps(x["e1_decision"], sort_keys=True) for x in init.values()}
+    if len(decs) > 1:
+        raise BaselineError("E2-W and E2-C were built from different E1 verdicts (their recorded decisions differ)")
+    r_in, r_miss = _native_files(reference, rseeds, rimgsz, testing_ok)
+    if r_miss:
+        pending.append("%s: %s" % (reference, ", ".join(r_miss)))
+    if pending:
+        return dict(base, status="pending", e2_verdict=e2v, init=init, arms=arms_out, pending=pending)
+    rin = {}
+    for s in rseeds:
+        rj = _read_json(C.INC_DIR / reference / "runs" / _final_id(s) / "run.json") or {}
+        if r_in[s][0].get("weights_sha256") != rj.get("weights_sha256"):
+            raise BaselineError("%s %s's native score names weights %s, its run.json %s"
+                                % (reference, _final_id(s), str(r_in[s][0].get("weights_sha256"))[:12],
+                                   str(rj.get("weights_sha256"))[:12]))
+        rin[s] = (r_in[s][0], r_in[s][1], dict(r_in[s][2], exp=reference, weights_sha256=rj.get("weights_sha256")))
+    files = {k: sides[k]["files"] for k in letters}
+    files["reference"] = rin
+    if not testing_ok:
+        for who, fs in files.items():
+            for s, f in fs.items():
+                if (f[0].get("vs_protocol_score") or {}).get("compared") is not True \
+                        or (f[0].get("protocol_score") or {}).get("production") is not True:
+                    raise BaselineError("%s %s's native dev score was not checked against its production protocol "
+                                        "score" % (who, _final_id(s)))
+    stamps = None
+    for who, fs in files.items():
+        for s in sorted(fs):
+            st = _native_stamps(fs[s][0])
+            if stamps is None:
+                stamps = st
+            elif st != stamps:
+                raise BaselineError("%s %s was scored on another exam, scorer or settings than the attribution's first "
+                                    "file (%s differ)" % (who, _final_id(s), ", ".join(sorted(x for x in st
+                                                                                          if st[x] != stamps[x]))))
+
+    def key(r):
+        return [r.get(g) for g in ("exp", "run_id", "sha256", "images_sha256", "weights_sha256")]
+    # the files E2's verdict read: E2-W's (and E2-S's when chosen) and the reference's are those very files
+    for k in [x for x in letters if x != RC.E2C_ARM]:
+        a = (v.get("arms") or {}).get(k) or {}
+        ours = sorted(key(files[k][s][2]) for s in files[k])
+        if sorted(key(r) for r in a.get("inputs") or [] if isinstance(r, dict)) != ours:
+            raise BaselineError("E2-%s's native dev files are not the ones E2's verdict (%s) read" % (k, vp.name))
+        theirs = sorted(key(r) for r in a.get("reference_inputs") or [] if isinstance(r, dict))
+        if not set(map(json.dumps, theirs)) <= set(json.dumps(key(rin[s][2])) for s in rin):
+            raise BaselineError("the reference's native dev files are not the ones E2's verdict (%s) read" % vp.name)
+
+    def shared(a, b):
+        sh = sorted(set(files[a]) & set(files[b]))
+        if len(sh) < 2:
+            raise BaselineError("%s and %s share seeds %s; the rule needs at least 2" % (a, b, sh))
+        return sh
+    data = dict(_e2_attr_pair(files["W"], files[RC.E2C_ARM], shared("W", RC.E2C_ARM), resamples, seed_text),
+                comparison="E2-W - E2-C", variable="the pre-training data (44,485 against 6,811 images at equal "
+                                                   "pre-training compute)")
+    credited = all(data["conditions"].values())
+    cvc = None
+    if chosen == "S":
+        cvc = dict(_e2_attr_pair(files["S"], files[RC.E2C_ARM], shared("S", RC.E2C_ARM), resamples, seed_text),
+                   comparison="E2-S - E2-C", confounded_by=E2_ATTR_CONFOUND,
+                   note="computed the same way as D_data and reported as confounded by the recipe; it credits nothing")
+    cref = dict(_e2_attr_pair(files[RC.E2C_ARM], rin, shared(RC.E2C_ARM, "reference"), resamples, seed_text),
+                comparison="E2-C - %s" % reference, reading="two-stage pre-training without extra data",
+                note="reported beside, not deciding")
+    cs = sorted(files[RC.E2C_ARM])
+    ag = _e2_mean([files[RC.E2C_ARM][s][0].get("agnostic_map50_95") for s in cs])
+    control = {"agnostic": ag, "species": {}}
+    for name in E2_REPORTED_SPECIES:
+        vals = [(files[RC.E2C_ARM][s][0].get("per_class") or {}).get(name) for s in cs]
+        control["species"][name] = {
+            "mean": statistics.fmean(float(x) for x in vals) if vals and None not in vals else None,
+            "w_minus_c": data["species"][name]["diff"], "w_minus_c_se": data["species"][name]["se"],
+            "c_minus_reference": cref["species"][name]["diff"], "c_minus_reference_se": cref["species"][name]["se"]}
+    arms_out = {k: {"status": "decided", "seeds": sorted(files[k]),
+                    "experiments": [files[k][s][2]["exp"] for s in sorted(files[k])],
+                    "dev": [float(files[k][s][0]["species_map50_95"]) for s in sorted(files[k])],
+                    "inputs": [files[k][s][2] for s in sorted(files[k])],
+                    "init_sha256": [files[k][s][2]["init_sha256"] for s in sorted(files[k])]} for k in letters}
+    return dict(base, status="decided", e2_verdict=e2v, init=init, arms=arms_out,
+                data=data, credited_to_data=credited,
+                reading=("E2's gain is credited to base v3's data" if credited else
+                         "E2's result is a property of one-class pre-training, not of data scale"),
+                chosen_vs_control=cvc,
+                reported={"control_vs_reference": dict(cref, reference_inputs=[rin[s][2] for s in sorted(rin)]),
+                          "control": control},
+                stamps=stamps, pending=[])
+
+
+def _e2_attr_canonical(d):
+    """The decision of an attribution record (E2_ATTR_DECISION_KEYS, the
+    bootstrap's E2_BOOTSTRAP_KEYS, E2's verdict it read, each comparison's
+    E2_ATTR_PAIR_KEYS and every arm's inputs' sha256s): what a recomputation
+    must reproduce for a decided file to be kept."""
+    d = d or {}
+    out = {k: d.get(k) for k in E2_ATTR_DECISION_KEYS}
+    out["bootstrap"] = {k: (d.get("bootstrap") or {}).get(k) for k in E2_BOOTSTRAP_KEYS}
+    out["e2_verdict"] = {k: (d.get("e2_verdict") or {}).get(k) for k in E2_ATTR_VERDICT_KEYS}
+    for k in ("data", "chosen_vs_control"):
+        a = d.get(k) if isinstance(d.get(k), dict) else None
+        out[k] = {f: a.get(f) for f in E2_ATTR_PAIR_KEYS} if a is not None else None
+    out["inputs"] = {k: [[r.get(g) for g in ("exp", "run_id", "sha256", "images_sha256", "weights_sha256")]
+                         for r in (a.get("inputs") or []) if isinstance(r, dict)]
+                     for k, a in sorted((d.get("arms") or {}).items()) if isinstance(a, dict)}
+    return json.loads(json.dumps(out, sort_keys=True))
+
+
+def _e2_attr_md(doc):
+    def f(x):
+        return "-" if x is None else "%.4f" % x
+    lines = ["# E2-C: the attribution control (dev, record only)", ""]
+    if doc.get("status") != "decided":
+        return "\n".join(lines + ["Pending: %s" % "; ".join(doc.get("pending") or [])]) + "\n"
+    d = doc["data"]
+    lines += ["| Comparison | D | 2 x pooled sd | SE(D) | reading |", "|---|---|---|---|---|",
+              "| E2-W - E2-C (D_data) | %s | %s | %s | %s |" % (f(d["diff"]), f(d["two_pooled_sd"]), f(d["se_diff"]),
+                                                             "credited to the data" if doc["credited_to_data"]
+                                                             else "one-class pre-training")]
+    if doc.get("chosen_vs_control"):
+        c = doc["chosen_vs_control"]
+        lines.append("| E2-S - E2-C (confounded by the recipe) | %s | %s | %s | reported only |"
+                     % (f(c["diff"]), f(c["two_pooled_sd"]), f(c["se_diff"])))
+    r = doc["reported"]["control_vs_reference"]
+    lines.append("| %s (reported beside) | %s | %s | %s | two-stage pre-training without extra data |"
+                 % (r["comparison"], f(r["diff"]), f(r["two_pooled_sd"]), f(r["se_diff"])))
+    ctl = doc["reported"]["control"]
+    lines += ["", "E2-C dev agnostic mAP50-95: %s +- %s (n %s)" % (f(ctl["agnostic"]["mean"]), f(ctl["agnostic"]["sd"]),
+                                                                  ctl["agnostic"]["n"]), "",
+              "| Species | E2-C dev AP50-95 | W - C (SE) | C - reference (SE) |", "|---|---|---|---|"]
+    for name, x in ctl["species"].items():
+        lines.append("| %s | %s | %s (%s) | %s (%s) |" % (name, f(x["mean"]), f(x["w_minus_c"]), f(x["w_minus_c_se"]),
+                                                       f(x["c_minus_reference"]), f(x["c_minus_reference_se"])))
+    lines += ["", "%s. E2's verdict (%s): qualifying %s, chosen %s; it is not rewritten."
+              % (doc["reading"], doc["e2_verdict"]["name"], doc["e2_verdict"]["qualifying"] or "none",
+                 doc["e2_verdict"]["chosen"] or "none")]
+    return "\n".join(lines) + "\n"
+
+
+def e2_attr_verdict(exps=None, reference=E2_REFERENCE, out_dir=None, verdict_path=None, write=True, testing_ok=False,
+                    resamples=E2_ATTR_RESAMPLES):
+    """The attribution record (capacity/e2_attr_v1.json, dev only, beside
+    e2_v1.json, which it reads and never rewrites) and its report for
+    people (e2_attr_v1_report.md). A decided record is never rewritten: a
+    recomputation whose decision (_e2_attr_canonical) agrees keeps the file
+    byte for byte (decision["kept"]), one that disagrees refuses; a pending
+    file is overwritten."""
+    d = Path(out_dir) if out_dir else C.INC_DIR / "capacity"
+    decision = e2_attr_decision(exps, reference, verdict_path=verdict_path or d / ("%s.json" % E2_NAME),
+                                testing_ok=testing_ok, resamples=resamples)
+    decision["generated_utc"] = D._utc()
+    if write:
+        out = d / ("%s.json" % E2_ATTR_NAME)
+        decision["out"] = str(out)
+        old = _read_json(out)
+        if isinstance(old, dict) and old.get("status") == "decided":
+            a, b = _e2_attr_canonical(old), _e2_attr_canonical(decision)
+            if a != b:
+                diff = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
+                raise BaselineError("%s holds a decided attribution this recomputation does not reproduce (%s differ): "
+                                    "a decided record is never rewritten; a person moves it aside" % (out, diff))
+            decision["kept"] = True
+        else:
+            _write_json(out, {k: v for k, v in decision.items() if k not in ("kept", "out")})
+        md = d / ("%s_report.md" % E2_ATTR_NAME)
+        tmp = md.with_name(".%s.tmp" % md.name)
+        tmp.write_text(_e2_attr_md(decision))
+        os.replace(tmp, md)
+    if decision["status"] == "decided":
+        x = decision["data"]
+        log("E2 attribution: D_data %.4f vs 2 pooled sd %.4f, SE %s -> %s" % (
+            x["diff"], x["two_pooled_sd"], "-" if x["se_diff"] is None else "%.4f" % x["se_diff"], decision["reading"]))
+    else:
+        log("E2 attribution: pending (%s)" % "; ".join(decision.get("pending") or []))
+    return decision
+
+
+def rescore_e2_attr(exps=None, reference=E2_REFERENCE, out_dir=None, batch=None, device=None,
+                    resamples=E2_ATTR_RESAMPLES):
+    """E2-C's rescore (lever L23D, one GPU job of run_inc2_build.sh): every
+    E2-C final run scored on dev at 640 by inc2.scorer_native, and each
+    E2-W (E2-S when E2's verdict chose it) and reference final run whose
+    file is missing (each written once; every final run must be done
+    first, and E2's verdict decided under its pre-registered parameters,
+    _e2_verdict_doc), then the attribution record
+    (e2_attr_verdict), then capacity/e2_attr_rescore.json (complete: the
+    files' names and sha256s and the record's sha256, no path). Returns that
+    record. Refuses when the record is still pending afterwards."""
+    exps = exps or e2_attr_exps()
+    d = Path(out_dir) if out_dir else C.INC_DIR / "capacity"
+    vp = d / ("%s.json" % E2_NAME)
+    v = _read_json(vp)
+    if not isinstance(v, dict) or v.get("format") != E2_FORMAT or v.get("status") != "decided":
+        raise BaselineError("%s is not a decided E2 verdict: the attribution reads its choice (L23C, rescore-e2, "
+                            "first)" % vp)
+    letters = ["W", RC.E2C_ARM] + (["S"] if v.get("chosen") == "S" else [])
+    defns = {}
+    for letter in letters:
+        for e in exps.get(letter) or []:
+            defns[e] = (letter, _e2_defn(e, letter))
+    testing_ok = all(bool(dd.get("testing")) for _l, dd in defns.values()) and scorer_testing()
+    _e2_verdict_doc(vp, reference=reference, testing_ok=testing_ok)    # its parameters, before anything is scored
+    rdefn, _raid, rimgsz = _native_arm(reference, measure=False)
+    rseeds = sorted(int(x) for x in rdefn.get("seeds") or [])
+    try:                                         # every final run done before anything is scored
+        for e, (_l, dd) in defns.items():
+            SN.final_run(e, _final_id(dd["e2"]["seed"]), dd)
+        for s in rseeds:
+            SN.final_run(reference, _final_id(s), rdefn)
+    except SN.NativeRefused as x:
+        raise BaselineError(str(x))
+    arms = {}
+    for e, (letter, dd) in defns.items():
+        r = _native_one(e, int(dd["e2"]["seed"]), E2_EXAM, E2_IMGSZ, batch, device)
+        arms.setdefault(letter, []).append(dict(r, exp=e))
+    ref = [_native_one(reference, s, E2_EXAM, rimgsz, batch, device) for s in rseeds]
+    decision = e2_attr_verdict(exps, reference, out_dir=out_dir, testing_ok=testing_ok, resamples=resamples)
+    if decision.get("status") != "decided":
+        raise BaselineError("E2's attribution is pending after the rescore: %s" % "; ".join(decision.get("pending")
+                                                                                             or []))
+    apath = Path(decision["out"])
+    rec = {"format": E2_ATTR_RESCORE_FORMAT, "status": "complete", "exam": E2_EXAM, "imgsz": E2_IMGSZ,
+           "arms": {k: [{f: r.get(f) for f in ("exp", "run_id", "score", "sha256", "status")} for r in x]
+                    for k, x in sorted(arms.items())},
+           "reference": {"exp": reference,
+                         "scores": [{f: r.get(f) for f in ("run_id", "score", "sha256", "status")} for r in ref]},
+           "attribution": {"name": apath.name, "sha256": _sha(apath), "status": decision["status"],
+                           "credited_to_data": decision.get("credited_to_data")},
+           "e2_verdict": {"name": vp.name, "sha256": _sha(vp)},
+           "written_utc": D._utc(), "note": "dev only; names and sha256s, no path"}
+    _write_json(apath.parent / E2_ATTR_RESCORE_NAME, rec)
+    log("E2 attribution rescore complete (%s written, reference %d written); %s" % (
+        sum(1 for x in arms.values() for r in x if r["status"] == "written"),
+        sum(1 for r in ref if r["status"] == "written"), decision["reading"]))
+    return rec
+
+
+def _e2_attr_doc(attr_path, reference=E2_REFERENCE, testing_ok=False):
+    """(path, document) of the decided attribution record, decided under its
+    pre-registered parameters (E2_ATTR_RULE, the reference, the bootstrap's
+    seed text and resamples, and, unless testing_ok, no test-mode file)."""
+    ap = Path(attr_path)
+    a = _read_json(ap)
+    if not isinstance(a, dict) or a.get("format") != E2_ATTR_FORMAT or a.get("status") != "decided":
+        raise BaselineError("%s is not a decided attribution record (L23D, rescore-e2-attr): E2-C's test is read only "
+                            "from the weights it read" % ap)
+    bs = a.get("bootstrap") if isinstance(a.get("bootstrap"), dict) else {}
+    probs = []
+    if a.get("rule") != E2_ATTR_RULE:
+        probs.append("its rule is not E2-C's pre-registered rule")
+    if (a.get("reference") or {}).get("exp") != reference:
+        probs.append("its reference is %r, not %s" % ((a.get("reference") or {}).get("exp"), reference))
+    if bs.get("seed_text") != E2_ATTR_SEED_TEXT or bs.get("resamples") != E2_ATTR_RESAMPLES:
+        probs.append("its bootstrap (seed text %r, %r resamples) is not the pre-registered %r, %d"
+                     % (bs.get("seed_text"), bs.get("resamples"), E2_ATTR_SEED_TEXT, E2_ATTR_RESAMPLES))
+    if a.get("testing_allowed") is not False and not testing_ok:
+        probs.append("it admitted test-mode files (testing_allowed %r)" % (a.get("testing_allowed"),))
+    if probs:
+        raise BaselineError("%s was not decided under E2-C's pre-registered parameters (%s): no sealed test is read on "
+                            "it" % (ap, "; ".join(probs)))
+    return ap, a
+
+
+def _e2c_gate(v, vp, attr_path=None, reference=E2_REFERENCE, testing_ok=False, prepared=True):
+    """E2-C's test read (amendment 2026-10-04, later): (its inputs, the
+    attribution record's path and document). Only on E2's verdict with a
+    qualifying choice (if no E2 arm qualifies, E2-C's test is not read), once
+    the chosen arm's read was prepared (prepared: every input of the chosen
+    arm holds its e2_test_read.json, on the weights the verdict read), and
+    from the weights the attribution record read (decided under its
+    pre-registered parameters on this very verdict)."""
+    q, chosen = list(v.get("qualifying") or []), v.get("chosen")
+    if not q or chosen not in q:
+        raise BaselineError("no E2 arm qualifies (qualifying: %s, chosen %s): E2-C's test is not read (pre-registered)"
+                            % (q or "none", chosen))
+    if prepared:
+        for inp in ((v.get("arms") or {}).get(chosen) or {}).get("inputs") or []:
+            rr = _read_json(C.INC_DIR / str(inp.get("exp")) / E2_TEST_RECORD)
+            if not (isinstance(rr, dict) and rr.get("format") == E2_TEST_FORMAT and rr.get("arm") == chosen
+                    and rr.get("weights_sha256") == inp.get("weights_sha256")):
+                raise BaselineError("E2-C's test is read with E2-%s's, the headline, and after it: %s's read is not "
+                                    "prepared (e2-test-read --e2 %s first)" % (chosen, inp.get("exp"), chosen))
+    ap, a = _e2_attr_doc(attr_path or vp.parent / ("%s.json" % E2_ATTR_NAME), reference=reference,
+                         testing_ok=testing_ok)
+    if (a.get("e2_verdict") or {}).get("sha256") != _sha(vp):
+        raise BaselineError("%s was decided on another E2 verdict (%s) than %s (%s)"
+                            % (ap, str((a.get("e2_verdict") or {}).get("sha256"))[:12], vp, str(_sha(vp))[:12]))
+    inputs = ((a.get("arms") or {}).get(RC.E2C_ARM) or {}).get("inputs") or []
+    if not inputs:
+        raise BaselineError("%s names no input of E2-C" % ap)
+    return inputs, ap, a
+
+
 # ----------------------------------------------------------------------- CLI
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Splits v2 baselines: B_v2, capacity arms, canary, B0 u tsw, "
                                              "milestones.")
     ap.add_argument("command", choices=("build", "canary-verdict", "capacity-verdict", "secondary", "estimate",
                                         "rescore-native", "native-verdict", "rescore-agnostic", "agnostic-verdict",
-                                        "e1-test-read", "rescore-e2", "e2-verdict", "e2-test-read", "e2-test-report"))
+                                        "e1-test-read", "rescore-e2", "e2-verdict", "e2-test-read", "e2-test-report",
+                                        "rescore-e2-attr", "e2-attr-verdict"))
     ap.add_argument("--exp", default=None)
     ap.add_argument("--manifest", default=None)
     ap.add_argument("--union", default=None, help="build: comma-separated manifests to merge (B0 u tsw)")
@@ -2666,13 +3220,14 @@ def main(argv=None):
     ap.add_argument("--run-id", default="secondary__incumbent")
     ap.add_argument("--source", default=None, help="secondary: where the weights come from (recorded)")
     ap.add_argument("--n-images", type=int, default=None, help="estimate: images in the base")
-    ap.add_argument("--e2", default=None, choices=sorted(RC.E2_ARMS),
+    ap.add_argument("--e2", default=None, choices=sorted(RC.E2_BUILD_ARMS),
                     help="build: this experiment's E2 arm (W: b_v2_m640's cold recipe, S: x1b; docs/CONTINUOUS_LOOP.md, "
-                         "Amendment 2026-10-04); e2-test-read, e2-test-report: the arm read")
+                         "Amendment 2026-10-04; C: E2-C, the attribution control, E2-W from E1-A's weights, amendment "
+                         "2026-10-04, later); e2-test-read, e2-test-report: the arm read")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
     if a.command in ("rescore-native", "native-verdict", "rescore-agnostic", "agnostic-verdict", "rescore-e2",
-                     "e2-verdict"):
+                     "e2-verdict", "rescore-e2-attr", "e2-attr-verdict"):
         # as the locked scorer's and the native scorer's CLIs: nothing is installed or fetched (before Ultralytics
         # is first imported, which this module's imports do not do)
         os.environ["YOLO_AUTOINSTALL"] = "false"
@@ -2694,9 +3249,18 @@ def main(argv=None):
                 rescore_e2(out_dir=a.out_dir)
             else:
                 e2_verdict(out_dir=a.out_dir)
+        elif a.command in ("rescore-e2-attr", "e2-attr-verdict"):
+            if a.exp:
+                raise BaselineError("E2-C's and E2's experiments are pre-registered (inc2.recipes.E2_BUILD_EXPS); "
+                                    "--exp is not taken")
+            if a.command == "rescore-e2-attr":
+                rescore_e2_attr(out_dir=a.out_dir)
+            else:
+                e2_attr_verdict(out_dir=a.out_dir)
         elif a.command in ("e2-test-read", "e2-test-report"):
             if not a.e2:
-                raise BaselineError("%s needs --e2 (an arm E2's verdict qualified: W or S)" % a.command)
+                raise BaselineError("%s needs --e2 (an arm E2's verdict qualified: W or S; or C, the attribution "
+                                    "control, read with the chosen arm's)" % a.command)
             if a.command == "e2-test-read":
                 res = e2_test_read(a.e2)
                 print(json.dumps({e: r["argv"] for e, r in res.items()}))

@@ -1266,9 +1266,9 @@ def stage_e1_base3(w):
           and not [e for e in w.events("proposed") if e.get("lever") == "L23B" and e.get("child_exp")
                    in [b["exp"] for b in e1]], (cards, held, ((st.get("stage") or {}).get("r0") or {}).get("base3")))
     e2 = [b["exp"] for b in w.dom["baselines"]["items"] if b.get("requires") == "e1"]
-    check("E2 (2026-10-04) is never built here: it requires E1's qualifying verdict, which this world never reaches "
-          "(no L23B --e2, no L23C, no E2 experiment)",
-          len(e2) == 6 and not [e for e in w.events("proposed") if e.get("lever") == "L23C"
+    check("E2 (2026-10-04) and E2-C (2026-10-04, later) are never built here: they require E1's qualifying verdict, "
+          "which this world never reaches (no L23B --e2, no L23C or L23D, no E2 or E2-C experiment)",
+          len(e2) == 9 and not [e for e in w.events("proposed") if e.get("lever") in ("L23C", "L23D")
                                 or (e.get("lever") == "L23B" and e.get("child_exp") in e2)]
           and not [x for x in e2 if (INC / x).exists()], e2)
 
@@ -1360,9 +1360,10 @@ def stage_milestone2_rollback(w):
     check("milestone 2 vs milestone 1 on dev: hurts (one-sided permutation p %s <= 0.025, lower mean), rollback "
           "recommended to P_1" % c.get("perm_p"), c.get("verdict") == "hurts" and c.get("rollback_recommended")
           and c.get("to_pool") == "P_1" and c.get("compared_with") == "%s_m001" % w.sid, c)
-    # the measurement arms' builds and rescores (L23B, L23N; E1's L23V, L23E; E2's L23C: record only, R0 long
-    # complete) may take the idle MAINT lane between them
-    maint = [lv for lv, ln in w.executed() if ln == "MAINT" and lv not in ("L23B", "L23N", "L23V", "L23E", "L23C")]
+    # the measurement arms' builds and rescores (L23B, L23N; E1's L23V, L23E; E2's L23C; E2-C's L23D: record only,
+    # R0 long complete) may take the idle MAINT lane between them
+    maint = [lv for lv, ln in w.executed() if ln == "MAINT"
+             and lv not in ("L23B", "L23N", "L23V", "L23E", "L23C", "L23D")]
     tail_ = maint[maint.index("L21") - 2:] if "L21" in maint else maint
     lcs = [e for e in w.events("proposed") if e.get("lever") == "LC"]
     check("the autopilot ran L20, LC, then L21 (D25), L27 (bisect) and LC (compare --exp on a bisect arm), and no "

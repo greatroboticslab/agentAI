@@ -182,7 +182,10 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # capacity/e2_rescore.json (inc2.baseline rescore-e2: the dev files' names and
 # sha256s and the verdict's sha256); e2_v1_report.* (ImageWeeds, for people),
 # capacity/e2_test_*.* and <exp>/e2_test_read.json (the person's read of the
-# sealed test) are never on the list. A Step 1 sidecar,
+# sealed test) are never on the list; E2-C's (2026-10-04, later):
+# capacity/e2_attr_v1.json (the attribution record, dev only) and
+# capacity/e2_attr_rescore.json (inc2.baseline rescore-e2-attr: the dev files'
+# names and sha256s and the record's sha256), never e2_attr_v1_report.md. A Step 1 sidecar,
 # step1_stream/eval_hits/<batch>.json, is not on the list: status.json carries
 # its fold, and the sidecar names each hit's matched evaluation key. A stream
 # ledger has no experiment: it is kept as a JSON list artifact, not under
@@ -199,7 +202,7 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"intake/(?P<batch>%s)/(?:summary|eval_hits)\.json\Z" % BATCH_RE,
     r"intake/(?P<file>sources|placement)\.json\Z",
     r"splits/(?P<ver>v[0-9]{1,3})/lock_status\.json\Z",
-    r"capacity/(?:(?:capacity|native|e1|e2)_v1|e2_rescore)\.json\Z",
+    r"capacity/(?:(?:capacity|native|e1|e2|e2_attr)_v1|e2_rescore|e2_attr_rescore)\.json\Z",
     r"splits/v3/summary\.json\Z",
     r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore|agnostic_rescore)\.json\Z"
     % ("|".join(RESERVED_DIRS), EXP_RE),

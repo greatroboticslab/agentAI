@@ -158,6 +158,13 @@ pre-registered experiment name; e2_cost prices one experiment from its
 image-epochs (N x the recipe's epochs) at m640's measured 14.2 ms, as E1's
 arms were priced, plus the dev score and the finals.
 
+E2-C, the attribution control (docs/CONTINUOUS_LOOP.md, "Amendment
+(2026-10-04, later): E2-C, the attribution control (pre-registered)"): arm
+letter C, experiments e2_c_m640_seed<k>, E2-W's definition exactly (the cold
+recipe) except the init, E1-A's seed-s weights (E2C_INIT_EXP). E2_BUILD_ARMS
+holds the three letters a build takes; E2_ARMS stays E2's two, the only arms
+E2's verdict reads (E2-C can neither qualify nor be chosen).
+
 Cost (estimates, V100, 1 SU per GPU-hour). The measured rates are YOLO11n at
 640 px (docs/CONTINUOUS_LOOP.md §5.6): cold 6.0-7.0 ms per image-epoch
 (realloop_v1 base 1.974 h / 3 / 3,927 / 100 = 6.0; b0_v1 base 1.768 h / 3 /
@@ -283,6 +290,18 @@ E2_FINAL_EXAMS = ("dev", "imageweeds")    # test is read once, after the verdict
 E2_MS_PER_IMAGE_EPOCH = BUDGET_MS_PER_IMAGE_EPOCH     # 14.2, m640 measured
 E2_DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-04): E2, the 12-class detector on E1-B's backbone "
                  "(pre-registered)")
+# ------------------------- E2-C, the attribution control (amendment 2026-10-04, later)
+E2C_ARM = "C"                             # E2-W's definition with E1-A's weights as the init
+E2C_EXP = "e2_c_m640_seed%d"
+E2C_INIT_EXP = "e1_a_m640"                # E1's arm A (base_v2 as one class, cold_budget): seed s starts from its seed s
+# every arm `inc2.baseline build --e2` builds: E2's two (E2_ARMS, the only ones its verdict reads) and E2-C, which
+# can neither qualify nor be chosen (its own record, capacity/e2_attr_v1.json)
+E2_BUILD_ARMS = dict(E2_ARMS, **{E2C_ARM: COLD_NAME})
+E2_BUILD_EXPS = dict(E2_EXPS, **{E2C_ARM: E2C_EXP})
+# the E1 arm each E2 arm starts from (E1's verdict names B as its `exp` and A as its `reference`)
+E2_INIT_ARM = {"W": "B", "S": "B", E2C_ARM: "A"}
+E2C_DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-04, later): E2-C, the attribution control "
+                  "(pre-registered)")
 
 
 class RecipeError(ValueError):
@@ -423,28 +442,30 @@ def check_budget_record(rec, arm, n_images):
 
 
 def _e2_letter(letter):
-    if letter not in E2_ARMS:
-        raise RecipeError("E2's arms are %s (pre-registered), not %r" % (sorted(E2_ARMS), letter))
+    if letter not in E2_BUILD_ARMS:
+        raise RecipeError("E2's arms are %s and the attribution control %s (pre-registered), not %r"
+                          % (sorted(E2_ARMS), E2C_ARM, letter))
     return letter
 
 
 def e2_exp(letter, seed):
     """The pre-registered experiment of E2's arm `letter` and seed (one
-    experiment per seed: seed s starts from E1-B's seed s)."""
+    experiment per seed: seed s starts from E1-B's seed s; for E2-C, C,
+    from E1-A's seed s)."""
     _e2_letter(letter)
     if isinstance(seed, bool) or not isinstance(seed, int) or seed not in E2_SEEDS:
         raise RecipeError("E2's seeds are %s (pre-registered), not %r" % (list(E2_SEEDS), seed))
-    return E2_EXPS[letter] % seed
+    return E2_BUILD_EXPS[letter] % seed
 
 
 def e2_recipe(letter, arm=E2_ARM):
     """The base runs' recipe of E2's arm (module docstring), in exp.json's
-    form (no seed): W the arm's cold recipe, S the table's x1b."""
+    form (no seed): W and C the arm's cold recipe, S the table's x1b."""
     _e2_letter(letter)
     aid = arm_id(arm)
     if aid != E2_ARM:
         raise RecipeError("E2 is pre-registered on %s only, not %s" % (E2_ARM, aid))
-    return cold(aid) if E2_ARMS[letter] == COLD_NAME else incremental(E2_ARMS[letter], aid)
+    return cold(aid) if E2_BUILD_ARMS[letter] == COLD_NAME else incremental(E2_BUILD_ARMS[letter], aid)
 
 
 def _diff(recipe, want):
@@ -721,7 +742,7 @@ def e2_cost(n_images, letter, seeds, final_exams, arm=E2_ARM, exam_images=None, 
     fin = score_hours(sum(exam_images[e] for e in final_exams), rate=rate)
     total = (n_seeds * (per_run[0] + fin[0]), n_seeds * (per_run[1] + fin[1]))
     return {"estimate": True, "arm": arm_id(arm), "n_images": int(n_images), "seeds": n_seeds,
-            "recipe_name": E2_ARMS[letter], "epochs": rec["epochs"], "imgsz": rec["imgsz"],
+            "recipe_name": E2_BUILD_ARMS[letter], "epochs": rec["epochs"], "imgsz": rec["imgsz"],
             "image_epochs": ie, "ms_per_image_epoch": E2_MS_PER_IMAGE_EPOCH,
             "per_run_gpu_h": [round(per_run[0], 3), round(per_run[1], 3)],
             "final_run_gpu_h": [round(fin[0], 3), round(fin[1], 3)],

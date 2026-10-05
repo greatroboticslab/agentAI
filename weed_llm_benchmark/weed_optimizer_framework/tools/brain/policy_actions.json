@@ -2246,7 +2246,8 @@
           "value_type": "str",
           "values": [
             "W",
-            "S"
+            "S",
+            "C"
           ]
         },
         "est_gpu_hours": {
@@ -2268,7 +2269,7 @@
         "round-scheduler",
         "human"
       ],
-      "description": "Lever L23's baselines (R3, envelope-eligible): B_v2 (milestone 0, 5 cold seeds), the canary, the capacity arms of L-4 (--arm s640 | m640), the measurement arms (--arm m832 | s1024 | l640 | y26m640 | y26l640, role capacity, record only) and B0 u tsw (--union), each a cold baseline under the v2 guard; and E1's two arms (2026-10-03: --arm m640 --role baseline on splits v3's base_v2_weed.jsonl and base_v3_weed.jsonl, the equal-compute recipe cold_budget, record only); the role is inc2.baseline's and must match what is built. E2 (2026-10-04, docs/CONTINUOUS_LOOP.md, Amendment: E2, pre-registered): --e2 W|S builds one of E2's six single-seed experiments (e2_<w|s>_m640_seed<k>: --manifest base_v2 --seeds k --arm m640 --role baseline), b_v2_m640's definition except the init (E1-B's seed-k weights) and, for S, the recipe (x1b); record only."
+      "description": "Lever L23's baselines (R3, envelope-eligible): B_v2 (milestone 0, 5 cold seeds), the canary, the capacity arms of L-4 (--arm s640 | m640), the measurement arms (--arm m832 | s1024 | l640 | y26m640 | y26l640, role capacity, record only) and B0 u tsw (--union), each a cold baseline under the v2 guard; and E1's two arms (2026-10-03: --arm m640 --role baseline on splits v3's base_v2_weed.jsonl and base_v3_weed.jsonl, the equal-compute recipe cold_budget, record only); the role is inc2.baseline's and must match what is built. E2 (2026-10-04, docs/CONTINUOUS_LOOP.md, Amendment: E2, pre-registered): --e2 W|S builds one of E2's six single-seed experiments (e2_<w|s>_m640_seed<k>: --manifest base_v2 --seeds k --arm m640 --role baseline), b_v2_m640's definition except the init (E1-B's seed-k weights) and, for S, the recipe (x1b); record only. E2-C (2026-10-04, later, Amendment: E2-C, the attribution control, pre-registered): --e2 C builds e2_c_m640_seed<k>, E2-W's definition with E1-A's seed-k weights as the init; record only."
     },
     "inc_rescore_native": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.baseline rescore-native --exp {exp} --reference {reference}",
@@ -2413,6 +2414,37 @@
         "human"
       ],
       "description": "Lever L23C (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04: E2, pre-registered): inc2.baseline rescore-e2 scores E2's six final runs on dev at 640 (inc2.scorer_native, the locked scorer as a library; never test, never a protocol score) and records E2's pre-registered verdict (capacity/e2_v1.json, dev only) and its record (capacity/e2_rescore.json). Record only: nothing switches."
+    },
+    "inc_rescore_e2_attr": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.baseline rescore-e2-attr",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 20.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that scores, never trains: one dev pass at 640 per E2-C final run (three) and per missing E2-W or b_v2_m640 file (six at most). est_gpu_hours is levers_stream.price's 'rescore' estimate (stream-domain cost rescore_hours_per_run per run, est.), charged to the campaign envelope and settled from sacct when the job ends."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23D (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04, later: E2-C, the attribution control, pre-registered): inc2.baseline rescore-e2-attr scores E2-C's three final runs on dev at 640 (inc2.scorer_native, the locked scorer as a library; never test, never a protocol score) and records the attribution of E2's result (capacity/e2_attr_v1.json, dev only: D_data = E2-W - E2-C) and its record (capacity/e2_attr_rescore.json). Record only: nothing switches and capacity/e2_v1.json is never rewritten."
     },
     "inc_build_pilot4": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.pilot4 build --exp {exp} --from {from_exp} --recipes {recipes}",

@@ -1579,8 +1579,9 @@ def s_r0():
     arm, Stage C, the measurement arms and their rescores, E1 (2026-10-03:
     base v3's build L23V, its two arms L23B --role baseline, their agnostic
     rescore L23E), E2 (2026-10-04: once E1's verdict qualifies E1-B, its six
-    single-seed builds L23B --e2 W|S, then its rescore and verdict L23C), then
-    the first segment."""
+    single-seed builds L23B --e2 W|S), E2-C (2026-10-04, later: its three
+    builds L23B --e2 C), E2's rescore and verdict L23C, then E2-C's
+    attribution L23D, then the first segment."""
     w = World("r0")
     w.lock()
     w.step1_status()
@@ -1711,7 +1712,8 @@ def s_r0():
     # 2026-10-04: E2. E1's verdict qualifies E1-B (inc2.baseline wrote capacity/e1_v1.json in L23E's job): E2's six
     # single-seed builds, one at a time, then its rescore and verdict (L23C), each once, within the envelope
     w.e1_verdict()
-    e2 = [b for b in w.dom["baselines"]["items"] if b.get("requires") == "e1"]
+    e2 = [b for b in w.dom["baselines"]["items"] if b.get("requires") == "e1" and b.get("e2") in ("W", "S")]
+    e2c = [b for b in w.dom["baselines"]["items"] if b.get("requires") == "e1" and b.get("e2") == "C"]
     e2got = []
     for b in e2:
         e2got.append(_step(w, "L23B", lambda b=b: (w.experiment(b["exp"], final=[w.final_row("base", 0.85, 0.002, 1)]),
@@ -1730,14 +1732,36 @@ def s_r0():
                                                b["e2"]] for b in e2]
           and e2ex == ["envelope"] * 6 and [x["name"] for x in e2sub] == ["inc_build_%s" % b["exp"] for b in e2]
           and e2req.get("params", {}).get("e2") == "S", ([tail(x, 8) for x in e2got], e2ex))
+    # 2026-10-04, later: E2-C. E1-A is done: E2-C's three builds after E2's six, each once, within the envelope
+    cgot = []
+    for b in e2c:
+        cgot.append(_step(w, "L23B", lambda b=b: (w.experiment(b["exp"], final=[w.final_row("base", 0.85, 0.002, 1)]),
+                                                  w.job_done("inc_build_%s" % b["exp"]))))
+    csub = [x for x in w.submits if "--e2" in x["argv"] and "C" in x["argv"]]
+    creq = SR.parse_submit("build", csub[0]["argv"][csub[0]["argv"].index("inc2.baseline"):]) if csub else {}
+    check("E2-C: then its three builds, each once, as L23B (--seeds k --arm m640 --role baseline --e2 C), in the order "
+          "C0, C1, C2, within the envelope, each one build job named after its experiment; the grammar reads --e2 C",
+          [(x or {}).get("child_exp") for x in cgot] == ["e2_c_m640_seed0", "e2_c_m640_seed1", "e2_c_m640_seed2"]
+          and [tail(x, 8) for x in cgot] == [["--seeds", b["seeds"], "--arm", "m640", "--role", "baseline", "--e2", "C"]
+                                             for b in e2c]
+          and [x["name"] for x in csub] == ["inc_build_%s" % b["exp"] for b in e2c]
+          and creq.get("params", {}).get("e2") == "C", ([tail(x, 8) for x in cgot], creq.get("params")))
     pc = _step(w, "L23C", lambda: (w.job_done("inc_build_e2_v1"), w.e2_records()))
     check("  then, all six and b_v2_m640 done, L23C once (inc2.baseline rescore-e2), within the envelope, one job "
           "named inc_build_e2_v1; no L23N for any E2 experiment",
           tail(pc, 2) == [MOD + "inc2.baseline", "rescore-e2"]
           and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23C"] == ["envelope"]
-          and [x["name"] for x in w.submits if "rescore-e2" in x["argv"]] == ["inc_build_e2_v1"]
+          and [x["name"] for x in w.submits if x["argv"][-1] == "rescore-e2"] == ["inc_build_e2_v1"]
           and not [e for e in w.events("proposed") if e.get("lever") == "L23N"
                    and str((e.get("argv") or [])[-3:]).count("e2_")], tail(pc, 2))
+    e2v = (w.inc / "capacity" / "e2_v1.json").read_bytes()
+    pd = _step(w, "L23D", lambda: (w.job_done("inc_build_e2_attr_v1"), w.e2_attr_records()))
+    check("  then, E2's verdict recorded and E2-W's and E2-C's runs done, L23D once (inc2.baseline rescore-e2-attr), "
+          "within the envelope, one job named inc_build_e2_attr_v1; capacity/e2_v1.json unchanged",
+          tail(pd, 2) == [MOD + "inc2.baseline", "rescore-e2-attr"]
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23D"] == ["envelope"]
+          and [x["name"] for x in w.submits if "rescore-e2-attr" in x["argv"]] == ["inc_build_e2_attr_v1"]
+          and (w.inc / "capacity" / "e2_v1.json").read_bytes() == e2v, tail(pd, 2))
     w.tick(2)
     check("  once both exist, no measurement arm is proposed again, nor its rescore",
           [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_m832") == 1
@@ -1750,7 +1774,8 @@ def s_r0():
     lv = [e.get("lever") for e in w.events("executed") if e.get("lane") == "MAINT"]
     check("the whole sequence ran by the platform, in order, one MAINT item at a time, each once",
           lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure)
-          + ["L23V"] + ["L23B"] * len(e1) + ["L23N"] * len(measure) + ["L23E"] + ["L23B"] * len(e2) + ["L23C"], lv)
+          + ["L23V"] + ["L23B"] * len(e1) + ["L23N"] * len(measure) + ["L23E"] + ["L23B"] * len(e2)
+          + ["L23B"] * len(e2c) + ["L23C", "L23D"], lv)
 
 
 def _commits_ev(segments, ctx):

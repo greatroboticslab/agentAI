@@ -3418,3 +3418,87 @@ Written after E2's amendment and before any E2 build, run or number existed. Dec
 **Test.** When E2's chosen arm's test is read, E2-C's test is read once as well, by the same person's step, and reported beside the headline (12-class and agnostic, mean ± sd over 3 seeds). No decision rests on it. If no E2 arm qualifies, E2-C's test is not read.
 
 **Platform.** The stream proposes E2-C's three builds after E2's six (C0, C1, C2), gated on E1's verdict being decided and E1-A's experiment being done, and proposes the attribution record once E2-W's and E2-C's runs are scored. The implementation follows in its own change, deployed before any E2 dev score exists; E2's six builds and L23C proceed as written above meanwhile. Price: as an E2-W item, 6.95 GPU-h per build item, 20.9 for the three.
+
+### What changed
+
+- `inc2/recipes.py`:
+  - `E2C_ARM`, `E2C_EXP`, `E2C_INIT_EXP` (`e1_a_m640`), `E2C_DECIDED_BY`;
+  - `E2_BUILD_ARMS` (W, S and C) and `E2_BUILD_EXPS`, the letters a build takes. `E2_ARMS` stays E2's two arms, the only ones E2's verdict reads;
+  - `E2_INIT_ARM` (W and S start from E1-B, C from E1-A);
+  - `e2_exp`, `e2_recipe` and `e2_cost` take C: E2-W's cold recipe and E2-W's price.
+- `inc2/train.py`: `e2_problems` takes arm C. E1's verdict must be decided, still hold the decision the record holds, and name the init's experiment as its arm A (its `reference`, the pre-registered `e1_a_m640`). E1-A's run must still record the weights. The init check, the environment check and the whole load read the e2 record, so they apply to E2-C unchanged.
+- `inc2/baseline.py`:
+  - `build --e2 C` (`e2_record`): E2-W's checks with E1-A in place of E1-B. E1's verdict is decided and names `e1_a_m640` as its arm A. E1-A is E1's arm A on m640 with cold_budget, built from the splits v3 summary the verdict was decided on. Its run is done and production, under the current LOCK v2 with a clean guard, and its own final.pt hashes as its run.json records. The model's research-only flag is base_v2's OR E1-A's;
+  - `rescore-e2-attr` (L23D) and `e2-attr-verdict` write `capacity/e2_attr_v1.json` and `e2_attr_v1_report.md`. `rescore-e2-attr` then writes `capacity/e2_attr_rescore.json` (`e2_attr_decision`, `_e2_attr_side`, `_e2_attr_pair`, `_e2_attr_canonical`);
+  - `e2-test-read --e2 C` and `e2-test-report --e2 C` (`_e2c_gate`, `_e2_attr_doc`).
+- `run_inc2_build.sh`: `inc2.baseline rescore-e2-attr` (provenance and lock `e2_attr_v1`, no advance).
+- Autopilot:
+  - `stream_domains/weed.json`: three baselines `e2_c0`, `e2_c1`, `e2_c2` after E2's six (`requires: e1`, `e2: C`, priced as an E2-W item) and the block `e2_attr`;
+  - `diagnose_stream.DR0`: `_e1a_done` on top of E2's gate for E2-C's builds, and L23D;
+  - `stream.py`: `/stage/e2_attr`, L23D as record only (phase E2_ATTR, followed by its job name and record after an unknown outcome or a restart), the card of a failed E2-C build, and the attribution card;
+  - `stream_levers.json`: the L23D row and the envelope;
+  - `executor` and `stream_remote`: the grammar, the job name `inc_build_e2_attr_v1`, `--e2 C`, and the stream summary's two new files;
+  - `evidence.ALLOWED`: `capacity/e2_attr_v1.json` and `capacity/e2_attr_rescore.json`;
+  - `brain/policy_actions.json`: the `inc_rescore_e2_attr` row and `--e2 C`;
+  - `brain/approvals.ENVELOPE_ACTIONS`.
+
+### Choices where the amendment was silent, and why
+
+1. *Two letter sets.* `E2_ARMS` stays `{W, S}`. E2's verdict, L23C, the stream's `e2` block and E2's card read only those, so E2-C cannot qualify, be chosen or hold L23C. A build takes `E2_BUILD_ARMS`.
+2. *What E2-C's build asks of E1's verdict.* It must be decided and name `e1_a_m640` as its arm A. It need not qualify E1-B: the amendment gates E2-C on "E1's verdict being decided and E1-A's experiment being done". The platform proposes E2-C's builds only under E2's own gate as well (E1-B qualified and done), so E2-C is built only as the control of an E2-W that exists.
+3. *L23D waits for E2's verdict record* (`/stage/e2` done). Whether E2-S − E2-C is computed rests on E2's choice, and a decided attribution is never rewritten, so it cannot be decided before the choice exists. L23C also writes the E2-W files the attribution reads. After a failed L23C, L23D waits for a person's rerun of `rescore-e2`.
+4. *E2's files as E2's verdict read them.* The attribution reads E2-W's (and, when chosen, E2-S's) and the reference's native files only when their names and sha256s are the ones `e2_v1.json` records. It reads `e2_v1.json` only when it was decided under E2's pre-registered parameters. It records E2's verdict by name and sha256 and never writes it.
+5. *One seed text for the record.* W − C, S − C and C − b_v2_m640 all draw under `inc2/e2/attribution_se`, one draw for every run, as E2's two arms share `inc2/e2/species_se`. C − b_v2_m640 is reported with its D, pooled sd and SE; it decides nothing.
+6. *S − C's conditions are computed and stored*, the same way as D_data, labelled confounded by the recipe. They credit nothing: `credited_to_data` is W − C's alone.
+7. *What a recomputation must reproduce* to keep the record byte for byte: the status, `credited_to_data`, `testing_allowed`, the bootstrap's seed text and resamples, E2's qualifying arms and choice, W − C's and S − C's rule fields, and every arm's inputs' sha256s. C − b_v2_m640 and the reported species are not part of it, as E2's reported fields are not part of E2's decision.
+8. *E2-C's test read needs the attribution decided* under its pre-registered parameters (the rule, the reference, `inc2/e2/attribution_se` with 1,000 resamples, no test-mode file) on the same E2 verdict (by sha256). That record pins E2-C's weights by sha256 before any test is read, as E2's verdict pins its arms'. The read is prepared only after the chosen arm's read was prepared, once. The report says it sits beside the chosen arm's headline.
+9. *A separate rescore record.* `capacity/e2_attr_rescore.json`, written after the attribution, marks L23D done, as `e2_rescore.json` marks L23C done. The card reads `e2_attr_v1.json`.
+10. *E2-C's builds join E2's group.* While any of the nine builds is failed, DR0 proposes none of the others. A failed E2-C build's card says that L23D needs all three and that L23C does not wait.
+11. *L23D's price*: nine scoring passes at 0.25 GPU-h (2.25 GPU-h), as L23C's: E2-C's three finals, and up to three E2-W and three reference files that may be missing.
+
+### How it is verified
+
+- `tests/test_inc2_e2.py`, new cases (E1-A is a fixture as E1-B is):
+  - the constants; `e2_cost` for C equal to W's;
+  - `build --e2 C`: E2-W's definition but the init (E1-A's base__s0 by absolute path and run.json sha256); research-only from E1-A; inc2.train's `e2_problems` accepting it and refusing an E2-C record whose init is E1-B's;
+  - its refusals, each leaving no directory: the name, the seeds, the role, the arm, the finals; the reference's recipe, manifest and LOCK v2; E1's verdict missing, pending, naming another arm A or built from another summary; E1-A not arm A; its run not done; its final.pt missing, a symlink or modified. A decided E1 verdict that does not qualify E1-B still builds it;
+  - inc2.train in production for E2-C (stops at device). Refused at stage recipe: x1b, E1-B's or the arm's weights as init, another seed, E1-A's run.json changed, E1's verdict naming another arm A, another environment. A real 1-epoch CPU run from E1-A's weights loads whole;
+  - the attribution on synthetic native files: D_data and pooled sd; the SE equal to an independent recomputation under `inc2/e2/attribution_se` and unlike E2's draw; each condition alone not crediting; E2-S − E2-C only when E2 chose S, labelled confounded; what is reported beside; three pending cases;
+  - every refusal of the attribution: E2's verdict under other parameters, an E2-W file changed after E2's verdict read it, an E2-C stamp, test-mode or unchecked file, init or weights, E2-C from another E1 verdict or record or from E1-B, another reference manifest, two experiments of one seed;
+  - the record: dev only (`brain_plan.dev_leaks`, the evidence scrub), never rewriting `e2_v1.json`, kept byte for byte, refused under other resamples, with test-mode files admitted or when its decision changed; a pending file overwritten;
+  - `rescore-e2-attr` end to end with real CPU passes: refused before anything is scored without E2's decided verdict or with an undone E2-C final run; then E2-C's three written, E2-W's and the reference's kept, a complete rescore record; a second run keeps everything;
+  - `e2-test-read --e2 C`: refused before the chosen arm's read is prepared, when no arm qualifies, on E2's verdict under other parameters, without the attribution, on one decided under other parameters or on another E2 verdict, and when E2-C's weights changed. Then three specs, once, each record naming the arm it sits beside. `e2-test-report --e2 C`: pending, then complete and never the headline, refusing a score from other weights and an attribution that admitted test-mode files;
+  - the CLI.
+- `tests/test_stream_ap_units.py` (`t_e2`, its E2-C part):
+  - the domain items and block, prices, argv, the grammar and the evidence list;
+  - the gate in five states; C0, C1, C2 in order with the full cites;
+  - L23D at three of three and not at two, with its cites; its record complete; one attribution card in three variants (credited with the read commands, E2 chose S, no arm qualifying);
+  - L23C before L23D when both are due; no L23D after a failed L23C;
+  - a failed L23D (one card, not proposed again, no longer due in DR0); an unknown outcome followed by its job name, also while that job stays queued past `BUILD_LOST_SNAPSHOTS`;
+  - an E2-C build the build refused (one card, the next E2-C build waiting until a person builds it);
+  - on a forked stream version (`_t_e2c_fork`: the stream's ledger re-chained without Stage C's feasibility build and read after the campaign recorded Stage C, as L22's fork leaves it): C0, C1, C2 in order once E1's verdict qualifies, no L28, then L23D once. With `_stream_state` as it was before 16c56e2 (Stage C read from the version's own ledger only), these checks fail: nothing of E2-C is proposed and L28 is.
+- `tests/test_stream_ap_replay.py`: stream_r0 now runs E2's six builds, E2-C's three, L23C, then L23D, each once, within the envelope.
+- `tests/test_stream_pipeline.py`: E2 and E2-C are never built in a world that never reaches E1's verdict. `tests/test_inc2_stream.py`: `run_inc2_build.sh inc2.baseline rescore-e2-attr` under `e2_attr_v1`.
+- An ad hoc mutation run on scratch copies of the package: 28 mutants of the new logic, each killed by a failing check of `test_inc2_e2.py` (the test functions each targets) or `test_stream_ap_units.py`. Two platform mutants survived the first pass; the two cases above added for them (a job queued past `BUILD_LOST_SNAPSHOTS`, DR0 after a failed L23D) kill them. They covered:
+  - inc2.train: E2-C accepted under any arm A; E2-C requiring E1-B to qualify;
+  - the build: E2-C from E1-B's weights; no check that E1's verdict names `e1_a_m640`, that E1-A is arm A, or of the reference's recipe;
+  - the attribution: either condition alone crediting; E2's seed text; E2's files not checked against E2's verdict; E2-S − E2-C always or never computed; the E1 decisions not compared; the decision compared without the bootstrap; a differing decided record overwritten; `rescore-e2-attr` scoring before it checks E2's verdict's parameters;
+  - the test read: without the chosen arm's prepared read, the verdict's sha256, a qualifying choice or the attribution's parameters;
+  - the platform: E2-C built without E1-A done; L23D before E2's verdict or at two of three; L23D not record only; L23D followed by L23C's job name; `/stage/e2_attr` ignoring what the platform ran; the card without the read commands; a failed E2-C build's card without its own text.
+- The full suite (142 scripts) on the lab passes but for 24 scripts, which fail the same way, check for check, on main's tree (16c56e2) in the same layout. Their causes lie in that environment, not in this change: the lab venv's Ultralytics is 8.4.129, whose args no longer carry the `half` the locked scorer reads; pytest is absent; the CI copy is not a git checkout (the deploy dry-run); there is no bench env with numpy for the job scripts and no Ollama `/api/show`; `test_brain_api.py` fails as on main. `test_inc2_e2.py` has one failing check more there than on main: E2-C's real 1-epoch run meets the same scorer error as E2-W's. On macOS with Ultralytics 8.4.22, the 13 inc2 and inc scripts among them, `test_stream_pipeline.py` and `test_stream_ap_no_throttles.py` pass with 0 failures (`test_inc2_e2.py`: 112 checks).
+
+### Deploy
+
+These files change `executor.code_hash()` and the stream rules version:
+- `inc_autopilot/{executor.py, stream.py, stream_remote.py, diagnose_stream.py, evidence.py, stream_levers.json, stream_domains/weed.json}`;
+- `brain/{policy_actions.json, approvals.py}`;
+- `tests/test_stream_ap_replay.py`.
+
+`inc2/{recipes.py, train.py, baseline.py}` are hashed into every run's drift check and S23. Sync the lab and both cluster copies from one commit that contains E2's commits and 16c56e2 (a forked stream version inherits the campaign's Stage C decision), restart the dashboard (`inc_dashboard.py`), then run `executor.run_replay_tests` so envelope grants resume. A run of E2's six that starts after the sync meets the same E2 checks as before (W and S are unchanged).
+
+A commit without 16c56e2 puts `diagnose_stream._stream_state` back to reading Stage C from the stream version's own ledger only. The live stream is the fork `weed_stream_v1_fork1364` (05:57Z on 2026-10-04), whose ledger holds no feasibility event, so R0 would read as incomplete again and DR0 would propose none of E2's builds, E2-C's builds, L23C or L23D. Before syncing, `git merge-base --is-ancestor 16c56e2 <commit>` must succeed.
+
+Before autonomy is turned on again, these read-only checks are made:
+1. *No E2 dev score exists yet* (the amendment's condition): `capacity/e2_v1.json` and `capacity/e2_rescore.json` are absent, and no `e2_*_m640_seed*/runs/final__base__s*/scores/dev@640.json` exists. No `e2_c_m640_seed*` experiment exists.
+2. *E1-A.* `capacity/e1_v1.json` names `e1_a_m640` as its `reference`. `e1_a_m640/runs/base__s{0,1,2}/run.json` are done and `testing` false; each guard record names the current LOCK v2 with nothing refused; each `weights/final.pt` is a regular file that hashes to its `weights_sha256`. `e1_a_m640/exp.json` is E1's arm A on m640 with cold_budget, built from the summary the verdict records.
+3. *Budget.* The campaign's and the domain's remaining SU cover E2-C's 20.9 GPU-h of builds and L23D's 2.25, on top of E2's 39.9 and the next L18 (about 116).

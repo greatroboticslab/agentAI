@@ -421,7 +421,7 @@
   },
   "L23B": {
    "name": "baseline_v2",
-   "title": "Cold baselines on splits v2 (B_v2 milestone 0, the canary, the capacity arms, B0 u tsw; the measurement arms, E1's arms and E2's six single-seed experiments, --e2 W|S)",
+   "title": "Cold baselines on splits v2 (B_v2 milestone 0, the canary, the capacity arms, B0 u tsw; the measurement arms, E1's arms, E2's six single-seed experiments, --e2 W|S, and E2-C's three, --e2 C)",
    "lane": "MAINT",
    "follow": "build",
    "policy_action": "inc_build_baseline_v2",
@@ -556,6 +556,26 @@
    "falsifier": "An arm qualifies only when D > 2 pooled sd and > the paired image-bootstrap SE (pre-registered 2026-10-04); nothing switches; each qualifying arm's sealed test is read once afterwards by a person (the chosen arm's is E2's headline).",
    "estimator": "rescore",
    "note": "Record only: proposed once, when E2's six experiments and b_v2_m640 are done and E2's rescore record is missing; a failure is a person's card and it is not proposed again."
+  },
+  "L23D": {
+   "name": "rescore_e2_attr",
+   "title": "Score E2-C's final runs (and any missing E2-W or reference run) on dev at 640 for their per-image arrays, then record E2-C's attribution of E2's result",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_rescore_e2_attr",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.baseline",
+    "rescore-e2-attr"
+   ],
+   "control": "E2-C (E2-W's definition from E1-A's weights: base_v2's 6,811 images pre-trained as one class at equal compute).",
+   "success": "scores/dev@640.json of every E2-C final run, capacity/e2_attr_v1.json decided, capacity/e2_attr_rescore.json complete (dev only).",
+   "falsifier": "E2's gain is credited to base v3's data only when D_data = E2-W - E2-C > 2 pooled sd and > the paired image-bootstrap SE (pre-registered 2026-10-04, later); otherwise it is a property of one-class pre-training; nothing switches and capacity/e2_v1.json is never rewritten.",
+   "estimator": "rescore",
+   "note": "Record only: proposed once, when E2's verdict is recorded (its rescore record complete), E2-W's and E2-C's six experiments are done and the attribution's rescore record is missing; a failure is a person's card and it is not proposed again."
   },
   "LV": {
    "name": "verdict",
@@ -893,11 +913,12 @@
    "L23V",
    "L23E",
    "L23C",
+   "L23D",
    "L25",
    "L27",
    "L28",
    "LI"
   ],
-  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04). L23's splits build and lock always wait for a person (D-A's exact command)."
+  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04; L23D, E2-C's attribution rescore, one GPU job, 2026-10-04, later). L23's splits build and lock always wait for a person (D-A's exact command)."
  }
 }
