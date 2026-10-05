@@ -622,8 +622,8 @@
     "--arm",
     "{arm}"
    ],
-   "control": "b_v2_m640's native dev files at 640 (the files capacity/e2_v1.json read); E3-M is the same classifier on the reference's own boxes, E3-A on E1-A's (base_v2, the control for data).",
-   "success": "twostage/e3_v1/arms/<arm>/s<k>/dev.json of the arm's three seeds, each stage-1 box set reproducing its run's recorded agnostic dev AP, and capacity/e3_score_<arm>.json complete (dev only).",
+   "control": "b_v2_m640's native dev files at 640 (the files capacity/e2_v1.json read); E3-M is the same classifier on the reference's own boxes (class-agnostic NMS), E3-A on E1-A's (base_v2, the control for data).",
+   "success": "twostage/e3_v1/arms/<arm>/s<k>/dev.json of the arm's three seeds, E3-A's and E3-B's stage-1 box sets reproducing their runs' recorded agnostic dev AP, and capacity/e3_score_<arm>.json complete (dev only).",
    "falsifier": "An arm qualifies only when D = mean(arm) - mean(b_v2_m640) on dev species mAP50-95 > 2 pooled sd and > the paired image-bootstrap SE (pre-registered 2026-10-05); nothing switches.",
    "estimator": "e3_score",
    "note": "Record only: one job per arm, in the domain's order (M, A, B), proposed once E2's verdict is recorded and decided, the three source experiments are done and E2-C's attribution (L23D) is settled; a failure is a person's card, the other arms wait, and it is not proposed again."

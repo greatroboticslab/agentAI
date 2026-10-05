@@ -17,11 +17,15 @@ BioCLIP-2 crop species classifier (docs/CONTINUOUS_LOOP.md, "Amendment
 The arms (stage 1, no retraining): seed s of arm X reads the final EMA
 weights of an existing base run, <exp>/runs/base__s<s>/weights/final.pt
 (ARMS: M b_v2_m640, A e1_a_m640, B e1_b_m640), under the locked scorer's
-own inference and NMS; rows at identical coordinates are reduced to their
-most confident one (inc/scorer.py one_per_box), which is also how E3-M's
-twelve classes are collapsed. A stage-1 box set is therefore the one its
-run's recorded protocol agnostic dev score was computed on, and its
-agnostic AP must reproduce that score (STAGE1_TOL), for every arm.
+own inference settings (640 px, its conf, IoU and max_det). E3-A and E3-B
+(one-class detectors) take the locked scorer's own NMS; E3-M takes
+class-agnostic NMS (NMS), which collapses b_v2_m640's twelve classes to
+one box set. Rows at identical coordinates are then reduced to their most
+confident one (inc/scorer.py one_per_box). A box set under the locked NMS
+is the one its run's recorded protocol agnostic dev score was computed on,
+so E3-A's and E3-B's agnostic AP must reproduce that score (STAGE1_TOL);
+E3-M's agnostic-NMS box set has no recorded score to reproduce. E3-M's
+boxes under the locked NMS are a reported reading (REPORTED_NMS).
 
 Stage 2: each stage-1 box is mapped back to the original image (the
 inverse of the validator's letterbox, per axis), cut as inc.audit cuts a
@@ -42,8 +46,10 @@ per-class, species and agnostic definitions are computed on them,
 unchanged. The same path fed a run's own predictions (identity mode) must
 reproduce b_v2_m640's recorded protocol dev scores (equivalence), or no E3
 score is taken. Every pass checks that the ground-truth boxes survive the
-geometry (GT_TOL) and that each image's EXIF orientation is absent or 1
-and its size Ultralytics' ori_shape.
+geometry (GT_TOL) and that each image's EXIF orientation is absent, 0 or
+1 (OK_ORIENTATIONS) and its size Ultralytics' ori_shape. A training image
+of the classifier may also carry 3, 6 or 8 (FIT_ORIENTATIONS): it is cut,
+as every crop is, in the EXIF-transposed frame, which is its labels'.
 
 Layout (INC_DIR/twostage/e3_v1, written once each unless said):
   classifier/classifier.json, classifier.npz   the fit (weights, prior, the fold classifiers)
@@ -51,7 +57,7 @@ Layout (INC_DIR/twostage/e3_v1, written once each unless said):
   classifier/dev_gt.json                       top-1 / top-3 on dev ground-truth crops (reported)
   equivalence.json                             the identity check, with the code it ran
   arms/<X>/s<k>/<exam>.json, .images.npz, .stage1.npz   E3 scores (dev decides; imageweeds reported)
-  arms/M/s<k>/dev.agnostic_nms.*               E3-M's boxes under agnostic NMS (reported)
+  arms/M/s<k>/dev.locked_nms.*                 E3-M's boxes under the locked NMS (reported)
   arms/<X>/reported.json                       the reported passes' outcome (overwritten)
   test/<X>/e3_test_read.json, test/<X>/s<k>/test.*, test/reference/s<k>/test.identity.*
   sensitivity.json                             the fold classifiers on seed 0 (optional, reported)
@@ -102,8 +108,10 @@ from . import train as T
 E3_NAME = "e3_v1"
 ARMS = {"M": "b_v2_m640", "A": "e1_a_m640", "B": "e1_b_m640"}
 ARM_ORDER = ("M", "A", "B")                 # the proposal order, and the tie order of the choice
-NMS = {"M": "locked", "A": "locked", "B": "locked"}
-REPORTED_NMS = {"M": "agnostic"}            # E3-M's boxes under class-agnostic NMS: reported, never deciding
+NMS = {"M": "agnostic", "A": "locked", "B": "locked"}   # the deciding stage-1 NMS (E3-M: class-agnostic)
+REPORTED_NMS = {"M": "locked"}              # E3-M's boxes under the locked scorer's own NMS: reported, never deciding
+# the arms whose deciding box set is the one their run's recorded protocol agnostic dev score was computed on
+STAGE1_COMPARED = tuple(a for a in ARM_ORDER if NMS[a] == "locked")
 REFERENCE = "b_v2_m640"
 SEEDS = (0, 1, 2)
 EXAM = "dev"
@@ -128,7 +136,13 @@ REPORTED_SPECIES = B.NATIVE_TARGET_SPECIES
 PROTOCOL_CHECK_MIN, PROTOCOL_CHECK_MEDIAN_COS = 100, 0.99
 GEOM_TOL = AU.GEOM_TOL                      # the crop-protocol check's box match (inc.audit's)
 ORIENTATION_TAG = 0x0112
-OK_ORIENTATIONS = (None, 1)
+# EXIF orientation tags read: none and 1 are no rotation, and so is the invalid 0 (PIL's exif_transpose and
+# OpenCV, Ultralytics' reader, both leave it unrotated). A pass reads only these: its crops and Ultralytics' frame
+# must agree, which the size check sees for 5-8 but not for 3. A training image of the classifier may also carry 3,
+# 6 or 8: it is cut in the EXIF-transposed frame (verify._cut_task), the frame its labels are in (read on base_v2's
+# tagged images, 2026-10-05) and the frame Ultralytics trained b_v2_m640 in; any other tag refuses.
+OK_ORIENTATIONS = (None, 0, 1)
+FIT_ORIENTATIONS = (None, 0, 1, 3, 6, 8)
 STAMP = "E3-"
 E3_STAMPS = ("manifest_sha256", "key_order_sha256", "n_images", "locked_scorer_sha256", "ultralytics_version")
 SETTINGS = B.NATIVE_SETTINGS
@@ -149,9 +163,10 @@ FMT_TEST_REPORT = "inc2-e3-test-report/1"
 FMT_SENSITIVITY = "inc2-e3-sensitivity/1"
 
 DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-05): E3, two-stage species detection (pre-registered)")
-RULE = ("for each arm (M: b_v2_m640's boxes, A: E1-A's, B: E1-B's; each the locked scorer's NMS output reduced by "
-        "one_per_box, named by one BioCLIP-2 logistic-regression classifier fitted once on base_v2's ground-truth "
-        "boxes, each box emitted as its top 3 classes at q x p within the locked conf and max_det), on seeds 0, 1, 2, "
+RULE = ("for each arm (M: b_v2_m640's boxes under class-agnostic NMS, A: E1-A's, B: E1-B's under the locked scorer's "
+        "NMS; each reduced by one_per_box, named by one BioCLIP-2 logistic-regression classifier fitted once on "
+        "base_v2's ground-truth boxes, each box emitted as its top 3 classes at q x p within the locked conf and "
+        "max_det), on seeds 0, 1, 2, "
         "D = mean(arm's dev species_map50_95, scored by the locked scorer's own matching and AP) - mean(b_v2_m640's "
         "native dev files at 640); the arm qualifies when D > 2 x pooled sd (sqrt((sd_arm^2 + sd_ref^2) / 2), sample "
         "sd) AND D > the paired image-bootstrap SE of D (inc2.baseline native_bootstrap, 1,000 resamples of the dev "
@@ -216,6 +231,11 @@ def rescore_path(out_dir=None):
 
 def test_dir(arm):
     return root() / "test" / arm
+
+
+def reported_variant(arm):
+    """The file variant of an arm's reported NMS reading (E3-M: locked_nms)."""
+    return "%s_nms" % REPORTED_NMS[arm]
 
 
 def file_names(exam, variant=""):
@@ -372,7 +392,8 @@ def small(w, h, w0, h0):
 
 
 def header(path):
-    """(EXIF orientation tag or None, (W, H) as the image is seen after EXIF transposition), from the header."""
+    """(EXIF orientation tag or None, (W, H) as the image is seen after EXIF transposition), from the header: tags
+    5-8 swap W and H, as PIL's exif_transpose does; 0 and the others do not."""
     from PIL import Image
     with Image.open(path) as im:
         try:
@@ -662,8 +683,8 @@ def e3_validator_class(cfg):
                 ori, (w, h) = hd
                 self.e3_orientations[str(ori)] += 1
                 if ori not in OK_ORIENTATIONS:
-                    raise E3Refused("%s has EXIF orientation %r: only an absent tag or 1 is read (the crop and "
-                                    "Ultralytics' frame could differ)" % (image, ori))
+                    raise E3Refused("%s has EXIF orientation %r: a pass reads only an absent tag, 0 or 1 (the crop "
+                                    "and Ultralytics' frame could differ)" % (image, ori))
                 if (w, h) != it["size"]:
                     raise E3Refused("%s is %dx%d after EXIF transposition, Ultralytics read it as %dx%d (ori_shape)"
                                     % (image, w, h, it["size"][0], it["size"][1]))
@@ -1079,18 +1100,20 @@ def fit_classifier(embedder=None, testing=None, workers=None):
     boxes, train_boxes_sha = all_boxes(rows)
     hd = _headers([r["image"] for r in rows])
     ors = collections.Counter(str(h[0]) for h in hd.values())
-    bad = [p for p, h in hd.items() if h[0] not in OK_ORIENTATIONS]
+    bad = [(p, h[0]) for p, h in hd.items() if h[0] not in FIT_ORIENTATIONS]
     if bad:
-        raise E3Refused("%d base_v2 image(s) carry an EXIF orientation other than none or 1 (e.g. %s)" % (len(bad),
-                                                                                                         bad[:3]))
+        raise E3Refused("%d base_v2 image(s) carry an EXIF orientation other than none, 0, 1, 3, 6 or 8 (e.g. %s)"
+                        % (len(bad), bad[:3]))
     by_key = {r["key"]: r for r in rows}
     train, n_small = [], collections.Counter()
+    ors_boxes = collections.Counter()
     for key, b, lab, cx, cy, w, h in boxes:
         r = by_key[key]
         W0, H0 = hd[r["image"]][1]
         if small(w, h, W0, H0):
             n_small[C.CLASS_NAMES[lab]] += 1
             continue
+        ors_boxes[str(hd[r["image"]][0])] += 1
         train.append({"key": key, "image": r["image"], "box": b, "label": lab, "session": r.get("session") or "",
                       "cx": cx, "cy": cy, "w": w, "h": h, "sha256": r["sha256"]})
     if not train:
@@ -1159,6 +1182,9 @@ def fit_classifier(embedder=None, testing=None, workers=None):
                                                "crosscheck_hits", "reasons")},
            "test_v1": {"hits": len(hits), "files": prior_rec.get("files"), "rows": prior_rec.get("rows")},
            "images": len(rows), "orientations": dict(sorted(ors.items())),
+           "orientation_train_boxes": dict(sorted(ors_boxes.items())),
+           "orientation_rule": "tags 3, 6 and 8 read through exif_transpose (verify._cut_task: the labels' frame); "
+                               "0 and none as no rotation; any other tag refuses",
            "boxes": len(boxes), "train_boxes": len(train), "train_boxes_sha256": train_boxes_sha,
            "skipped_small": {"total": int(sum(n_small.values())), "per_class": dict(sorted(n_small.items()))},
            "per_class": {C.CLASS_NAMES[k_]: int(counts[k_]) for k_ in range(C.NC)},
@@ -1480,7 +1506,7 @@ def score_arm(arm, seeds=SEEDS, embedder=None, lock_check=True, batch=S.BATCH, d
     classifier (fitted once if missing), the dev ground-truth accuracy and
     the equivalence check first when missing; then every dev pass of the
     arm (written once), capacity/e3_score_<arm>.json (dev only), then the
-    reported passes (E3-M's agnostic-NMS reading, ImageWeeds), whose
+    reported passes (E3-M's locked-NMS reading, ImageWeeds), whose
     failure is recorded and does not fail the job."""
     if arm not in ARMS:
         raise E3Refused("--arm %r is not one of E3's arms %s" % (arm, list(ARM_ORDER)))
@@ -1521,18 +1547,24 @@ def score_arm(arm, seeds=SEEDS, embedder=None, lock_check=True, batch=S.BATCH, d
                 doc = _e3_doc(arm, s, EXAM, srcs[s], ps, cfg, shas, eq_sha, ro_clf)
                 rec_ag = srcs[s]["recorded"].get("agnostic_map50_95")
                 diff = abs(float(ps["stage1_agnostic"][0]) - float(rec_ag)) if rec_ag is not None else None
-                if diff is None or not diff <= STAGE1_TOL:
-                    raise E3Refused("%s seed %d: the stage-1 box set's agnostic AP %.6f is not the run's recorded "
-                                    "%s (tolerance %g): not the box set E3 pre-registered"
-                                    % (arm, s, ps["stage1_agnostic"][0], rec_ag, STAGE1_TOL))
-                doc["stage1"]["vs_recorded_agnostic"] = {"compared": True, "recorded": float(rec_ag),
-                                                        "max_abs_diff": diff, "tolerance": STAGE1_TOL,
-                                                        "file": srcs[s]["recorded"]["file"],
-                                                        "sha256": srcs[s]["recorded"]["sha256"]}
+                if arm in STAGE1_COMPARED:
+                    if diff is None or not diff <= STAGE1_TOL:
+                        raise E3Refused("%s seed %d: the stage-1 box set's agnostic AP %.6f is not the run's "
+                                        "recorded %s (tolerance %g): not the box set E3 pre-registered"
+                                        % (arm, s, ps["stage1_agnostic"][0], rec_ag, STAGE1_TOL))
+                    doc["stage1"]["vs_recorded_agnostic"] = {"compared": True, "recorded": float(rec_ag),
+                                                            "max_abs_diff": diff, "tolerance": STAGE1_TOL,
+                                                            "file": srcs[s]["recorded"]["file"],
+                                                            "sha256": srcs[s]["recorded"]["sha256"]}
+                else:
+                    doc["stage1"]["vs_recorded_agnostic"] = {
+                        "compared": False, "why": "%s NMS: a box set no recorded score was computed on" % NMS[arm],
+                        "recorded": _finite(rec_ag), "abs_diff": _finite(diff), "file": srcs[s]["recorded"]["file"]}
                 _commit_file(d, EXAM, doc, ps["arrays"], ps["stage1"])
                 status = "written"
-                log("E3-%s seed %d on dev: species %.4f, stage-1 agnostic %.4f (recorded %.4f), %d crops, %.0fs"
-                    % (arm, s, doc["species_map50_95"] or 0.0, ps["stage1_agnostic"][0], float(rec_ag),
+                log("E3-%s seed %d on dev: species %.4f, stage-1 agnostic %.4f (recorded %s, %s), %d crops, %.0fs"
+                    % (arm, s, doc["species_map50_95"] or 0.0, ps["stage1_agnostic"][0], rec_ag,
+                       "compared" if arm in STAGE1_COMPARED else "%s NMS, not compared" % NMS[arm],
                        doc["stage2"]["n_crops"], ps["seconds"]))
             dd = _read_json(js) or {}
             files.append({"seed": s, "file": "arms/%s/s%d/%s" % (arm, s, js.name), "sha256": _sha(js),
@@ -1558,12 +1590,12 @@ def score_arm(arm, seeds=SEEDS, embedder=None, lock_check=True, batch=S.BATCH, d
 
 
 def _reported_passes(arm, seeds, srcs, ccfg, shas, eq_sha, ro_clf, embedder, wk, lock_check, batch, device):
-    """E3-M's agnostic-NMS dev reading and every arm's ImageWeeds passes, each written once; a failure is
+    """E3-M's locked-NMS dev reading and every arm's ImageWeeds passes, each written once; a failure is
     recorded (arms/<arm>/reported.json) and never raised."""
     out = []
     plan = []
     if arm in REPORTED_NMS:
-        plan += [(s, EXAM, REPORTED_NMS[arm], "agnostic_nms") for s in seeds]
+        plan += [(s, EXAM, REPORTED_NMS[arm], reported_variant(arm)) for s in seeds]
     plan += [(s, exam, NMS[arm], "") for exam in REPORT_EXAMS for s in seeds]
     for s, exam, nms, variant in plan:
         d = arm_dir(arm, s)
@@ -1579,11 +1611,12 @@ def _reported_passes(arm, seeds, srcs, ccfg, shas, eq_sha, ro_clf, embedder, wk,
             ps = _score_pass(srcs[s]["weights"], exam, cfg, lock_check=lock_check, batch=batch, device=device)
             doc = _e3_doc(arm, s, exam, srcs[s], ps, cfg, shas, eq_sha, ro_clf, variant=variant)
             rec_doc = _read_json(C.INC_DIR / srcs[s]["exp"] / "runs" / srcs[s]["final_run_id"] / "scores"
-                                 / ("%s.json" % exam)) if not variant else None
+                                 / ("%s.json" % exam))
+            rec_ag = _finite(rec_doc.get("agnostic_map50_95")) if isinstance(rec_doc, dict) else None
             doc["stage1"]["vs_recorded_agnostic"] = {
-                "compared": False, "why": "agnostic NMS: a box set no recorded score was computed on" if variant
-                else "reported exam: recorded beside, not checked",
-                "recorded": (rec_doc or {}).get("agnostic_map50_95") if isinstance(rec_doc, dict) else None}
+                "compared": False, "why": "a reported reading: recorded beside, never checked",
+                "recorded": rec_ag, "abs_diff": _finite(abs(float(ps["stage1_agnostic"][0]) - rec_ag))
+                if rec_ag is not None else None}
             _commit_file(d, exam, doc, ps["arrays"], ps["stage1"], variant=variant)
             out.append(dict(item, status="written", sha256=_sha(js)))
         except Exception as e:               # noqa: BLE001 - a reported pass never fails the job
@@ -1623,7 +1656,7 @@ def _e3_files(arm, testing_ok, clf_shas, eq, pin):
                 probs.append("E3-M seed %d's stage-1 weights are not the reference's seed-%d final weights" % (s, s))
         if s1.get("nms") != NMS[arm] or (doc.get("settings") or {}).get("nms") != NMS[arm]:
             probs.append("its NMS is %r, not %r" % (s1.get("nms"), NMS[arm]))
-        if (s1.get("vs_recorded_agnostic") or {}).get("compared") is not True:
+        if arm in STAGE1_COMPARED and (s1.get("vs_recorded_agnostic") or {}).get("compared") is not True:
             probs.append("its stage-1 agnostic AP was not checked against the recorded one")
         st2 = doc.get("stage2") or {}
         if st2.get("classifier_npz_sha256") != clf_shas["npz_sha256"] \
@@ -1820,11 +1853,11 @@ def e3_decision(testing_ok=False, resamples=RESAMPLES):
                 "note": "E3-M seed s uses the reference's seed-s detector: paired differences, reported only"}
             ag = []
             for s in SEEDS:
-                x = _read_json(arm_dir("M", s) / file_names(EXAM, "agnostic_nms")[0])
+                x = _read_json(arm_dir("M", s) / file_names(EXAM, reported_variant("M"))[0])
                 ag.append({"seed": s, "species_map50_95": x.get("species_map50_95"),
                            "stage1_agnostic_map50_95": (x.get("stage1") or {}).get("agnostic_map50_95")}
                           if isinstance(x, dict) else {"seed": s, "missing": True})
-            arms[arm]["reported"]["agnostic_nms_reading"] = ag
+            arms[arm]["reported"]["%s_reading" % reported_variant("M")] = ag
         if q:
             qualifying.append(arm)
     status = "decided" if not pending else "pending"

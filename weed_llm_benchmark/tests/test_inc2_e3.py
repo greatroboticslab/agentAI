@@ -14,8 +14,9 @@ open_clip is never imported. Every pass is a real Ultralytics CPU pass in
 test mode (INC_SCORER_TESTING=1).
 
 What is pinned:
-- the constants (arms, order, NMS locked for every arm, E3-M's agnostic-NMS
-  reading reported, seeds, seed texts, 1,000 resamples, top 3, the C grid,
+- the constants (arms, order, class-agnostic NMS for E3-M and the locked
+  NMS for E3-A and E3-B, E3-M's locked-NMS reading reported, the EXIF
+  orientations read, seeds, seed texts, 1,000 resamples, top 3, the C grid,
   the tolerances);
 - emit (top 3, ties to the lower id, q x p float32, the conf and max_det
   limits, OtherPlant kept), the geometry (the per-axis inverse, the
@@ -28,7 +29,10 @@ What is pinned:
   scikit-learn's, no dev or test file opened, the crop-protocol check's
   refusals; the pin and restore-classifier;
 - the crops: equal to verify._cut_task's, an EXIF-orientation tag
-  refused, the dev ground-truth crops cut through the same geometry;
+  refused in a pass (0 read as none), training images tagged 6, 3 and 0
+  fitted with crops equal to verify._cut_task's and cut in their labels'
+  frame (another tag refused), the dev ground-truth crops cut through the
+  same geometry;
 - the validator layering (two passes in one process, the restore after an
   exception, exactly one E3 layer);
 - identity and equivalence (a real pass reproduces the locked scorer's score
@@ -332,10 +336,12 @@ def src_weights(arm, s):
 # ------------------------------------------------------------------ 1. constants and units
 def test_constants():
     print("E3's constants (pre-registered)")
-    check("arms M b_v2_m640, A e1_a_m640, B e1_b_m640 in the order M, A, B; the locked NMS for every arm; E3-M's "
-          "agnostic-NMS reading reported only; reference b_v2_m640; seeds 0-2; dev decides, imageweeds reported",
+    check("arms M b_v2_m640, A e1_a_m640, B e1_b_m640 in the order M, A, B; class-agnostic NMS for E3-M, the locked "
+          "NMS for E3-A and E3-B (whose stage-1 AP is compared with the recorded one); E3-M's locked-NMS reading "
+          "reported only; reference b_v2_m640; seeds 0-2; dev decides, imageweeds reported",
           TS.ARMS == {"M": "b_v2_m640", "A": "e1_a_m640", "B": "e1_b_m640"} and TS.ARM_ORDER == ("M", "A", "B")
-          and TS.NMS == {"M": "locked", "A": "locked", "B": "locked"} and TS.REPORTED_NMS == {"M": "agnostic"}
+          and TS.NMS == {"M": "agnostic", "A": "locked", "B": "locked"} and TS.REPORTED_NMS == {"M": "locked"}
+          and TS.STAGE1_COMPARED == ("A", "B") and TS.reported_variant("M") == "locked_nms"
           and TS.REFERENCE == "b_v2_m640" and TS.SEEDS == (0, 1, 2) and TS.EXAM == "dev"
           and TS.REPORT_EXAMS == ("imageweeds",) and TS.IMGSZ == 640)
     check("seed texts inc2/e3/classifier, inc2/e3/species_se, inc2/e3/attribution_se; 1,000 resamples; top 3; the "
@@ -348,6 +354,8 @@ def test_constants():
           and TS.STAGE1_TOL == 0.002 and TS.GT_TOL == 1e-3 and TS.PROBA_TOL == 1e-6
           and (TS.PROTOCOL_CHECK_MIN, TS.PROTOCOL_CHECK_MEDIAN_COS) == (100, 0.99)
           and TS.REPORTED_SPECIES == ("Carpetweed", "SpottedSpurge", "Purslane"))
+    check("EXIF orientations: a pass reads none, 0 and 1; a training image also 3, 6 and 8",
+          TS.OK_ORIENTATIONS == (None, 0, 1) and TS.FIT_ORIENTATIONS == (None, 0, 1, 3, 6, 8))
 
 
 def test_units():
@@ -596,6 +604,95 @@ def test_protocol_check():
 
 # ------------------------------------------------------------------ 3. the fit, the pin, restore
 EVAL_MANIFESTS = None
+PATCH_BOX = (10, 60, 49, 109)                # the patch in the seen (EXIF-transposed) 80 x 120 frame, inclusive
+
+
+def exif_image(key, tag, colour):
+    """A training image stored with EXIF orientation `tag` whose EXIF-transposed frame (80 x 120, the frame its
+    label is in) holds a `colour` patch at PATCH_BOX; its stored frame is that frame turned back. Returns (path,
+    label boxes)."""
+    from PIL import Image
+    seen = Image.new("RGB", (80, 120), (120, 110, 90))
+    seen.paste(colour, (PATCH_BOX[0], PATCH_BOX[1], PATCH_BOX[2] + 1, PATCH_BOX[3] + 1))
+    back = {0: None, 2: Image.Transpose.FLIP_LEFT_RIGHT, 3: Image.Transpose.ROTATE_180,
+            6: Image.Transpose.ROTATE_90, 8: Image.Transpose.ROTATE_270}[tag]
+    stored = seen.transpose(back) if back is not None else seen
+    ex = Image.Exif()
+    ex[0x0112] = tag
+    p = W.TMP / "exif_train" / ("%s.jpg" % key)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    stored.save(p, quality=95, exif=ex)
+    x0, y0, x1, y1 = PATCH_BOX
+    return p, [(2, (x0 + x1 + 1) / 2.0 / 80, (y0 + y1 + 1) / 2.0 / 120, (x1 - x0 + 1) / 80.0, (y1 - y0 + 1) / 120.0)]
+
+
+def _centre(a):
+    h, w = a.shape[:2]
+    return a[h // 3:2 * h // 3, w // 3:2 * w // 3].reshape(-1, 3).astype(np.float64).mean(axis=0)
+
+
+def test_fit_exif():
+    print("fit-classifier: training images tagged 6, 3 and 0 (base_v2 holds 401, 156 and 54) are cut in their "
+          "labels' frame, as verify._cut_task cuts them; another tag is refused")
+    from PIL import Image, ImageOps
+    rows = C.read_manifest(W.v2_dir() / "base_v2.jsonl")
+    colour = (200, 30, 40)
+    tagged = {}
+    for tag in (6, 3, 0):
+        img, boxes = exif_image("tsw23__exif%d" % tag, tag, colour)
+        tagged[tag] = W.row_for("tsw23__exif%d" % tag, img, boxes, "3seasonweeddet10/data2023", "s_exif%d" % tag)
+    with Image.open(tagged[6]["image"]) as im:
+        seen6 = ImageOps.exif_transpose(im)
+        fixture_ok = seen6.size == (80, 120) and im.size == (120, 80) \
+            and np.abs(np.asarray(seen6.convert("RGB"))[85, 30].astype(int) - colour).max() < 40
+
+    class Capture(StubEmbedder):
+        def __init__(self):
+            StubEmbedder.__init__(self)
+            self.crops = []
+
+        def __call__(self, pils):
+            self.crops += [np.asarray(p) for p in pils]
+            return StubEmbedder.__call__(self, pils)
+    cap = Capture()
+    with swap_base_v2(rows + [tagged[t] for t in (6, 3, 0)]):
+        e0 = refused(TS.fit_classifier, embedder=cap)
+        rec = json.loads((TS.classifier_dir() / "classifier.json").read_text()) if e0 is None else {}
+        crops_csv = list(__import__("csv").DictReader(open(TS.classifier_dir() / "train_crops.csv"))) \
+            if e0 is None else []
+    reset_e3()
+    check("a base_v2 holding images tagged 6, 3 and 0 is fitted, not refused", e0 is None, e0)
+    by_key = {r["key"]: int(r["crop_id"]) for r in crops_csv}
+    res = {}
+    for tag, row in tagged.items():
+        cx, cy, w, h = T.read_label_strict(pathlib.Path(row["label"]))[0][1:]
+        want = V._cut_task((row["image"], [{"crop_id": 0, "cx": cx, "cy": cy, "w": w, "h": h}]))[2][0]
+        got = cap.crops[by_key[row["key"]]] if row["key"] in by_key else None
+        with Image.open(row["image"]) as im:
+            stored = im.convert("RGB")
+        raw = np.asarray(TS.SL._cut(stored, {"cx": cx, "cy": cy, "w": w, "h": h, "W": stored.size[0],
+                                             "H": stored.size[1]}))
+        res[tag] = {"same_as_cut_task": got is not None and np.array_equal(got, want),
+                    "on_patch": got is not None and float(np.abs(_centre(got) - colour).max()) < 40,
+                    "stored_frame_off_patch": float(np.abs(_centre(raw) - colour).max()) > 60 if tag else None}
+    check("the fixtures: tag 6's stored frame is 120 x 80, its EXIF-transposed frame 80 x 120 with the patch under "
+          "its label", fixture_ok)
+    check("fitted with the tagged images: each one's crop is verify._cut_task's array, bit for bit, and its centre is "
+          "the patch under its label (the EXIF-transposed frame); for tags 6 and 3 the stored frame cut at the same "
+          "box is not",
+          all(r["same_as_cut_task"] and r["on_patch"] for r in res.values())
+          and res[6]["stored_frame_off_patch"] and res[3]["stored_frame_off_patch"], res)
+    check("  classifier.json counts the images and training boxes per tag",
+          e0 is None and rec["orientations"].get("6") == 1 and rec["orientations"].get("3") == 1
+          and rec["orientations"].get("0") == 1 and rec["orientation_train_boxes"].get("6") == 1
+          and rec["orientation_train_boxes"].get("3") == 1 and rec["orientation_train_boxes"].get("0") == 1
+          and rec["orientations"].get("None") == len(rows) and "exif_transpose" in rec["orientation_rule"],
+          (rec.get("orientations"), rec.get("orientation_train_boxes")))
+    img2, boxes2 = exif_image("tsw23__exif2", 2, colour)
+    with swap_base_v2(rows + [W.row_for("tsw23__exif2", img2, boxes2, "3seasonweeddet10/data2023", "s_exif2")]):
+        e = refused(TS.fit_classifier, embedder=EMB)
+    check("a training image with another tag (2, a mirror) refuses the fit, writing nothing",
+          e is not None and "EXIF orientation" in str(e) and nothing_written(), e)
 
 
 def test_fit():
@@ -805,7 +902,8 @@ def test_nms_and_cap():
         b = TS._score_pass(w, "dev", two_stage_cfg(nms="agnostic"), **KW)
     per_img = np.bincount(a["arrays"]["pred_img"], minlength=len(a["arrays"]["keys"]))
     check("agnostic NMS reads another box set than the locked NMS (%d vs %d stage-1 boxes): E3-M's deciding boxes "
-          "are the locked ones" % (b["stats"]["stage1_boxes"], a["stats"]["stage1_boxes"]),
+          "are the agnostic ones, its locked ones a reported reading" % (b["stats"]["stage1_boxes"],
+                                                                        a["stats"]["stage1_boxes"]),
           a["stats"]["stage1_boxes"] != b["stats"]["stage1_boxes"], (a["stats"], b["stats"]))
     check("at most 300 rows per image after top 3 (%d images capped, %d rows dropped by the cap, %d by conf)"
           % (a["stats"]["capped"], a["stats"]["dropped_cap"], a["stats"]["dropped_conf"]),
@@ -825,6 +923,11 @@ def test_pass_refusals():
     t0 = TS.to_original
     with patched(TS, "to_original", lambda xy, rp, os_: t0(xy, rp, os_) + 2.0):
         out["a map to the original image 2 px off"] = refused(TS._score_pass, w, "dev", two_stage_cfg(), **KW)
+    with patched(TS, "header", lambda p: (0, h0(p)[1])):
+        ps0 = TS._score_pass(w, "dev", two_stage_cfg(), **KW)
+    n_dev = len(C.read_manifest(C.manifest_path("dev")))
+    check("EXIF orientation 0 (invalid) reads as no rotation in a pass (%d images)" % n_dev,
+          ps0["stats"]["orientations"] == {"0": n_dev}, ps0["stats"]["orientations"])
     e = refused(TS._score_pass, w, "test", {"mode": "identity", "nms": "locked", "workers": V._Workers(1)}, **KW)
     check("refused: %s; and test outside score-test" % "; ".join(out),
           "EXIF orientation" in str(out["EXIF orientation 6"]) and "ori_shape" in str(out["a size other than ori_shape"])
@@ -911,25 +1014,31 @@ def test_score_arm():
     t0 = time.time()
     recm = TS.score_arm("M", embedder=EMB, **KW)
     files = tree(TS.root() / "arms" / "M")
-    check("E3-M (%.0fs): three dev files with their arrays and stage-1 records, the agnostic-NMS reading and ImageWeeds "
+    check("E3-M (%.0fs): three dev files with their arrays and stage-1 records, the locked-NMS reading and ImageWeeds "
           "reported, the record complete (dev only, names and sha256s, no path)" % (time.time() - t0),
           recm["status"] == "complete" and [f["status"] for f in recm["dev"]] == ["written"] * 3
           and all("s%d/dev.json" % s in files and "s%d/dev.stage1.npz" % s in files
-                  and "s%d/dev.agnostic_nms.json" % s in files and "s%d/imageweeds.json" % s in files for s in (0, 1, 2))
+                  and "s%d/dev.locked_nms.json" % s in files and "s%d/imageweeds.json" % s in files for s in (0, 1, 2))
           and recm["reported"] == {"status": "complete", "passes": 6, "failed": 0}
           and not BP.dev_leaks(recm) and str(C.INC_DIR) not in json.dumps(recm), (recm, files))
     d0 = json.loads((TS.arm_dir("M", 0) / "dev.json").read_text())
-    check("an E3 file: stamped E3- (TEST- here), production false, its stage-1 weights the base run's, NMS locked, "
-          "its stage-1 agnostic AP the recorded one (compared), the classifier's sha256s, the emission's counts",
+    check("an E3-M dev file: stamped E3- (TEST- here), production false, its stage-1 weights the base run's, "
+          "class-agnostic NMS (settings agnostic_nms true), its stage-1 agnostic AP recorded beside and not compared, "
+          "the classifier's sha256s, the emission's counts",
           d0["scorer_sha256"].startswith("TEST-E3-") and d0["production"] is False and d0["e3_production"] is False
-          and d0["stage1"]["weights_sha256"] == W.sha(src_weights("M", 0)) and d0["stage1"]["nms"] == "locked"
-          and d0["stage1"]["vs_recorded_agnostic"]["compared"] and d0["stage1"]["vs_recorded_agnostic"][
-              "max_abs_diff"] == 0 and d0["stage2"]["classifier_npz_sha256"] == TS.load_classifier()[5]["npz_sha256"]
-          and d0["emitted"]["rows"] > 0 and d0["settings"]["nms"] == "locked" and d0["settings"]["top_k"] == 3, d0)
-    ag = json.loads((TS.arm_dir("M", 0) / "dev.agnostic_nms.json").read_text())
-    check("  the agnostic-NMS reading: variant agnostic_nms, settings agnostic_nms true, its stage-1 never compared",
-          ag["variant"] == "agnostic_nms" and ag["settings"]["agnostic_nms"] is True
-          and ag["stage1"]["vs_recorded_agnostic"]["compared"] is False, ag["stage1"])
+          and d0["stage1"]["weights_sha256"] == W.sha(src_weights("M", 0)) and d0["stage1"]["nms"] == "agnostic"
+          and d0["stage1"]["vs_recorded_agnostic"]["compared"] is False
+          and "agnostic NMS" in d0["stage1"]["vs_recorded_agnostic"]["why"]
+          and d0["stage2"]["classifier_npz_sha256"] == TS.load_classifier()[5]["npz_sha256"]
+          and d0["emitted"]["rows"] > 0 and d0["settings"]["nms"] == "agnostic"
+          and d0["settings"]["agnostic_nms"] is True and d0["settings"]["top_k"] == 3, d0)
+    lk = json.loads((TS.arm_dir("M", 0) / "dev.locked_nms.json").read_text())
+    check("  the locked-NMS reading (reported): variant locked_nms, settings agnostic_nms false, its stage-1 box set "
+          "the one the recorded agnostic dev score was computed on (its AP the recorded one exactly, recorded beside, "
+          "never checked)",
+          lk["variant"] == "locked_nms" and lk["settings"]["agnostic_nms"] is False and lk["stage1"]["nms"] == "locked"
+          and lk["stage1"]["vs_recorded_agnostic"]["compared"] is False
+          and lk["stage1"]["vs_recorded_agnostic"]["abs_diff"] == 0, lk["stage1"])
     s0 = W.sha(TS.arm_dir("M", 0) / "dev.json")
     rec2 = TS.score_arm("M", embedder=EMB, **KW)
     check("a second run keeps every file (written once)", [f["status"] for f in rec2["dev"]] == ["kept"] * 3
@@ -952,6 +1061,11 @@ def test_score_arm():
           and [f["status"] for f in reca2["dev"]] == ["kept"] * 3)
     TS.score_arm("B", embedder=EMB, **KW)
     check("E3-B scored", TS.score_record_path("B").exists())
+    a0 = json.loads((TS.arm_dir("A", 0) / "dev.json").read_text())
+    check("an E3-A dev file: the locked NMS (settings agnostic_nms false), its stage-1 agnostic AP compared with the "
+          "recorded one (diff 0 on the CPU)", a0["stage1"]["nms"] == "locked" and a0["settings"]["agnostic_nms"] is False
+          and a0["stage1"]["vs_recorded_agnostic"]["compared"] is True
+          and a0["stage1"]["vs_recorded_agnostic"]["max_abs_diff"] == 0, a0["stage1"])
 
 
 # ------------------------------------------------------------------ 9. the verdict on the real files
@@ -995,10 +1109,10 @@ def test_verdict_real():
           [p for p in opened if "test" in p][:5])
     m = d["arms"]["M"]
     check("reported beside: each arm's stage-1 agnostic mean, E3-M's paired per-seed differences and its "
-          "agnostic-NMS reading, the three species with their SE, the dev ground-truth accuracy, the research-only "
+          "locked-NMS reading, the three species with their SE, the dev ground-truth accuracy, the research-only "
           "flags", m["reported"]["stage1_agnostic"]["mean"] is not None
           and len(m["reported"]["paired_per_seed"]["diffs"]) == 3
-          and all("species_map50_95" in x for x in m["reported"]["agnostic_nms_reading"])
+          and all("species_map50_95" in x for x in m["reported"]["locked_nms_reading"])
           and set(m["reported"]["species"]) == {"Carpetweed", "SpottedSpurge", "Purslane"}
           and d["reported"]["dev_gt"]["n"] > 0 and m["reported"]["research_only"] is True, m["reported"])
     vj = json.loads((out / "e3_v1.json").read_text())
@@ -1043,6 +1157,8 @@ def test_verdict_refusals():
                      ("another key order", lambda d: d.update(key_order_sha256="0" * 64))):
         with tamper(f, fn):
             out[what] = run()
+    with tamper(_arm_file("M", 1), lambda d: (d["stage1"].update(nms="locked"), d["settings"].update(nms="locked"))):
+        out["E3-M under the locked NMS (its deciding NMS is class-agnostic)"] = run()
     npz = TS.arm_dir("A", 1) / "dev.images.npz"
     raw = npz.read_bytes()
     try:
@@ -1382,7 +1498,8 @@ def test_cli():
     check("an unknown verb is a usage error (exit 2)", rc == 2)
 
 
-SEQUENCE = ("test_constants", "test_units", "test_cv_units", "test_protocol_check", "test_fit_refusals", "test_fit",
+SEQUENCE = ("test_constants", "test_units", "test_cv_units", "test_protocol_check", "test_fit_refusals",
+            "test_fit_exif", "test_fit",
             "test_pin_restore", "test_crops", "test_dev_gt", "test_layering_and_identity", "test_equivalence",
             "test_score_arm", "test_pass_refusals", "test_nms_and_cap", "test_verdict_real", "test_verdict_refusals",
             "test_rule", "test_verdict_file", "test_test_read", "test_sensitivity", "test_cli")

@@ -2528,7 +2528,7 @@
         "gpu_type": "v100-32",
         "gpu_count": 1,
         "hours_param": "est_gpu_hours",
-        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that scores, never trains a detector: one E3 arm's three seeds on dev, its reported passes (ImageWeeds; E3-M's agnostic-NMS dev reading) and, in the first arm's job, the classifier's one fit, the dev ground-truth crops and the equivalence check. est_gpu_hours is levers_stream.price's 'e3_score' estimate (stream-domain cost e3_hours_per_run per arm-seed, plus e3_fit_hours in the first arm's job, est.), charged to the campaign envelope and settled from sacct when the job ends."
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that scores, never trains a detector: one E3 arm's three seeds on dev, its reported passes (ImageWeeds; E3-M's locked-NMS dev reading) and, in the first arm's job, the classifier's one fit, the dev ground-truth crops and the equivalence check. est_gpu_hours is levers_stream.price's 'e3_score' estimate (stream-domain cost e3_hours_per_run per arm-seed, plus e3_fit_hours in the first arm's job, est.), charged to the campaign envelope and settled from sacct when the job ends."
       },
       "dry_run_variant": null,
       "allowed_tiers": [
