@@ -458,12 +458,15 @@
  "zoo": {
   "version": "v1",
   "record": "capacity/zoo_v1.json",
-  "requires": "e2",
+  "requires": [
+   "e2",
+   "e2_attr"
+  ],
   "shards_a": 32,
   "shards_c": 16,
   "concurrency": 4,
   "max_gpu_hours": 40,
-  "why": "Amendment (2026-10-04) Z1: every detector the project trained, scored under one protocol by the locked scorer; descriptive, record only. Proposed once, after E2's rescore and verdict, when capacity/zoo_v1.json is missing. Concurrency 4 (not 6): the stream's own arrays share GPU-shared, whose backfill considers 20 jobs per user."
+  "why": "Amendment (2026-10-04) Z1: every detector the project trained, scored under one protocol by the locked scorer; descriptive, record only. Proposed once and last: after E2's rescore and verdict (/stage/e2) and E2-C's attribution (/stage/e2_attr, which follows E2-C's three builds) are done, so the chain, which holds MAINT for 8-12 h, never delays either; when capacity/zoo_v1.json is missing. A failed L23C or L23D holds it until a person's rerun completes that record. Concurrency 4 (not 6): the stream's own arrays share GPU-shared, whose backfill considers 20 jobs per user."
  },
  "stage_a": {
   "exp": "pilot_v4",

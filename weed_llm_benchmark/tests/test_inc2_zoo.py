@@ -954,6 +954,146 @@ def test_contamination():
 
 
 
+def synth_run(name, train, val=None, base=None):
+    """An Ultralytics run outside the list (its model dict, as meta writes one): a data yaml with these train (and
+    val) entries, args.yaml newer than the yaml and every entry (so the list is listed_exact), a legacy best.pt."""
+    T0 = WORLD["T0"]
+    d = FW / "unread" / name
+    y = d / "data.yaml"
+    y.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["path: %s" % (base or d), "train:"] + ["  - %s" % x for x in train]
+    if val:
+        lines += ["val:"] + ["  - %s" % x for x in val]
+    y.write_text("\n".join(lines + ["nc: 1", "names: ['weed']"]) + "\n")
+    os.utime(y, (T0, T0))
+    rd = d / "run" / "train"
+    ta = write_args(rd, y, mtime=T0 + 3600)
+    rel = rel_of(rd / "weights" / "best.pt")
+    return {"model_id": hashlib.sha256(rel.encode()).hexdigest(), "rel": rel, "path": str(rd / "weights" / "best.pt"),
+            "family": "other", "run_dir": rel_of(rd), "ckpt_role": "best", "mlflow": None, "scorable": False,
+            "ckpt": {"date": LEGACY_DATE, "train_args": dict(ta)}, "class_map": {"rule": "R5", "n_species_channels": 0}}
+
+
+def test_unread():
+    print("a training list with entries the zoo could not read is never clean: U on every exam it shows no copy of, "
+          "Y where it does; the count is recorded per row")
+    c, csha = conf()
+    T0 = WORLD["T0"]
+    d = TMP / "unread_src"
+    ok_dir = d / "imgs"
+    for i in range(2):
+        os.utime(img(ok_dir / ("u%d.jpg" % i), 990 + i), (T0, T0))
+    rel_txt = d / "rel.txt"
+    rel_txt.write_text("images/a.jpg\nimages/b.jpg\n./imgs/u0.jpg\n")
+    bad_txt = d / "bad.txt"
+    bad_txt.write_bytes(b"\xff\xfe\x00 not utf-8\n")
+    for f in (rel_txt, bad_txt):
+        os.utime(f, (T0, T0))
+    got_rel, got_bad = Z.Lister().entries(str(rel_txt)), Z.Lister().entries(str(bad_txt))
+    check("Lister: a .txt list's relative lines are counted unresolved (its './' line resolves); a .txt list that "
+          "cannot be read is counted unreadable, never an empty list",
+          got_rel["unresolved"] == 2 and [os.path.basename(p) for p, _m in got_rel["entries"]] == ["u0.jpg"]
+          and got_rel["unreadable"] == 0 and got_bad["unreadable"] == 1 and got_bad["entries"] == []
+          and not got_bad["missing"], (got_rel, got_bad))
+    walk = d / "walk"
+    img(walk / "w0.jpg", 993)
+    img(walk / "locked" / "w1.jpg", 994)
+    real_scandir = os.scandir
+
+    def refusing(path="."):
+        if os.path.realpath(str(path)) == os.path.realpath(str(walk / "locked")):
+            raise PermissionError(13, "Permission denied", str(path))
+        return real_scandir(path)
+    os.scandir = refusing
+    try:
+        got_walk = Z.Lister().entries(str(walk))
+    finally:
+        os.scandir = real_scandir
+    check("Lister: a directory the walk cannot read is counted unreadable; what it could read is listed",
+          got_walk["unreadable"] == 1 and [os.path.basename(p) for p, _m in got_walk["entries"]] == ["w0.jpg"],
+          got_walk)
+    tol = 0.01
+    clean_c = {"exact": 0, "near": 0, "unhashed": 0, "n": 10}
+    hit_c = {"exact": 3, "near": 0, "unhashed": 0, "n": 10}
+    st = (Z.own_state("listed_exact", clean_c, 10, tol), Z.own_state("listed_exact", clean_c, 10, tol, incomplete=1),
+          Z.own_state("listed_exact", hit_c, 10, tol, incomplete=4), Z.own_state("exact", clean_c, 10, tol, incomplete=1),
+          Z.own_state("listed_after_rebuild", clean_c, 10, tol, incomplete=1))
+    check("own_state: no hit on a complete list N; with one entry unread U (never N); hits Y whatever is unread; an "
+          "exact list with an unread entry U; a rebuilt list P", st == ("N", "U", "Y", "U", "P"), st)
+    # end to end: provenance of four runs, then the contamination step over them beside the world's rows
+    links = d / "devlinks"
+    for i, r in enumerate(WORLD["dev"]):
+        link(links / ("dv%d.jpg" % i), r["image"])
+        os.utime(links / ("dv%d.jpg" % i), (T0, T0), follow_symlinks=False)
+    os.utime(ok_dir / "u0.jpg", (T0, T0))
+    vbase = d / "own"
+    os.utime(img(vbase / "train" / "o0.jpg", 995), (T0, T0))
+    (vbase / "val.txt").write_bytes(b"\xff\xfe not utf-8\n")
+    os.utime(vbase / "val.txt", (T0, T0))
+    synth = {"complete": synth_run("complete", [ok_dir]),
+             "relative": synth_run("relative", [ok_dir, rel_txt]),
+             "unreadable": synth_run("unreadable", [ok_dir, bad_txt]),
+             "every_dev": synth_run("every_dev", [links, rel_txt]),
+             "own_val": synth_run("own_val", [vbase / "train"], val=["val.txt"], base=vbase)}
+    zd = Z.zoo_dir(V)
+    saved = {n: (zd / n).read_bytes() for n in ("provenance.jsonl", "contamination.jsonl")}
+    real_read_models = Z.read_models
+    every = real_read_models(V)
+    idx = Z.Index(Z.read_files(V), every)
+    lister, cache = Z.Lister(), {"version": V}
+    prov = {k: Z.provenance_one(m, idx, c, lister, cache) for k, m in synth.items()}
+    ct, rows = {}, {}
+    try:
+        Z._write_jsonl(zd / "provenance.jsonl", Z._read_jsonl(zd / "provenance.jsonl") + list(prov.values()))
+        Z.read_models = lambda version: [dict(m) for m in every] + [dict(m) for m in synth.values()]
+        quiet(Z.contamination_step, V, c, csha, 2)
+        cont = Z.read_contamination(V)
+        ct = {k: cont[m["model_id"]] for k, m in synth.items()}
+        rows = {r["model_id"]: r for r in Z.build_rows(V, c)}
+    finally:
+        Z.read_models = real_read_models
+        for n, b in saved.items():
+            (zd / n).write_bytes(b)
+    dpr = {k: (p["data"]["rating"], p["data"]["n_unresolved"], p["data"]["n_unreadable"]) for k, p in prov.items()}
+    check("provenance records the unread entries of a training list: 2 relative lines, 1 unreadable .txt; a "
+          "complete list none (each listed_exact)",
+          dpr["complete"] == ("listed_exact", 0, 0) and dpr["relative"] == ("listed_exact", 2, 0)
+          and dpr["unreadable"] == ("listed_exact", 0, 1) and dpr["every_dev"] == ("listed_exact", 2, 0), dpr)
+    own = {k: x["own"] for k, x in ct.items()}
+    check("contamination: the complete list with no copy is N on every exam; with 2 relative lines, or with an "
+          "unreadable .txt among its entries, U on every exam (never N)",
+          set(own["complete"].values()) == {"N"} and set(own["relative"].values()) == {"U"}
+          and set(own["unreadable"].values()) == {"U"}, own)
+    ev = ct.get("every_dev") or {}
+    check("a list that shows every dev image, with relative lines beside: dev Y (all %d exact), every other exam U"
+          % len(WORLD["dev"]), ev.get("own", {}).get("dev") == "Y"
+          and ev.get("counts", {}).get("dev", {}).get("exact") == len(WORLD["dev"])
+          and {e: s for e, s in ev.get("own", {}).items() if e != "dev"} == {e: "U" for e in Z.HASH_EXAMS if e != "dev"},
+          (ev.get("own"), (ev.get("counts") or {}).get("dev")))
+    check("each row records its unread entries (n_unresolved, n_unreadable) and a note; the report row carries them",
+          [(ct[k].get("n_unresolved"), ct[k].get("n_unreadable")) for k in ("relative", "unreadable", "complete")]
+          == [(2, 0), (0, 1), (0, 0)] and any("could not be read" in n for n in ct["relative"]["notes"])
+          and rows[synth["relative"]["model_id"]]["data"].get("n_unresolved") == 2
+          and rows[synth["unreadable"]["model_id"]]["data"].get("n_unreadable") == 1,
+          {k: (x.get("n_unresolved"), x.get("n_unreadable")) for k, x in ct.items()})
+    rc, rr, ru = (rows[synth[k]["model_id"]] for k in ("complete", "relative", "unreadable"))
+    check("dev-clean only on the complete list: the rows with unread entries are not dev-clean (dev U)",
+          rc["dev_clean"] and rc["flags"]["dev"] == "N" and not rr["dev_clean"] and rr["flags"]["dev"] == "U"
+          and not ru["dev_clean"] and ru["flags"]["dev"] == "U",
+          (rc["dev_clean"], rr["flags"]["dev"], ru["flags"]["dev"]))
+    ov, ro = ct["own_val"], rows[synth["own_val"]["model_id"]]
+    check("best.pt chosen on its own val set, which could not be read: test_selected unknown (never none), dev "
+          "selection unknown (+sel?), so not dev-clean though its training list is N",
+          prov["own_val"]["selected_on"] == "own_split" and prov["own_val"]["val"]["n_unreadable"] == 1
+          and ov["test_selected"] == "unknown" and ov.get("dev_selected_unknown") and ov["own"]["dev"] == "N"
+          and not ro["dev_clean"] and ro["flags"]["dev_selected_unknown"] and "+sel?" in Z._flag_string(ro),
+          (prov["own_val"]["selected_on"], prov["own_val"].get("val"), ov.get("test_selected"),
+           ov.get("dev_selected_unknown"), ro["dev_clean"]))
+    after = Z.read_contamination(V)
+    check("the world's provenance and contamination records are restored", not any(
+        m["model_id"] in after for m in synth.values()))
+
+
 def plant(mid, exam, ag, sp=None, origin="scored", per_class=None):
     rec = {"format": Z.SCORE_FORMAT, "model_id": mid, "exam": exam, "origin": origin,
            "result": {"agnostic_map50_95": ag, "agnostic_map50": ag, "species_map50_95": sp, "map50_95": sp,
@@ -1128,6 +1268,16 @@ def test_select():
     pj.write_bytes(raw)
     (Z.zoo_dir(V) / "shortlist.keep").rename(Z.zoo_dir(V) / "shortlist.json")
     check("no plan: select refuses (exit 2)", e3 is not None and "no plan" in str(e3), e3)
+    shard_items = [it for p in sorted((Z.zoo_dir(V) / "shards").glob("*.json")) for it in json.loads(p.read_text())["items"]]
+    on_inc = {(it["model_id"], it["exam"]) for it in shard_items if it["model_id"] in inc_ids}
+    check("no shard (the pilot's, stage A's and B's, stage C's) reads an INC row on an exam other than dev; "
+          "inc_off_dev finds none in them", on_inc and all(e == "dev" for _m, e in on_inc)
+          and Z.inc_off_dev(V, shard_items) == [], sorted(on_inc))
+    e1_id, b_id = mid("e1"), mid("b_best")
+    probe = [{"model_id": e1_id, "exam": "test"}, {"model_id": e1_id, "exam": "test_v1"},
+             {"model_id": e1_id, "exam": "dev"}, {"model_id": b_id, "exam": "test_v1"}]
+    check("inc_off_dev names an INC row's items off dev (test, test v1), never its dev item nor a non-INC row's",
+          Z.inc_off_dev(V, probe) == probe[:2], Z.inc_off_dev(V, probe))
 
 
 def plant_all(skip=()):
@@ -1232,6 +1382,85 @@ def test_report():
     check("the platform record: complete, counts and sha256s only (no non-dev key, no score path)",
           rec["status"] == "complete" and R.non_dev_keys(rec) == [] and not E._NON_DEV_SCORE.search(json.dumps(rec))
           and rec["counts"]["files_listed"] == rep["counts"]["files_listed"], rec)
+
+
+def _perturb(obj, f):
+    """Every score-like number in a record's result (and per source or group) through f."""
+    if isinstance(obj, dict):
+        return {k: (v if k in ("n_images", "seconds", "imgsz", "batch") else _perturb(v, f)) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_perturb(v, f) for v in obj]
+    if isinstance(obj, float) and not isinstance(obj, bool):
+        return f(obj)
+    return obj
+
+
+def test_test_blind():
+    print("rankings and the shortlist read dev alone: every non-dev number perturbed (cwd12 test, ImageWeeds, OOD, "
+          "test v1, the evaluation groups), nothing moves")
+    import csv
+    import random
+    c, csha = conf()
+    zd = Z.zoo_dir(V)
+    files = [p for p in sorted((zd / "scores").rglob("*.json")) if not p.name.endswith((".refused.json", ".error.json"))
+             and p.stem != "dev"]
+    raw = {p: p.read_bytes() for p in files}
+    exams = {json.loads(b).get("exam") for b in raw.values()}
+    keep = {n: (zd / n).read_bytes() for n in ("shortlist.json",) if (zd / n).exists()}
+    c_shards = {p: p.read_bytes() for p in (zd / "shards").glob("c_*.json")}
+    small = json.loads(json.dumps(c))
+    small["shortlist"]["max"] = 5
+
+    def snap():
+        rep, _o = quiet(Z.report_step, V, c, csha)
+        ranks = [(r["model_id"], r["rank"]) for r in csv.DictReader(io.StringIO((zd / "report.csv").read_text()))]
+        out = {"sections": rep["sections"], "csv": ranks}
+        for tag, cfg in (("shortlist", c), ("shortlist_cap5", small)):
+            for p in list((zd / "shards").glob("c_*.json")) + [zd / "shortlist.json"]:
+                if p.exists():
+                    p.unlink()
+            sl, _o = quiet(Z.select_step, V, cfg, csha, 2)
+            items = sorted((it["model_id"], it["exam"]) for p in (zd / "shards").glob("c_*.json")
+                           for it in json.loads(p.read_text())["items"])
+            out[tag] = {"rules": sl["rules"], "ids": sl["ids"], "items_c": items}
+        return out
+    rnd = random.Random(20261004)
+    ways = {"reversed": lambda v: round(1.0 - v, 6), "random": lambda v: round(rnd.random(), 6),
+            "constant": lambda v: 0.5}
+    got = {}
+    try:
+        got["as scored"] = snap()
+        for name, f in ways.items():
+            for p, b in raw.items():
+                rec = json.loads(b)
+                if rec.get("format") == Z.SCORE_FORMAT:
+                    rec = dict(rec, **{k: _perturb(rec[k], f) for k in ("result", "per_source", "per_group")
+                                       if k in rec})
+                p.write_text(json.dumps(rec))
+            got[name] = snap()
+    finally:
+        for p, b in raw.items():
+            p.write_bytes(b)
+        for p in (zd / "shards").glob("c_*.json"):
+            p.unlink()
+        for p, b in c_shards.items():
+            p.write_bytes(b)
+        for n, b in keep.items():
+            (zd / n).write_bytes(b)
+        quiet(Z.report_step, V, c, csha)
+    base = got.get("as scored") or {}
+    ranked = [base.get("sections", {}).get(k) or [] for k in ("species12_dev_clean", "species_partial_dev_clean",
+                                                                "agnostic_dev_clean")]
+    check("the world has non-dev records on %s and rows in each ranked section to move" % sorted(exams - {None}),
+          {"test", "imageweeds", "test_v1"} <= exams and all(len(r) >= 2 for r in ranked[::2])
+          and base.get("shortlist", {}).get("rules", {}).get("top_dev_clean"), [len(r) for r in ranked])
+    for part in ("sections", "csv", "shortlist", "shortlist_cap5"):
+        check("%s: identical under every perturbation of the non-dev numbers (%s)" % (
+            {"sections": "the report's sections and their order", "csv": "report.csv's order and ranks",
+             "shortlist": "the shortlist's rules, ids and stage C's items",
+             "shortlist_cap5": "the shortlist under a cap of 5"}[part], ", ".join(ways)),
+            all(got.get(w, {}).get(part) == base.get(part) for w in ways),
+            {w: got.get(w, {}).get(part) == base.get(part) for w in ways})
 
 
 def test_sections():
@@ -1468,8 +1697,8 @@ def test_pinned_unchanged():
 def main():
     world()
     for t in (test_list, test_class_maps, test_meta, test_convert, test_provenance, test_exams,
-              test_contamination, test_plan, test_select, test_report, test_sections, test_submit, test_script,
-              test_pinned_unchanged):
+              test_contamination, test_unread, test_plan, test_select, test_report, test_test_blind, test_sections,
+              test_submit, test_script, test_pinned_unchanged):
         t()
     print("\n%d failure(s)" % len(FAILURES))
     shutil.rmtree(TMP, ignore_errors=True)

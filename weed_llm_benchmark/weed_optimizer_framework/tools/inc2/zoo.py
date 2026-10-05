@@ -1081,10 +1081,11 @@ class Lister:
     hidden names (here with a visited set, so a symlink loop ends), a .txt
     file by its lines ('./' replaced by the file's directory; another relative
     line is resolved against the training process's working directory, which
-    is unknown: counted unresolved). Each entry's realpath (readlink plus the
-    cached realpath of its directory: one lstat per link instead of one per
-    path component) and its own lstat mtime (a merge rebuilt after training
-    shows as entries newer than the run)."""
+    is unknown: counted unresolved). A .txt list or a directory that cannot
+    be read is counted unreadable: what it held is unknown, never empty. Each
+    entry's realpath (readlink plus the cached realpath of its directory: one
+    lstat per link instead of one per path component) and its own lstat mtime
+    (a merge rebuilt after training shows as entries newer than the run)."""
 
     def __init__(self, fmts=None):
         self.fmts = fmts or img_formats()
@@ -1118,8 +1119,10 @@ class Lister:
         return "." in name and not name.startswith(".") and name.rpartition(".")[-1].lower() in self.fmts
 
     def entries(self, p):
-        """({'entries': [(path, lstat mtime)], 'unresolved': n, 'missing': bool})."""
-        out, unresolved = [], 0
+        """({'entries': [(path, lstat mtime)], 'unresolved': n, 'unreadable': n,
+        'missing': bool}): unresolved counts the relative lines of a .txt list,
+        unreadable the .txt lists and directories that could not be read."""
+        out, unresolved, unreadable = [], 0, 0
         if os.path.isdir(p):
             seen = set()
             stack = [p]
@@ -1128,6 +1131,7 @@ class Lister:
                 try:
                     st = os.stat(d)
                 except OSError:
+                    unreadable += 1
                     continue
                 key = (st.st_dev, st.st_ino)
                 if key in seen:
@@ -1137,6 +1141,7 @@ class Lister:
                     with os.scandir(d) as it:
                         ents = sorted(it, key=lambda e: e.name)
                 except OSError:
+                    unreadable += 1
                     continue
                 subdirs = []
                 for e in ents:
@@ -1155,14 +1160,14 @@ class Lister:
                             mt = None
                         out.append((e.path, mt))
                 stack.extend(reversed(subdirs))
-            return {"entries": out, "unresolved": 0, "missing": False}
+            return {"entries": out, "unresolved": 0, "unreadable": unreadable, "missing": False}
         if os.path.isfile(p):
             parent = os.path.dirname(p) + os.sep
             try:
                 with open(p, encoding="utf-8") as fh:
                     lines = fh.read().strip().splitlines()
             except (OSError, UnicodeDecodeError):
-                return {"entries": [], "unresolved": 0, "missing": True}
+                return {"entries": [], "unresolved": 0, "unreadable": 1, "missing": False}
             for x in lines:
                 x = x.strip()
                 if not x:
@@ -1179,8 +1184,8 @@ class Lister:
                 except OSError:
                     mt = None
                 out.append((x, mt))
-            return {"entries": out, "unresolved": unresolved, "missing": False}
-        return {"entries": [], "unresolved": 0, "missing": True}
+            return {"entries": out, "unresolved": unresolved, "unreadable": 0, "missing": False}
+        return {"entries": [], "unresolved": 0, "unreadable": 0, "missing": True}
 
 
 def dataset_dirs(yaml_path, key):
@@ -1272,8 +1277,9 @@ def _selected_on(val_dirs, train_dirs, base, cont):
         return "cwd12_test_part"
     if any(s in hay for s in cont["dev_val"]):
         return "dev"
+    # val entries are real paths (dataset_dirs): the dataset's root is compared as written and as its real path
     if val_dirs and (set(val_dirs) <= set(train_dirs or []) or
-                     (base and all(_under(v, [base]) for v in val_dirs))):
+                     (base and all(_under(v, [base, os.path.realpath(base)]) for v in val_dirs))):
         return "own_split"
     return "unknown"
 
@@ -1388,7 +1394,7 @@ def provenance_one(m, idx, conf, lister, cache):
            "kind": "inc" if is_inc_family(m["family"]) and not m.get("mlflow") else "ultralytics",
            "dates": {}, "recipe": {}, "init": {"kind": "unknown", "ref": None, "model_id": None}, "soup_of": [],
            "data": {"source": "none", "rating": "none", "reason": None, "list_sha256": None, "n_entries": 0,
-                    "n_unique": 0, "n_unresolved": 0},
+                    "n_unique": 0, "n_unresolved": 0, "n_unreadable": 0},
            "val": None, "selected_on": "unknown", "test_selected": "unknown", "dev_selected": False,
            "dev_gated": False, "species_trained": None, "code": {"kind": "unknown"}, "imgsz_trained": None,
            "notes": []}
@@ -1517,18 +1523,20 @@ def provenance_one(m, idx, conf, lister, cache):
         else:
             key = ("train", tuple(train_dirs))
             if key not in cache:
-                ents, unres = [], 0
+                ents, unres, unread = [], 0, 0
                 for x in train_dirs:
                     got = lister.entries(x)
                     ents += got["entries"]
                     unres += got["unresolved"]
+                    unread += got["unreadable"]
                 reals = [lister.realpath(p) for p, _mt in ents]
                 newest = max((mt for _p, mt in ents if mt is not None), default=None)
                 # entries listed under the cottonweed_holdout slug's merge prefix (their realpath loses the name)
                 pre = tuple(cont.get("cwd12_holdout_prefixes") or ())
                 slug = {r for (p, _mt), r in zip(ents, reals) if pre and os.path.basename(p).startswith(pre)}
                 cache[key] = {"sha": write_list(cache["version"], reals), "n_entries": len(ents),
-                              "n_unique": len(set(reals)), "unresolved": unres, "newest": newest,
+                              "n_unique": len(set(reals)), "unresolved": unres, "unreadable": unread,
+                              "newest": newest,
                               "holdout_slug": len(slug)}
             got = cache[key]
             if derived and out["data"]["source"] == "derived":
@@ -1550,18 +1558,24 @@ def provenance_one(m, idx, conf, lister, cache):
                     out["data"]["reason"] = "; ".join(rebuilt)
             out["data"].update(rating=rating, list_sha256=got["sha"], n_entries=got["n_entries"],
                                n_unique=got["n_unique"], n_unresolved=got["unresolved"],
+                               n_unreadable=got["unreadable"],
                                holdout_slug=got.get("holdout_slug", 0),
                                newest_entry_utc=_utc(got["newest"]) if got["newest"] else None)
     if val_dirs:
         vkey = ("val", tuple(val_dirs))
         if vkey not in cache and all(os.path.exists(x) for x in val_dirs):
-            ents = []
+            ents, unres, unread = [], 0, 0
             for x in val_dirs:
-                ents += lister.entries(x)["entries"]
+                got = lister.entries(x)
+                ents += got["entries"]
+                unres += got["unresolved"]
+                unread += got["unreadable"]
             reals = [lister.realpath(p) for p, _mt in ents]
-            cache[vkey] = {"sha": write_list(cache["version"], reals), "n_unique": len(set(reals))}
+            cache[vkey] = {"sha": write_list(cache["version"], reals), "n_unique": len(set(reals)),
+                           "unresolved": unres, "unreadable": unread}
         if vkey in cache:
             out["val"] = {"list_sha256": cache[vkey]["sha"], "n_unique": cache[vkey]["n_unique"],
+                          "n_unresolved": cache[vkey]["unresolved"], "n_unreadable": cache[vkey]["unreadable"],
                           "ref": val_dirs}
     sel = derived.get("val") if (derived and out["data"]["source"] == "derived") else \
         _selected_on(val_dirs, train_dirs, base, cont)
@@ -2588,22 +2602,29 @@ def _cwd12_stem(p, cont):
     return stem
 
 
-def own_state(rating, counts, n_unique, tol):
-    """Y / P / U / N of one list on one exam (the amendment's state rule)."""
+def own_state(rating, counts, n_unique, tol, incomplete=0):
+    """Y / P / U / N of one list on one exam (the amendment's state rule).
+    `incomplete` counts the training entries the list could not read (a
+    relative line of a .txt list, an unreadable .txt list or directory):
+    with any, the list is not the whole training set, so the state is never
+    N (clean): U, unless the list read shows the exam's images (Y) or the
+    state is P anyway."""
     if rating == "inherits":
         return "N"
     if rating == "none" or counts is None:
         return "U"
     hits = int(counts.get("exact") or 0) + int(counts.get("near") or 0) + int(counts.get("companion") or 0)
     if rating in ("listed_after_rebuild", "derived_superset"):
-        return "P"
-    if hits:
-        return "Y"
-    if not n_unique:
-        return "U"
-    if int(counts.get("unhashed") or 0) > tol * max(1, int(counts.get("n") or 0)):
-        return "P"
-    return "N"
+        state = "P"
+    elif hits:
+        state = "Y"
+    elif not n_unique:
+        state = "U"
+    elif int(counts.get("unhashed") or 0) > tol * max(1, int(counts.get("n") or 0)):
+        state = "P"
+    else:
+        state = "N"
+    return _worse(state, "U") if incomplete else state
 
 
 def _worse(a, b):
@@ -2743,29 +2764,45 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
     for mid, pr in prov.items():
         d = pr.get("data") or {}
         cnt, extra = by_list.get(d.get("list_sha256"), (None, None)) if d.get("list_sha256") else (None, None)
-        own = {e: own_state(d.get("rating") or "none", (cnt or {}).get(e), d.get("n_unique") or 0, tol)
-               for e in HASH_EXAMS}
+        # training entries the list could not read: their images are unknown, so no exam is clean on this list
+        n_unres, n_unread = int(d.get("n_unresolved") or 0), int(d.get("n_unreadable") or 0)
+        own = {e: own_state(d.get("rating") or "none", (cnt or {}).get(e), d.get("n_unique") or 0, tol,
+                            incomplete=n_unres + n_unread) for e in HASH_EXAMS}
         rows[mid] = {"format": CONTAMINATION_FORMAT, "model_id": mid, "list_sha256": d.get("list_sha256"),
-                     "rating": d.get("rating"), "counts": cnt, "own": own, "eval_groups": (extra or {}).get("groups"),
+                     "rating": d.get("rating"), "n_unresolved": n_unres, "n_unreadable": n_unread,
+                     "counts": cnt, "own": own, "eval_groups": (extra or {}).get("groups"),
                      "cwd12": {k: (extra or {}).get(k) for k in ("cwd12_train", "cwd12_holdout", "non_cwd12")},
                      "selected_on": pr.get("selected_on"), "test_selected": pr.get("test_selected"),
                      "dev_selected": bool(pr.get("dev_selected")), "dev_gated": bool(pr.get("dev_gated")),
                      "notes": list(pr.get("notes") or [])}
         v = pr.get("val") or {}
+        own_best = (models.get(mid) or {}).get("ckpt_role") == "best" and pr.get("selected_on") == "own_split"
         if v.get("list_sha256"):
             vc, _vx = by_list[v["list_sha256"]]
             vt = vc["test"]["exact"] + vc["test"]["near"]
             vd = vc["dev"]["exact"] + vc["dev"]["near"]
-            rows[mid]["val"] = {"test_hits": vt, "dev_hits": vd, "n": vc["test"]["n"]}
+            # val entries the list could not read: a val set without a hit may still hold test or dev images
+            v_inc = int(v.get("n_unresolved") or 0) + int(v.get("n_unreadable") or 0)
+            rows[mid]["val"] = {"test_hits": vt, "dev_hits": vd, "n": vc["test"]["n"], "n_unresolved":
+                                int(v.get("n_unresolved") or 0), "n_unreadable": int(v.get("n_unreadable") or 0)}
             if pr.get("test_selected") == "pending_val_check":
-                rows[mid]["test_selected"] = "best_partial" if vt else "none"
-            if (models.get(mid) or {}).get("ckpt_role") == "best" and vd and pr.get("selected_on") == "own_split":
+                rows[mid]["test_selected"] = "best_partial" if vt else ("unknown" if v_inc else "none")
+            if own_best and vd:
                 rows[mid]["dev_selected"] = True
                 rows[mid]["notes"].append("best.pt chosen on a val set holding %d dev images" % vd)
+            elif own_best and v_inc:
+                rows[mid]["dev_selected_unknown"] = True
+                rows[mid]["notes"].append("best.pt chosen on a val set of which %d entries could not be read" % v_inc)
             if vt:
                 rows[mid]["notes"].append("selected on a val set holding %d cwd12 test images" % vt)
         elif pr.get("test_selected") == "pending_val_check":
             rows[mid]["test_selected"] = "unknown"
+            if own_best:
+                rows[mid]["dev_selected_unknown"] = True
+                rows[mid]["notes"].append("best.pt chosen on a val set that could not be listed")
+        if n_unres + n_unread:
+            rows[mid]["notes"].append("%d training entries could not be read (%d relative, %d unreadable): no exam "
+                                      "is clean on this list" % (n_unres + n_unread, n_unres, n_unread))
         m = models.get(mid) or {}
         cmap = m.get("class_map") or {}
         date = (m.get("ckpt") or {}).get("date") or (pr.get("dates") or {}).get("start_utc")
@@ -2797,7 +2834,8 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
             return {e: "U" for e in HASH_EXAMS}, {"test": False}
         st = dict(rows[mid]["own"])
         sel = {"test": rows[mid]["test_selected"] in ("best", "early_stop", "best_partial"),
-               "dev": bool(rows[mid]["dev_gated"] or rows[mid]["dev_selected"])}
+               "dev": bool(rows[mid]["dev_gated"] or rows[mid]["dev_selected"]
+                           or rows[mid].get("dev_selected_unknown"))}
         inh = {e: "N" for e in HASH_EXAMS}
         for kind, ref in parents(mid):
             if kind == "unknown":
@@ -3109,6 +3147,15 @@ def read_shard(version, stage, index=None):
     return sh
 
 
+def inc_off_dev(version, items):
+    """The items that would read an INC row on an exam other than dev. An INC
+    row is read on dev alone (its other columns are its own records): the
+    plan, the pilot and the shortlist never put one in a shard, and a scoring
+    task that meets one refuses before it scores anything."""
+    fam = {m["model_id"]: m.get("family") for m in read_models(version)}
+    return [it for it in items if it.get("exam") != "dev" and is_inc_family(fam.get(it.get("model_id")) or "")]
+
+
 def score_cmd(version, stage=None, shard=None, pilot=False, item=None):
     conf, conf_sha = load_config(version)
     check_root(version)
@@ -3126,6 +3173,10 @@ def score_cmd(version, stage=None, shard=None, pilot=False, item=None):
     else:
         idx = int(shard if shard is not None else os.environ.get("SLURM_ARRAY_TASK_ID", "0"))
         sh, stg, task = read_shard(version, stage, idx), stage, "%s_%03d" % (stage, idx)
+    off = inc_off_dev(version, sh["items"])
+    if off:
+        raise ZooRefused("an INC row is read on dev alone: %s; nothing scored"
+                         % ", ".join("%s:%s" % (it["model_id"][:12], it["exam"]) for it in off[:5]))
     cap = None
     if stg in ("a", "c"):
         st = conf["stages"]
@@ -3596,13 +3647,15 @@ def build_rows(version, conf):
         ext = {"tv1_ag": scores[EXAM_TV1]["agnostic_map50_95"], "ev1_ag": scores[EXAM_EVG]["agnostic_map50_95"]}
         fin = ct.get("final") or {}
         dev_sel = bool(ct.get("dev_selected"))
+        dev_sel_unknown = bool(ct.get("dev_selected_unknown"))
         dev_gated = bool(ct.get("dev_gated") or pr.get("dev_gated"))
         rel = m["rel"]
         cl = [c.get("cite") for c in claims if c.get("match") and re.search(c["match"], rel)]
         rt = [c.get("cite") for c in retracted if c.get("match") and re.search(c["match"], rel)]
         imgsz = pr.get("imgsz_trained")
         rid = (pr.get("inc_run") or "") + " " + json.dumps(pr.get("recipe") or {})
-        flags = {"dev": fin.get("dev"), "dev_selected": dev_sel, "dev_gated": dev_gated,
+        flags = {"dev": fin.get("dev"), "dev_selected": dev_sel, "dev_selected_unknown": dev_sel_unknown,
+                 "dev_gated": dev_gated,
                  "dev_gated_inherited": bool(ct.get("dev_gated_inherited")), "test": fin.get("test"),
                  "test_selected": ct.get("test_selected") or pr.get("test_selected"),
                  "test_selected_inherited": bool(ct.get("test_selected_inherited")),
@@ -3619,7 +3672,7 @@ def build_rows(version, conf):
                  "inc_kind": pr.get("inc_kind"), "arm": (pr.get("recipe") or {}).get("arm") if isinstance(
                      (pr.get("recipe") or {}).get("arm"), str) else ((pr.get("recipe") or {}).get("arm") or {}).get("id")
                  if isinstance((pr.get("recipe") or {}).get("arm"), dict) else None}
-        dev_clean = flags["dev"] == "N" and not dev_sel and not dev_gated
+        dev_clean = flags["dev"] == "N" and not dev_sel and not dev_sel_unknown and not dev_gated
         sp12 = species_level and nsp == 12
         if not m.get("scorable"):
             section = "unscorable"
@@ -3639,7 +3692,7 @@ def build_rows(version, conf):
                      "end2end": (m.get("head") or {}).get("end2end"), "nc_native": (m.get("head") or {}).get("nc")},
             "imgsz_trained": imgsz, "recipe": pr.get("recipe"), "init": pr.get("init"),
             "data": {k: (pr.get("data") or {}).get(k) for k in ("source", "ref", "n_entries", "n_unique", "rating",
-                                                                  "reason")},
+                                                                  "reason", "n_unresolved", "n_unreadable")},
             "selected_on": pr.get("selected_on"), "soup_of": [x.get("model_id") or x.get("ref")
                                                               for x in pr.get("soup_of") or []],
             "code": _row_code(pr, cv.get(mid) or cv.get(sid)),
@@ -3842,7 +3895,8 @@ def _flag_string(r):
     def sel(s):
         return "S" if s in ("best", "early_stop", "best_partial") else ""
     s = "dev:%s%s%s test:%s%s iw:%s tv1:%s ev1:%s" % (
-        f.get("dev") or "-", "+sel" if f.get("dev_selected") else "", "+gated" if f.get("dev_gated") else "",
+        f.get("dev") or "-", "+sel" if f.get("dev_selected") else ("+sel?" if f.get("dev_selected_unknown") else ""),
+        "+gated" if f.get("dev_gated") else "",
         sel(f.get("test_selected")) + ("s" if f.get("test_selected_inherited") else ""), f.get("test") or "-",
         f.get("imageweeds") or "-", f.get("test_v1") or "-", f.get("eval_v1") or "-")
     extra = [k for k in ("legacy_join", "class_map_suspect", "species_not_trained", "planted_noise",
@@ -3866,7 +3920,10 @@ def _md_table(rows, ranked, with_rank=True):
             r["short_id"], r["family"], r["ckpt_role"] + ("+" + "+".join(r["also_role"]) if r["also_role"] else ""),
             str(r["dates"].get("end") or r["dates"].get("start_utc") or "")[:10],
             (r["arch"].get("head") or "?"), "" if not _num(imgsz) or int(imgsz) == 640 else " †%s" % imgsz,
-            r["data"].get("n_unique") if r["data"].get("n_unique") is not None else "?", r["data"].get("rating"),
+            "%s%s" % (r["data"].get("n_unique") if r["data"].get("n_unique") is not None else "?",
+                      " +%d unread" % (int(r["data"].get("n_unresolved") or 0) + int(r["data"].get("n_unreadable") or 0))
+                      if (r["data"].get("n_unresolved") or r["data"].get("n_unreadable")) else ""),
+            r["data"].get("rating"),
             r["class_map"]["rule"] or "-", " (conv)" if r["class_map"]["converted"] else "",
             _f(c["dev_sp"]) if _num(c["dev_sp"]) else ("n/i" if r["flags"].get("legacy_join") else ""),
             dag, _f(c["dev_named"]), _f(c["iw_rag"]), _status_cell(r, "imageweeds", "iw_ag") if not _num(c["iw_ag"])
@@ -3888,7 +3945,8 @@ def _csv_row(r, rank):
             val(_status_cell(r, "dev", "dev_ag")), val(c["dev_named"]), val(c["iw_rag"]),
             val(_status_cell(r, "imageweeds", "iw_ag")), val(_status_cell(r, EXAM_OOD, "od1_ag")),
             val(c["t12_sp_desc"]), val(_status_cell(r, "test", "t12_ag_desc")), f.get("dev") or "",
-            "1" if f.get("dev_selected") else "", "1" if f.get("dev_gated") else "", f.get("test") or "",
+            "1" if f.get("dev_selected") else ("?" if f.get("dev_selected_unknown") else ""),
+            "1" if f.get("dev_gated") else "", f.get("test") or "",
             f.get("test_selected") or "", f.get("imageweeds") or "", f.get("test_v1") or "", f.get("eval_v1") or "",
             "1" if f.get("legacy_join") else "", "1" if f.get("class_map_suspect") else "", r["section"],
             str(rank or ""), str(r.get("method") or ""), r.get("recipe_brief") or "", r.get("init_brief") or "",
@@ -4135,10 +4193,13 @@ def _report_md(version, rep, secs, exams, conf):
           "## Legend", "",
           "- flags: `dev:Y test:S+Y iw:N tv1:N ev1:P`: Y (an exact or near copy of an exam image in the training "
           "list), P (possible: hits on a list rebuilt after the run or a derived superset, or more than 1 % of the "
-          "list unhashed), U (no list, or an unknown init), N (a complete, non-empty list with no hit); `+sel` "
-          "selected on dev; `+gated` dev-gated (its data or init chosen by a dev gate: an INC candidate, a stream "
-          "pool, any row initialised from an INC row or from a dev-gated or dev-selected row); S selected on the "
-          "cwd12 test (best.pt, an early stop, or a val set holding test images), s the same through its init.",
+          "list unhashed), U (no list, an unknown init, or no hit on a list with training entries it could not "
+          "read: `+N unread` beside its image count, relative lines of a .txt list or an unreadable list or "
+          "directory), N (a complete, non-empty list with no hit); `+sel` selected on dev, `+sel?` a best.pt whose "
+          "own val set could not be read whole (not dev-clean); `+gated` dev-gated (its data or init chosen by a "
+          "dev gate: an INC candidate, a stream pool, any row initialised from an INC row or from a dev-gated or "
+          "dev-selected row); S selected on the cwd12 test (best.pt, an early stop, or a val set holding test "
+          "images), s the same through its init.",
           "- `*` cwd12 test is descriptive: the sealed test, the selection set from 03-15 to 09-26.",
           "- `†N`: read at 640, trained at N. The native-resolution reads of the measurement arms (L23N) are in "
           "capacity/native_v1.json and their runs' scores/dev@<imgsz>.json.",

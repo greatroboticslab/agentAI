@@ -1271,8 +1271,8 @@ def stage_e1_base3(w):
           len(e2) == 9 and not [e for e in w.events("proposed") if e.get("lever") in ("L23C", "L23D")
                                 or (e.get("lever") == "L23B" and e.get("child_exp") in e2)]
           and not [x for x in e2 if (INC / x).exists()], e2)
-    check("the zoo audit (L23Z, 2026-10-04) is never proposed here: it waits for E2's verdict, which this world never "
-          "reaches", not [e for e in w.events("proposed") if e.get("lever") == "L23Z"])
+    check("the zoo audit (L23Z, 2026-10-04) is never proposed here: it waits for E2's verdict and E2-C's attribution, "
+          "which this world never reaches", not [e for e in w.events("proposed") if e.get("lever") == "L23Z"])
 
 
 def d28_now(w):

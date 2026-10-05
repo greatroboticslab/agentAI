@@ -604,7 +604,7 @@
    "success": "capacity/zoo_v1.json complete; INC_DIR/_zoo/v1/report.{json,csv,md} (and report_external.* for the sealed reads).",
    "falsifier": "none: nothing switches; the usage rule is pre-registered (Amendment 2026-10-04, Z1).",
    "estimator": "zoo",
-   "note": "Record only: proposed once, after E2's verdict, when no zoo record exists; a failure is a person's card and it is not proposed again. One chain of five GPU-shared jobs within a 40 GPU-h cap its tasks enforce."
+   "note": "Record only: proposed once and last, after E2's verdict and E2-C's attribution are recorded (stream-domain zoo.requires: /stage/e2, /stage/e2_attr), when no zoo record exists; a failure is a person's card and it is not proposed again. One chain of five GPU-shared jobs within a 40 GPU-h cap its tasks enforce."
   },
   "LV": {
    "name": "verdict",

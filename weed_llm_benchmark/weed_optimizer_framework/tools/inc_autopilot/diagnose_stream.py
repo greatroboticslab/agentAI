@@ -1694,10 +1694,13 @@ def r0(v, d28=None):
     E2's verdict is recorded and E2-W's and E2-C's experiments are done,
     the attribution's rescore and record (L23D, once); the model-zoo audit
     (2026-10-04, L23Z: every detector under one protocol, record only),
-    once, last, when MAINT and DATA have nothing else due, E2's rescore and
-    verdict are done (/stage/e2) and no zoo record exists (/stage/zoo
-    missing: a person's submission, a stale chain, a failure, a partial or a
-    complete record all stop it). DATA --
+    once, last, when MAINT and DATA have nothing else due, every stage the
+    zoo requires is done (zoo.requires: E2's rescore and verdict, /stage/e2,
+    and E2-C's attribution, /stage/e2_attr, which follows E2-C's builds; the
+    chain holds MAINT for hours, so it never delays either, and a failed one
+    holds it until a person's rerun completes that record) and no zoo record
+    exists (/stage/zoo missing: a person's submission, a stale chain, a
+    failure, a partial or a complete record all stop it). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill), then D28-v2's sidecars for batches
     committed before the amendment (L17 eval-hits, _eval_hits_due)."""
@@ -1903,17 +1906,19 @@ def r0(v, d28=None):
                                    "attribution (record only, dev)" % ", ".join(b["exp"] for b in at_items)}
             cites = [v.ccite("/stage/lock")] + [v.ccite(E.pointer("stage", "exp_status", b["exp"]))
                                                 for b in at_items] + [v.ccite("/stage/e2"), v.ccite("/stage/e2_attr")]
-    # the model-zoo audit (2026-10-04, Amendment Z1): once, last, after E2's verdict, while no zoo record exists;
-    # record only. Cites only what it rests on (the lock, the zoo's stage, E2's), so a build changing /stage does not
-    # void its envelope grant.
+    # the model-zoo audit (2026-10-04, Amendment Z1): once, last, after every stage it requires is done (E2's
+    # verdict and E2-C's attribution: the chain holds MAINT for 8-12 h and must never delay either), while no zoo
+    # record exists; record only. Cites only what it rests on (the lock, the zoo's stage, the required stages), so a
+    # build changing /stage does not void its envelope grant.
     z = v.dom.get("zoo") or {}
+    req = z.get("requires")
+    req = [req] if isinstance(req, str) else [str(x) for x in req or []]
     if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"] \
-            and z.get("record") and st.get("zoo") in (None, "missing") \
-            and (z.get("requires") != "e2" or st.get("e2") == "done"):
-        out["MAINT"] = {"lever": "L23Z", "why": "no zoo record (%s): every detector the project trained, scored under "
-                        "one protocol (record only, descriptive)" % z["record"]}
-        cites = [v.ccite("/stage/lock"), v.ccite("/stage/zoo")] + ([v.ccite("/stage/e2")] if z.get("requires") == "e2"
-                                                                    else [])
+            and z.get("record") and st.get("zoo") in (None, "missing") and all(st.get(k) == "done" for k in req):
+        out["MAINT"] = {"lever": "L23Z", "why": "no zoo record (%s)%s: every detector the project trained, scored "
+                        "under one protocol (record only, descriptive)"
+                        % (z["record"], "; %s done" % ", ".join("/stage/%s" % k for k in req) if req else "")}
+        cites = [v.ccite("/stage/lock"), v.ccite("/stage/zoo")] + [v.ccite("/stage/%s" % k) for k in req]
     items = {k: x for k, x in out.items() if x}
     wait = wait if wait and wait["state"] == "waiting" else None
     if not items and not wait:

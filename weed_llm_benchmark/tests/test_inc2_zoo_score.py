@@ -24,6 +24,8 @@ What is pinned:
   says exam_root local and equals the Lustre root's score; too little room:
   the Lustre root;
 - score --item ID:EXAM matches the shard's record;
+- an INC row is read on dev alone: score --item on test or test v1, or a
+  shard holding one of its items off dev, refuses before anything is scored;
 - the pilot (a real subprocess, as the inventory runs it) inside a job that
   started 4.2 h ago scores every item (its deadline runs from its own start)
   and measures a rate for every exam with images; a pilot that measures
@@ -337,6 +339,39 @@ def main():
     check("score --item ID:EXAM gives the shard's record", abs(first["result"]["agnostic_map50_95"] -
                                                                second["result"]["agnostic_map50_95"]) <= 1e-9
           and second["task"].startswith("item_"))
+    print("an INC row is read on dev alone")
+    e1 = item("e1", "dev")
+    refusals = {}
+    for what, call in (("score --item <e1>:test", lambda: Z.score_cmd(V, None, None, False, "%s:test" % e1["model_id"])),
+                       ("score --item <e1>:test_v1", lambda: Z.score_cmd(V, None, None, False,
+                                                                         "%s:test_v1" % e1["model_id"]))):
+        with as_root(root):
+            try:
+                T.quiet(call)
+                refusals[what] = None
+            except Z.ZooRefused as e:
+                refusals[what] = str(e)
+    Z._write_json(Z.shard_path(V, "a", 8), {"format": Z.SHARD_FORMAT, "stage": "a", "index": 8,
+                                            "exams": ["dev", "imageweeds"],
+                                            "items": [dict(items[4], exam="dev"), dict(e1, exam="imageweeds")],
+                                            "predicted_s": 2.0})
+    with as_root(root):
+        try:
+            T.quiet(Z.score_cmd, V, "a", 8)
+            refusals["a shard holding e1 on ImageWeeds"] = None
+        except Z.ZooRefused as e:
+            refusals["a shard holding e1 on ImageWeeds"] = str(e)
+    Z.shard_path(V, "a", 8).unlink()
+    tasks = sorted(p.name for p in (Z.zoo_dir(V) / "tasks").glob("*.json")
+                   if p.name.startswith("item_%s" % e1["model_id"][:12]) or p.name == "a_008.json")
+    check("an INC row (e1) on test, test v1, or in a shard beside another row's item: refused before anything is "
+          "scored (no record, no task record)", all(v and "dev alone" in v for v in refusals.values())
+          and all(Z.record_of(V, e1["model_id"], x)[0] is None for x in ("test", "test_v1", "imageweeds"))
+          and Z.record_of(V, items[4]["model_id"], "dev")[0] == "scored" and not tasks, (refusals, tasks))
+    with as_root(root):
+        T.quiet(Z.score_cmd, V, None, None, False, "%s:dev" % e1["model_id"])
+    check("  its dev item is scored (score --item <e1>:dev)", Z.record_of(V, e1["model_id"], "dev")[0] == "scored",
+          Z.record_of(V, e1["model_id"], "dev")[0])
     check("nothing under the INC run directories changed; no score file appeared there",
           tree_hash(C.INC_DIR / "zt_inc") == inc_before
           and sorted(p.name for p in (C.INC_DIR / "zt_inc").glob("runs/*/scores/*.json")) == ["dev.json", "test.json"])

@@ -1763,11 +1763,13 @@ def s_r0():
           and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23D"] == ["envelope"]
           and [x["name"] for x in w.submits if "rescore-e2-attr" in x["argv"]] == ["inc_build_e2_attr_v1"]
           and (w.inc / "capacity" / "e2_v1.json").read_bytes() == e2v, tail(pd, 2))
-    # 2026-10-04: the model-zoo audit (Amendment Z1). E2's rescore and verdict done (capacity/e2_rescore.json
-    # complete): L23Z once, last, within the envelope; its chain followed by its five job ids
+    # 2026-10-04: the model-zoo audit (Amendment Z1). E2's verdict and E2-C's attribution recorded
+    # (capacity/e2_rescore.json and capacity/e2_attr_rescore.json complete): L23Z once, last, within the envelope;
+    # its chain followed by its five job ids
     pz = _step(w, "L23Z", lambda: w.zoo_finish("complete"))
-    check("  then, E2's verdict done and no zoo record, L23Z once (bash run_inc2_zoo.sh submit --version v1 "
-          "--shards-a 32 --shards-c 16 --concurrency 4 --max-gpu-hours 40), within the envelope, one submission",
+    check("  then, E2's verdict and E2-C's attribution recorded and no zoo record, L23Z once (bash run_inc2_zoo.sh "
+          "submit --version v1 --shards-a 32 --shards-c 16 --concurrency 4 --max-gpu-hours 40), within the "
+          "envelope, one submission",
           tail(pz, 13) == ["bash", "run_inc2_zoo.sh", "submit", "--version", "v1", "--shards-a", "32", "--shards-c",
                            "16", "--concurrency", "4", "--max-gpu-hours", "40"]
           and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23Z"] == ["envelope"]

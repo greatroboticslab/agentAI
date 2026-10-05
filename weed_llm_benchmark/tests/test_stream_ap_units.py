@@ -2844,14 +2844,16 @@ def _t_e2c_fork():
           (pro, [e.get("lever") for e in w.events("proposed")]))
 
 
-def _zoo_world(tag, e2=True):
+def _zoo_world(tag, e2=True, attr=True):
     """R0 complete and every lever before it done (ready_r0), the zoo's record missing; E2's rescore record removed
-    unless e2."""
+    unless e2, E2-C's attribution rescore record removed unless attr."""
     w = World(tag)
     w.ready_r0()
     (w.inc / "capacity" / "zoo_v1.json").unlink()
     if not e2:
         (w.inc / "capacity" / "e2_rescore.json").unlink()
+    if not attr:
+        (w.inc / "capacity" / "e2_attr_rescore.json").unlink()
     return w
 
 
@@ -2861,7 +2863,7 @@ def _zoo_items(w, lever="L23Z"):
 
 def t_zoo():
     section("the model-zoo audit (L23Z, 2026-10-04, Amendment Z1): one held-free chain of five jobs, proposed once "
-            "after E2's verdict, record only")
+            "and last, after E2's verdict and E2-C's attribution, record only")
     from weed_optimizer_framework.tools.inc2 import zoo as Z
     dom = LS.load_domain("weed")
     prm = PARAMS["L23Z"]
@@ -2877,7 +2879,8 @@ def t_zoo():
                    "--concurrency", "4", "--max-gpu-hours", "40"]
           and r["remote"][:2] == ["stream-submit", "zoo"] and r["remote"][r["remote"].index("--") + 1:] == argv[2:]
           and X.argv_check(r, argv)[0] and ok and est == 40.0 and det["estimator"] == "zoo"
-          and dom["zoo"]["requires"] == "e2" and dom["zoo"]["record"] == "capacity/zoo_v1.json", (argv, r, bad, det))
+          and dom["zoo"]["requires"] == ["e2", "e2_attr"] and dom["zoo"]["record"] == "capacity/zoo_v1.json",
+          (argv, r, bad, det))
     check("the zoo's job names and pinned release agree across inc2.zoo and stream_remote",
           tuple(Z.ZOO_JOB_NAMES) == tuple(SR.ZOO_JOB_NAMES) and LS.row("L23Z")["follow"] == "job")
     good = ["submit", "--version", "v1", "--shards-a", "32", "--shards-c", "16", "--concurrency", "4",
@@ -2911,6 +2914,8 @@ def t_zoo():
           and R.non_dev_keys(rec) == [] and not E._NON_DEV_SCORE.search(json.dumps(rec)), arts.get("capacity/zoo_v1.json"))
     # the proposal gate
     gates = {"E2's rescore missing": lambda w: None,
+             "E2-C's attribution missing (L23D due first)": lambda w: (
+                 w.e2_records(verdict=False), (w.inc / "capacity" / "e2_attr_rescore.json").unlink()),
              "a person's submitted record": lambda w: (w.e2_records(verdict=False), w.zoo_record("submitted",
                                                                                                  jobs=["9"])),
              "a complete record": lambda w: (w.e2_records(verdict=False), w.zoo_record("complete")),
@@ -2937,10 +2942,11 @@ def t_zoo():
     cites = sorted(c.get("pointer") for c in first.get("cites") or [])
     ex = [e for e in w.events("executed") if e.get("lever") == "L23Z"]
     st = w.state()
-    check("E2 done and no zoo record: L23Z proposed once, last in MAINT, citing /stage/lock, /stage/zoo and "
-          "/stage/e2 only; executed within the envelope as one stream-submit zoo; five job ids recorded; r0 zoo "
-          "running; phase ZOO",
-          len(pz) == 1 and cites == ["/stage/e2", "/stage/lock", "/stage/zoo"] and [e.get("basis") for e in ex]
+    check("E2's verdict and E2-C's attribution done and no zoo record: L23Z proposed once, last in MAINT, citing "
+          "/stage/lock, /stage/zoo, /stage/e2 and /stage/e2_attr only; executed within the envelope as one "
+          "stream-submit zoo; five job ids recorded; r0 zoo running; phase ZOO",
+          len(pz) == 1 and cites == ["/stage/e2", "/stage/e2_attr", "/stage/lock", "/stage/zoo"]
+          and [e.get("basis") for e in ex]
           == ["envelope"] and len(w.zoo_submits) == 1 and len((w.lane("MAINT").get("item") or {}).get("job_ids") or [])
           == 5 and st["stage"]["r0"].get("zoo") == "running" and w.lane("MAINT").get("phase") == "ZOO",
           (len(pz), cites, ex, w.lane("MAINT")))
@@ -3090,6 +3096,74 @@ def t_zoo():
           a1.get("state") == "PENDING" and a1["array_tasks"]["n"] == 3 and a2.get("state") == "FAILED"
           and a2["array_tasks"]["failed"] == [1] and a3.get("state") == "COMPLETED" and a3["elapsed_s"] == 5400.0 and (got1["jobs"].get("200") or {}).get("state") == "COMPLETED"
           and "100_0" not in got1["jobs"], (a1, a2, a3, got1["jobs"].get("200")))
+    _t_zoo_order()
+
+
+def _zoo_levers(w, levers=("L23B", "L23C", "L23D", "L23Z")):
+    return [e.get("lever") for e in w.events("proposed") if e.get("lever") in levers]
+
+
+def _t_zoo_order():
+    """L23Z's place in MAINT: after E2's verdict (L23C), E2-C's three builds and E2-C's attribution (L23D), once and
+    last; a failed L23C or L23D holds it until a person's rerun completes that record."""
+    section("the model-zoo audit's order: never before E2's verdict, E2-C's builds or E2-C's attribution; once, last")
+    c = _e2c_items(LS.load_domain("weed"))
+    # E2's six and E2-C's three done, neither E2's record nor the attribution's: L23C, then L23D, then L23Z
+    w = _zoo_world("zoo_order", e2=False, attr=False)
+    w.tick(3)
+    s1 = _zoo_levers(w)
+    w.job_done("inc_build_e2_v1")
+    w.e2_records(qualifying=("W",), chosen="W")
+    w.tick(3)
+    s2 = _zoo_levers(w)
+    w.job_done("inc_build_e2_attr_v1")
+    w.e2_attr_records()
+    w.tick(3)
+    s3 = _zoo_levers(w)
+    w.zoo_finish("complete")
+    w.tick(3)
+    mt = [e.get("lever") for e in w.events("executed") if e.get("lane") == "MAINT"]
+    check("E2's six and E2-C's three done, no record yet: L23C first, L23D once E2's verdict is recorded, L23Z only "
+          "once the attribution's record is complete; each proposed once and L23Z last in MAINT",
+          s1 == ["L23C"] and s2 == ["L23C", "L23D"] and s3 == ["L23C", "L23D", "L23Z"] and _zoo_levers(w) == s3
+          and mt[-3:] == ["L23C", "L23D", "L23Z"] and mt.count("L23Z") == 1, (s1, s2, s3, mt[-4:]))
+    # an E2-C build still to come: it is built first, then L23D, then L23Z
+    wb = _zoo_world("zoo_order_e2c", attr=False)
+    shutil.rmtree(str(wb.inc / c[2]["exp"]))
+    wb.tick(3)
+    b1 = [(e.get("lever"), e.get("child_exp")) for e in wb.events("proposed")
+          if e.get("lever") in ("L23B", "L23D", "L23Z")]
+    _e2_build_step(wb, c[2])
+    wb.tick(3)
+    b2 = _zoo_levers(wb)
+    wb.experiment(c[2]["exp"], done=True)
+    wb.tick(3)
+    b3 = _zoo_levers(wb)
+    wb.job_done("inc_build_e2_attr_v1")
+    wb.e2_attr_records()
+    wb.tick(3)
+    check("E2-C's last build still to come: it is proposed (L23B --e2 C) and runs to the end, then L23D, and L23Z "
+          "only after L23D's record; never before",
+          b1 == [("L23B", c[2]["exp"])] and b2 == ["L23B"] and b3 == ["L23B", "L23D"]
+          and _zoo_levers(wb) == ["L23B", "L23D", "L23Z"], (b1, b2, b3, _zoo_levers(wb)))
+    # a failed L23D (record only, a card): the zoo waits for a person's rerun of rescore-e2-attr
+    wf = _zoo_world("zoo_order_l23d_failed", attr=False)
+    wf.tick(3)
+    wf.job_done("inc_build_e2_attr_v1", state="FAILED", refusal="[inc2.baseline] ERROR: refused")
+    wf.tick(4)
+    f1 = (wf.state()["stage"]["r0"].get("e2_attr"), _zoo_levers(wf))
+    wf.e2_attr_records()
+    wf.tick(3)
+    check("a failed L23D: L23Z is not proposed while /stage/e2_attr is failed; once a person's rerun writes the "
+          "attribution's complete record, L23Z is proposed once",
+          f1 == ("failed", ["L23D"]) and _zoo_levers(wf) == ["L23D", "L23Z"], (f1, _zoo_levers(wf)))
+    # a failed L23C: neither L23D nor L23Z
+    wx = _zoo_world("zoo_order_l23c_failed", e2=False, attr=False)
+    wx.tick(3)
+    wx.job_done("inc_build_e2_v1", state="FAILED", refusal="[inc2.baseline] ERROR: refused")
+    wx.tick(4)
+    check("a failed L23C: neither L23D nor L23Z is proposed", wx.state()["stage"]["r0"].get("e2") == "failed"
+          and _zoo_levers(wx) == ["L23C"], _zoo_levers(wx))
 
 
 def _lift_world(tag, quarantined=("src_lift",)):
