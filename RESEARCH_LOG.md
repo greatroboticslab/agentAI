@@ -13,6 +13,25 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-05 — E3 pre-registered and on the platform: two-stage species detection (no E3 results yet)
+
+**Accuracy (unchanged).**
+- Best sealed cwd12 12-class test: 0.8786 ± 0.0018 (YOLO11m@640, base_v2). Gap to 0.90: 0.021.
+- Training data: the 12-class labels are base_v2's 6,811 images; the weed-box base is base v3's 44,485 images.
+
+**Why E3.** E2's verdict (`capacity/e2_v1.json`, decided 2026-10-05): no arm qualifies. Starting a 12-class detector from E1-B's weed-box weights and learning the species on base_v2 lost dev 12-class mAP (E2-W 0.8401 ± 0.0034, D −0.0123; E2-S 0.8479 ± 0.0067, D −0.0045), and E2-W's dev agnostic fell from E1-B's 0.8787 to 0.8589: learning the species in the same network costs the boxes what E1-B gained. On its own boxes, b_v2_m640 loses 0.017 on dev and 0.0115 on test to naming. BioCLIP-2 names cwd12 ground-truth crops at 0.9858 ± 0.0007 from 61 exemplars (a figure that includes dev's crops).
+
+**Design (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-05).**
+- Stage 1, no retraining: E3-B E1-B's boxes, E3-A E1-A's, E3-M b_v2_m640's own boxes with its classes collapsed; the locked scorer's own inference, each box set checked against its recorded agnostic dev AP.
+- Stage 2: BioCLIP-2 features of each box's crop (inc.audit's protocol), one logistic regression over 13 classes fitted once on base_v2's ground-truth boxes, pinned. Each box is emitted as its top 3 classes at q × p.
+- Scored by the locked scorer's own matching and AP; an identity path must first reproduce b_v2_m640's recorded dev scores.
+
+**Rule (dev only, record only).** D = mean dev 12-class mAP50-95 of the arm − b_v2_m640's (seeds 0–2); qualifies when D > 2 pooled sd and D > the paired bootstrap SE (`inc2/e3/species_se`, 1,000 resamples); the largest D wins, ties M, A, B. E3-B − E3-A says whether a gain is base v3's data. Verdict `capacity/e3_v1.json`; nothing switches.
+
+**Test.** Read once per qualifying arm, after the verdict, by a person (`inc2.twostage test-read`), against 0.8786 with the gap to 0.90; the chosen arm's is E3's headline.
+
+**Platform.** Once E2's verdict is decided, the sources are done and E2-C's attribution is settled, the stream proposes one scoring job per arm (L23F: M 1.5 GPU-h with the classifier's fit, A and B 0.75), then the verdict (L23G, 0.5); 3.5 SU in all. A failure is a card; the ticker raises one card with the read commands.
+
 ## 2026-10-04 — E2-C, the attribution control, on the platform (no results yet)
 
 **Accuracy (unchanged).**

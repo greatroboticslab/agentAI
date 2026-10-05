@@ -415,16 +415,18 @@ def test_units():
 
 # ------------------------------------------------------------------ 2. fit-classifier: refusals (nothing written)
 @contextlib.contextmanager
-def swap_base_v2(rows):
-    """base_v2 replaced by `rows` with LOCK v2 and b_v2_m640's records naming its sha256 (restored afterwards)."""
+def swap_base_v2(rows, lock=True):
+    """base_v2 replaced by `rows` with LOCK v2 (unless lock is False) and b_v2_m640's records naming its sha256
+    (restored afterwards)."""
     d = W.v2_dir()
     keep = {p: p.read_bytes() for p in [d / "base_v2.jsonl", d / "LOCK.json", C.INC_DIR / REF / "exp.json"]
             + [C.INC_DIR / REF / "runs" / ("base__s%d" % s) / "run.json" for s in (0, 1, 2)]}
     try:
         sha = C.write_manifest(d / "base_v2.jsonl", rows)
-        lock = json.loads((d / "LOCK.json").read_text())
-        lock["manifests"]["base_v2"] = sha
-        (d / "LOCK.json").write_text(json.dumps(lock, sort_keys=True))
+        if lock:
+            lk = json.loads((d / "LOCK.json").read_text())
+            lk["manifests"]["base_v2"] = sha
+            (d / "LOCK.json").write_text(json.dumps(lk, sort_keys=True))
         ex = json.loads((C.INC_DIR / REF / "exp.json").read_text())
         ex["base"]["manifest_sha256"] = sha
         (C.INC_DIR / REF / "exp.json").write_text(json.dumps(ex))
@@ -450,6 +452,9 @@ def test_fit_refusals():
         out["base_v2 not as LOCK v2 records"] = refused(TS.fit_classifier, embedder=EMB)
     finally:
         bp.write_bytes(raw)
+    with swap_base_v2(rows[:-1], lock=False):
+        out["base_v2 changed after LOCK v2 (b_v2_m640's records naming the new bytes)"] = refused(
+            TS.fit_classifier, embedder=EMB)
     with tamper(C.INC_DIR / REF / "exp.json", lambda d: d["base"].update(manifest_sha256="0" * 64)):
         out["b_v2_m640 trained another manifest"] = refused(TS.fit_classifier, embedder=EMB)
     dev = C.read_manifest(C.manifest_path("dev"))[0]
@@ -477,7 +482,8 @@ def test_fit_refusals():
           "guard" in str(out["a dev image planted in base_v2 (the guard)"])
           and "test v1" in str(out["a base_v2 row in a test_v1 list"])
           and "test v1" in str(out["a base_v2 row in a test_v1_companions list"])
-          and "is the v1 dev split" in str(out["an evaluation manifest (check_manifest)"]),
+          and "is the v1 dev split" in str(out["an evaluation manifest (check_manifest)"])
+          and "locked" in str(out["base_v2 changed after LOCK v2 (b_v2_m640's records naming the new bytes)"]),
           {k: str(v)[:200] for k, v in out.items()})
     after = {}
     for what, path in (("an arms directory", TS.root() / "arms" / "M"),
@@ -764,6 +770,13 @@ def test_layering_and_identity():
     check("exactly one E3 layer over the scorer's own validator (via the sidecar's); building one over an E3 "
           "validator is refused", len(layers) == 1 and cls.__mro__.count(b2) == 1 and b2 is base
           and cls.__mro__[1].__mro__[1] is base and e2 is not None, (layers, e2))
+    calls = []
+    with spy(TS, "emit", calls), spy(TS, "_rows_pred", calls):
+        TS._score_pass(w, "dev", {"mode": "identity", "nms": "locked", "workers": V._Workers(1)}, **KW)
+    n_dev = len(C.read_manifest(C.manifest_path("dev")))
+    check("identity mode emits every image's rows through emit and _rows_pred (the two-stage path's own code), once "
+          "per image", calls.count("emit") == n_dev and calls.count("_rows_pred") == n_dev, (calls.count("emit"),
+                                                                                             calls.count("_rows_pred")))
     for label, ctx in (("the oracle's predictions", contextlib.nullcontext()), ("an untrained model's real NMS "
                                                                                "output", no_oracle())):
         with ctx:
@@ -861,6 +874,11 @@ def test_equivalence():
     check("a second run is refused (written once); code other than the one it ran refuses score-arm before any pass",
           e is not None and e2 is not None and "move twostage" in str(e2) and e3 is not None
           and not (TS.root() / "arms").exists(), (e, e2, e3))
+    with tamper(TS.root() / "equivalence.json", lambda d: d.update(all_passed=False)):
+        e4 = refused(TS.check_equivalence)
+        e5 = refused(TS.score_arm, "A", embedder=EMB, **KW)
+    check("  an equivalence record that did not pass refuses score-arm before any pass", e4 is not None
+          and e5 is not None and "did not pass" in str(e4) and not (TS.root() / "arms").exists(), (e4, e5))
 
 
 # ------------------------------------------------------------------ 8. score-arm
@@ -1255,10 +1273,15 @@ def test_test_read():
     with tamper(vp, lambda d: d["arms"]["A"]["inputs"][1].update(weights_sha256="0" * 64)):
         e6 = refused(TS.test_read, "A")
     e7 = refused(TS.score_test, "A", embedder=EMB, **KW)
+    with tamper(vp, lambda d: d.update(status="pending")):
+        e8 = refused(TS.test_read, "A")
+    with tamper(vp, lambda d: d.update(format="inc2-e2-verdict/1")):
+        e9 = refused(TS.test_read, "A")
     check("refused, writing nothing: before the verdict, under other resamples, test-mode files admitted, another "
-          "rule, a non-qualifying arm, another classifier, changed weights; score-test without a read",
-          all(x is not None for x in (e0, e1, e2, e3, e4, e5, e6, e7)) and not (TS.root() / "test").exists()
-          and "did not qualify" in str(e4) and "test-read" in str(e7), (e0, e1, e2, e3, e4, e5, e6, e7))
+          "rule, a non-qualifying arm, another classifier, changed weights, a pending verdict, another format; "
+          "score-test without a read",
+          all(x is not None for x in (e0, e1, e2, e3, e4, e5, e6, e7, e8, e9)) and not (TS.root() / "test").exists()
+          and "did not qualify" in str(e4) and "test-read" in str(e7), (e0, e1, e2, e3, e4, e5, e6, e7, e8, e9))
     rec = TS.test_read("A")
     argv = rec["argv"]
     check("test-read --arm A: the record pins the verdict, the classifier and the three weights; one "
@@ -1286,6 +1309,11 @@ def test_test_read():
           and t0["exam"] == "test" and t0["stage1"]["weights_sha256"] == rec["weights"]["0"]["weights_sha256"], out)
     e = refused(TS.score_test, "A", embedder=EMB, **KW)
     check("  a second score-test is refused", e is not None and "once" in str(e), e)
+    with moved(TS.test_dir("A") / "e3_test_read.json"):
+        e = refused(TS.test_read, "A")
+        again = (TS.test_dir("A") / "e3_test_read.json").exists()
+    check("  with the read record gone, a new read is refused while E3-A's test scores exist (none written)",
+          e is not None and "prepared already" in str(e) and not again, e)
     rep = TS.test_report("A", testing_ok=True)
     check("test-report: complete, 12-class and agnostic mean +- sd against b_v2_m640's test files, the gap to 0.90, "
           "the headline; capacity/e3_test_A.json is not on the evidence", rep["status"] == "complete"
