@@ -18,7 +18,7 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 - **E2** (pre-registered, dev, 3 seeds; `capacity/e2_v1.json`): no arm qualifies. Starting a 12-class YOLO11m from E1-B's one-class weights gave 0.8401 ± 0.0034 (100-epoch cold recipe, D = −0.0123, beyond 2 pooled sd and SE) and 0.8479 ± 0.0067 (50-epoch x1b, D = −0.0045, within noise) against b_v2_m640's 0.8524 ± 0.0025. The sealed test was not read; the best 12-class test score stays 0.8786 ± 0.0018.
 - **E2-C** (`capacity/e2_attr_v1.json`): starting from E1-A's weights gave 0.8349 ± 0.0034 (−0.0175 against the reference); E2-W − E2-C = +0.0052, under 2 pooled sd (0.0068) and SE (0.0071), so the loss is not credited to data scale: the one-class pre-training stage itself lowers the 12-class score.
-- **E3** (two-stage: one-class boxes + a BioCLIP-2 crop classifier; Amendment 2026-10-05, pre-registered) was deployed at fb99375. Because the model-zoo audit held the MAINT lane, its four jobs were submitted by hand with the platform's own commands (CONTINUOUS_LOOP, note of 2026-10-05 18:55Z): jobs 47444540, 47444541, 47444543, 47444545.
+- **E3** (two-stage: one-class boxes + a BioCLIP-2 crop classifier; Amendment 2026-10-05, pre-registered) was deployed at fb99375. Because the model-zoo audit held the MAINT lane, its four jobs were submitted by hand with the platform's own commands (CONTINUOUS_LOOP, note of 2026-10-05 18:21Z): jobs 47444540, 47444541, 47444543, 47444545.
 
 ## 2026-10-05 — E3 revised before deploy: E3-M on class-agnostic NMS, base_v2's tagged images read, E3 merged with the zoo audit (no E3 results yet)
 
