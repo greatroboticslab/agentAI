@@ -1801,6 +1801,13 @@ def test_build_script():
           "(it builds nothing)",
           p.returncode == 0 and "[stub baseline] rescore-e2" in p.stdout and "[stub driver]" not in p.stdout
           and a.get("status") == "scored" and a.get("build_rc") == 0, (p.returncode, p.stdout[-400:], a))
+    p = run(["inc2.baseline", "rescore-e2-attr"])
+    a = ((prov("e2_attr_v1") or {}).get("attempts") or [{}])[-1]
+    check("inc2.baseline rescore-e2-attr (L23D, 2026-10-04, later): run without --exp, recorded as scored under "
+          "e2_attr_v1 (not e2_v1), no advance (it builds nothing)",
+          p.returncode == 0 and "[stub baseline] rescore-e2-attr" in p.stdout and "[stub driver]" not in p.stdout
+          and a.get("status") == "scored" and a.get("build_rc") == 0
+          and len((prov("e2_v1") or {}).get("attempts") or []) == 1, (p.returncode, p.stdout[-400:], a))
     p = run(["inc2.base3", "build", "--stream", "wsv"])
     a = ((prov("base3_v3") or {}).get("attempts") or [{}])[-1]
     check("inc2.base3 build (L23V, 2026-10-03): run under the provenance and lock base3_v3 with HF_HUB_OFFLINE=1, "
