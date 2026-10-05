@@ -2446,6 +2446,57 @@
       ],
       "description": "Lever L23D (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04, later: E2-C, the attribution control, pre-registered): inc2.baseline rescore-e2-attr scores E2-C's three final runs on dev at 640 (inc2.scorer_native, the locked scorer as a library; never test, never a protocol score) and records the attribution of E2's result (capacity/e2_attr_v1.json, dev only: D_data = E2-W - E2-C) and its record (capacity/e2_attr_rescore.json). Record only: nothing switches and capacity/e2_v1.json is never rewritten."
     },
+    "inc_audit_zoo": {
+      "template": "bash run_inc2_zoo.sh submit --version {version} --shards-a {shards_a} --shards-c {shards_c} --concurrency {concurrency} --max-gpu-hours {max_gpu_hours}",
+      "param_bounds": {
+        "version": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "v1"
+          ]
+        },
+        "shards_a": {
+          "type": "int",
+          "min": 1,
+          "max": 200
+        },
+        "shards_c": {
+          "type": "int",
+          "min": 1,
+          "max": 200
+        },
+        "concurrency": {
+          "type": "int",
+          "min": 1,
+          "max": 8
+        },
+        "max_gpu_hours": {
+          "type": "int",
+          "min": 1,
+          "max": 45
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 45.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One chain of five GPU-shared jobs (run_inc2_zoo.sh: inventory, two scoring arrays, select, report), inference only, one V100 per job or array task. est_gpu_hours is levers_stream.price's 'zoo' estimate: the pre-registered cap (max_gpu_hours), which the chain's plan refuses above and every task stops at; charged to the campaign envelope and settled from sacct per job (array tasks summed) when the jobs end."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23Z (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04: Z1, the model-zoo audit, pre-registered usage): run_inc2_zoo.sh submit on the login node submits the audit's chain (inc2.zoo inventory, score arrays A and C, select, report), which scores every detector the project trained with the locked scorer (INC rows on dev only; their other columns reused from their own records). Record only and descriptive: nothing switches; no checkpoint is adopted or called best from it."
+    },
     "inc_score_e3": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.twostage score-arm --arm {arm}",
       "param_bounds": {

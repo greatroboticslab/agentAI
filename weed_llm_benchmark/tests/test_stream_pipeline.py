@@ -1271,6 +1271,8 @@ def stage_e1_base3(w):
           len(e2) == 9 and not [e for e in w.events("proposed") if e.get("lever") in ("L23C", "L23D")
                                 or (e.get("lever") == "L23B" and e.get("child_exp") in e2)]
           and not [x for x in e2 if (INC / x).exists()], e2)
+    check("the zoo audit (L23Z, 2026-10-04) is never proposed here: it waits for E2's verdict and E2-C's attribution, "
+          "which this world never reaches", not [e for e in w.events("proposed") if e.get("lever") == "L23Z"])
     check("E3 (2026-10-05) is never scored here: it requires E2's decided verdict, which this world never reaches (no "
           "L23F, no L23G, no twostage directory)",
           not [e for e in w.events("proposed") if e.get("lever") in ("L23F", "L23G")]
@@ -1663,10 +1665,12 @@ def stage_deploy():
     def shipped(rel):
         return any(rel == p or rel.startswith(p.rstrip("/") + "/") for p in pkg)
     need = ["weed_optimizer_framework/tools/inc2", "weed_optimizer_framework/tools/collect",
-            "run_inc2_build.sh", "run_inc2_job.sh", "run_inc2_splits.sh", "run_inc2_stream.sh", "run_inc_collect.sh"]
+            "run_inc2_build.sh", "run_inc2_job.sh", "run_inc2_splits.sh", "run_inc2_stream.sh", "run_inc_collect.sh",
+            "run_inc2_zoo.sh"]
     need += ["weed_optimizer_framework/%s" % m for m in SRM.module_hashes()]
     missing = [n for n in need if not shipped(n)]
-    check("every stream module (stream_remote.module_hashes, S23) and the five stream job scripts are shipped",
+    check("every stream module (stream_remote.module_hashes, S23) and the six stream job scripts (the zoo's "
+          "included) are shipped",
           not missing, missing)
     rs = sorted(set(XE.REPLAY_SCRIPTS.values()))
     check("every replay script the gate runs (executor.REPLAY_SCRIPTS) is shipped and in the local pre-flight, "

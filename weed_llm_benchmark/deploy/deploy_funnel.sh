@@ -90,7 +90,7 @@ PKG_PATHS=(
   weed_optimizer_framework/tools/collect
   weed_optimizer_framework/tools/round_scheduler.py
   weed_optimizer_framework/tools/brain/su_rates.json
-  run_inc2_build.sh run_inc2_job.sh run_inc2_splits.sh run_inc2_stream.sh run_inc_collect.sh
+  run_inc2_build.sh run_inc2_zoo.sh run_inc2_job.sh run_inc2_splits.sh run_inc2_stream.sh run_inc_collect.sh
   tests/fixtures/collect
   # shared libraries the stream job scripts hash (SHARED_RE: never changed by this deploy)
   weed_optimizer_framework/tools/near_dup.py weed_optimizer_framework/tools/semisup_labeler.py

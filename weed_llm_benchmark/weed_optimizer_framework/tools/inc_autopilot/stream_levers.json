@@ -577,6 +577,35 @@
    "estimator": "rescore",
    "note": "Record only: proposed once, when E2's verdict is recorded (its rescore record complete), E2-W's and E2-C's six experiments are done and the attribution's rescore record is missing; a failure is a person's card and it is not proposed again."
   },
+  "L23Z": {
+   "name": "zoo_audit",
+   "title": "Score every detector the project trained under one protocol (the descriptive model-zoo table)",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_audit_zoo",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "bash",
+    "run_inc2_zoo.sh",
+    "submit",
+    "--version",
+    "{version}",
+    "--shards-a",
+    "{shards_a}",
+    "--shards-c",
+    "{shards_c}",
+    "--concurrency",
+    "{concurrency}",
+    "--max-gpu-hours",
+    "{max_gpu_hours}"
+   ],
+   "control": "none (descriptive): the locked scorer, unchanged, at its own settings; INC rows read on dev only, their other columns reused from their own records.",
+   "success": "capacity/zoo_v1.json complete; INC_DIR/_zoo/v1/report.{json,csv,md} (and report_external.* for the sealed reads).",
+   "falsifier": "none: nothing switches; the usage rule is pre-registered (Amendment 2026-10-04, Z1).",
+   "estimator": "zoo",
+   "note": "Record only: proposed once and last, after E2's verdict and E2-C's attribution are recorded (stream-domain zoo.requires: /stage/e2, /stage/e2_attr), when no zoo record exists; a failure is a person's card and it is not proposed again. One chain of five GPU-shared jobs within a 40 GPU-h cap its tasks enforce."
+  },
   "L23F": {
    "name": "score_e3",
    "title": "Score one E3 arm on dev: a stage-1 detector's boxes named by the BioCLIP-2 crop classifier, through the locked scorer's own matching (the first arm also fits the classifier and runs the equivalence check)",
@@ -934,6 +963,9 @@
   },
   "LI": {
    "total": 1
+  },
+  "L23Z": {
+   "total": 1
   }
  },
  "gated_r2": {
@@ -956,6 +988,7 @@
    "L23E",
    "L23C",
    "L23D",
+   "L23Z",
    "L23F",
    "L23G",
    "L25",
@@ -963,6 +996,6 @@
    "L28",
    "LI"
   ],
-  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04; L23D, E2-C's attribution rescore, one GPU job, 2026-10-04, later; L23F, one E3 arm's scores, and L23G, E3's verdict, one GPU job each, 2026-10-05). L23's splits build and lock always wait for a person (D-A's exact command)."
+  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04; L23D, E2-C's attribution rescore, one GPU job, 2026-10-04, later; L23Z, the zoo audit, one held-free chain of five GPU-shared jobs within its 40 GPU-h cap, 2026-10-04; L23F, one E3 arm's scores, and L23G, E3's verdict, one GPU job each, 2026-10-05). L23's splits build and lock always wait for a person (D-A's exact command)."
  }
 }

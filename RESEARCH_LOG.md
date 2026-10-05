@@ -32,6 +32,39 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 **Platform.** Once E2's verdict is decided, the sources are done and E2-C's attribution is settled, the stream proposes one scoring job per arm (L23F: M 1.5 GPU-h with the classifier's fit, A and B 0.75), then the verdict (L23G, 0.5); 3.5 SU in all. A failure is a card; the ticker raises one card with the read commands.
 
+## 2026-10-04 — Z1 pre-registered: the model-zoo audit (no results yet)
+
+**Accuracy (unchanged).** Best sealed cwd12 12-class test 0.8786 ± 0.0018 (YOLO11m@640, base_v2); gap to 0.90: 0.021.
+
+**Why.** About 1,000 detectors were trained from 2026-03 to 2026-10 (4,785 .pt files, 805 GB). Their numbers came from four evaluators, the cwd12 test was the selection set until 09-26, some training sets held test copies, and species names were wrong before 09-21. Nothing in that history can be compared with today's protocol numbers.
+
+**Design (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04 Z1).**
+- One decision per listed file by a pre-registered rule; detectors only; every skip counted.
+- The locked scorer, unchanged, at 640: dev (the decision exam), ImageWeeds, ooddev_v1 (paddy) and cwd12 test (descriptive). Heads outside the INC class space are read through a max-merged 13-channel copy, checked against the original.
+- INC models are read on dev only; their other columns are their own records.
+- Contamination flags per row and exam (exact, 8-variant near, dev session, test v1 companion; Y/P/U/N, inherited through inits). A checkpoint chosen on a val set holding dev images (best.pt, or the last.pt of an early stop), or on one the zoo cannot read whole, is never dev-clean.
+- Test v1 and the five evaluation test groups stay the frozen test: their reads of historical checkpoints are sealed in `report_external.*`.
+- Usage: descriptive. Ranked by dev among dev-clean rows only; nothing adopted, called best or quoted from a test-like column; a checkpoint the project wants to use re-qualifies under its own pre-registered dev rule.
+
+**Platform.** Lever L23Z: one chain of five GPU-shared jobs within a 40 GPU-h cap its tasks enforce, proposed once and last, after E2's verdict and E2-C's attribution (the chain holds MAINT for 8-12 h and must delay neither); record only. A person may submit it once before the lever is deployed.
+
+## 2026-10-05 — The stream's DATA lane stood idle for a day; TRAIN counted a cut refused for want of data
+
+**Accuracy (unchanged).**
+- Best sealed cwd12 12-class test: 0.8786 ± 0.0018 (YOLO11m@640, base_v2). Gap to 0.90: 0.021.
+- E2's dev verdict (2026-10-05 07:25Z, the platform's card): no arm qualifies (E2-W D −0.0123, E2-S D −0.0045); nothing switches.
+- Training data: base_v2's 6,811 images carry the 12-class labels. The stream's eligible queue holds 319 images against M 1,364 since zenodo_15808623 was quarantined.
+
+**What went wrong (platform).**
+- A restart on 2026-10-03 07:44Z lost the state of a tick that had run an L16S candidate sync. Its re-proposal was refused as already run and declined, then skipped every tick with no event: from 2026-10-04 09:27Z the DATA lane did nothing for about 24 h. The source it kept asking for had an estimate of 0 target boxes, as do all 123 open candidates (their class names are pending).
+- On 2026-10-05 a quarantine (L24) and a segment cut (L18) were proposed in the same tick; the cut ran after Q had fallen to 319 and the cutter refused it 'short', which TRAIN counted as a failed step.
+
+**What the platform now does** (docs/CONTINUOUS_LOOP.md, "Fix (2026-10-05)").
+- Runs a restart lost are taken back from the execution log at the next tick; a lab item met as "already ran" follows its recorded lab job. A run a lane already followed is never taken back: the same work runs again under a new id, and a discovery (L15) takes a new id when it finishes.
+- A declined proposal is never skipped silently: one `not_taken`, and a `stall` card after 12 idle ticks.
+- No fetch of a zero-estimate candidate. Names-pending candidates get their names resolved first (L26, lab only, one per DATA item), so the next discovery (L15, once none is pending; its 7-day interval ends 2026-10-06 17:39Z) can estimate them again.
+- A cut refused short while Q < M is not a failure; a cut waits for a pending quarantine and is withdrawn when the queue no longer calls for it. A cut whose approval is still pending is kept filed instead, so a person's run of it is still followed by TRAIN.
+
 ## 2026-10-04 — E2-C, the attribution control, on the platform (no results yet)
 
 **Accuracy (unchanged).**

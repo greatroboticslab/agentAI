@@ -185,10 +185,13 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # sealed test) are never on the list; E2-C's (2026-10-04, later):
 # capacity/e2_attr_v1.json (the attribution record, dev only) and
 # capacity/e2_attr_rescore.json (inc2.baseline rescore-e2-attr: the dev files'
-# names and sha256s and the record's sha256), never e2_attr_v1_report.md; E3's
-# (2026-10-05): capacity/e3_score_<M|A|B>.json (inc2.twostage score-arm: the
-# dev files' names and sha256s), capacity/e3_v1.json (E3's verdict, dev only)
-# and capacity/e3_rescore.json (inc2.twostage verdict: the records' names and
+# names and sha256s and the record's sha256), never e2_attr_v1_report.md; the
+# model-zoo audit's record (2026-10-04, L23Z): capacity/zoo_v1.json (status,
+# job ids, counts and sha256s: no exam name as a key, no score path, no
+# metric), never its reports under _zoo/; and E3's (2026-10-05):
+# capacity/e3_score_<M|A|B>.json (inc2.twostage score-arm: the dev files'
+# names and sha256s), capacity/e3_v1.json (E3's verdict, dev only) and
+# capacity/e3_rescore.json (inc2.twostage verdict: the records' names and
 # sha256s); e3_v1_report.* (ImageWeeds, for people), e3_test_*.*, the
 # classifier's pin and INC_DIR/twostage/ (a reserved directory) are never on
 # the list. A Step 1 sidecar,
@@ -208,7 +211,9 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"intake/(?P<batch>%s)/(?:summary|eval_hits)\.json\Z" % BATCH_RE,
     r"intake/(?P<file>sources|placement)\.json\Z",
     r"splits/(?P<ver>v[0-9]{1,3})/lock_status\.json\Z",
-    r"capacity/(?:(?:capacity|native|e1|e2|e2_attr|e3)_v1|e2_rescore|e2_attr_rescore|e3_rescore|e3_score_[MAB])"
+    # the model-zoo audit's record (L23Z, 2026-10-04): status, job ids, counts and sha256s only; E3's
+    # records (2026-10-05): its score records, verdict and rescore record (dev only)
+    r"capacity/(?:(?:capacity|native|e1|e2|e2_attr|zoo|e3)_v1|e2_rescore|e2_attr_rescore|e3_rescore|e3_score_[MAB])"
     r"\.json\Z",
     r"splits/v3/summary\.json\Z",
     r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore|agnostic_rescore)\.json\Z"

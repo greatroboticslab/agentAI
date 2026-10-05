@@ -253,7 +253,8 @@ class World(object):
         self.scripts = self.dir / "scripts"
         for d in (self.lab, self.inc, self.scripts):
             d.mkdir(parents=True)
-        for n in ("run_inc_collect.sh", "run_inc2_stream.sh", "run_inc2_build.sh", "run_inc2_job.sh", "run_inc_job.sh"):
+        for n in ("run_inc_collect.sh", "run_inc2_stream.sh", "run_inc2_build.sh", "run_inc2_job.sh", "run_inc_job.sh",
+                  "run_inc2_zoo.sh"):
             (self.scripts / n).write_text("#!/bin/bash\n")
         self.cfg = self.dir / "round_scheduler.json"
         self.hooks = C._local_cfg_hooks(self.cfg)
@@ -261,6 +262,10 @@ class World(object):
         self.perturbed = perturbed
         self.domain = domain
         self.squeue, self.sacct, self.submits, self.runs, self.advances = [], {}, [], [], []
+        # the model-zoo audit's submit (run_inc2_zoo.sh submit, L23Z): None answers with five queued jobs; "refused"
+        # (exit 2), "failed" (exit 1, nothing queued) and "timeout" (TimeoutExpired, two jobs queued) are its faults
+        self.zoo_submit_mode = None
+        self.zoo_submits = []
         self.tick_calls, self.verbs, self.ticks_out = [], [], []
         self.next_job = 5000
         self.qos = False
@@ -903,6 +908,29 @@ class World(object):
             SR.module_hashes = _REAL_MODULE_HASHES
 
     def _subprocess_run(self, argv, **kw):
+        if len(argv) > 2 and argv[0] == "bash" and str(argv[1]).endswith("run_inc2_zoo.sh") and argv[2] == "submit":
+            # run_inc2_zoo.sh submit: the chain of five jobs, the record (submitted), the INCZOO line
+            self.zoo_submits.append({"argv": list(argv), "env": {k: v for k, v in (kw.get("env") or {}).items()
+                                                                  if k.startswith("INCAP_")}})
+            v = argv[argv.index("--version") + 1]
+            names = [n % v for n in SR.ZOO_JOB_NAMES]
+            mode = self.zoo_submit_mode
+            if self.qos:
+                return _Proc(1, "", "sbatch: error: Batch job submission failed: Invalid qos specification")
+            if mode == "refused":
+                return _Proc(2, "", "[inc2.zoo] ERROR: a zoo job of v1 is queued or running: nothing submitted")
+            if mode == "failed":
+                return _Proc(1, "", "[inc2.zoo] ERROR: sbatch of %s exited 1: socket timed out; cancelled 1001; "
+                                    "no record written" % names[1])
+            ids = []
+            for n in names[:2] if mode == "timeout" else names:
+                self.next_job += 1
+                self.squeue.append({"id": str(self.next_job), "name": n, "state": "PENDING"})
+                ids.append(str(self.next_job))
+            self.zoo_record("submitting" if mode == "timeout" else "submitted", jobs=ids)
+            if mode == "timeout":
+                raise subprocess.TimeoutExpired(argv, 240)
+            return _Proc(0, "[inc2.zoo] submitted\nINCZOO %s\n" % json.dumps({"job_ids": ids, "names": names}), "")
         if argv and argv[0] == "sbatch":
             name = next(a.split("=", 1)[1] for a in argv if a.startswith("--job-name="))
             self.submits.append({"argv": list(argv), "name": name, "env": {k: v for k, v in (kw.get("env") or {}).items()
@@ -1009,6 +1037,41 @@ class World(object):
                 keep.append(j)
         self.squeue = keep
 
+    def zoo_record(self, status="complete", jobs=(), **extra):
+        """capacity/zoo_v1.json as inc2.zoo writes it: status, job ids, counts
+        and sha256s only."""
+        keys = ("inventory", "score_a", "select", "score_c", "report")
+        doc = {"format": "inc2-zoo-record/1", "version": "v1", "status": status,
+               "jobs": dict(zip(keys, [str(j) for j in jobs])), "job_names": [n % "v1" for n in SR.ZOO_JOB_NAMES],
+               "updated_utc": utc(self.t[0]),
+               "counts": {"files_listed": 4785, "kept": 1100, "unscorable": 9, "skipped": 3676,
+                          "skipped_by_reason": {"epoch_snapshot": 2078, "sha256_duplicate": 1200},
+                          "converted": 360, "items_planned": 2000, "items_scored": 1500, "items_reused": 900,
+                          "items_refused": 3, "items_error": 1, "items_not_scored_budget": 40,
+                          "items_not_scored_time": 0},
+               "shards": {"a": {"n": 32, "done": 32, "failed": []}, "c": {"n": 16, "done": 16, "failed": []}},
+               "gpu_hours": {"cap": 40, "inventory": 4.2, "tasks": 24.0, "total": 29.0, "predicted": 27.5},
+               "sha256": {"config": "1" * 64, "list": "2" * 64, "lock": "3" * 64, "report_json": "4" * 64}}
+        doc.update(extra)
+        self._w("capacity/zoo_v1.json", doc)
+        return doc
+
+    def zoo_finish(self, status="complete", states=None, failed_shards=None):
+        """The zoo's chain ends: its record (status), its five jobs settled in
+        sacct (COMPLETED, or `states`), squeue cleared of them."""
+        ids = [j["id"] for j in self.squeue if j["name"].startswith("inc_zoo_")]
+        for i, j in enumerate(ids):
+            st = (states or {}).get(i, "COMPLETED")
+            self.sacct[j] = {"state": st, "elapsed_s": 3600.0, "gpu_count": 1, "gpu_type": "v100-32"}
+        self.squeue = [j for j in self.squeue if not j["name"].startswith("inc_zoo_")]
+        extra = {}
+        if failed_shards:
+            extra["shards"] = {"a": {"n": 32, "done": 32 - len(failed_shards), "failed": list(failed_shards)},
+                               "c": {"n": 16, "done": 16, "failed": []}}
+        if status:
+            self.zoo_record(status, jobs=ids, **extra)
+        return ids
+
     def build_refused(self, exp, refusal="[inc2.baseline] ERROR: refused", state="FAILED"):
         """run_inc2_build.sh's end when the build itself refused: its provenance
         record (INC_DIR/_campaign/provenance/<exp>.json, status build_failed
@@ -1036,8 +1099,9 @@ class World(object):
         on E2's builds or L23C (no e2_v1.json: no S-case carries E2's verdict
         card); E2-C's three are done with the attribution's rescore record
         (capacity/e2_attr_rescore.json), so none waits on E2-C's builds or
-        L23D (no e2_attr_v1.json: no attribution card); E3's three arms are
-        scored with its rescore record (capacity/e3_score_<arm>.json,
+        L23D (no e2_attr_v1.json: no attribution card); the zoo audit's record
+        says complete, so none waits on L23Z; E3's three arms are scored
+        with its rescore record (capacity/e3_score_<arm>.json,
         e3_rescore.json), so none waits on L23F or L23G (no e3_v1.json: no
         E3 card)."""
         self.lock()
@@ -1059,6 +1123,8 @@ class World(object):
             self.e2_records(verdict=False)
         if (self.dom.get("e2_attr") or {}).get("arms"):
             self.e2_attr_records(record=False)
+        if (self.dom.get("zoo") or {}).get("record"):
+            self.zoo_record("complete")             # the zoo audit ran (L23Z): no S-case waits on it
         if (self.dom.get("e3") or {}).get("arms"):
             self.e3_records()
         self.canary_file()

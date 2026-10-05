@@ -17,6 +17,7 @@ Three lanes, one item in flight per lane:
                 build) | AGNOSTIC (L23E, E1's agnostic rescore and verdict)
                 | E2_VERDICT (L23C, E2's rescore and verdict)
                 | E2_ATTR (L23D, E2-C's attribution rescore and record)
+                | ZOO (L23Z, the model-zoo audit: one chain of five jobs)
                 | E3_SCORE (L23F, one E3 arm's two-stage dev scores)
                 | E3_VERDICT (L23G, E3's verdict)
                 | MILESTONE (L20) | COMPARE (LC)
@@ -164,27 +165,35 @@ LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "D
            "L16RL": "DATA", "L16I": "DATA", "L16S": "DATA", "L17": "DATA", "L24": "STOP", "LH": "DATA",
            "L18": "TRAIN", "L19": "TRAIN", "L22": "TRAIN",
            "L20": "MAINT", "L21": "MAINT", "L23": "MAINT", "L23B": "MAINT", "L23N": "MAINT", "L23V": "MAINT",
-           "L23E": "MAINT", "L23C": "MAINT", "L23D": "MAINT", "L23F": "MAINT", "L23G": "MAINT", "L25": "MAINT",
-           "L27": "MAINT", "L28": "MAINT", "L4": "MAINT", "LV": "MAINT", "LI": "MAINT", "LA": "MAINT", "LC": "MAINT"}
+           "L23E": "MAINT", "L23C": "MAINT", "L23D": "MAINT", "L23Z": "MAINT", "L23F": "MAINT", "L23G": "MAINT",
+           "L25": "MAINT", "L27": "MAINT", "L28": "MAINT", "L4": "MAINT", "LV": "MAINT", "LI": "MAINT", "LA": "MAINT",
+           "LC": "MAINT"}
 # Record-only levers (a measurement arm's native-resolution rescore, L23N;
 # E1's base v3 build, L23V, and its agnostic rescore, L23E, 2026-10-03; E2's
 # rescore and verdict, L23C, 2026-10-04; E2-C's attribution rescore and
-# record, L23D, 2026-10-04, later; E3's scores of one arm, L23F, and its
-# verdict, L23G, 2026-10-05): a
+# record, L23D, 2026-10-04, later; the model-zoo audit, L23Z, 2026-10-04;
+# E3's scores of one arm, L23F, and its verdict, L23G, 2026-10-05): a
 # failure is a person's card, never a failed step of its lane (no stop-loss
 # counts it), and the item is not proposed again (_failed); a submission whose
 # outcome is unknown is followed by its job name and its record, never a pause
 # (_follow_record_only). A qos refusal is a platform defect and holds the lane
 # as for every lever (S21).
-RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E", "L23C", "L23D", "L23F", "L23G")
+RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E", "L23C", "L23D", "L23Z", "L23F", "L23G")
 # The failure card title of each record-only lever (_failed; "%s" is its --exp, or L23F's --arm)
 RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
                       "L23V": "Base v3 build (splits v3, E1) failed (L23V)",
                       "L23E": "E1's agnostic rescore of %s failed (L23E)",
                       "L23C": "E2's 12-class rescore and verdict failed (L23C)",
                       "L23D": "E2-C's attribution rescore and record failed (L23D)",
+                      "L23Z": "The model-zoo audit v1 (every detector under one protocol) failed (L23Z)",
                       "L23F": "E3's two-stage scores of arm %s failed (L23F)",
                       "L23G": "E3's verdict failed (L23G)"}
+# The zoo audit's rerun commands (a person's, on the login node; written records are kept, so both resume)
+ZOO_RERUN = ("bash run_inc2_zoo.sh submit --version %(v)s --shards-a %(a)s --shards-c %(c)s --concurrency %(p)s "
+             "--max-gpu-hours %(h)s (resumable: written records are kept; refused while a zoo job is queued); or, "
+             "for failed shards only, sbatch -p GPU-shared --job-name=inc_zoo_%(v)s_score_a --array=<ids> "
+             "run_inc2_zoo.sh score --version %(v)s --stage a|c, then sbatch -p GPU-shared "
+             "--job-name=inc_zoo_%(v)s_report --dependency=afterany:<that job> run_inc2_zoo.sh report --version %(v)s")
 # A measurement arm's build (L23B of a baselines item marked measure) whose job
 # ran and ended without its experiment: record only as well (a card; no lane
 # failure; DR0 skips the item, /stage/baselines says failed), since no lane
@@ -211,6 +220,25 @@ RETRY_FALSE_RE = re.compile(r"verifier|LOCK|pinned|pins? (mismatch|differ)", re.
 # wait: filed "parked" and adopted into the lane once approved (a funnel_F9
 # release at its deadline would otherwise stop collection until a person acts).
 PERSON_LEVERS = ("LH",)
+# Runs the lanes lost (2026-10-03 07:44Z: the dashboard restarted after an L16S
+# was executed and before the tick wrote its state, so the state came back
+# without the running item): the run ids adopted back into a lane (never twice),
+# and the proposal ids of the items that left a lane (_clear), which together
+# with the lanes, done_keys, failed_ids and declined tell a lost run from one
+# the lanes already followed (_adopt_lost_runs).
+ADOPTED_KEEP = 200
+ENDED_KEEP = 200
+# A segment build the cutter refused for want of eligible images (inc2.stream
+# build: "nothing cut for <exp>: short", or short_after_guard once the guard
+# excluded rows): no failure while the queue holds fewer than M (_cut_short).
+SHORT_RE = re.compile(r"nothing cut for \S+: (short|short_after_guard)\b")
+# The campaign ledger's events that end a lane item and name its proposal
+# (with lab_job_finished, which names the lab job): a run with one was followed
+# to its end and is never taken back (_ledger_ended, _seed_ended, _run_followed)
+ENDED_EVENTS = ("item_done", "failed", "withdrawn", "intake_names_pending")
+# Login verbs done when they ran (_on_result; a lost run of one, _adopt_run)
+DONE_AT_ONCE = ("inc_stream_commit", "inc_stream_rollback", "inc_stream_quarantine", "inc_stream_release",
+                "inc_unblock_transient")
 
 
 # ------------------------------------------------------------------ helpers
@@ -732,6 +760,9 @@ class StreamRun(object):
         self.prior = None
         self.domain_budget = domain_budget
         self.preamble = preamble
+        self._execs = None                       # this campaign's execution records, read once a tick (_executions)
+        self._ended = None                       # the items the campaign ledger records ended (_ledger_ended)
+        self._ctx = self._payload = None
         self.xctx = X.Context(slurm_sh=ssh, resources=resources, domain_budget=domain_budget, clock=clock,
                               lab_repo=paths.lab_repo, preamble=preamble, domain=self.domain,
                               diagnoses=lambda _n: self._hook_diagnoses())
@@ -1048,6 +1079,7 @@ class StreamRun(object):
     def _step(self):
         st = self.st
         st["ticks"] = int(st.get("ticks") or 0) + 1
+        self._seed_ended()
         self._resumed()
         self._reopen_sources()
         why = self._paused_reason()
@@ -1071,10 +1103,12 @@ class StreamRun(object):
             # nothing observed yet (or only the stream a fork replaced): this
             # tick's one call is the snapshot
             self._poll_lab()
+            self._adopt_lost_runs()
             self._observe()
             return {"mode": "stream", "ssh": self.ssh.calls > before, "first": True}
         # 1. lab work on the cached evidence (no ssh)
         self._poll_lab()
+        self._adopt_lost_runs()
         self._build_evidence()
         self._diagnose()
         if self._paused_reason():
@@ -1245,6 +1279,7 @@ class StreamRun(object):
     def _build_evidence(self):
         payload = _read_json(self.paths.latest(self.name)) or {}
         ctx = self._context(payload)
+        self._ctx, self._payload = ctx, payload          # D22 read again with TRAIN idle (_cut_still_called)
         try:
             self.ev = E.from_snapshot(self._record(payload), self.sid, context=ctx,
                                       domain=LS.funnel_ref(self.dom))
@@ -1304,6 +1339,7 @@ class StreamRun(object):
         ear = self._artifact((self.dom.get("e2_attr") or {}).get("rescore_record")
                              or "capacity/e2_attr_rescore.json") or {}
         e2_attr = "done" if ear.get("status") == "complete" else (r0.get("e2_attr") or "missing")
+        zoo = self._zoo_stage(payload, r0)
         # E3 (2026-10-05): an arm's scores (L23F) are done once capacity/e3_score_<arm>.json says complete, else
         # what the platform ran; E3's verdict (L23G) once capacity/e3_rescore.json says complete
         e3d = self.dom.get("e3") or {}
@@ -1319,7 +1355,8 @@ class StreamRun(object):
             return x if x in ("done", "built") else ("building" if r0.get(key) == "building" else "missing")
         return {"lock": bool(lock.get("locked")), "splits_built": bool(r0.get("splits_built")),
                 "train_manifests": lock.get("train_manifests") or [], "baselines": base, "native": native,
-                "base3": base3, "agnostic": agnostic, "e2": e2, "e2_attr": e2_attr, "e3_score": e3_score, "e3": e3,
+                "base3": base3, "agnostic": agnostic, "e2": e2, "e2_attr": e2_attr, "zoo": zoo,
+                "e3_score": e3_score, "e3": e3,
                 "exp_status": exp_status, "verdicts": dict(r0.get("verdicts") or {}),
                 "protocol_v3_accepted": bool(self.cfg.get("protocol_v3_accepted_by")),
                 "stage_a": {"exp": sa_exp, "status": state_of(sa_exp, "stage_a")},
@@ -1445,6 +1482,8 @@ class StreamRun(object):
         self._e2_card()
         # E2-C's decided attribution (2026-10-04, later): one card, and E2-C's test read beside the headline
         self._e2_attr_card()
+        # the zoo's chain stopped part-way with nobody following it (a person's submit, a killed submit): one card
+        self._zoo_stale_card()
         # E3's decided verdict (2026-10-05): one card, with each qualifying arm's test read, a person's step
         self._e3_card()
         # cards and holds
@@ -1641,6 +1680,9 @@ class StreamRun(object):
         unseen = [s["exp"] for s in self.st.get("segments") or [] if s.get("committed") and s["exp"] not in seen]
         if unseen:
             miss.append("the commit of %s is not yet in the evidence (the next snapshot shows it)" % ", ".join(unseen))
+        why = self._quarantine_unseen()
+        if why:
+            miss.append(why)
         if not stg["lock"]:
             miss.append("splits v2 not locked")
         m0 = self._milestone0()
@@ -1669,6 +1711,25 @@ class StreamRun(object):
         if not stg["step1_stream"].get("bootstrap"):
             miss.append("step1_stream not bootstrapped")
         return "; ".join(miss)
+
+    def _quarantine_unseen(self):
+        """Why a segment's cut waits for a quarantine (L24), or "". A
+        quarantine takes its source's rows out of the eligible queue, so D22's
+        Q is stale while one is pending in the STOP lane or ran after the last
+        snapshot (a tick that submits takes no snapshot). On 2026-10-05 04:53Z
+        L18 was proposed in the tick L24 quarantined zenodo_15808623, Q fell
+        from 8,041 to 319 (M 1,364), and the cutter refused the build 'short'."""
+        st = self.st
+        it = st["lanes"]["STOP"].get("item") or {}
+        if it.get("lever") == "L24":
+            return "a quarantine (L24 on %s) is %s: the queue the cut reads changes with it" % (
+                ((it.get("proposal") or {}).get("params") or {}).get("source"), it.get("status"))
+        seen = str(st.get("last_snapshot_utc") or "")
+        q = sorted(src for src, s in (st.get("sources") or {}).items()
+                   if isinstance(s, dict) and s.get("quarantined_utc") and str(s["quarantined_utc"]) >= seen)
+        if q:
+            return "the quarantine of %s is not yet in the evidence (the next snapshot shows it)" % ", ".join(q)
+        return ""
 
     def _cut_order(self, lever):
         """Why `lever` must wait for the other of the pair L18 (a segment's
@@ -1750,6 +1811,7 @@ class StreamRun(object):
         if st.get("drift"):
             return
         self._adopt_person_items()
+        self._stalls, wanted = {}, set()
         for lane_name, lever, pr, did, d in self._intents():
             if lever in PERSON_LEVERS:
                 self._file_person(lane_name, lever, pr, did, d)
@@ -1757,6 +1819,7 @@ class StreamRun(object):
             lane = st["lanes"][lane_name]
             if lane.get("item") is not None or lane.get("hold") or lane.get("diag_hold"):
                 continue
+            wanted.add(lane_name)
             if lane_name == "DATA" and lane.get("half") and st["ticks"] % 2:
                 continue
             if lane_name == "DATA" and lane["phase"] == "WAIT_DATA":
@@ -1768,10 +1831,12 @@ class StreamRun(object):
                 why = self._train_ready()
                 if why:
                     self._once("train_wait", why, "not_taken", lever="L18", reasons=["R0 not READY: " + why])
+                    self._stall(lane_name, lever, did, "R0 not READY: " + why)
                     continue
                 why = self._cut_order("L18")
                 if why:
                     self._once("cut_order:L18", why, "not_taken", lever="L18", reasons=[why])
+                    self._stall(lane_name, lever, did, why)
                     continue
                 self._prospective_guard()
             try:
@@ -1779,10 +1844,20 @@ class StreamRun(object):
             except (LS.LeverError, ValueError, KeyError) as e:
                 self._once("render:%s:%s" % (lever, did), str(e), "not_taken", lever=lever,
                            reasons=["cannot render %s: %s" % (lever, _short(e, 300))])
+                self._stall(lane_name, lever, did, "cannot render %s: %s" % (lever, _short(e, 300)))
                 continue
             if p is None:
                 continue
             if p["id"] in (st.get("declined") or []):
+                # a lab item declined after a restart lost its run: the run is taken back (its effect lives only
+                # in this state); any other declined id is never proposed again, recorded once, never silently
+                if p.get("follow") == "lab" and self._adopt_declined(lane_name, lever, p, did, d):
+                    continue
+                why = ("%s (proposal %s) was declined earlier and is never proposed again; %s calls for it on "
+                       "every tick" % (p.get("lever") or lever, p["id"], did))
+                self._once("declined:%s" % p["id"], p["id"], "not_taken", lane=lane_name, lever=p.get("lever") or lever,
+                           proposal_id=p["id"], trigger=[did], reasons=[why])
+                self._stall(lane_name, p.get("lever") or lever, did, why)
                 continue
             if self._step_exhausted(lane_name, lane, p):
                 continue
@@ -1794,6 +1869,7 @@ class StreamRun(object):
                 self._once("stale:%s" % p["id"], done_at, "not_taken", lever=lever,
                            reasons=["%s ran at %s, after the last snapshot: waiting for a snapshot that shows it"
                                     % (lever, done_at)])
+                self._stall(lane_name, lever, did, "%s ran at %s, after the last snapshot" % (lever, done_at))
                 continue
             lever = p.get("lever") or lever           # the sub-lever the proposal took (L16 -> L16L on the lab)
             lane["item"] = {"proposal": p, "lever": lever, "status": "proposed", "since_utc": self.utc,
@@ -1803,6 +1879,56 @@ class StreamRun(object):
                          argv=p["argv"], est_gpu_hours=p.get("est_gpu_hours"), trigger=[did],
                          cites=p.get("cites"), proposal_id=p["id"], child_exp=p.get("child_exp"))
         self._file_reviews()
+        self._watchdog(wanted)
+
+    def _stall(self, ln, lever, did, why):
+        """A diagnosis's lever on an idle, unheld lane not taken this tick for
+        a reason that can last (_watchdog counts such ticks). The waits by
+        design are not: DATA's half cadence, WAIT_DATA's discovery date, and a
+        proposal with nothing to act on (_proposal None: a source already
+        quarantined, closed this tick)."""
+        self._stalls.setdefault(ln, []).append({"lever": lever, "trigger": did, "why": _short(why, 400)})
+
+    def _watchdog(self, wanted):
+        """A card when a lane stalls: on watchdog stall_ticks ticks in a row a
+        fired diagnosis called for a lever on the lane, nothing held it and
+        nothing took it (_stall). Once per stall; a tick on which the lane holds
+        an item, is held, or no diagnosis calls for it ends the stall, and a
+        tick with only waits by design leaves the count as it is. Live, from
+        2026-10-04 09:27Z: D20 called for L16 on rf_a-programlama__ag-programlama
+        every tick and the DATA lane stood idle about 24 h, its L16S skipped as
+        declined with no event and no card."""
+        st = self.st
+        n = int(LS.t(self.th, "watchdog", "stall_ticks"))
+        stalls = st.setdefault("stalls", {})
+        for ln in ALL_LANES:
+            lane = st["lanes"][ln]
+            got = self._stalls.get(ln)
+            if lane.get("item") is not None or lane.get("hold") or lane.get("diag_hold") or ln not in wanted:
+                old = stalls.pop(ln, None)
+                if old and old.get("carded"):
+                    self._ledger("lane_stall_ended", lane=ln, since_utc=old.get("since_utc"), ticks=old.get("ticks"))
+                continue
+            if not got:
+                continue
+            rec = stalls.setdefault(ln, {"since_utc": self.utc, "ticks": 0})
+            rec["ticks"] = int(rec.get("ticks") or 0) + 1
+            rec["levers"] = sorted(set(rec.get("levers") or []) | {g["lever"] for g in got})
+            rec["triggers"] = sorted(set(rec.get("triggers") or []) | {g["trigger"] for g in got})
+            rec["last"] = got[-1]["why"]
+            if rec["ticks"] < n or rec.get("carded"):
+                continue
+            rec["carded"] = self.utc
+            title = "Lane %s stalled: %s called for %s on %d ticks and nothing took the lane" % (
+                ln, ", ".join(rec["triggers"]), ", ".join(rec["levers"]), rec["ticks"])
+            detail = ("Since %s every tick a fired diagnosis called for %s on lane %s, nothing held the lane (no "
+                      "stop-loss, no diagnosis hold) and no item took it. The last reason: %s. A person reads it: a "
+                      "declined proposal is never proposed again (stream ledger: not_taken, recovered, refused); a "
+                      "render error or a wait that does not end is a defect." % (
+                          rec["since_utc"], ", ".join(rec["levers"]), ln, rec["last"]))
+            self._card("stall", title, detail, lever=rec["levers"][0], trigger=rec["triggers"])
+            self._ledger("lane_stalled", lane=ln, since_utc=rec["since_utc"], ticks=rec["ticks"], levers=rec["levers"],
+                         trigger=rec["triggers"], reasons=[rec["last"]])
 
     @staticmethod
     def _phase_of(lever):
@@ -1810,7 +1936,7 @@ class StreamRun(object):
                 "L16R": "COLLECT", "L16RL": "COLLECT", "L16S": "SYNC", "L16I": "INTAKE", "L17": "ADMIT",
                 "L24": "QUARANTINE", "LH": "HOLD_RELEASE", "L18": "SEGMENT", "L19": "COMMIT", "L22": "FORK",
                 "L20": "MILESTONE", "L21": "ROLLBACK", "L23": "SPLITS", "L23B": "BASELINE", "L23N": "NATIVE",
-                "L23V": "BASE3", "L23E": "AGNOSTIC", "L23C": "E2_VERDICT", "L23D": "E2_ATTR",
+                "L23V": "BASE3", "L23E": "AGNOSTIC", "L23C": "E2_VERDICT", "L23D": "E2_ATTR", "L23Z": "ZOO",
                 "L23F": "E3_SCORE", "L23G": "E3_VERDICT",
                 "L25": "STAGE_A", "L27": "BISECT",
                 "L28": "STAGE_C", "L4": "AUDIT", "LV": "VERDICT", "LI": "INIT", "LA": "ARM",
@@ -2050,6 +2176,12 @@ class StreamRun(object):
             # one scoring pass per E2-C final run (three) and per E2-W and reference final run whose file may be
             # missing (six), as L23C's are priced
             info["runs"] = sum(nseeds(b) for v_ in arms.values() for b in v_) + nseeds(rb)
+        elif lever == "L23Z":
+            z = dom.get("zoo") or {}
+            if not z.get("record"):
+                return None
+            params = {"version": z["version"], "shards_a": int(z["shards_a"]), "shards_c": int(z["shards_c"]),
+                      "concurrency": int(z["concurrency"]), "max_gpu_hours": int(z["max_gpu_hours"])}
         elif lever == "L23F":
             e3 = dom.get("e3") or {}
             order = list(e3.get("order") or [])
@@ -2339,6 +2471,286 @@ class StreamRun(object):
                                                                                   or "", 300)),
                              lost=bool(res.get("lost")))
 
+    # ---- runs a lane lost (a tick that ran them and did not write its state)
+    def _executions(self):
+        """This campaign's execution records (the executor's log, folded: one
+        record per run), read once a tick."""
+        if self._execs is None:
+            tag, rows = json.dumps(self.name), []
+            try:
+                with open(str(self.xctx.exec_log), "r", encoding="utf-8") as fh:
+                    for line in fh:
+                        if tag not in line or not line.lstrip().startswith("{"):
+                            continue
+                        try:
+                            r = json.loads(line)
+                        except ValueError:
+                            continue
+                        if isinstance(r, dict) and r.get("campaign") == self.name:
+                            rows.append(r)
+            except OSError:
+                return []
+            self._execs = B.fold(rows)
+        return self._execs
+
+    @staticmethod
+    def _lab_job_of(rec):
+        """The lab job an executed lab action's run recorded (its hook's
+        payload, executor._run_plans), or None."""
+        if (rec or {}).get("status") != "executed":
+            return None
+        pay = ((rec.get("remote") or {}).get("payload")) or {}
+        return pay.get("lab_job") if isinstance(pay, dict) else None
+
+    def _adopt_lost_runs(self):
+        """Runs of this campaign the lanes lost, taken back (_adopt_run). The
+        executor writes a run's record before the ticker writes its state, so a
+        restart (or a raising tick) between the two leaves an executed record
+        no lane follows: on 2026-10-03 07:44Z an L16S candidate sync ran (lab
+        job sync_rf_a_programlama__ag_programlama_c2ad2f813a, ok), the
+        dashboard restarted before the state was written, and the sync's
+        effect (candidate_synced) was never recorded. An executed record of a
+        lane lever is adopted when its proposal id is in no lane (or in its
+        lane still 'proposed', which takes it in place), no item ended with it
+        (ended_ids, failed_ids, declined), no person's parked item holds it,
+        and its run was not adopted before. Only records at or after the
+        state's last successful write (updated_utc) are read: an earlier run
+        was seen by a tick whose state was written. A lost run whose lane is
+        busy waits for it (adopt_from_utc keeps the horizon). A state written
+        before ended_ids existed takes them from the campaign ledger first
+        (_seed_ended)."""
+        st = self.st
+        horizon = str(st.get("adopt_from_utc") or st.get("updated_utc") or "")
+        if not horizon:
+            return
+        lanes = st["lanes"]
+        held = {}
+        for ln in ALL_LANES:
+            it = lanes[ln].get("item") or {}
+            if (it.get("proposal") or {}).get("id"):
+                held[it["proposal"]["id"]] = (ln, it)
+        gone = set(st.get("ended_ids") or []) | set(self._failed_ids()) | set(st.get("declined") or []) \
+            | set(st.get("person_items") or {})
+        adopted = set(st.get("adopted_runs") or [])
+        waiting = []
+        for rec in self._executions():
+            pid, lever, ts = rec.get("proposal_id"), rec.get("lever"), str(rec.get("ts") or "")
+            if rec.get("status") != "executed" or not pid or lever not in LANE_OF or lever in PERSON_LEVERS \
+                    or ts < horizon or pid in gone or (rec.get("run_id") or pid) in adopted:
+                continue
+            if pid in held:
+                ln, it = held[pid]
+                if it.get("status") != "proposed":
+                    continue                     # followed already: running, or filed with its approval
+            else:
+                ln = LANE_OF[lever]
+                if lanes[ln].get("item") is not None:
+                    waiting.append(ts)
+                    continue
+                it = {"proposal": self._proposal_of(rec), "lever": lever, "status": "proposed", "since_utc": self.utc,
+                      "attempt": None, "trigger": (rec.get("trigger") or [None])[0], "diagnoses": []}
+            self._adopt_run(ln, it, rec, "executed at %s and lost with the state of that tick (a restart or a raising "
+                                         "tick before the state was written)" % ts)
+            held[pid] = (ln, it)
+            adopted.add(rec.get("run_id") or pid)
+        if waiting:
+            st["adopt_from_utc"] = min(waiting)
+        else:
+            st.pop("adopt_from_utc", None)
+
+    def _ledger_ended(self):
+        """({proposal id: utc}, {lab job: utc}) of the items the lanes followed
+        to an end, from the campaign ledger (ENDED_EVENTS name the proposal,
+        lab_job_finished the lab job; the latest utc of each), read once a
+        tick; None when the ledger cannot be read."""
+        if self._ended is None:
+            pids, jobs = {}, {}
+            try:
+                with open(str(self.paths.ledger), "r", encoding="utf-8") as fh:
+                    for line in fh:
+                        if not any('"%s"' % e in line for e in ENDED_EVENTS + ("lab_job_finished",)):
+                            continue
+                        try:
+                            r = json.loads(line)
+                        except ValueError:
+                            continue
+                        if not isinstance(r, dict) or r.get("campaign") != self.name:
+                            continue
+                        if r.get("event") in ENDED_EVENTS and r.get("proposal_id"):
+                            pids[str(r["proposal_id"])] = str(r.get("utc") or "")
+                        elif r.get("event") == "lab_job_finished" and r.get("lab_job"):
+                            jobs[str(r["lab_job"])] = str(r.get("utc") or "")
+            except FileNotFoundError:
+                pass
+            except OSError:
+                return None
+            self._ended = (pids, jobs)
+        return self._ended
+
+    def _seed_ended(self):
+        """A state written before ended_ids existed (the first tick after the
+        deploy that added them) takes them once from the campaign ledger: the
+        items that ended at or after the state's horizon (_adopt_lost_runs),
+        by proposal id, or by the lab job their run recorded. Without this,
+        every run of the last tick that wrote the state, held by no lane (an
+        L24 done when it ran), read as lost, and its effect was applied a
+        second time. A ledger that cannot be read: no run before this tick is
+        taken back (the horizon moves to it)."""
+        st = self.st
+        if isinstance(st.get("ended_ids"), list):
+            return
+        horizon = str(st.get("adopt_from_utc") or st.get("updated_utc") or "")
+        led = self._ledger_ended() if horizon else ({}, {})
+        if led is None:
+            st["ended_ids"] = []
+            st["adopt_from_utc"] = self.utc
+            self._ledger("ended_ids_seeded", ids=0, reasons=["the campaign ledger cannot be read: runs before %s are "
+                                                             "not taken back" % self.utc])
+            return
+        pids, jobs = led
+        ids = {p for p, u in pids.items() if u >= horizon}
+        jobs = {j for j, u in jobs.items() if u >= horizon}
+        if jobs:
+            ids |= {r["proposal_id"] for r in self._executions() if r.get("proposal_id") and self._lab_job_of(r) in jobs}
+        st["ended_ids"] = sorted(ids)[-ENDED_KEEP:]
+        if horizon:
+            self._ledger("ended_ids_seeded", ids=len(st["ended_ids"]), since_utc=horizon)
+
+    def _run_followed(self, rec):
+        """True when a lane followed run `rec` to its end: its proposal id
+        left a lane (ended_ids), or the campaign ledger records its item's end
+        or its lab job's (_ledger_ended). A ledger that cannot be read counts
+        as followed: a run is never taken back twice."""
+        pid = (rec or {}).get("proposal_id")
+        if pid in (self.st.get("ended_ids") or []):
+            return True
+        led = self._ledger_ended()
+        if led is None:
+            return True
+        job = self._lab_job_of(rec)
+        return pid in led[0] or bool(job and job in led[1])
+
+    def _renew(self, ln, lever, p, rec, how):
+        """The step of proposal p runs again under a new id (the executor runs
+        an id once): its earlier run was followed to its end, so it is neither
+        taken back nor declined. The step's attempt count rises past p's."""
+        key = step_key(lever, p.get("params"))
+        att = self.st.setdefault("attempts", {})
+        att[key] = max(int(att.get(key) or 0), int(p.get("attempt") or 0)) + 1
+        self._ledger("not_taken", lane=ln, lever=lever, proposal_id=p["id"], run_id=(rec or {}).get("run_id"),
+                     lab_job=self._lab_job_of(rec), attempt=att[key],
+                     reasons=["%s; the same step runs again under a new id (attempt %d)" % (_short(how, 400), att[key])])
+
+    def _proposal_of(self, rec):
+        """A lost run's proposal rebuilt from its execution record (the
+        proposal itself was in the state that was not written): the same id,
+        lever, action, params (with the price), trigger and experiments."""
+        lever = rec["lever"]
+        try:
+            row = LS.row(lever)
+        except LS.LeverError:
+            row = {"follow": "job"}              # L4, the label audit (_audit_proposal): a job
+        params = dict(rec.get("params") or {}, **(rec.get("meta_params") or {}))
+        return {"id": rec["proposal_id"], "lever": lever, "family": LS.family(lever) if row.get("policy_action") else lever,
+                "argv": list(rec.get("argv") or []), "params": params, "policy_action": rec.get("action"),
+                "risk": rec.get("risk"), "trigger": list(rec.get("trigger") or []), "cites": [], "lit": [],
+                "est_gpu_hours": _num(params.get("est_gpu_hours")) or 0.0, "proposed_by": AUTO,
+                "lane": LANE_OF.get(lever), "follow": row.get("follow"), "parent_exp": rec.get("parent_exp"),
+                "child_exp": rec.get("child_exp"), "attempt": None, "rebuilt_from_run": rec.get("run_id")}
+
+    def _adopt_run(self, ln, it, rec, how):
+        """An executed run taken back as lane ln's running item `it`: the lane
+        follows it as any item it ran (a lab job by its result, _poll_lab; a
+        cluster job by squeue and sacct, an experiment by name, _fold; a login
+        verb is done at once, its effect happened), and _on_started's
+        bookkeeping, lost with the state, is done again."""
+        st = self.st
+        p = it["proposal"]
+        pay = ((rec.get("remote") or {}).get("payload")) or {}
+        pay = pay if isinstance(pay, dict) else {}
+        it.update(status="running", job_ids=[str(j) for j in rec.get("job_ids") or []],
+                  approval_id=rec.get("approval_id") or it.get("approval_id"), executed_utc=rec.get("ts"),
+                  lab_job=self._lab_job_of(rec), adopted_run=rec.get("run_id"), adopted_utc=self.utc)
+        lane = st["lanes"][ln]
+        lane["item"] = it
+        lane["phase"] = self._phase_of(it["lever"])
+        st["adopted_runs"] = (list(st.get("adopted_runs") or []) + [rec.get("run_id") or p["id"]])[-ADOPTED_KEEP:]
+        self._ledger("adopted_run", lane=ln, lever=it["lever"], proposal_id=p["id"], run_id=rec.get("run_id"),
+                     executed_utc=rec.get("ts"), lab_job=it.get("lab_job"), job_ids=it.get("job_ids"),
+                     child_exp=p.get("child_exp"), reasons=[_short(how, 500)])
+        self._on_started(ln, it)
+        if p.get("follow") == "login" or p.get("policy_action") in DONE_AT_ONCE:
+            self._done(ln, it, pay)
+
+    def _recover_lab(self, ln, it, why):
+        """A lab item refused as already run (its id ran before the state that
+        holds the item was written): the lane takes that run back by its
+        recorded lab job (_adopt_run), so its result is read and its effect
+        recorded, or it fails and is proposed again under a new id. A run a
+        lane already followed to its end (_run_followed: a deterministic id
+        proposed again for the same work, as an L15 with the same classes was
+        before L15 took a new attempt when it finished) is never taken back,
+        or its old result would be read as new: the step runs again under a
+        new id (_renew). Declined, with a card, only when no lab job of it was
+        recorded (the restart came before the hook launched it) or its run was
+        taken back once already. Before this, every such item was declined as
+        if its effect showed in the snapshots, which an L16S candidate sync's
+        never does."""
+        st, p = self.st, it["proposal"]
+        rec = X._prior_run(self._executions(), p["id"])
+        job = self._lab_job_of(rec)
+        if job and self._run_followed(rec):
+            self._renew(ln, p.get("lever") or it["lever"], p, rec,
+                        "refused as already run (%s); that run (lab job %s) was followed to its end, so it is not "
+                        "taken back" % (_short(why, 200), job))
+            lane = st["lanes"][ln]
+            # an L15 is taken out of D29's wait once its date passed: the lane goes back to that wait (no new
+            # wait starts) and the renewed discovery is proposed on the next tick
+            wait = it["lever"] == "L15" and lane.get("until_utc") and (_secs(lane["until_utc"]) or 0) <= self.now
+            self._clear(ln)
+            if wait:
+                lane["phase"] = "WAIT_DATA"
+            return
+        if job and (rec.get("run_id") or p["id"]) not in (st.get("adopted_runs") or []):
+            return self._adopt_run(ln, it, rec, "refused as already run (%s): its lab job %s is followed"
+                                   % (_short(why, 200), job))
+        st["declined"] = (list(st.get("declined") or []) + [p["id"]])[-200:]
+        self._card("platform", "%s %s already ran and no lab job of it can be followed: not proposed again"
+                   % (it["lever"], p["id"][:12]),
+                   "%s (proposal %s) was refused: %s. Its earlier run %s, so the lane cannot follow it; the proposal "
+                   "is declined and never proposed again. A person checks what that run did (the execution log, the "
+                   "lab_jobs directory of the campaign) and, if it did nothing, runs the step by hand."
+                   % (it["lever"], p["id"], _short(why, 300),
+                      "was taken back once already" if job else
+                      "recorded no lab job (%s)" % ((rec or {}).get("status") or "no record")),
+                   lever=it["lever"], trigger=list(p.get("trigger") or []))
+        self._clear(ln)
+
+    def _adopt_declined(self, ln, lever, p, did, d):
+        """True when a declined lab proposal is not skipped: its earlier run
+        (an executed run with a recorded lab job) is taken back into idle lane
+        ln when no lane followed it and it was not adopted before, and the
+        step runs again under a new id (_renew) when a lane followed it to its
+        end (a repeat _on_result declined as already run, e.g. an L15 with the
+        same classes). This recovers an item _on_result declined before
+        _recover_lab existed (live: the L16S 22b59a187f1c00415b9c2d70a0858c3f,
+        declined on 2026-10-03 15:36Z) without editing the state."""
+        rec = X._prior_run(self._executions(), p["id"])
+        if not self._lab_job_of(rec):
+            return False
+        if self._run_followed(rec):
+            self._renew(ln, p.get("lever") or lever, p, rec,
+                        "%s was declined as already run; that run (lab job %s) was followed to its end"
+                        % (p["id"], self._lab_job_of(rec)))
+            return True
+        if (rec.get("run_id") or p["id"]) in (self.st.get("adopted_runs") or []):
+            return False
+        it = {"proposal": p, "lever": p.get("lever") or lever, "status": "proposed", "since_utc": self.utc,
+              "attempt": p.get("attempt", 0), "trigger": did, "diagnoses": [d]}
+        self._adopt_run(ln, it, rec, "declined earlier although its run (lab job %s) was never followed"
+                        % self._lab_job_of(rec))
+        return True
+
     # ---- the one ssh: ready items
     def _ready(self):
         out = []
@@ -2349,6 +2761,8 @@ class StreamRun(object):
                 continue
             p = it["proposal"]
             if p["policy_action"] in X.LAB_ACTIONS:
+                continue
+            if it.get("lever") == "L18" and it.get("status") in ("proposed", "filed") and self._cut_recheck(ln, it, ap):
                 continue
             if it.get("status") == "proposed":
                 out.append((ln, it, None))
@@ -2389,6 +2803,99 @@ class StreamRun(object):
                 continue
             keep.append((ln, it, appr))
         return keep
+
+    def _cut_recheck(self, ln, it, ap):
+        """True when a proposed or filed segment cut (L18) is not submitted
+        this tick. It waits while a quarantine is pending or not yet in the
+        evidence (_quarantine_unseen), and it is withdrawn when D22, read
+        again on this tick's evidence with the TRAIN lane idle (the item holds
+        the lane, so this tick's own D22 is silent), no longer calls for L18:
+        a cut submitted then meets a queue below M and is refused 'short'
+        (2026-10-05 05:15Z: L18 filed at 05:03Z, submitted at 05:15Z after the
+        snapshot showed Q 319 against M 1,364). A filed item whose approval
+        the ticker cannot close (pending) is kept filed instead (_hold_cut). A
+        D22 that cannot be read changes nothing, and neither does a filed item
+        whose approval a person denied or ran (_ready follows those)."""
+        p = it["proposal"]
+        a = (ap.get(it["approval_id"]) or {}) if it.get("status") == "filed" and it.get("approval_id") else {}
+        if a.get("status") == "denied" or a.get("execution") is not None:
+            return False
+        why = self._quarantine_unseen()
+        if why:
+            self._once("cut_wait:%s" % p["id"], why, "waiting", lane=ln, lever="L18", proposal_id=p["id"],
+                       reasons=[why])
+            return True
+        d = self._cut_still_called()
+        if d is None or d.get("unknown") or (d.get("fired") and "L18" in (d.get("levers") or [])):
+            return False
+        self._withdraw_cut(ln, it, "D22 no longer calls for a cut: %s" % _short(d.get("summary"), 300), a)
+        return True
+
+    def _cut_still_called(self):
+        """D22 on this tick's evidence with the TRAIN lane idle and unheld
+        (only whether the queue still calls for a cut), or None when it cannot
+        be read."""
+        if not isinstance(self._ctx, dict):
+            return None
+        ctx = copy.deepcopy(self._ctx)
+        lanes = ctx.setdefault("lanes", {})
+        lanes["TRAIN"] = dict(lanes.get("TRAIN") or {}, busy=False, hold=None)
+        try:
+            ev = E.from_snapshot(self._record(self._payload), self.sid, context=ctx, domain=LS.funnel_ref(self.dom))
+        except (E.EvidenceError, KeyError, TypeError, ValueError):
+            return None
+        return DS.by_id(DS.detect(ev, self.dom, self.th, prior=self.prior, only=("D22",))).get("D22")
+
+    def _withdraw_cut(self, ln, it, why, a=None):
+        """A proposed or filed L18 withdrawn before submission (as _adopt_fork
+        withdraws an old stream's items). Its id goes to failed_ids, not to
+        declined: D22 calls for the same cut (k, exp) again once the queue
+        refills, and a declined id would never be proposed again. A filed
+        item is withdrawn only once its approval is closed (_close_unsubmitted,
+        an approved one); a pending approval, or one that could not be closed,
+        keeps the item filed and unsubmitted (_hold_cut). `a`: the approval as
+        _ready read it this tick."""
+        p = it["proposal"]
+        aid = it.get("approval_id")
+        if aid and (a or {}).get("status") == "pending":
+            return self._hold_cut(ln, it, why, "its approval %s is pending, and only a person decides an approval"
+                                               % aid)
+        closed, cwhy = self._close_unsubmitted(aid, why) if aid else (None, "")
+        if aid and not closed:
+            return self._hold_cut(ln, it, why, "its approval %s could not be closed (%s)" % (aid, cwhy))
+        self._ledger("withdrawn", lane=ln, lever=it.get("lever"), approval_id=aid, proposal_id=p["id"],
+                     child_exp=p.get("child_exp"), reasons=[why], approval_closed=closed, close_error=cwhy or None)
+        self.st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+        self._clear(ln)
+
+    def _hold_cut(self, ln, it, why, held):
+        """A filed L18 that D22 no longer calls for, whose approval the ticker
+        cannot close: not submitted, and kept filed rather than withdrawn. A
+        pending approval stays on the INC page, where a person can approve it
+        and run it (executor.execute_approved); withdrawn, its id in
+        failed_ids, that run (a segment cut, R3) would be followed by no lane,
+        since _adopt_lost_runs reads the id as ended, and D22 would propose
+        another cut beside it. Kept filed, a person's run is followed
+        (_executed_elsewhere), an approval approved and not yet run is closed
+        and the item withdrawn on the next tick that D22 is still silent
+        (_withdraw_cut), and, if D22 calls for the cut again, the item goes on
+        as any filed item (run under the envelope, or once a person approves
+        it). One waiting event and one card per approval."""
+        p = it["proposal"]
+        aid = it.get("approval_id")
+        if self._once("cut_held:%s" % p["id"], [aid, held], "waiting", lane=ln, lever="L18", proposal_id=p["id"],
+                      approval_id=aid, child_exp=p.get("child_exp"),
+                      reasons=[why, "not submitted and kept filed, not withdrawn: %s" % held]) is None:
+            return
+        self._card("escalation", "Filed cut %s not submitted: the queue no longer calls for it (approval %s)"
+                   % (p.get("child_exp"), aid),
+                   "D22 no longer calls for a segment cut (the queue holds fewer than M eligible images), so the "
+                   "filed L18 is not submitted; %s, so the item stays filed and holds TRAIN. Approved and not yet "
+                   "run, it is closed unsubmitted and withdrawn while D22 stays silent; run from the INC page, the "
+                   "lane follows that run, and the cutter refuses it short while the queue is below M. If the queue "
+                   "calls for the cut again, the item goes on as any filed cut (run under the envelope, or once "
+                   "approved)." % held,
+                   lever="L18", trigger=list(p.get("trigger") or []))
 
     def _misplaced_review(self, it):
         """Why an approved source review in its cluster form (L16R: sbatch
@@ -2620,9 +3127,7 @@ class StreamRun(object):
                          child_exp=p.get("child_exp"), trigger=p.get("trigger"))
             self._mirror_action(p, res)
             self._on_started(ln, it)
-            if p.get("follow") == "login" or p["policy_action"] in ("inc_stream_commit", "inc_stream_rollback",
-                                                                     "inc_stream_quarantine", "inc_stream_release",
-                                                                     "inc_unblock_transient"):
+            if p.get("follow") == "login" or p["policy_action"] in DONE_AT_ONCE:
                 self._done(ln, it, payload)
             return
         if s == "filed":
@@ -2657,6 +3162,14 @@ class StreamRun(object):
                 st["lanes"][ln]["hold_utc"] = self.utc
                 self._clear(ln, keep_phase=False)
                 return
+            if payload.get("error_kind") == "uncertain" and it["lever"] in RECORD_ONLY_LEVERS:
+                # the zoo's submit timed out part-way (L23Z): what it queued runs, and its record is written by the
+                # jobs themselves; followed by its job names and its record, as an unknown outcome is
+                it.update(status="running", uncertain=True, job_ids=[])
+                self._ledger("uncertain", lane=ln, lever=it["lever"], reasons=res.get("reasons"),
+                             next="followed by its job names; its record decides")
+                self._on_started(ln, it)
+                return
             if X.uncertain(res):
                 if p.get("follow") in ("build", "experiment") and p.get("child_exp"):
                     it.update(status="running", uncertain=True, job_ids=[])
@@ -2675,7 +3188,10 @@ class StreamRun(object):
                 self._ledger("uncertain", lane=ln, lever=it["lever"], reasons=res.get("reasons"), next="paused")
                 return self._pause("the outcome of %s (%s) is unknown: it may have run on the cluster; a person checks"
                                    % (it["lever"], p["policy_action"]))
-            return self._failed(ln, it, why, charged=bool(res.get("charged")))
+            # a zoo submission whose sbatch failed before anything stayed queued (the submit cancels what it
+            # queued): the lane's ordinary failure, proposed again, never the record-only card
+            return self._failed(ln, it, why, charged=bool(res.get("charged")),
+                                submission=it["lever"] == "L23Z" and payload.get("error_kind") == "submit")
         # refused
         if any(t in why for t in WAIT_REFUSALS) or "the campaign is paused" in why:
             self._once("wait:%s" % p["id"], why, "waiting", lane=ln, lever=it["lever"], reasons=res.get("reasons"))
@@ -2694,6 +3210,11 @@ class StreamRun(object):
                 it.update(status="running", uncertain=True, job_ids=[])
                 self._on_started(ln, it)
                 return
+            if p.get("follow") == "lab":
+                # a lab item (L15, L26, L16L, L16RL, L16S) has a lab job to follow, recorded with its run: the
+                # lane takes that run back (its effect, e.g. an L16S's candidate_synced, lives only in this
+                # state, never in a snapshot); declined only when no lab job was recorded, with a card
+                return self._recover_lab(ln, it, why)
             # a job or verb that already ran has no job id to follow here: its
             # effect shows in the snapshots; following it would fail it as a
             # job that "ended unknown" and count toward the lane's stop-loss
@@ -2759,6 +3280,8 @@ class StreamRun(object):
             r0["e2"] = "running"
         elif lever == "L23D":
             r0["e2_attr"] = "running"
+        elif lever == "L23Z":
+            r0["zoo"] = "running"
         elif lever == "L23F":
             r0["e3_score_%s" % params.get("arm")] = "running"
         elif lever == "L23G":
@@ -2774,10 +3297,16 @@ class StreamRun(object):
             if lever == "L25" and ref and ref not in st["exps"]:
                 st["exps"].append(ref)
         if lever == "L15":
-            st["discover"]["before"] = sorted(c.get("id") for c in (self.ev.json(E.CONTEXT) or {}).get("candidates") or [])
+            # (a lost run taken back before this tick's evidence exists reads the candidates file itself)
+            cands = ((self.ev.json(E.CONTEXT) or {}).get("candidates") if self.ev is not None else self._candidates())
+            st["discover"]["before"] = sorted(c.get("id") for c in cands or [])
 
     def _clear(self, ln, keep_phase=False):
         lane = self.st["lanes"][ln]
+        pid = ((lane.get("item") or {}).get("proposal") or {}).get("id")
+        if pid:
+            # every item leaves its lane here: its run is not a lost one (_adopt_lost_runs)
+            self.st["ended_ids"] = ([x for x in self.st.get("ended_ids") or [] if x != pid] + [pid])[-ENDED_KEEP:]
         lane["item"] = None
         if not keep_phase:
             lane["phase"] = "IDLE"
@@ -2798,6 +3327,10 @@ class StreamRun(object):
             for k in sorted(dk, key=lambda k: dk[k])[:len(dk) - 64]:
                 dk.pop(k, None)
         if lever == "L15":
+            # the next discovery runs under a new id even with the same classes (the executor runs an id once; a
+            # repeat under this one was refused as already run, and once taken back as if this run were new)
+            key, att = step_key(lever, params), st.setdefault("attempts", {})
+            att[key] = max(int(att.get(key) or 0), int(p.get("attempt") or 0)) + 1
             before = set(st["discover"].pop("before", []) or [])
             after = set(c.get("id") for c in self._candidates())
             new = len(after - before)
@@ -2883,6 +3416,9 @@ class StreamRun(object):
         elif lever in ("L23V", "L23E", "L23C", "L23D", "L23G"):
             st["stage"].setdefault("r0", {})[{"L23V": "base3", "L23E": "agnostic", "L23C": "e2",
                                               "L23D": "e2_attr", "L23G": "e3"}[lever]] = "done"
+        elif lever == "L23Z":
+            st["stage"].setdefault("r0", {})["zoo"] = "done"
+            self._zoo_card(params, p)
         elif lever == "L23F":
             st["stage"].setdefault("r0", {})["e3_score_%s" % params.get("arm")] = "done"
         elif lever == "LV":
@@ -2913,7 +3449,7 @@ class StreamRun(object):
             st["bisected"] = rb[-1]["utc"] if rb else self.utc
         self._clear(ln)
 
-    def _failed(self, ln, it, why, charged=False, retry=True, lost=False, ended=None):
+    def _failed(self, ln, it, why, charged=False, retry=True, lost=False, ended=None, submission=False):
         """An item that ended without its effect. `ended` is given only by the
         follow of a build whose job ran and ended without its experiment
         ({"refusal": the provenance's refusal line or None, "states": the
@@ -2954,7 +3490,7 @@ class StreamRun(object):
                              charged=charged, fails=int(lane.get("fails") or 0), lost=True, lost_runs=lr[key])
                 self._clear(ln)
                 return
-        if lever in RECORD_ONLY_LEVERS:
+        if lever in RECORD_ONLY_LEVERS and not submission:
             # record only (a measurement arm's native-resolution rescore; E1's base v3 build and agnostic
             # rescore): a person's card; the lane's failure count, its step count and its stop-loss are not
             # touched, and the item stays failed, so DR0 does not propose it again (a person reruns it, or
@@ -2979,6 +3515,9 @@ class StreamRun(object):
             elif lever == "L23D":
                 r0["e2_attr"] = "failed"
                 rerun = "inc2.baseline rescore-e2-attr (sbatch run_inc2_build.sh inc2.baseline rescore-e2-attr)"
+            elif lever == "L23Z":
+                r0["zoo"] = "failed"
+                rerun = self._zoo_rerun(params)
             elif lever == "L23F":
                 r0["e3_score_%s" % params.get("arm")] = "failed"
                 rerun = ("inc2.twostage score-arm --arm %s (sbatch run_inc2_build.sh inc2.twostage score-arm --arm %s; "
@@ -3601,12 +4140,14 @@ class StreamRun(object):
                     states = [(sacct.get(j) or {}).get("state") for j in it.get("job_ids") or []]
                     if it["lost"] >= BUILD_LOST_SNAPSHOTS or any(s_ not in (None, "RUNNING", "PENDING", "COMPLETED")
                                                                 for s_ in states):
-                        prov = ((payload.get("status") or {}).get("builds") or {}).get(child) or {}
+                        prov = self._build_prov(payload, it, child)
                         # the build ran and ended without its experiment: what _failed needs to tell a refusal
                         # of the build itself from a job killed from outside (a measurement arm's build)
-                        self._failed(ln, it, "the build of %s ended without the experiment%s" % (
-                            child, (": %s" % prov.get("refusal")) if prov.get("refusal") else ""),
-                            ended={"refusal": prov.get("refusal"), "states": [str(s_) for s_ in states if s_]})
+                        why = "the build of %s ended without the experiment%s" % (
+                            child, (": %s" % prov.get("refusal")) if prov.get("refusal") else "")
+                        ended = {"refusal": prov.get("refusal"), "states": [str(s_) for s_ in states if s_]}
+                        if not (it["lever"] == "L18" and self._cut_short(ln, it, why, ended, q)):
+                            self._failed(ln, it, why, ended=ended)
                 continue
             if follow == "job":
                 ids = [str(j) for j in it.get("job_ids") or []]
@@ -3659,6 +4200,57 @@ class StreamRun(object):
                     st.setdefault("frozen", {})[exp] = {"utc": self.utc}
         self._health(payload)
 
+    def _build_prov(self, payload, it, child):
+        """The last attempt of the build job's provenance record (the
+        snapshot's builds, remote.status): the experiment's own record
+        (run_inc2_build.sh names a baseline's after its --exp), else the
+        stream's when its last attempt is this item's job: every inc2.stream
+        build of a stream writes provenance/stream_<sid>.json (a segment's
+        refusal was looked up under the segment's name and never found)."""
+        builds = (payload.get("status") or {}).get("builds") or {}
+        if isinstance(builds.get(child), dict) and builds[child]:
+            return builds[child]
+        sid = ((it["proposal"].get("params") or {}).get("stream")) or self.sid
+        rec = builds.get("stream_%s" % sid)
+        jobs = {str(j).split("_")[0] for j in it.get("job_ids") or []}
+        return rec if isinstance(rec, dict) and str(rec.get("job_id") or "") in jobs else {}
+
+    def _cut_short(self, ln, it, why, ended, q):
+        """True when a segment build (L18) the cutter refused for want of
+        eligible images (SHORT_RE) was handled here. While the queue summary
+        this snapshot shipped holds fewer than M eligible images the refusal
+        is no failure: the queue fell after D22 called for the cut (a
+        quarantine, rows consumed or held), so it is recorded not_taken, its
+        id retired (the next cut runs under a new one), its build's estimate
+        released, and neither the lane's failure count nor the step's is
+        touched. While Q >= M (or Q unknown) the cutter and D22 disagree: a
+        failure as before, and a card. Live, 2026-10-05: L24 quarantined
+        zenodo_15808623 in the tick L18 was proposed, Q fell from 8,041 to
+        319 (M 1,364), and the cutter's 'short' counted as TRAIN's failed step."""
+        if not SHORT_RE.search(str(ended.get("refusal") or "")):
+            return False
+        st, p = self.st, it["proposal"]
+        Q = _num(((q or {}).get("eligible") or {}).get("images"))
+        Mv = _num((q or {}).get("M")) or _num((self.dom.get("increment") or {}).get("M"))
+        if Q is not None and Mv and Q < Mv:
+            self._build_ended_spend(it, why)
+            st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+            self._ledger("not_taken", lane=ln, lever=it["lever"], proposal_id=p["id"], child_exp=p.get("child_exp"),
+                         Q=int(Q), M=int(Mv), job_ids=list(it.get("job_ids") or []), states=ended.get("states"),
+                         reasons=["%s; the queue now holds Q %d < M %d eligible images, so the cut was refused for "
+                                  "want of data, not failed: no lane failure, a new id for the next cut"
+                                  % (_short(why, 300), Q, Mv)])
+            self._clear(ln)
+            return True
+        self._card("escalation", "Segment %s: the cutter refused it short while the queue holds Q %s >= M %s"
+                   % (p.get("child_exp"), "unknown" if Q is None else "%d" % Q, "%d" % Mv if Mv else "unknown"),
+                   "%s. D22 counts Q from the queue summary and the cutter found fewer eligible images than M: the "
+                   "two disagree (a guard exclusion, a stale summary). Counted as a failed step of TRAIN; a person "
+                   "reads the cutter's last_refusal in the queue summary." % _short(why, 400),
+                   lever=it["lever"], trigger=list(p.get("trigger") or []))
+        self._failed(ln, it, why, ended=ended)
+        return True
+
     @staticmethod
     def _record_only_follow(it):
         """(job name, record artifact) a record-only item is followed by."""
@@ -3672,6 +4264,9 @@ class StreamRun(object):
             return SR.E2_JOB_NAME, "capacity/e2_rescore.json"
         if it["lever"] == "L23D":
             return SR.E2_ATTR_JOB_NAME, "capacity/e2_attr_rescore.json"
+        if it["lever"] == "L23Z":
+            return tuple(n % prm.get("version", "v1") for n in SR.ZOO_JOB_NAMES), "capacity/zoo_%s.json" % prm.get(
+                "version", "v1")
         if it["lever"] == "L23F":
             arm = str(prm.get("arm"))
             return SR.E3_SCORE_JOB_NAME % arm.lower(), "capacity/e3_score_%s.json" % arm
@@ -3680,19 +4275,26 @@ class StreamRun(object):
         return SR.NATIVE_JOB_NAME % prm.get("exp"), "%s/native_rescore.json" % prm.get("exp")
 
     def _follow_record_only(self, ln, it, queued, names, arts):
-        """A record-only item (L23N, L23V, L23E, L23C, L23D, L23F, L23G)
-        whose submission's outcome is unknown: it runs while a job of its
-        name is queued; then it is done once its record
-        (<exp>/native_rescore.json, splits/v3/summary.json,
+        """A record-only item (L23N, L23V, L23E, L23C, L23D, L23Z, L23F,
+        L23G) whose submission's outcome is unknown: it runs while a job of
+        its name (L23Z: any of its chain's five) is queued; then it is done
+        once its record (<exp>/native_rescore.json, splits/v3/summary.json,
         <exp>/agnostic_rescore.json, capacity/e2_rescore.json,
-        capacity/e2_attr_rescore.json, capacity/e3_score_<arm>.json,
-        capacity/e3_rescore.json) says complete, and failed (record only: a
-        card) after BUILD_LOST_SNAPSHOTS snapshots with neither."""
+        capacity/e2_attr_rescore.json, capacity/zoo_v1.json,
+        capacity/e3_score_<arm>.json, capacity/e3_rescore.json) says complete
+        (the zoo's: complete or partial), and failed (record only: a card)
+        after BUILD_LOST_SNAPSHOTS snapshots with neither."""
         job, record = self._record_only_follow(it)
-        if queued is None or job in names:
+        jobs = job if isinstance(job, tuple) else (job,)
+        if queued is None or any(j in names for j in jobs):
             return
-        if ((arts.get(record) or {}).get("status")) == "complete":
+        rs = (arts.get(record) or {}).get("status")
+        if rs == "complete" or (it["lever"] == "L23Z" and rs == "partial"):
             self._done(ln, it)
+            return
+        if it["lever"] == "L23Z" and rs in ("refused", "failed"):
+            self._failed(ln, it, "the zoo record says %s%s" % (rs, (": %s" % _short((arts.get(record) or {}).get(
+                "refusal"), 300)) if (arts.get(record) or {}).get("refusal") else ""), charged=True)
             return
         it["lost"] = int(it.get("lost") or 0) + 1
         if it["lost"] >= BUILD_LOST_SNAPSHOTS:
@@ -3877,6 +4479,90 @@ class StreamRun(object):
         for exp in list(stale):
             if not any(d.get("exp") == exp for d in by.get("D6") or []):
                 stale[exp] = 0
+
+    def _zoo_stage(self, payload, r0):
+        """/stage/zoo: done once capacity/zoo_<v>.json says complete; partial;
+        failed (refused, failed, or the platform's item failed); stale (a live
+        status with no zoo job queued and no item of the platform following
+        it: a card, never a second proposal); running; else what the platform
+        ran (unconfirmed when its item ended without a record), else missing."""
+        from . import stream_remote as SR
+        z = (self.dom or {}).get("zoo") or {}
+        rec = self._artifact(z.get("record") or "capacity/zoo_v1.json") or {}
+        rs = rec.get("status")
+        self._zoo_rec = rec
+        out = None
+        if rs == "complete":
+            out = "done"
+        elif rs == "partial":
+            out = "partial"
+        elif rs in ("refused", "failed"):
+            out = "failed"
+        elif rs:
+            if r0.get("zoo") in ("failed", "running"):
+                out = r0["zoo"]
+            else:
+                out = "running"
+                sq = ((payload or {}).get("status") or {}).get("squeue") or {}
+                if sq.get("ok"):
+                    names = {j.get("name") for j in sq.get("jobs") or [] if isinstance(j, dict)}
+                    v = rec.get("version") or z.get("version") or "v1"
+                    if not any((n % v) in names for n in SR.ZOO_JOB_NAMES):
+                        out = "stale"
+        elif r0.get("zoo") == "done":
+            out = "unconfirmed"
+        else:
+            out = r0.get("zoo") or "missing"
+        self._zoo_state = out
+        return out
+
+    def _zoo_rerun(self, params):
+        z = (self.dom or {}).get("zoo") or {}
+        g = lambda k: (params or {}).get(k) or z.get(k)  # noqa: E731
+        return ZOO_RERUN % {"v": g("version") or "v1", "a": g("shards_a"), "c": g("shards_c"),
+                            "p": g("concurrency"), "h": g("max_gpu_hours")}
+
+    def _zoo_card(self, params, p):
+        """The zoo's card once its item is done: counts and the report's path
+        (a research card when complete; an escalation naming the failed shards
+        and the rerun commands when partial). Never a metric."""
+        z = (self.dom or {}).get("zoo") or {}
+        v = (params or {}).get("version") or z.get("version") or "v1"
+        rec = self._artifact(z.get("record") or "capacity/zoo_%s.json" % v) or {}
+        c = rec.get("counts") or {}
+        sk = ", ".join("%s %s" % (k, n) for k, n in sorted((c.get("skipped_by_reason") or {}).items()) if n)
+        lines = ["files listed %s: kept %s, unscorable %s, skipped %s (%s); converted %s"
+                 % (c.get("files_listed"), c.get("kept"), c.get("unscorable"), c.get("skipped"), sk or "-",
+                    c.get("converted")),
+                 "items: planned %s, scored %s, reused %s, refused %s, errors %s, not scored (budget) %s, not scored "
+                 "(time) %s" % (c.get("items_planned"), c.get("items_scored"), c.get("items_reused"),
+                                c.get("items_refused"), c.get("items_error"), c.get("items_not_scored_budget"),
+                                c.get("items_not_scored_time")),
+                 "report: INC_DIR/_zoo/%s/report.md (report.json, report.csv; the sealed reads in report_external.*)"
+                 % v, "descriptive: no model is adopted or called best from it (Amendment Z1)."]
+        if rec.get("status") == "complete":
+            self._card("research", "Model-zoo audit %s complete" % v, "\n".join(lines), lever="L23Z",
+                       trigger=list((p or {}).get("trigger") or []))
+            return
+        sh = rec.get("shards") or {}
+        failed = ["%s%s" % (k, (sh.get(k) or {}).get("failed")) for k in ("a", "c") if (sh.get(k) or {}).get("failed")]
+        self._card("escalation", "Model-zoo audit %s partial (L23Z)" % v,
+                   "\n".join(lines + ["record status %s; failed shards %s. A person reruns: %s"
+                                       % (rec.get("status"), ", ".join(failed) or "none named", self._zoo_rerun(params))]),
+                   lever="L23Z", trigger=list((p or {}).get("trigger") or []))
+
+    def _zoo_stale_card(self):
+        """One card per stale zoo record (/stage/zoo stale): a chain that
+        stopped part-way, followed by nobody."""
+        st = self.st
+        rec = getattr(self, "_zoo_rec", None) or {}
+        if getattr(self, "_zoo_state", None) != "stale" or st.get("zoo_stale_card") == rec.get("updated_utc"):
+            return
+        st["zoo_stale_card"] = rec.get("updated_utc")
+        self._card("escalation", "The model-zoo audit stopped part-way (record %s, no zoo job queued)"
+                   % rec.get("status"), "capacity/zoo_%s.json says %s and no inc_zoo job is queued. A person "
+                   "resubmits (resumable): %s" % (rec.get("version") or "v1", rec.get("status"), self._zoo_rerun({})),
+                   lever="L23Z", trigger=["L23Z"])
 
     def _measure_build(self, lever, params, p):
         """The measurement baseline an L23B item builds (a baselines item

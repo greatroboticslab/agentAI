@@ -78,8 +78,8 @@ ENVELOPE_GRANTEES = ("round-scheduler:inc-autopilot",)
 # last 'hurts' milestone recommended, L23's baselines, L23N's native-resolution
 # rescore of a done measurement arm, E1's base v3 build (L23V) and agnostic
 # rescore (L23E), E2's rescore and verdict (L23C), E2-C's attribution rescore
-# (L23D), E3's scores of one arm (L23F) and its verdict (L23G), L25's Stage A
-# pilot and LI, the stream's
+# (L23D), the model-zoo audit's submission (L23Z), E3's scores of one arm
+# (L23F) and its verdict (L23G), L25's Stage A pilot and LI, the stream's
 # creation). L23's splits build
 # and lock, a source that failed its pre-check and a funnel_F9 release are not
 # here: a person decides them. Anything else in the queue is decided by a
@@ -88,7 +88,7 @@ ENVELOPE_ACTIONS = ("inc_build_pilot", "inc_build_realloop", "inc_build_baseline
                     "inc_build_segment", "inc_build_consolidation", "inc_stream_rollback",
                     "inc_build_baseline_v2", "inc_build_pilot4", "inc_stream_init", "inc_rescore_native",
                     "inc_build_base3", "inc_rescore_agnostic", "inc_rescore_e2", "inc_rescore_e2_attr",
-                    "inc_score_e3", "inc_verdict_e3")
+                    "inc_audit_zoo", "inc_score_e3", "inc_verdict_e3")
 EXEC_PHASES = ("started", "done", "failed", "released")
 
 

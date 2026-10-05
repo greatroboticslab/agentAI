@@ -382,6 +382,12 @@ def price(lid, params, dom, info=None):
     if kind == "splits":
         h = float(cost(dom, "splits_hours"))
         return h, dict(detail, job_hours=h)
+    if kind == "zoo":
+        # the model-zoo audit (L23Z, 2026-10-04): its pre-registered cap; its plan refuses above it, every task stops
+        # at it, and sacct settles what it spent
+        h = float(p.get("max_gpu_hours") or (dom.get("zoo") or {})["max_gpu_hours"])
+        return round(h, 3), dict(detail, job_hours=h, why="the zoo audit's pre-registered cap (its plan refuses above "
+                                                          "it, every task stops at it); settled from sacct")
     if kind == "rescore":
         # one GPU pass per final run (the arm's on its final exams, the reference's on dev), never training
         runs = int(info.get("runs") or 2 * seeds)
