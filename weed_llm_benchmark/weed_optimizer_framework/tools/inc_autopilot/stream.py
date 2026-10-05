@@ -17,6 +17,7 @@ Three lanes, one item in flight per lane:
                 build) | AGNOSTIC (L23E, E1's agnostic rescore and verdict)
                 | E2_VERDICT (L23C, E2's rescore and verdict)
                 | E2_ATTR (L23D, E2-C's attribution rescore and record)
+                | ZOO (L23Z, the model-zoo audit: one chain of five jobs)
                 | MILESTONE (L20) | COMPARE (LC)
                 | ROLLBACK (L21) | BISECT (L27) | AUDIT (L4) -> IDLE
 
@@ -162,24 +163,31 @@ LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "D
            "L16RL": "DATA", "L16I": "DATA", "L16S": "DATA", "L17": "DATA", "L24": "STOP", "LH": "DATA",
            "L18": "TRAIN", "L19": "TRAIN", "L22": "TRAIN",
            "L20": "MAINT", "L21": "MAINT", "L23": "MAINT", "L23B": "MAINT", "L23N": "MAINT", "L23V": "MAINT",
-           "L23E": "MAINT", "L23C": "MAINT", "L23D": "MAINT", "L25": "MAINT",
+           "L23E": "MAINT", "L23C": "MAINT", "L23D": "MAINT", "L23Z": "MAINT", "L25": "MAINT",
            "L27": "MAINT", "L28": "MAINT", "L4": "MAINT", "LV": "MAINT", "LI": "MAINT", "LA": "MAINT", "LC": "MAINT"}
 # Record-only levers (a measurement arm's native-resolution rescore, L23N;
 # E1's base v3 build, L23V, and its agnostic rescore, L23E, 2026-10-03; E2's
 # rescore and verdict, L23C, 2026-10-04; E2-C's attribution rescore and
-# record, L23D, 2026-10-04, later): a
+# record, L23D, 2026-10-04, later; the model-zoo audit, L23Z, 2026-10-04): a
 # failure is a person's card, never a failed step of its lane (no stop-loss
 # counts it), and the item is not proposed again (_failed); a submission whose
 # outcome is unknown is followed by its job name and its record, never a pause
 # (_follow_record_only). A qos refusal is a platform defect and holds the lane
 # as for every lever (S21).
-RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E", "L23C", "L23D")
+RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E", "L23C", "L23D", "L23Z")
 # The failure card title of each record-only lever (_failed; "%s" is its --exp)
 RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
                       "L23V": "Base v3 build (splits v3, E1) failed (L23V)",
                       "L23E": "E1's agnostic rescore of %s failed (L23E)",
                       "L23C": "E2's 12-class rescore and verdict failed (L23C)",
-                      "L23D": "E2-C's attribution rescore and record failed (L23D)"}
+                      "L23D": "E2-C's attribution rescore and record failed (L23D)",
+                      "L23Z": "The model-zoo audit v1 (every detector under one protocol) failed (L23Z)"}
+# The zoo audit's rerun commands (a person's, on the login node; written records are kept, so both resume)
+ZOO_RERUN = ("bash run_inc2_zoo.sh submit --version %(v)s --shards-a %(a)s --shards-c %(c)s --concurrency %(p)s "
+             "--max-gpu-hours %(h)s (resumable: written records are kept; refused while a zoo job is queued); or, "
+             "for failed shards only, sbatch -p GPU-shared --job-name=inc_zoo_%(v)s_score_a --array=<ids> "
+             "run_inc2_zoo.sh score --version %(v)s --stage a|c, then sbatch -p GPU-shared "
+             "--job-name=inc_zoo_%(v)s_report --dependency=afterany:<that job> run_inc2_zoo.sh report --version %(v)s")
 # A measurement arm's build (L23B of a baselines item marked measure) whose job
 # ran and ended without its experiment: record only as well (a card; no lane
 # failure; DR0 skips the item, /stage/baselines says failed), since no lane
@@ -1299,13 +1307,14 @@ class StreamRun(object):
         ear = self._artifact((self.dom.get("e2_attr") or {}).get("rescore_record")
                              or "capacity/e2_attr_rescore.json") or {}
         e2_attr = "done" if ear.get("status") == "complete" else (r0.get("e2_attr") or "missing")
+        zoo = self._zoo_stage(payload, r0)
 
         def state_of(exp, key):
             x = exp_status.get(exp)
             return x if x in ("done", "built") else ("building" if r0.get(key) == "building" else "missing")
         return {"lock": bool(lock.get("locked")), "splits_built": bool(r0.get("splits_built")),
                 "train_manifests": lock.get("train_manifests") or [], "baselines": base, "native": native,
-                "base3": base3, "agnostic": agnostic, "e2": e2, "e2_attr": e2_attr,
+                "base3": base3, "agnostic": agnostic, "e2": e2, "e2_attr": e2_attr, "zoo": zoo,
                 "exp_status": exp_status, "verdicts": dict(r0.get("verdicts") or {}),
                 "protocol_v3_accepted": bool(self.cfg.get("protocol_v3_accepted_by")),
                 "stage_a": {"exp": sa_exp, "status": state_of(sa_exp, "stage_a")},
@@ -1431,6 +1440,8 @@ class StreamRun(object):
         self._e2_card()
         # E2-C's decided attribution (2026-10-04, later): one card, and E2-C's test read beside the headline
         self._e2_attr_card()
+        # the zoo's chain stopped part-way with nobody following it (a person's submit, a killed submit): one card
+        self._zoo_stale_card()
         # cards and holds
         for d in fired:
             for lv in d.get("levers") or []:
@@ -1794,7 +1805,7 @@ class StreamRun(object):
                 "L16R": "COLLECT", "L16RL": "COLLECT", "L16S": "SYNC", "L16I": "INTAKE", "L17": "ADMIT",
                 "L24": "QUARANTINE", "LH": "HOLD_RELEASE", "L18": "SEGMENT", "L19": "COMMIT", "L22": "FORK",
                 "L20": "MILESTONE", "L21": "ROLLBACK", "L23": "SPLITS", "L23B": "BASELINE", "L23N": "NATIVE",
-                "L23V": "BASE3", "L23E": "AGNOSTIC", "L23C": "E2_VERDICT", "L23D": "E2_ATTR",
+                "L23V": "BASE3", "L23E": "AGNOSTIC", "L23C": "E2_VERDICT", "L23D": "E2_ATTR", "L23Z": "ZOO",
                 "L25": "STAGE_A", "L27": "BISECT",
                 "L28": "STAGE_C", "L4": "AUDIT", "LV": "VERDICT", "LI": "INIT", "LA": "ARM",
                 "LC": "COMPARE"}.get(lever, "ITEM")
@@ -2033,6 +2044,12 @@ class StreamRun(object):
             # one scoring pass per E2-C final run (three) and per E2-W and reference final run whose file may be
             # missing (six), as L23C's are priced
             info["runs"] = sum(nseeds(b) for v_ in arms.values() for b in v_) + nseeds(rb)
+        elif lever == "L23Z":
+            z = dom.get("zoo") or {}
+            if not z.get("record"):
+                return None
+            params = {"version": z["version"], "shards_a": int(z["shards_a"]), "shards_c": int(z["shards_c"]),
+                      "concurrency": int(z["concurrency"]), "max_gpu_hours": int(z["max_gpu_hours"])}
         elif lever == "L25":
             sa = dom.get("stage_a") or {}
             params = {"pkg": pkg, "exp": sa["exp"], "from_exp": sa["from_exp"], "recipes": sa["recipes"]}
@@ -2628,6 +2645,14 @@ class StreamRun(object):
                 st["lanes"][ln]["hold_utc"] = self.utc
                 self._clear(ln, keep_phase=False)
                 return
+            if payload.get("error_kind") == "uncertain" and it["lever"] in RECORD_ONLY_LEVERS:
+                # the zoo's submit timed out part-way (L23Z): what it queued runs, and its record is written by the
+                # jobs themselves; followed by its job names and its record, as an unknown outcome is
+                it.update(status="running", uncertain=True, job_ids=[])
+                self._ledger("uncertain", lane=ln, lever=it["lever"], reasons=res.get("reasons"),
+                             next="followed by its job names; its record decides")
+                self._on_started(ln, it)
+                return
             if X.uncertain(res):
                 if p.get("follow") in ("build", "experiment") and p.get("child_exp"):
                     it.update(status="running", uncertain=True, job_ids=[])
@@ -2646,7 +2671,10 @@ class StreamRun(object):
                 self._ledger("uncertain", lane=ln, lever=it["lever"], reasons=res.get("reasons"), next="paused")
                 return self._pause("the outcome of %s (%s) is unknown: it may have run on the cluster; a person checks"
                                    % (it["lever"], p["policy_action"]))
-            return self._failed(ln, it, why, charged=bool(res.get("charged")))
+            # a zoo submission whose sbatch failed before anything stayed queued (the submit cancels what it
+            # queued): the lane's ordinary failure, proposed again, never the record-only card
+            return self._failed(ln, it, why, charged=bool(res.get("charged")),
+                                submission=it["lever"] == "L23Z" and payload.get("error_kind") == "submit")
         # refused
         if any(t in why for t in WAIT_REFUSALS) or "the campaign is paused" in why:
             self._once("wait:%s" % p["id"], why, "waiting", lane=ln, lever=it["lever"], reasons=res.get("reasons"))
@@ -2730,6 +2758,8 @@ class StreamRun(object):
             r0["e2"] = "running"
         elif lever == "L23D":
             r0["e2_attr"] = "running"
+        elif lever == "L23Z":
+            r0["zoo"] = "running"
         elif lever == "L25":
             r0["stage_a"] = "building"
         elif lever == "L28":
@@ -2850,6 +2880,9 @@ class StreamRun(object):
         elif lever in ("L23V", "L23E", "L23C", "L23D"):
             st["stage"].setdefault("r0", {})[{"L23V": "base3", "L23E": "agnostic", "L23C": "e2",
                                               "L23D": "e2_attr"}[lever]] = "done"
+        elif lever == "L23Z":
+            st["stage"].setdefault("r0", {})["zoo"] = "done"
+            self._zoo_card(params, p)
         elif lever == "LV":
             key = p.get("verdict_key") or params.get("exp") or params.get("verb")
             st["stage"]["r0"].setdefault("verdicts", {})[key] = self.utc
@@ -2878,7 +2911,7 @@ class StreamRun(object):
             st["bisected"] = rb[-1]["utc"] if rb else self.utc
         self._clear(ln)
 
-    def _failed(self, ln, it, why, charged=False, retry=True, lost=False, ended=None):
+    def _failed(self, ln, it, why, charged=False, retry=True, lost=False, ended=None, submission=False):
         """An item that ended without its effect. `ended` is given only by the
         follow of a build whose job ran and ended without its experiment
         ({"refusal": the provenance's refusal line or None, "states": the
@@ -2919,7 +2952,7 @@ class StreamRun(object):
                              charged=charged, fails=int(lane.get("fails") or 0), lost=True, lost_runs=lr[key])
                 self._clear(ln)
                 return
-        if lever in RECORD_ONLY_LEVERS:
+        if lever in RECORD_ONLY_LEVERS and not submission:
             # record only (a measurement arm's native-resolution rescore; E1's base v3 build and agnostic
             # rescore): a person's card; the lane's failure count, its step count and its stop-loss are not
             # touched, and the item stays failed, so DR0 does not propose it again (a person reruns it, or
@@ -2944,6 +2977,9 @@ class StreamRun(object):
             elif lever == "L23D":
                 r0["e2_attr"] = "failed"
                 rerun = "inc2.baseline rescore-e2-attr (sbatch run_inc2_build.sh inc2.baseline rescore-e2-attr)"
+            elif lever == "L23Z":
+                r0["zoo"] = "failed"
+                rerun = self._zoo_rerun(params)
             else:
                 rerun = "the lever's command"
             st["declined"] = (list(st.get("declined") or []) + [p["id"]])[-200:]
@@ -3628,6 +3664,9 @@ class StreamRun(object):
             return SR.E2_JOB_NAME, "capacity/e2_rescore.json"
         if it["lever"] == "L23D":
             return SR.E2_ATTR_JOB_NAME, "capacity/e2_attr_rescore.json"
+        if it["lever"] == "L23Z":
+            return tuple(n % prm.get("version", "v1") for n in SR.ZOO_JOB_NAMES), "capacity/zoo_%s.json" % prm.get(
+                "version", "v1")
         return SR.NATIVE_JOB_NAME % prm.get("exp"), "%s/native_rescore.json" % prm.get("exp")
 
     def _follow_record_only(self, ln, it, queued, names, arts):
@@ -3639,10 +3678,16 @@ class StreamRun(object):
         complete, and failed (record only: a card) after
         BUILD_LOST_SNAPSHOTS snapshots with neither."""
         job, record = self._record_only_follow(it)
-        if queued is None or job in names:
+        jobs = job if isinstance(job, tuple) else (job,)
+        if queued is None or any(j in names for j in jobs):
             return
-        if ((arts.get(record) or {}).get("status")) == "complete":
+        rs = (arts.get(record) or {}).get("status")
+        if rs == "complete" or (it["lever"] == "L23Z" and rs == "partial"):
             self._done(ln, it)
+            return
+        if it["lever"] == "L23Z" and rs in ("refused", "failed"):
+            self._failed(ln, it, "the zoo record says %s%s" % (rs, (": %s" % _short((arts.get(record) or {}).get(
+                "refusal"), 300)) if (arts.get(record) or {}).get("refusal") else ""), charged=True)
             return
         it["lost"] = int(it.get("lost") or 0) + 1
         if it["lost"] >= BUILD_LOST_SNAPSHOTS:
@@ -3827,6 +3872,90 @@ class StreamRun(object):
         for exp in list(stale):
             if not any(d.get("exp") == exp for d in by.get("D6") or []):
                 stale[exp] = 0
+
+    def _zoo_stage(self, payload, r0):
+        """/stage/zoo: done once capacity/zoo_<v>.json says complete; partial;
+        failed (refused, failed, or the platform's item failed); stale (a live
+        status with no zoo job queued and no item of the platform following
+        it: a card, never a second proposal); running; else what the platform
+        ran (unconfirmed when its item ended without a record), else missing."""
+        from . import stream_remote as SR
+        z = (self.dom or {}).get("zoo") or {}
+        rec = self._artifact(z.get("record") or "capacity/zoo_v1.json") or {}
+        rs = rec.get("status")
+        self._zoo_rec = rec
+        out = None
+        if rs == "complete":
+            out = "done"
+        elif rs == "partial":
+            out = "partial"
+        elif rs in ("refused", "failed"):
+            out = "failed"
+        elif rs:
+            if r0.get("zoo") in ("failed", "running"):
+                out = r0["zoo"]
+            else:
+                out = "running"
+                sq = ((payload or {}).get("status") or {}).get("squeue") or {}
+                if sq.get("ok"):
+                    names = {j.get("name") for j in sq.get("jobs") or [] if isinstance(j, dict)}
+                    v = rec.get("version") or z.get("version") or "v1"
+                    if not any((n % v) in names for n in SR.ZOO_JOB_NAMES):
+                        out = "stale"
+        elif r0.get("zoo") == "done":
+            out = "unconfirmed"
+        else:
+            out = r0.get("zoo") or "missing"
+        self._zoo_state = out
+        return out
+
+    def _zoo_rerun(self, params):
+        z = (self.dom or {}).get("zoo") or {}
+        g = lambda k: (params or {}).get(k) or z.get(k)  # noqa: E731
+        return ZOO_RERUN % {"v": g("version") or "v1", "a": g("shards_a"), "c": g("shards_c"),
+                            "p": g("concurrency"), "h": g("max_gpu_hours")}
+
+    def _zoo_card(self, params, p):
+        """The zoo's card once its item is done: counts and the report's path
+        (a research card when complete; an escalation naming the failed shards
+        and the rerun commands when partial). Never a metric."""
+        z = (self.dom or {}).get("zoo") or {}
+        v = (params or {}).get("version") or z.get("version") or "v1"
+        rec = self._artifact(z.get("record") or "capacity/zoo_%s.json" % v) or {}
+        c = rec.get("counts") or {}
+        sk = ", ".join("%s %s" % (k, n) for k, n in sorted((c.get("skipped_by_reason") or {}).items()) if n)
+        lines = ["files listed %s: kept %s, unscorable %s, skipped %s (%s); converted %s"
+                 % (c.get("files_listed"), c.get("kept"), c.get("unscorable"), c.get("skipped"), sk or "-",
+                    c.get("converted")),
+                 "items: planned %s, scored %s, reused %s, refused %s, errors %s, not scored (budget) %s, not scored "
+                 "(time) %s" % (c.get("items_planned"), c.get("items_scored"), c.get("items_reused"),
+                                c.get("items_refused"), c.get("items_error"), c.get("items_not_scored_budget"),
+                                c.get("items_not_scored_time")),
+                 "report: INC_DIR/_zoo/%s/report.md (report.json, report.csv; the sealed reads in report_external.*)"
+                 % v, "descriptive: no model is adopted or called best from it (Amendment Z1)."]
+        if rec.get("status") == "complete":
+            self._card("research", "Model-zoo audit %s complete" % v, "\n".join(lines), lever="L23Z",
+                       trigger=list((p or {}).get("trigger") or []))
+            return
+        sh = rec.get("shards") or {}
+        failed = ["%s%s" % (k, (sh.get(k) or {}).get("failed")) for k in ("a", "c") if (sh.get(k) or {}).get("failed")]
+        self._card("escalation", "Model-zoo audit %s partial (L23Z)" % v,
+                   "\n".join(lines + ["record status %s; failed shards %s. A person reruns: %s"
+                                       % (rec.get("status"), ", ".join(failed) or "none named", self._zoo_rerun(params))]),
+                   lever="L23Z", trigger=list((p or {}).get("trigger") or []))
+
+    def _zoo_stale_card(self):
+        """One card per stale zoo record (/stage/zoo stale): a chain that
+        stopped part-way, followed by nobody."""
+        st = self.st
+        rec = getattr(self, "_zoo_rec", None) or {}
+        if getattr(self, "_zoo_state", None) != "stale" or st.get("zoo_stale_card") == rec.get("updated_utc"):
+            return
+        st["zoo_stale_card"] = rec.get("updated_utc")
+        self._card("escalation", "The model-zoo audit stopped part-way (record %s, no zoo job queued)"
+                   % rec.get("status"), "capacity/zoo_%s.json says %s and no inc_zoo job is queued. A person "
+                   "resubmits (resumable): %s" % (rec.get("version") or "v1", rec.get("status"), self._zoo_rerun({})),
+                   lever="L23Z", trigger=["L23Z"])
 
     def _measure_build(self, lever, params, p):
         """The measurement baseline an L23B item builds (a baselines item

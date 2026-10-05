@@ -185,7 +185,10 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # sealed test) are never on the list; E2-C's (2026-10-04, later):
 # capacity/e2_attr_v1.json (the attribution record, dev only) and
 # capacity/e2_attr_rescore.json (inc2.baseline rescore-e2-attr: the dev files'
-# names and sha256s and the record's sha256), never e2_attr_v1_report.md. A Step 1 sidecar,
+# names and sha256s and the record's sha256), never e2_attr_v1_report.md; and
+# the model-zoo audit's record (2026-10-04, L23Z): capacity/zoo_v1.json
+# (status, job ids, counts and sha256s: no exam name as a key, no score path,
+# no metric), never its reports under _zoo/. A Step 1 sidecar,
 # step1_stream/eval_hits/<batch>.json, is not on the list: status.json carries
 # its fold, and the sidecar names each hit's matched evaluation key. A stream
 # ledger has no experiment: it is kept as a JSON list artifact, not under
@@ -202,7 +205,8 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"intake/(?P<batch>%s)/(?:summary|eval_hits)\.json\Z" % BATCH_RE,
     r"intake/(?P<file>sources|placement)\.json\Z",
     r"splits/(?P<ver>v[0-9]{1,3})/lock_status\.json\Z",
-    r"capacity/(?:(?:capacity|native|e1|e2|e2_attr)_v1|e2_rescore|e2_attr_rescore)\.json\Z",
+    # the model-zoo audit's record (L23Z, 2026-10-04): status, job ids, counts and sha256s only
+    r"capacity/(?:(?:capacity|native|e1|e2|e2_attr|zoo)_v1|e2_rescore|e2_attr_rescore)\.json\Z",
     r"splits/v3/summary\.json\Z",
     r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore|agnostic_rescore)\.json\Z"
     % ("|".join(RESERVED_DIRS), EXP_RE),

@@ -65,6 +65,7 @@ PARAMS = {
     "L23E": {"pkg": "inc2", "exp": "e1_b_m640", "reference": "e1_a_m640"},
     "L23C": {"pkg": "inc2"},
     "L23D": {"pkg": "inc2"},
+    "L23Z": {"version": "v1", "shards_a": 32, "shards_c": 16, "concurrency": 4, "max_gpu_hours": 40},
     "LV": {"pkg": "inc2", "module": "baseline", "verb": "canary-verdict", "exp": "canary_v2"},
     "LI": {"pkg": "inc2", "stream": "weed_stream_v1", "stage_b": "r0,x1a"},
     "LA": {"pkg": "inc2", "stream": "weed_stream_v1"},
@@ -169,8 +170,8 @@ def t_menu():
     check("the gated R2 levers and the envelope levers are the contract's (and LI, the stream's creation)",
           LS.gated_r2() == ("L16", "L17", "L24")
           and set(LS.envelope_levers()) == {"L18", "L20", "L21", "L22", "L23B", "L23N", "L23V", "L23E", "L23C", "L23D",
-                                            "L25", "L27", "L28", "LI"} and "inc_rescore_e2" in AP.ENVELOPE_ACTIONS
-          and "inc_rescore_e2_attr" in AP.ENVELOPE_ACTIONS)
+                                            "L23Z", "L25", "L27", "L28", "LI"} and "inc_rescore_e2" in AP.ENVELOPE_ACTIONS
+          and "inc_rescore_e2_attr" in AP.ENVELOPE_ACTIONS and "inc_audit_zoo" in AP.ENVELOPE_ACTIONS)
     check("the executor's gated actions cover L16 (fetch on the cluster or the lab, intake), L17 and L24",
           set(X.GATED_R2_ACTIONS.values()) == {"L16", "L17", "L24"})
     check("every envelope action of a stream lever is in approvals.ENVELOPE_ACTIONS",
@@ -2843,6 +2844,254 @@ def _t_e2c_fork():
           (pro, [e.get("lever") for e in w.events("proposed")]))
 
 
+def _zoo_world(tag, e2=True):
+    """R0 complete and every lever before it done (ready_r0), the zoo's record missing; E2's rescore record removed
+    unless e2."""
+    w = World(tag)
+    w.ready_r0()
+    (w.inc / "capacity" / "zoo_v1.json").unlink()
+    if not e2:
+        (w.inc / "capacity" / "e2_rescore.json").unlink()
+    return w
+
+
+def _zoo_items(w, lever="L23Z"):
+    return [e for e in w.events("proposed") if e.get("lever") == lever]
+
+
+def t_zoo():
+    section("the model-zoo audit (L23Z, 2026-10-04, Amendment Z1): one held-free chain of five jobs, proposed once "
+            "after E2's verdict, record only")
+    from weed_optimizer_framework.tools.inc2 import zoo as Z
+    dom = LS.load_domain("weed")
+    prm = PARAMS["L23Z"]
+    pp = LS.policy_params("L23Z", prm)
+    argv = LS.render("L23Z", pp)
+    est, det = LS.price("L23Z", pp, dom, {})
+    ok, bad = LS.check_params("L23Z", dict(pp, est_gpu_hours=est))
+    r = X.render("inc_audit_zoo", pp)
+    check("L23Z renders bash run_inc2_zoo.sh submit --version v1 --shards-a 32 --shards-c 16 --concurrency 4 "
+          "--max-gpu-hours 40; the executor's remote line is stream-submit zoo -- submit ...; the policy row admits "
+          "it; priced at its 40 GPU-h cap (estimator zoo)",
+          argv == ["bash", "run_inc2_zoo.sh", "submit", "--version", "v1", "--shards-a", "32", "--shards-c", "16",
+                   "--concurrency", "4", "--max-gpu-hours", "40"]
+          and r["remote"][:2] == ["stream-submit", "zoo"] and r["remote"][r["remote"].index("--") + 1:] == argv[2:]
+          and X.argv_check(r, argv)[0] and ok and est == 40.0 and det["estimator"] == "zoo"
+          and dom["zoo"]["requires"] == "e2" and dom["zoo"]["record"] == "capacity/zoo_v1.json", (argv, r, bad, det))
+    check("the zoo's job names and pinned release agree across inc2.zoo and stream_remote",
+          tuple(Z.ZOO_JOB_NAMES) == tuple(SR.ZOO_JOB_NAMES) and LS.row("L23Z")["follow"] == "job")
+    good = ["submit", "--version", "v1", "--shards-a", "32", "--shards-c", "16", "--concurrency", "4",
+            "--max-gpu-hours", "40"]
+    req = SR.parse_submit("zoo", good)
+    check("the cluster's zoo grammar admits the five flags; its job name is inc_zoo_v1_inventory",
+          req["script"] == "run_inc2_zoo.sh" and req["script_args"] == good
+          and SR.job_name(req, {}) == "inc_zoo_v1_inventory", req)
+    bads = {"a missing flag": good[:-2], "--version v2": good[:2] + ["v2"] + good[3:],
+            "--concurrency 9": good[:7] + ["9"] + good[8:], "--max-gpu-hours 46": good[:9] + ["46"],
+            "--shards-a 0": good[:3] + ["--shards-a", "0"] + good[5:], "an unknown verb": ["inventory"] + good[1:]}
+    res = {}
+    for k, v in bads.items():
+        try:
+            SR.parse_submit("zoo", v)
+            res[k] = "admitted"
+        except R.Refused:
+            res[k] = "refused"
+    check("refused: %s" % ", ".join(bads), set(res.values()) == {"refused"}, res)
+    check("the evidence allow-lists capacity/zoo_v1.json, never the zoo's reports",
+          E.allowed("capacity/zoo_v1.json") and not E.allowed("_zoo/v1/report.json")
+          and not E.allowed("capacity/zoo_v1_report.json"))
+    # the record is shipped by the snapshot and passes the dev-only scrub whole
+    w0 = World("zoo_ship")
+    rec = w0.zoo_record("complete", jobs=["1", "2", "3", "4", "5"])
+    w0._activate()
+    ss = SR.stream_summary(w0.sid)
+    arts = ss["decision"]["artifacts"]
+    check("stream_snapshot ships capacity/zoo_v1.json; a realistic record passes the dev-only scrub with nothing "
+          "dropped and holds no score path", arts.get("capacity/zoo_v1.json", {}).get("status") == "complete"
+          and R.non_dev_keys(rec) == [] and not E._NON_DEV_SCORE.search(json.dumps(rec)), arts.get("capacity/zoo_v1.json"))
+    # the proposal gate
+    gates = {"E2's rescore missing": lambda w: None,
+             "a person's submitted record": lambda w: (w.e2_records(verdict=False), w.zoo_record("submitted",
+                                                                                                 jobs=["9"])),
+             "a complete record": lambda w: (w.e2_records(verdict=False), w.zoo_record("complete")),
+             "a partial record": lambda w: (w.e2_records(verdict=False), w.zoo_record("partial")),
+             "a failed record": lambda w: (w.e2_records(verdict=False), w.zoo_record("failed"))}
+    got = {}
+    for i, (name, fn) in enumerate(gates.items()):
+        wg = _zoo_world("zoo_gate_%d" % i, e2=False)
+        fn(wg)
+        wg.tick(3)
+        got[name] = len(_zoo_items(wg))
+    check("never proposed while %s" % "; ".join(gates), all(v == 0 for v in got.values()), got)
+    wb = _zoo_world("zoo_busy")
+    mb = next(b for b in wb.dom["baselines"]["items"] if b.get("measure") and not b.get("requires"))
+    shutil.rmtree(str(wb.inc / mb["exp"]))
+    wb.tick(3)
+    check("never proposed while MAINT has another item due (a measurement arm's build first)",
+          not _zoo_items(wb) and (wb.lane("MAINT").get("item") or {}).get("lever") == "L23B",
+          wb.lane("MAINT").get("item"))
+    w = _zoo_world("zoo")
+    w.tick(3)
+    pz = _zoo_items(w)
+    first = pz[0] if pz else {}
+    cites = sorted(c.get("pointer") for c in first.get("cites") or [])
+    ex = [e for e in w.events("executed") if e.get("lever") == "L23Z"]
+    st = w.state()
+    check("E2 done and no zoo record: L23Z proposed once, last in MAINT, citing /stage/lock, /stage/zoo and "
+          "/stage/e2 only; executed within the envelope as one stream-submit zoo; five job ids recorded; r0 zoo "
+          "running; phase ZOO",
+          len(pz) == 1 and cites == ["/stage/e2", "/stage/lock", "/stage/zoo"] and [e.get("basis") for e in ex]
+          == ["envelope"] and len(w.zoo_submits) == 1 and len((w.lane("MAINT").get("item") or {}).get("job_ids") or [])
+          == 5 and st["stage"]["r0"].get("zoo") == "running" and w.lane("MAINT").get("phase") == "ZOO",
+          (len(pz), cites, ex, w.lane("MAINT")))
+    w.tick(2)
+    check("  running while its jobs are queued: no second proposal, no second submission",
+          len(_zoo_items(w)) == 1 and len(w.zoo_submits) == 1)
+    w.zoo_finish("complete")
+    w.tick(2)
+    st = w.state()
+    cards = [c for c in st.get("cards") or [] if c.get("lever") == "L23Z"]
+    stage = (_diags(w).get("DR0") or {}).get("cites") or []
+    check("all five COMPLETED in sacct: done; r0 zoo done; one research card with counts and the report's path and "
+          "no metric; /stage/zoo done; never proposed again",
+          st["stage"]["r0"].get("zoo") == "done" and len(cards) == 1 and cards[0]["kind"] == "research"
+          and "_zoo/v1/report.md" in cards[0]["detail"] and "files listed 4785" in cards[0]["detail"]
+          and not re.search(r"0\.[0-9]{3,}", cards[0]["detail"]) and len(_zoo_items(w)) == 1
+          and S.StreamRun.__dict__.get("_zoo_stage") is not None, [c.get("detail") for c in cards])
+    wp = _zoo_world("zoo_partial")
+    wp.tick(3)
+    wp.zoo_finish("partial", failed_shards=[3, 7])
+    wp.tick(2)
+    cp = [c for c in wp.state().get("cards") or [] if c.get("lever") == "L23Z"]
+    check("a partial record: done, plus one escalation card naming the failed shards and both rerun commands",
+          len(cp) == 1 and cp[0]["kind"] == "escalation" and "a[3, 7]" in cp[0]["detail"]
+          and "run_inc2_zoo.sh submit --version v1" in cp[0]["detail"] and "--array=<ids>" in cp[0]["detail"]
+          and wp.state()["stage"]["r0"].get("zoo") == "done", [c.get("detail") for c in cp])
+    # failures
+    wf = _zoo_world("zoo_fail")
+    wf.tick(3)
+    fails0 = wf.lane("MAINT").get("fails") or 0
+    wf.zoo_finish("plan_ready", states={1: "FAILED"})
+    wf.tick(3)
+    stf = wf.state()
+    cf = [c for c in stf.get("cards") or [] if c.get("lever") == "L23Z"]
+    check("array A ended FAILED: one record-only card (its title) with both rerun commands; the lane's failure "
+          "count unchanged; r0 zoo failed; L23Z not proposed again; /stage/zoo failed",
+          [c["title"] for c in cf] == [S.RECORD_ONLY_TITLES["L23Z"]] and "run_inc2_zoo.sh submit" in cf[0]["detail"]
+          and (wf.lane("MAINT").get("fails") or 0) == fails0 and stf["stage"]["r0"].get("zoo") == "failed"
+          and len(_zoo_items(wf)) == 1, ([c["title"] for c in cf], stf["stage"]["r0"]))
+    wr = _zoo_world("zoo_refused")
+    wr.zoo_submit_mode = "refused"
+    wr.tick(3)
+    cr = [c for c in wr.state().get("cards") or [] if c.get("lever") == "L23Z"]
+    check("the submit refused (exit 2: a zoo job queued): a record-only card, not proposed again",
+          [c["title"] for c in cr] == [S.RECORD_ONLY_TITLES["L23Z"]] and len(_zoo_items(wr)) == 1, [c["title"] for c in cr])
+    wsf = _zoo_world("zoo_submit_failed")
+    wsf.zoo_submit_mode = "failed"
+    wsf.tick(2)
+    n1 = len(_zoo_items(wsf))
+    fails = wsf.lane("MAINT").get("fails")
+    wsf.zoo_submit_mode = None
+    wsf.tick(3)
+    check("an sbatch failure before anything stayed queued (exit 1, 'submit'): the lane's ordinary failure, no "
+          "card, proposed again under a new id and submitted",
+          n1 >= 1 and fails == 1 and len(_zoo_items(wsf)) >= 2 and len({e.get("proposal_id") or e.get("id") for e in _zoo_items(wsf)}) >= 2
+          and not [c for c in wsf.state().get("cards") or [] if c.get("lever") == "L23Z"]
+          and len(wsf.zoo_submits) >= 2, (n1, fails, len(_zoo_items(wsf))))
+    wq = _zoo_world("zoo_qos")
+    wq.qos = True
+    wq.tick(2)
+    check("a qos refusal is a platform defect: MAINT held (S21)", "qos" in str(wq.lane("MAINT").get("hold") or ""),
+          wq.lane("MAINT"))
+    # an unknown outcome
+    wu = _zoo_world("zoo_lost")
+    wu.lose_reply = "zoo"
+    wu.tick(3)
+    itu = wu.lane("MAINT").get("item") or {}
+    check("the reply lost: followed by the five job names (running while queued), no second submission",
+          itu.get("lever") == "L23Z" and itu.get("uncertain") and wu.state()["stage"]["r0"].get("zoo") == "running"
+          and len(wu.zoo_submits) == 1, itu)
+    wu.zoo_finish("complete")
+    wu.tick(2)
+    check("  done once the record says complete", wu.state()["stage"]["r0"].get("zoo") == "done"
+          and not (wu.lane("MAINT").get("item") or {}).get("lever") == "L23Z")
+    wl = _zoo_world("zoo_lost2")
+    wl.lose_reply = "zoo"
+    wl.tick(3)
+    wl.zoo_finish(None)
+    wl.tick(S.BUILD_LOST_SNAPSHOTS + 2)
+    cl = [c["title"] for c in wl.state().get("cards") or [] if c.get("lever") == "L23Z"]
+    check("  failed (a record-only card) after BUILD_LOST_SNAPSHOTS snapshots with no job queued and no record",
+          cl == [S.RECORD_ONLY_TITLES["L23Z"]] and wl.state()["stage"]["r0"].get("zoo") == "failed", cl)
+    wt = _zoo_world("zoo_timeout")
+    wt.zoo_submit_mode = "timeout"
+    wt.tick(3)
+    itt = wt.lane("MAINT").get("item") or {}
+    check("a submit timeout (part of the chain queued): an unknown outcome, followed by the job names, never a pause",
+          itt.get("lever") == "L23Z" and itt.get("uncertain") and not wt.state().get("paused"), itt)
+    # a stale chain nobody follows (a person's submit that stopped part-way)
+    wst = _zoo_world("zoo_stale")
+    wst.zoo_record("plan_ready", jobs=["5"])
+    wst.tick(2)
+    cs = [c for c in wst.state().get("cards") or [] if c.get("lever") == "L23Z"]
+    check("a live record with no zoo job queued: /stage/zoo stale, one escalation card, never proposed",
+          len(cs) == 1 and "stopped part-way" in cs[0]["title"] and not _zoo_items(wst), [c["title"] for c in cs])
+    wst.tick(2)
+    check("  no second card", len([c for c in wst.state().get("cards") or [] if c.get("lever") == "L23Z"]) == 1)
+    # the budget: the cap is committed until every one of the five jobs is settled from sacct (an array once)
+    base = pathlib.Path(tempfile.mkdtemp(prefix="zoo_budget_", dir=str(W.TMP)))
+    now = W.T0 + 3600
+    camp = {"name": NAME, "mode": "stream", "envelope_su": 1000.0, "domain": "weed"}
+    ex5 = [{"campaign": NAME, "action": "inc_audit_zoo", "params": pp, "child_exp": None, "charged": True,
+            "est_su": 40.0, "epoch": now - 60, "ts": W.utc(now - 60), "status": "executed", "run_id": "z1",
+            "job_ids": ["901", "902", "903", "904", "905"]}]
+    c0 = B.state(camp, ex5, None, now, base_dir=str(base))["committed_su"]
+    for j in ("901", "902", "903", "904"):
+        B.record_job_spend(j, NAME, {"state": "COMPLETED", "elapsed_s": 3600.0, "gpu_count": 1, "gpu_type": "v100-32"},
+                           "inc_audit_zoo", base_dir=str(base), ts=W.utc(now))
+    c1 = B.state(camp, ex5, None, now, base_dir=str(base))["committed_su"]
+    B.record_job_spend("905", NAME, {"state": "COMPLETED", "elapsed_s": 1800.0, "gpu_count": 1, "gpu_type": "v100-32"},
+                       "inc_audit_zoo", base_dir=str(base), ts=W.utc(now))
+    st5 = B.state(camp, ex5, None, now, base_dir=str(base))
+    check("the zoo's 40 GPU-h estimate stays committed until all five ids are settled from sacct, then its spend is "
+          "what sacct charged", c0 == 40.0 and c1 == 40.0 and st5["committed_su"] == 0.0 and st5["spent_su"] > 0,
+          (c0, c1, st5["committed_su"], st5["spent_su"]))
+    # the sacct fold
+    rows = ("JobID|JobIDRaw|JobName|State|Elapsed|AllocTRES|NodeList\n"
+            "100_0|101|inc_zoo_v1_score_a|COMPLETED|01:00:00|billing=5,cpu=5,gres/gpu:v100-32=1|v001\n"
+            "100_1|102|inc_zoo_v1_score_a|FAILED|00:30:00|billing=5,cpu=5,gres/gpu:v100-32=1|v002\n"
+            "100_[2-3%2]|100|inc_zoo_v1_score_a|PENDING|00:00:00||None assigned\n"
+            "200|200|inc_zoo_v1_select|COMPLETED|00:10:00|billing=5,cpu=5,gres/gpu:v100-32=1|v003\n")
+    fake = W.TMP / "fake_sacct"
+    fake.write_text("#!/bin/bash\ncat <<'EOF'\n%sEOF\n" % rows)
+    os.chmod(fake, 0o755)
+    old = os.environ.get("INCAP_SACCT")
+    os.environ["INCAP_SACCT"] = str(fake)
+    real_sacct = SR.__dict__.get("_real_sacct") or SR.sacct
+    try:
+        import importlib
+        from weed_optimizer_framework.tools.inc_autopilot import stream_remote as SR2
+        fresh = importlib.reload(SR2) if SR2.sacct.__name__ == "<lambda>" else SR2
+        got1 = fresh.sacct(["100", "200"])
+        fake.write_text("#!/bin/bash\ncat <<'EOF'\n%sEOF\n" % rows.replace("100_[2-3%2]|100|inc_zoo_v1_score_a|PENDING",
+                                                                       "100_2|103|inc_zoo_v1_score_a|COMPLETED"))
+        got2 = fresh.sacct(["100"])
+        fake.write_text("#!/bin/bash\ncat <<'EOF'\n%sEOF\n" % rows.replace("FAILED", "COMPLETED").replace(
+            "100_[2-3%2]|100|inc_zoo_v1_score_a|PENDING", "100_2|103|inc_zoo_v1_score_a|COMPLETED"))
+        got3 = fresh.sacct(["100"])
+    finally:
+        if old is None:
+            os.environ.pop("INCAP_SACCT", None)
+        else:
+            os.environ["INCAP_SACCT"] = old
+    a1, a2, a3 = got1["jobs"].get("100") or {}, got2["jobs"].get("100") or {}, got3["jobs"].get("100") or {}
+    check("sacct folds an array into its id: RUNNING-or-PENDING while a task is pending (PENDING when none runs), "
+          "FAILED with array_tasks.failed [1] once all ended, COMPLETED with the elapsed summed; a plain id unchanged",
+          a1.get("state") == "PENDING" and a1["array_tasks"]["n"] == 3 and a2.get("state") == "FAILED"
+          and a2["array_tasks"]["failed"] == [1] and a3.get("state") == "COMPLETED" and a3["elapsed_s"] == 5400.0 and (got1["jobs"].get("200") or {}).get("state") == "COMPLETED"
+          and "100_0" not in got1["jobs"], (a1, a2, a3, got1["jobs"].get("200")))
+
+
 def _lift_world(tag, quarantined=("src_lift",)):
     """_e1_world plus an intake batch of src_lift whose one dHash hit D28-v2 judges chance (pair cos 0.31), and
     the stream's queue summary quarantining the given sources."""
@@ -3135,7 +3384,7 @@ def t_fork_stage_c():
 
 def main():
     for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_e1, t_e1_lift_wait, t_e1_lift_faults, t_e1_cut_order,
-               t_e2, t_fork_stage_c,
+               t_e2, t_fork_stage_c, t_zoo,
                t_formats,
                t_replay_gate,
                t_config, t_lab, t_lanes, t_d28, t_d28_v2, t_d28_v2_sources, t_d28_v2_round3):

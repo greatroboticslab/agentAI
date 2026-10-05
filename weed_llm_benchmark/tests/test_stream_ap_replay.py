@@ -1581,7 +1581,8 @@ def s_r0():
     rescore L23E), E2 (2026-10-04: once E1's verdict qualifies E1-B, its six
     single-seed builds L23B --e2 W|S), E2-C (2026-10-04, later: its three
     builds L23B --e2 C), E2's rescore and verdict L23C, then E2-C's
-    attribution L23D, then the first segment."""
+    attribution L23D, the model-zoo audit (L23Z, once, last), then the first
+    segment."""
     w = World("r0")
     w.lock()
     w.step1_status()
@@ -1762,6 +1763,15 @@ def s_r0():
           and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23D"] == ["envelope"]
           and [x["name"] for x in w.submits if "rescore-e2-attr" in x["argv"]] == ["inc_build_e2_attr_v1"]
           and (w.inc / "capacity" / "e2_v1.json").read_bytes() == e2v, tail(pd, 2))
+    # 2026-10-04: the model-zoo audit (Amendment Z1). E2's rescore and verdict done (capacity/e2_rescore.json
+    # complete): L23Z once, last, within the envelope; its chain followed by its five job ids
+    pz = _step(w, "L23Z", lambda: w.zoo_finish("complete"))
+    check("  then, E2's verdict done and no zoo record, L23Z once (bash run_inc2_zoo.sh submit --version v1 "
+          "--shards-a 32 --shards-c 16 --concurrency 4 --max-gpu-hours 40), within the envelope, one submission",
+          tail(pz, 13) == ["bash", "run_inc2_zoo.sh", "submit", "--version", "v1", "--shards-a", "32", "--shards-c",
+                           "16", "--concurrency", "4", "--max-gpu-hours", "40"]
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23Z"] == ["envelope"]
+          and len(w.zoo_submits) == 1, (tail(pz, 13), len(w.zoo_submits)))
     w.tick(2)
     check("  once both exist, no measurement arm is proposed again, nor its rescore",
           [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_m832") == 1
@@ -1775,7 +1785,13 @@ def s_r0():
     check("the whole sequence ran by the platform, in order, one MAINT item at a time, each once",
           lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure)
           + ["L23V"] + ["L23B"] * len(e1) + ["L23N"] * len(measure) + ["L23E"] + ["L23B"] * len(e2)
-          + ["L23B"] * len(e2c) + ["L23C", "L23D"], lv)
+          + ["L23B"] * len(e2c) + ["L23C", "L23D", "L23Z"], lv)
+    zc = [c for c in w.state()["cards"] if c.get("lever") == "L23Z"]
+    check("  the zoo's chain ended complete: /stage/zoo done, one research card (counts and the report's path, no "
+          "metric), never proposed again",
+          len(zc) == 1 and zc[0]["kind"] == "research" and "_zoo/v1/report.md" in zc[0]["detail"]
+          and "descriptive" in zc[0]["detail"] and len([e for e in w.events("proposed") if e.get("lever") == "L23Z"])
+          == 1, zc)
 
 
 def _commits_ev(segments, ctx):

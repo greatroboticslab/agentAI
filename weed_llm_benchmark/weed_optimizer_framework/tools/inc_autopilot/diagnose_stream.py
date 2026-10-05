@@ -1692,7 +1692,12 @@ def r0(v, d28=None):
     once); E2-C (2026-10-04, later): its three builds after E2's six, under
     E2's gate and E1-A done (_e1a_done), in E2's group of builds, and once
     E2's verdict is recorded and E2-W's and E2-C's experiments are done,
-    the attribution's rescore and record (L23D, once). DATA --
+    the attribution's rescore and record (L23D, once); the model-zoo audit
+    (2026-10-04, L23Z: every detector under one protocol, record only),
+    once, last, when MAINT and DATA have nothing else due, E2's rescore and
+    verdict are done (/stage/e2) and no zoo record exists (/stage/zoo
+    missing: a person's submission, a stale chain, a failure, a partial or a
+    complete record all stop it). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill), then D28-v2's sidecars for batches
     committed before the amendment (L17 eval-hits, _eval_hits_due)."""
@@ -1898,6 +1903,17 @@ def r0(v, d28=None):
                                    "attribution (record only, dev)" % ", ".join(b["exp"] for b in at_items)}
             cites = [v.ccite("/stage/lock")] + [v.ccite(E.pointer("stage", "exp_status", b["exp"]))
                                                 for b in at_items] + [v.ccite("/stage/e2"), v.ccite("/stage/e2_attr")]
+    # the model-zoo audit (2026-10-04, Amendment Z1): once, last, after E2's verdict, while no zoo record exists;
+    # record only. Cites only what it rests on (the lock, the zoo's stage, E2's), so a build changing /stage does not
+    # void its envelope grant.
+    z = v.dom.get("zoo") or {}
+    if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"] \
+            and z.get("record") and st.get("zoo") in (None, "missing") \
+            and (z.get("requires") != "e2" or st.get("e2") == "done"):
+        out["MAINT"] = {"lever": "L23Z", "why": "no zoo record (%s): every detector the project trained, scored under "
+                        "one protocol (record only, descriptive)" % z["record"]}
+        cites = [v.ccite("/stage/lock"), v.ccite("/stage/zoo")] + ([v.ccite("/stage/e2")] if z.get("requires") == "e2"
+                                                                    else [])
     items = {k: x for k, x in out.items() if x}
     wait = wait if wait and wait["state"] == "waiting" else None
     if not items and not wait:

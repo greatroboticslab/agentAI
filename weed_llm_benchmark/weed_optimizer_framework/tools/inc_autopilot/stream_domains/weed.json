@@ -455,6 +455,16 @@
   "rescore_record": "capacity/e2_attr_rescore.json",
   "why": "E2-C, the attribution control (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04, later, pre-registered): E2-W's definition with E1-A's weights as the init (base_v2's 6,811 images pre-trained as one class under the same 1.2M image-epochs), so E2-W against E2-C differs in the pre-training data only. Once E2's verdict is recorded (L23C's record complete: E2-S - E2-C is computed only when E2 chose S) and E2-W's and E2-C's six experiments are done, DR0 proposes L23D once (inc2.baseline rescore-e2-attr: E2-C's finals scored on dev at 640, then capacity/e2_attr_v1.json and its record capacity/e2_attr_rescore.json). Rule (dev, record only): E2's gain is credited to base v3's data when D_data = mean(E2-W) - mean(E2-C) > 2 x pooled sd and > the paired image-bootstrap SE (stable_int('inc2/e2/attribution_se'), 1,000 resamples). It never rewrites capacity/e2_v1.json; E2-C can neither qualify nor be chosen. A failure is a card and it is not proposed again. Once the record is decided the ticker raises one card; E2-C's sealed test is read once with the chosen arm's, by a person, beside the headline."
  },
+ "zoo": {
+  "version": "v1",
+  "record": "capacity/zoo_v1.json",
+  "requires": "e2",
+  "shards_a": 32,
+  "shards_c": 16,
+  "concurrency": 4,
+  "max_gpu_hours": 40,
+  "why": "Amendment (2026-10-04) Z1: every detector the project trained, scored under one protocol by the locked scorer; descriptive, record only. Proposed once, after E2's rescore and verdict, when capacity/zoo_v1.json is missing. Concurrency 4 (not 6): the stream's own arrays share GPU-shared, whose backfill considers 20 jobs per user."
+ },
  "stage_a": {
   "exp": "pilot_v4",
   "from_exp": "pilot_v3",

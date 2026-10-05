@@ -27,7 +27,10 @@ prints exactly one "INCAP <json>" line (remote.emit).
         build (run_inc2_build.sh <pkg>.stream init|build|milestone|fork|feasibility|bisect,
         <pkg>.splits build|lock, <pkg>.baseline build|rescore-native|rescore-agnostic|rescore-e2|
         rescore-e2-attr,
-        <pkg>.base3 build, <pkg>.pilot4 build).
+        <pkg>.base3 build, <pkg>.pilot4 build); zoo (run_inc2_zoo.sh submit: the model-zoo
+        audit, L23Z, 2026-10-04: the script itself runs on the login node and submits its
+        chain of five jobs; the last INCZOO line carries their ids; refused while any of the
+        five names is queued; a timeout is an unknown outcome, error_kind 'uncertain').
         Always GPU-shared: the allocation refuses RM-shared ("Invalid qos"),
         and a qos refusal comes back as error_kind 'qos', a platform defect,
         never retried elsewhere (S21). Refused while a job of the same name is
@@ -47,6 +50,7 @@ not stamped dev is refused (remote.funnel_dev_scores).
 """
 from __future__ import annotations
 
+import collections
 import hashlib
 import json
 import os
@@ -63,9 +67,10 @@ from . import remote as R
 FORMAT = "inc_autopilot.stream_remote/1"
 V2_JOB_SCRIPT = "run_inc2_job.sh"
 PARTITION = "GPU-shared"
-SCRIPTS = {"collect": "run_inc_collect.sh", "admit": "run_inc2_stream.sh", "build": "run_inc2_build.sh"}
+SCRIPTS = {"collect": "run_inc_collect.sh", "admit": "run_inc2_stream.sh", "build": "run_inc2_build.sh",
+           "zoo": "run_inc2_zoo.sh"}
 VERBS = {"collect": ("fetch", "intake", "probe"),
-         "admit": ("admit", "bootstrap", "knowntruth", "backfill", "scan-holds", "eval-hits")}
+         "admit": ("admit", "bootstrap", "knowntruth", "backfill", "scan-holds", "eval-hits"), "zoo": ("submit",)}
 BUILD_VERBS = {"stream": ("init", "build", "milestone", "fork", "feasibility", "bisect"), "splits": ("build", "lock"),
                "baseline": ("build", "rescore-native", "rescore-agnostic", "rescore-e2", "rescore-e2-attr"),
                "pilot4": ("build",),
@@ -87,6 +92,12 @@ E2_JOB_NAME = "inc_build_e2_v1"
 # E2-C (2026-10-04, later): inc2.baseline rescore-e2-attr's job (L23D: E2-C's final runs on dev at 640, then the
 # attribution record), one name for the one record, followed by it the same way
 E2_ATTR_JOB_NAME = "inc_build_e2_attr_v1"
+# The model-zoo audit (L23Z, 2026-10-04): its chain's five job names (inc2.zoo.ZOO_JOB_NAMES restates them; a
+# test checks they agree); the platform follows the chain by its five job ids, or by these names after an unknown
+# outcome
+ZOO_JOB_NAMES = ("inc_zoo_%s_inventory", "inc_zoo_%s_score_a", "inc_zoo_%s_select", "inc_zoo_%s_score_c",
+                 "inc_zoo_%s_report")
+ZOO_SUBMIT_TIMEOUT_S = 240
 PKG_RE = re.compile(r"(?:weed_optimizer_framework\.tools\.)?(?P<pkg>[a-z][a-z0-9_]{0,31})\.(?P<mod>[a-z0-9_]+)\Z")
 SOURCE_RE = re.compile(r"(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}\Z")
 BATCH_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
@@ -301,13 +312,56 @@ def _job_refusal(jid, name):
     return None
 
 
+ARRAY_LIVE = ("PENDING", "RUNNING", "REQUEUED", "CONFIGURING", "COMPLETING", "SUSPENDED")
+
+
+def fold_arrays(jobs, ids):
+    """Each requested id whose sacct rows are array tasks (<id>_<n> or a
+    pending <id>_[...] row) folded into one entry: RUNNING while a task is
+    live (PENDING when none runs), else COMPLETED when every task completed,
+    else the first other state by task index; elapsed_s summed (each task
+    holds one GPU), the GPU of the first task, array_tasks {n, states, failed}.
+    A requested id with its own row and no task rows is left as it is."""
+    out = dict(jobs)
+    for b in ids:
+        rx = re.compile(r"^%s_(\d+|\[.*\])$" % re.escape(str(b)))
+        tasks = sorted(((k, v) for k, v in jobs.items() if rx.match(k)),
+                       key=lambda kv: (0, int(kv[0].split("_", 1)[1])) if kv[0].split("_", 1)[1].isdigit()
+                       else (1, kv[0]))
+        if not tasks:
+            continue
+        states = [str(v.get("state") or "") for _k, v in tasks]
+        live = [s for s in states if s.startswith(ARRAY_LIVE)]
+        if live:
+            st = "RUNNING" if any(s.startswith(("RUNNING", "COMPLETING", "CONFIGURING")) for s in states) \
+                else "PENDING"
+        elif all(s.startswith("COMPLETED") for s in states):
+            st = "COMPLETED"
+        else:
+            st = next(s for s in states if not s.startswith("COMPLETED"))
+        failed = [int(k.split("_", 1)[1]) for (k, v), s in zip(tasks, states)
+                  if k.split("_", 1)[1].isdigit() and not s.startswith(("COMPLETED",) + ARRAY_LIVE)]
+        first = tasks[0][1]
+        el = [v.get("elapsed_s") for _k, v in tasks if isinstance(v.get("elapsed_s"), (int, float))]
+        e = {"state": st, "elapsed_s": sum(el) if el else None, "gpu_count": first.get("gpu_count"),
+             "gpu_type": first.get("gpu_type"),
+             "array_tasks": {"n": len(tasks), "states": dict(collections.Counter(states)), "failed": failed}}
+        ref = next((v.get("refusal") for (k, v) in tasks if v.get("refusal")), None)
+        if ref:
+            e["refusal"] = ref
+        out[str(b)] = e
+        for k, _v in tasks:
+            out.pop(k, None)
+    return out
+
+
 def sacct(job_ids):
     ids = [str(j) for j in job_ids if re.match(r"^[0-9]+(_[0-9]+)?$", str(j))]
     if not ids:
         return {"ok": True, "jobs": {}}
     cmd = os.environ.get("INCAP_SACCT", "sacct")
     rc, out, err = _run([cmd, "-X", "-P", "-j", ",".join(ids),
-                         "--format=JobIDRaw,JobName,State,Elapsed,AllocTRES,NodeList"], timeout=120)
+                         "--format=JobID,JobIDRaw,JobName,State,Elapsed,AllocTRES,NodeList"], timeout=120)
     if rc != 0:
         return {"ok": False, "error": (err or out)[-300:]}
     from ..brain import su_ledger
@@ -319,7 +373,8 @@ def sacct(job_ids):
             ref = _job_refusal(j["jobid"], name)
             if ref:
                 jobs[j["jobid"]]["refusal"] = ref
-    return {"ok": True, "jobs": jobs}
+    # an array job (the zoo's score arrays) is one entry under its own id: every task folded into it
+    return {"ok": True, "jobs": fold_arrays(jobs, ids)}
 
 
 def _advance_v2(exp):
@@ -563,6 +618,9 @@ def stream_summary(sid, dev_exps=()):
     # and E2-C's test read are for people, never read here)
     put("capacity/e2_attr_v1.json", inc / "capacity" / "e2_attr_v1.json")
     put("capacity/e2_attr_rescore.json", inc / "capacity" / "e2_attr_rescore.json")
+    # the model-zoo audit (L23Z, 2026-10-04): its record holds status, job ids, counts and sha256s only (no exam
+    # name as a key, no score path, no metric); the zoo's reports are for people and never read here
+    put("capacity/zoo_v1.json", inc / "capacity" / "zoo_v1.json")
     try:
         tops = sorted(p.name for p in inc.iterdir() if p.is_dir())   # INC_DIR's top level only, as remote.status
     except OSError:
@@ -691,7 +749,12 @@ COLLECT_FLAGS = {"fetch": {"--source": ("source", SOURCE_RE), "--max-bytes": ("m
                  "intake": {"--source": ("source", SOURCE_RE)}, "probe": {}}
 ADMIT_FLAGS = {"admit": {"--intake": ("intake", BATCH_RE)}, "bootstrap": {}, "knowntruth": {}, "backfill": {},
                "scan-holds": {"--hold": ("hold", _ENUM(*HOLDS))}, "eval-hits": {}}
+_ZOO_SHARDS = re.compile(r"(?:[1-9]|[1-9][0-9]|1[0-9][0-9]|200)\Z")
+ZOO_FLAGS = {"--version": ("version", _ENUM("v1")), "--shards-a": ("shards_a", _ZOO_SHARDS),
+             "--shards-c": ("shards_c", _ZOO_SHARDS), "--concurrency": ("concurrency", re.compile(r"[1-8]\Z")),
+             "--max-gpu-hours": ("max_gpu_hours", re.compile(r"(?:[1-9]|[1-3][0-9]|4[0-5])\Z"))}
 REQUIRED = {("collect", "fetch"): ("source", "max_bytes"), ("collect", "intake"): ("source",),
+            ("zoo", "submit"): ("version", "shards_a", "shards_c", "concurrency", "max_gpu_hours"),
             ("admit", "admit"): ("intake",), ("admit", "scan-holds"): ("hold",),
             ("stream", "init"): ("stream", "stage_b"),
             ("stream", "build"): ("stream", "k"), ("stream", "milestone"): ("stream",),
@@ -705,11 +768,11 @@ REQUIRED = {("collect", "fetch"): ("source", "max_bytes"), ("collect", "intake")
 def parse_submit(kind, args):
     """{"kind", "script", "verb", "module", "pkg", "params", "script_args"} or R.Refused."""
     args = [str(a) for a in args]
-    if kind in ("collect", "admit"):
+    if kind in ("collect", "admit", "zoo"):
         if not args or args[0] not in VERBS[kind]:
             raise R.Refused("%s takes a verb among %s" % (kind, VERBS[kind]))
         verb = args[0]
-        spec = (COLLECT_FLAGS if kind == "collect" else ADMIT_FLAGS)[verb]
+        spec = ZOO_FLAGS if kind == "zoo" else (COLLECT_FLAGS if kind == "collect" else ADMIT_FLAGS)[verb]
         params = _flags(args[1:], spec)
         missing = [p for p in REQUIRED.get((kind, verb), ()) if p not in params]
         if missing:
@@ -739,6 +802,8 @@ def parse_submit(kind, args):
 
 def job_name(req, meta):
     p = req["params"]
+    if req["kind"] == "zoo":
+        return ZOO_JOB_NAMES[0] % p["version"]
     if req["kind"] == "build":
         if (req["module"], req["verb"]) == ("baseline", "rescore-native"):
             # it builds nothing: its own name, never the arm's build job's (inc_build_<exp>)
@@ -775,9 +840,15 @@ def stream_submit(kind, args, meta=None, dry_run=False):
         if not script.is_file():
             raise R.Refused("job script %s not found" % script)
         name = job_name(req, {"child_exp": child})
-        sbatch = os.environ.get("INCAP_SBATCH", "sbatch")
-        argv = [sbatch, "--parsable", "--job-name=%s" % name, "-p", PARTITION, str(script)] + req["script_args"]
-        rec.update(job_name=name, sbatch_argv=argv, partition=PARTITION)
+        if kind == "zoo":
+            # the script runs here, on the login node, and submits its own chain (inc2.zoo submit)
+            argv = [os.environ.get("INCAP_BASH", "bash"), str(script)] + req["script_args"]
+            names = [n % req["params"]["version"] for n in ZOO_JOB_NAMES]
+            rec.update(job_name=name, job_names=names, argv=argv, partition=PARTITION)
+        else:
+            sbatch = os.environ.get("INCAP_SBATCH", "sbatch")
+            argv = [sbatch, "--parsable", "--job-name=%s" % name, "-p", PARTITION, str(script)] + req["script_args"]
+            rec.update(job_name=name, sbatch_argv=argv, partition=PARTITION)
         if req["kind"] == "build" and child and (R.inc_dir() / child / "exp.json").exists():
             raise R.Refused("experiment %s is already built; an experiment is built once" % child)
         if dry_run:
@@ -785,11 +856,13 @@ def stream_submit(kind, args, meta=None, dry_run=False):
         q = R.squeue_jobs()
         if not q["ok"]:
             raise R.Refused("squeue unavailable (%s): cannot rule out a duplicate job, nothing submitted" % q["error"])
-        dup = [j for j in q["jobs"] if j["name"] == name]
+        dup = [j for j in q["jobs"] if j["name"] == name or (kind == "zoo" and j["name"] in rec["job_names"])]
         if dup:
-            raise R.Refused("%s is already queued or running as job %s" % (name, dup[0]["id"]))
+            raise R.Refused("%s is already queued or running as job %s" % (dup[0]["name"], dup[0]["id"]))
     except R.Refused as e:
         return R.fail(rec, e, error_kind="refused")
+    if kind == "zoo":
+        return _zoo_submit(rec, argv, prov)
     (R.inc_dir() / "logs").mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     for k, v in prov.items():
@@ -809,6 +882,46 @@ def stream_submit(kind, args, meta=None, dry_run=False):
     if not re.match(r"^[0-9]+$", jid):
         return R.fail(rec, "sbatch printed no job id: %r" % (pr.stdout or "")[-200:], "SubmitFailed", "submit")
     rec["job_id"] = jid
+    return rec
+
+
+def _zoo_submit(rec, argv, prov):
+    """run_inc2_zoo.sh submit on the login node (it submits the chain and
+    writes the record): exit 2 a refusal, a qos message 'qos', any other
+    failure 'submit' (the script cancels what it queued); a timeout an
+    unknown outcome ('uncertain': part of the chain may be queued); the last
+    INCZOO line gives the five job ids."""
+    env = dict(os.environ)
+    for k, v in prov.items():
+        env["INCAP_" + k.upper()] = ",".join(v) if isinstance(v, list) else str(v)
+    env["INCAP_REQUESTED_UTC"] = M.utc_now()
+    try:
+        pr = subprocess.run(argv, capture_output=True, text=True, timeout=ZOO_SUBMIT_TIMEOUT_S, env=env)
+    except subprocess.TimeoutExpired as e:
+        return R.fail(rec, "run_inc2_zoo.sh submit timed out after %d s: part of the chain may be queued; it is "
+                           "followed by its job names (%s)" % (ZOO_SUBMIT_TIMEOUT_S, str(e)[:200]),
+                      "SubmitTimeout", "uncertain")
+    except OSError as e:
+        return R.fail(rec, "run_inc2_zoo.sh could not be run: %s" % e, type(e).__name__, "submit")
+    msg = (pr.stderr or "") + (pr.stdout or "")
+    rec.update(submit_rc=pr.returncode, submit_stderr=R._short(pr.stderr, 400))
+    if pr.returncode == 2:
+        return R.fail(rec, "run_inc2_zoo.sh submit refused: %s" % R._short(msg[-600:], 300), "SubmitRefused",
+                      "refused")
+    if QOS_RE.search(msg):
+        return R.fail(rec, "sbatch refused on qos: %s" % R._short(msg[-600:], 300), "SubmitFailed", "qos")
+    if pr.returncode != 0:
+        return R.fail(rec, "run_inc2_zoo.sh submit exited %d: %s" % (pr.returncode, R._short(msg[-600:], 300)),
+                      "SubmitFailed", "submit")
+    line = next((ln for ln in reversed((pr.stdout or "").splitlines()) if ln.startswith("INCZOO ")), None)
+    try:
+        got = json.loads(line[len("INCZOO "):]) if line else None
+        ids = [str(j) for j in got["job_ids"]]
+    except (ValueError, TypeError, KeyError):
+        ids = []
+    if len(ids) != len(ZOO_JOB_NAMES) or not all(re.match(r"^[0-9]+$", j) for j in ids):
+        return R.fail(rec, "run_inc2_zoo.sh submit printed no job ids", "SubmitFailed", "submit")
+    rec.update(job_ids=ids, job_id=ids[0], job_names=list(got.get("names") or rec.get("job_names") or []))
     return rec
 
 
