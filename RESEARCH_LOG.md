@@ -23,7 +23,7 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 - One decision per listed file by a pre-registered rule; detectors only; every skip counted.
 - The locked scorer, unchanged, at 640: dev (the decision exam), ImageWeeds, ooddev_v1 (paddy) and cwd12 test (descriptive). Heads outside the INC class space are read through a max-merged 13-channel copy, checked against the original.
 - INC models are read on dev only; their other columns are their own records.
-- Contamination flags per row and exam (exact, 8-variant near, dev session, test v1 companion; Y/P/U/N, inherited through inits).
+- Contamination flags per row and exam (exact, 8-variant near, dev session, test v1 companion; Y/P/U/N, inherited through inits). A checkpoint chosen on a val set holding dev images (best.pt, or the last.pt of an early stop), or on one the zoo cannot read whole, is never dev-clean.
 - Test v1 and the five evaluation test groups stay the frozen test: their reads of historical checkpoints are sealed in `report_external.*`.
 - Usage: descriptive. Ranked by dev among dev-clean rows only; nothing adopted, called best or quoted from a test-like column; a checkpoint the project wants to use re-qualifies under its own pre-registered dev rule.
 
