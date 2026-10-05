@@ -117,6 +117,9 @@ LIST_SKIPS = ("not_checkpoint", "gone", "changed_since_list", "epoch_snapshot", 
 META_SKIPS = ("classifier", "segmentation", "other_task", "stock_weights", "stock_coco")
 SKIP_REASONS = LIST_SKIPS + META_SKIPS
 UNSCORABLE_REASONS = ("unscorable_load", "unscorable_foreign", "unscorable_head", "unscorable_fidelity")
+# test_selected values that mean chosen on the cwd12 test (S); selected_on values whose val list decides
+TEST_CHOSEN = ("best", "best_partial", "early_stop", "early_stop_partial")
+VAL_LISTED = ("own_split", "unknown")
 RULES = ("R0", "R1", "R2", "R3", "R4", "R5")
 RATINGS = ("exact", "listed_exact", "listed_after_rebuild", "derived_superset", "inherits", "none")
 STATE_RANK = {"N": 0, "U": 1, "P": 2, "Y": 3}
@@ -1206,6 +1209,8 @@ def dataset_dirs(yaml_path, key):
     elif not os.path.isabs(str(base)):
         return None, "relative dataset path %r: resolved against the training process's working directory" % base
     vals = d.get(key)
+    if key == "val" and key not in d:
+        vals = d.get("validation")          # check_det_dataset renames a 'validation' key to 'val'
     if vals in (None, ""):
         return [], None
     vals = [vals] if isinstance(vals, str) else [str(v) for v in vals]
@@ -1395,7 +1400,8 @@ def provenance_one(m, idx, conf, lister, cache):
            "dates": {}, "recipe": {}, "init": {"kind": "unknown", "ref": None, "model_id": None}, "soup_of": [],
            "data": {"source": "none", "rating": "none", "reason": None, "list_sha256": None, "n_entries": 0,
                     "n_unique": 0, "n_unresolved": 0, "n_unreadable": 0},
-           "val": None, "selected_on": "unknown", "test_selected": "unknown", "dev_selected": False,
+           "val": None, "selected_on": "unknown", "test_selected": "unknown", "chosen_on_val": None,
+           "dev_selected": False, "dev_selected_unknown": False,
            "dev_gated": False, "species_trained": None, "code": {"kind": "unknown"}, "imgsz_trained": None,
            "notes": []}
     ck = m.get("ckpt") or {}
@@ -1584,21 +1590,29 @@ def provenance_one(m, idx, conf, lister, cache):
     res = _results_csv(rdir)
     out["results"] = res
     test_sets = ("cwd12_test", "cwd12_test_part")
+    # chosen on its val set: best.pt always; last.pt when its run stopped early (unknown without results.csv)
+    chosen = "no"
     if role == "best":
-        out["test_selected"] = "best" if sel in test_sets else ("pending_val_check" if sel == "own_split" else "none")
-        out["dev_selected"] = sel == "dev"
+        chosen = "yes"
     elif role in ("last", "last_merged"):
         ep, pat, tl = ta.get("epochs"), ta.get("patience"), ta.get("time")
         if res is None:
-            out["test_selected"] = "unknown"
+            chosen = "unknown"
         elif tl not in (None, 0, 0.0, "null") and res["rows"] < (ep or 0):
-            out["test_selected"] = "none"
             out["notes"].append("time-limited run (time %s h): its last epoch is not an early stop" % tl)
-        elif sel in test_sets and _num(ep) and _num(pat) and res["rows"] < ep and pat < ep \
+        elif _num(ep) and _num(pat) and res["rows"] < ep and pat < ep \
                 and res.get("best_index") is not None and res["rows"] - 1 - res["best_index"] >= pat:
-            out["test_selected"] = "early_stop"
-        else:
-            out["test_selected"] = "none"
+            chosen = "yes"
+    out["chosen_on_val"] = chosen
+    out["dev_selected"] = sel == "dev" and chosen == "yes"
+    out["dev_selected_unknown"] = sel == "dev" and chosen == "unknown"
+    if chosen == "no":
+        out["test_selected"] = "none"
+    elif sel in test_sets:
+        out["test_selected"] = ("best" if role == "best" else "early_stop") if chosen == "yes" else "unknown"
+    elif sel in VAL_LISTED:
+        # a val under the dataset's root, or one the zoo cannot place: its list decides (contamination_step)
+        out["test_selected"] = "pending_val_check"
     else:
         out["test_selected"] = "none"
     out["code"] = {"kind": "approx", "date_start": out["dates"].get("start_utc"), "ultralytics": ck.get("version")}
@@ -1622,7 +1636,8 @@ def provenance_step(version, conf, conf_sha):
                          "family": m["family"], "kind": "error", "error": "%s: %s" % (type(e).__name__, str(e)[:300]),
                          "data": {"source": "none", "rating": "none", "reason": "provenance failed"},
                          "init": {"kind": "unknown"}, "soup_of": [], "selected_on": "unknown",
-                         "test_selected": "unknown", "dev_selected": False, "dev_gated": False, "notes": []})
+                         "test_selected": "unknown", "chosen_on_val": "unknown", "dev_selected": False,
+                         "dev_selected_unknown": True, "dev_gated": False, "notes": []})
         if (i + 1) % 100 == 0:
             log("provenance: %d / %d rows (%.0fs)" % (i + 1, len(models), time.time() - t0))
     _write_jsonl(zd / "provenance.jsonl", rows)
@@ -2773,10 +2788,18 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
                      "counts": cnt, "own": own, "eval_groups": (extra or {}).get("groups"),
                      "cwd12": {k: (extra or {}).get(k) for k in ("cwd12_train", "cwd12_holdout", "non_cwd12")},
                      "selected_on": pr.get("selected_on"), "test_selected": pr.get("test_selected"),
-                     "dev_selected": bool(pr.get("dev_selected")), "dev_gated": bool(pr.get("dev_gated")),
-                     "notes": list(pr.get("notes") or [])}
+                     "dev_selected": bool(pr.get("dev_selected")),
+                     "dev_selected_unknown": bool(pr.get("dev_selected_unknown")),
+                     "dev_gated": bool(pr.get("dev_gated")), "notes": list(pr.get("notes") or [])}
         v = pr.get("val") or {}
-        own_best = (models.get(mid) or {}).get("ckpt_role") == "best" and pr.get("selected_on") == "own_split"
+        # a checkpoint chosen on its val set: best.pt, or last.pt of an early stop ("yes"; "unknown" without
+        # results.csv). Dev images in its val list make it dev_selected whatever its selected_on; on a val set the
+        # zoo places by its list (own_split or unknown: pending), the list's test hits and unread entries decide too
+        pending = pr.get("test_selected") == "pending_val_check"
+        role = (models.get(mid) or {}).get("ckpt_role")
+        chosen = pr.get("chosen_on_val") or "no"
+        what = "best.pt" if role == "best" else ("last.pt of an early stop" if chosen == "yes" else
+                                                 "last.pt without results.csv (an early stop unknown)")
         if v.get("list_sha256"):
             vc, _vx = by_list[v["list_sha256"]]
             vt = vc["test"]["exact"] + vc["test"]["near"]
@@ -2785,21 +2808,27 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
             v_inc = int(v.get("n_unresolved") or 0) + int(v.get("n_unreadable") or 0)
             rows[mid]["val"] = {"test_hits": vt, "dev_hits": vd, "n": vc["test"]["n"], "n_unresolved":
                                 int(v.get("n_unresolved") or 0), "n_unreadable": int(v.get("n_unreadable") or 0)}
-            if pr.get("test_selected") == "pending_val_check":
-                rows[mid]["test_selected"] = "best_partial" if vt else ("unknown" if v_inc else "none")
-            if own_best and vd:
+            if pending:
+                if vt:
+                    rows[mid]["test_selected"] = ("best_partial" if role == "best" else "early_stop_partial") \
+                        if chosen == "yes" else "unknown"
+                else:
+                    rows[mid]["test_selected"] = "unknown" if v_inc else "none"
+            if vd and chosen == "yes" and not rows[mid]["dev_selected"]:
                 rows[mid]["dev_selected"] = True
-                rows[mid]["notes"].append("best.pt chosen on a val set holding %d dev images" % vd)
-            elif own_best and v_inc:
+                rows[mid]["notes"].append("%s chosen on a val set holding %d dev images" % (what, vd))
+            elif vd and chosen == "unknown" and not rows[mid]["dev_selected_unknown"]:
                 rows[mid]["dev_selected_unknown"] = True
-                rows[mid]["notes"].append("best.pt chosen on a val set of which %d entries could not be read" % v_inc)
+                rows[mid]["notes"].append("%s on a val set holding %d dev images" % (what, vd))
+            elif pending and v_inc and not vd:
+                rows[mid]["dev_selected_unknown"] = True
+                rows[mid]["notes"].append("%s on a val set of which %d entries could not be read" % (what, v_inc))
             if vt:
                 rows[mid]["notes"].append("selected on a val set holding %d cwd12 test images" % vt)
-        elif pr.get("test_selected") == "pending_val_check":
+        elif pending:
             rows[mid]["test_selected"] = "unknown"
-            if own_best:
-                rows[mid]["dev_selected_unknown"] = True
-                rows[mid]["notes"].append("best.pt chosen on a val set that could not be listed")
+            rows[mid]["dev_selected_unknown"] = True
+            rows[mid]["notes"].append("%s on a val set that could not be listed" % what)
         if n_unres + n_unread:
             rows[mid]["notes"].append("%d training entries could not be read (%d relative, %d unreadable): no exam "
                                       "is clean on this list" % (n_unres + n_unread, n_unres, n_unread))
@@ -2833,7 +2862,7 @@ def contamination_step(version, conf, conf_sha, procs=5, hash_budget_s=None):
         if mid in stack or mid not in rows:
             return {e: "U" for e in HASH_EXAMS}, {"test": False}
         st = dict(rows[mid]["own"])
-        sel = {"test": rows[mid]["test_selected"] in ("best", "early_stop", "best_partial"),
+        sel = {"test": rows[mid]["test_selected"] in TEST_CHOSEN,
                "dev": bool(rows[mid]["dev_gated"] or rows[mid]["dev_selected"]
                            or rows[mid].get("dev_selected_unknown"))}
         inh = {e: "N" for e in HASH_EXAMS}
@@ -2916,6 +2945,33 @@ def scorable(m, version):
     if not conv or not conv.get("ok"):
         return None
     return str(zoo_dir(version) / conv["converted"]), conv["converted_sha256"], conv
+
+
+def fidelity_failed(m, version):
+    """True for a kept, scorable row outside the INC class space whose
+    conversion (its own, or that of the row holding the same weights) is
+    missing or failed its check: the convert step's decision unscorable_fidelity."""
+    if not m.get("scorable") or (m.get("class_map") or {}).get("rule") in (None, "R0"):
+        return False
+    conv = conversion_of(version, m.get("same_weights_as") or m["model_id"])
+    return not conv or not conv.get("ok")
+
+
+def final_counts(version, rows):
+    """The inventory's counts after the convert step: meta's reconciliation
+    (files.jsonl joined with meta.jsonl) with every row the convert step made
+    unscorable_fidelity moved from keep to unscorable, reconciled again (one
+    decision per listed file)."""
+    zd = zoo_dir(version)
+    inv = _read_json(zd / "inventory" / "summary.json") or {}
+    meta_rows = _read_jsonl(zd / "inventory" / "meta.jsonl")
+    if meta_rows is None:
+        raise ZooRefused("no inventory/meta.jsonl: run the meta step first")
+    meta = {r["rel"]: r for r in meta_rows}
+    for r in rows:
+        if r.get("unscorable_reason") == "unscorable_fidelity":
+            meta[r["rel"]] = dict(meta.get(r["rel"]) or {}, decision="unscorable", reason="unscorable_fidelity")
+    return reconcile(read_files(version), inv.get("files_listed", 0), inv.get("inc_glob_added", 0), meta=meta)
 
 
 def _strip_result(res, exam):
@@ -3674,14 +3730,13 @@ def build_rows(version, conf):
                  if isinstance((pr.get("recipe") or {}).get("arm"), dict) else None}
         dev_clean = flags["dev"] == "N" and not dev_sel and not dev_sel_unknown and not dev_gated
         sp12 = species_level and nsp == 12
-        if not m.get("scorable"):
+        fid_bad = fidelity_failed(m, version)
+        if not m.get("scorable") or fid_bad:
             section = "unscorable"
         elif species_level:
             section = ("species12" if sp12 else "species_partial") + ("_dev_clean" if dev_clean else "_flagged")
         else:
             section = "agnostic" + ("_dev_clean" if dev_clean else "_flagged")
-        if m.get("scorable") and scorable(m, version) is None and not m.get("same_weights_as"):
-            section = "unscorable"
         row = {
             "model_id": mid, "short_id": mid[:12], "rel": rel, "family": m["family"], "method": m.get("method"),
             "run_dir": m.get("run_dir"), "ckpt_role": m.get("ckpt_role"), "also_role": m.get("also_role") or [],
@@ -3705,8 +3760,7 @@ def build_rows(version, conf):
             "external_scores": {e: scores[e] for e in SEALED_EXAMS},
             "flags": flags, "contamination": ct.get("counts"), "section": section, "dev_clean": dev_clean,
             "species_level": species_level, "unscorable_reason": m.get("unscorable_reason") or (
-                "unscorable_fidelity" if m.get("scorable") and scorable(m, version) is None
-                and not m.get("same_weights_as") else None),
+                "unscorable_fidelity" if fid_bad else None),
             "rescore_command": "python -m weed_optimizer_framework.tools.inc2.zoo score --version %s --item %s:dev"
                                % (version, sid)}
         row.update(recipe_brief=_recipe_brief(row), init_brief=_init_brief(row["init"], row["soup_of"]))
@@ -3893,7 +3947,7 @@ def _flag_string(r):
     f = r["flags"]
 
     def sel(s):
-        return "S" if s in ("best", "early_stop", "best_partial") else ""
+        return "S" if s in TEST_CHOSEN else ""
     s = "dev:%s%s%s test:%s%s iw:%s tv1:%s ev1:%s" % (
         f.get("dev") or "-", "+sel" if f.get("dev_selected") else ("+sel?" if f.get("dev_selected_unknown") else ""),
         "+gated" if f.get("dev_gated") else "",
@@ -4013,11 +4067,12 @@ def report_step(version, conf, conf_sha):
     secs = _sections(rows, conf)
     status, failed, missing, ncount, shards = _completion(version)
     inv = _read_json(zd / "inventory" / "summary.json") or {}
-    ms = _read_json(zd / "inventory" / "meta_summary.json") or {}
     exams = read_exams(version)
     lock_sha = _sha_file(root_dir(version) / "splits" / "v1" / "LOCK.json")
-    counts = dict(ms.get("counts") or inv.get("counts") or {})
-    conv_rules = collections.Counter(r["class_map"]["rule"] for r in rows if r["class_map"]["converted"])
+    # meta's decisions plus the convert step's (a failed conversion is unscorable_fidelity, not keep)
+    counts = final_counts(version, rows)
+    conv_rules = collections.Counter(r["class_map"]["rule"] for r in rows
+                                     if r["class_map"]["converted"] and r["class_map"]["fidelity_ok"])
     items = {}
     for e in ALL_EXAMS:
         cnt = collections.Counter()
@@ -4097,7 +4152,9 @@ def platform_counts(version, rows, counts, ncount, shards, plan, lock_sha, conf_
     return {"counts": {"files_listed": inv.get("files_listed"), "kept": bd.get("keep", 0),
                        "unscorable": bd.get("unscorable", 0), "skipped": bd.get("skip", 0),
                        "skipped_by_reason": counts.get("skipped_by_reason") or {},
-                       "converted": sum(1 for r in rows if r["class_map"]["converted"]),
+                       "unscorable_by_reason": counts.get("unscorable_by_reason") or {},
+                       "converted": sum(1 for r in rows if r["class_map"]["converted"]
+                                        and r["class_map"]["fidelity_ok"]),
                        "items_planned": sum(ncount.values()), "items_scored": ncount.get("scored", 0) + ncount.get(
                            "pilot", 0), "items_reused": sum(1 for r in rows for c in list(r["scores"].values())
                                                             + list(r["external_scores"].values())
@@ -4195,8 +4252,11 @@ def _report_md(version, rep, secs, exams, conf):
           "list), P (possible: hits on a list rebuilt after the run or a derived superset, or more than 1 % of the "
           "list unhashed), U (no list, an unknown init, or no hit on a list with training entries it could not "
           "read: `+N unread` beside its image count, relative lines of a .txt list or an unreadable list or "
-          "directory), N (a complete, non-empty list with no hit); `+sel` selected on dev, `+sel?` a best.pt whose "
-          "own val set could not be read whole (not dev-clean); `+gated` dev-gated (its data or init chosen by a "
+          "directory), N (a complete, non-empty list with no hit); `+sel` selected on dev (best.pt, or last.pt of "
+          "an early stop, on a val set staged from dev or whose list holds dev images), `+sel?` its dev selection "
+          "unknown (a val set, its own split or one the zoo cannot place, that could not be listed or read whole, "
+          "or a last.pt without results.csv on a val set holding dev images; not dev-clean); `+gated` dev-gated "
+          "(its data or init chosen by a "
           "dev gate: an INC candidate, a stream pool, any row initialised from an INC row or from a dev-gated or "
           "dev-selected row); S selected on the cwd12 test (best.pt, an early stop, or a val set holding test "
           "images), s the same through its init.",

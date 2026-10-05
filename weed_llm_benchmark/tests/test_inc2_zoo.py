@@ -406,7 +406,8 @@ def build(dev_rows, test_rows, iw_rows):
     mt = FW / "merged_t"
     link(mt / "train" / "images" / "c3.jpg", clean[3])
     link(mt / "train" / "images" / "sess.jpg", sess_img)
-    yt = write_yaml(mt / "data.yaml", "train/images", base=str(mt), mtime=T0)
+    img(mt / "val" / "images" / "vt0.jpg", 1101)                  # its own val (every Ultralytics yaml has one)
+    yt = write_yaml(mt / "data.yaml", "train/images", val="val/images", base=str(mt), mtime=T0)
     for e in (mt / "train" / "images").iterdir():
         os.utime(e, (T0, T0), follow_symlinks=False)
     rt = FW / "child" / "train"
@@ -437,7 +438,8 @@ def build(dev_rows, test_rows, iw_rows):
     mx = FW / "merged_x"
     link(mx / "train" / "images" / "cottonweeddet12_cw_960.jpg", cw_a)
     link(mx / "train" / "images" / "cottonweed_holdout_cw_961.jpg", l4b)
-    yx = write_yaml(mx / "data.yaml", "train/images", base=str(mx), mtime=T0)
+    img(mx / "val" / "images" / "vx0.jpg", 1102)
+    yx = write_yaml(mx / "data.yaml", "train/images", val="val/images", base=str(mx), mtime=T0)
     for e in (mx / "train" / "images").iterdir():
         os.utime(e, (T0, T0), follow_symlinks=False)
     rx = FW / "slugmerge" / "train"
@@ -446,7 +448,7 @@ def build(dev_rows, test_rows, iw_rows):
                                 train_args=tax))
     # (y) a legacy R1 head on cwd12 train and valid themselves: cwd12 images only, no legacy_join
     yy = cwd / "data_trainvalid.yaml"
-    yy.write_text("path: %s\ntrain:\n  - train/images\n  - valid/images\nnc: 12\nnames: %s\n"
+    yy.write_text("path: %s\ntrain:\n  - train/images\n  - valid/images\nval: valid/images\nnc: 12\nnames: %s\n"
                   % (cwd, json.dumps(list(SP.CWD12_LEGACY_LABELS))))
     os.utime(yy, (T0, T0))
     ry = FW / "cwd12direct" / "train"
@@ -954,13 +956,18 @@ def test_contamination():
 
 
 
-def synth_run(name, train, val=None, base=None):
+def synth_run(name, train, val=None, base=None, role="best", fitness=None):
     """An Ultralytics run outside the list (its model dict, as meta writes one): a data yaml with these train (and
-    val) entries, args.yaml newer than the yaml and every entry (so the list is listed_exact), a legacy best.pt."""
+    val) entries, args.yaml newer than the yaml and every entry (so the list is listed_exact; epochs 10, patience
+    3), a legacy best.pt (or last.pt), and a results.csv of one row per `fitness` value when given. Without `val`
+    the yaml's val is a clean image under the run's own root; `val=[]` writes no val key."""
     T0 = WORLD["T0"]
     d = FW / "unread" / name
     y = d / "data.yaml"
     y.parent.mkdir(parents=True, exist_ok=True)
+    if val is None:
+        img(d / "val" / "images" / "sv0.jpg", 1103)
+        val = ["val/images"]
     lines = ["path: %s" % (base or d), "train:"] + ["  - %s" % x for x in train]
     if val:
         lines += ["val:"] + ["  - %s" % x for x in val]
@@ -968,16 +975,46 @@ def synth_run(name, train, val=None, base=None):
     os.utime(y, (T0, T0))
     rd = d / "run" / "train"
     ta = write_args(rd, y, mtime=T0 + 3600)
-    rel = rel_of(rd / "weights" / "best.pt")
-    return {"model_id": hashlib.sha256(rel.encode()).hexdigest(), "rel": rel, "path": str(rd / "weights" / "best.pt"),
-            "family": "other", "run_dir": rel_of(rd), "ckpt_role": "best", "mlflow": None, "scorable": False,
+    if fitness is not None:
+        (rd / "results.csv").write_text("epoch,metrics/mAP50(B),metrics/mAP50-95(B)\n" + "".join(
+            "%d,%.2f,%.2f\n" % (i + 1, f, f) for i, f in enumerate(fitness)))
+    wp = rd / "weights" / ("%s.pt" % role)
+    rel = rel_of(wp)
+    return {"model_id": hashlib.sha256(rel.encode()).hexdigest(), "rel": rel, "path": str(wp), "family": "other",
+            "run_dir": rel_of(rd), "ckpt_role": role, "mlflow": None, "scorable": False,
             "ckpt": {"date": LEGACY_DATE, "train_args": dict(ta)}, "class_map": {"rule": "R5", "n_species_channels": 0}}
+
+
+def synth_contamination(synth):
+    """Provenance of the synthetic runs, then the contamination step over them beside the world's rows: (their
+    provenance rows, contamination rows and report rows by key). The world's records are restored after."""
+    c, csha = conf()
+    zd = Z.zoo_dir(V)
+    saved = {n: (zd / n).read_bytes() for n in ("provenance.jsonl", "contamination.jsonl")}
+    real_read_models = Z.read_models
+    every = real_read_models(V)
+    idx = Z.Index(Z.read_files(V), every)
+    lister, cache = Z.Lister(), {"version": V}
+    prov = {k: Z.provenance_one(m, idx, c, lister, cache) for k, m in synth.items()}
+    ct, rows = {}, {}
+    try:
+        Z._write_jsonl(zd / "provenance.jsonl", Z._read_jsonl(zd / "provenance.jsonl") + list(prov.values()))
+        Z.read_models = lambda version: [dict(m) for m in every] + [dict(m) for m in synth.values()]
+        quiet(Z.contamination_step, V, c, csha, 2)
+        cont = Z.read_contamination(V)
+        ct = {k: cont[m["model_id"]] for k, m in synth.items()}
+        every_row = {r["model_id"]: r for r in Z.build_rows(V, c)}
+        rows = {k: every_row[m["model_id"]] for k, m in synth.items()}
+    finally:
+        Z.read_models = real_read_models
+        for n, b in saved.items():
+            (zd / n).write_bytes(b)
+    return prov, ct, rows
 
 
 def test_unread():
     print("a training list with entries the zoo could not read is never clean: U on every exam it shows no copy of, "
           "Y where it does; the count is recorded per row")
-    c, csha = conf()
     T0 = WORLD["T0"]
     d = TMP / "unread_src"
     ok_dir = d / "imgs"
@@ -1035,25 +1072,7 @@ def test_unread():
              "unreadable": synth_run("unreadable", [ok_dir, bad_txt]),
              "every_dev": synth_run("every_dev", [links, rel_txt]),
              "own_val": synth_run("own_val", [vbase / "train"], val=["val.txt"], base=vbase)}
-    zd = Z.zoo_dir(V)
-    saved = {n: (zd / n).read_bytes() for n in ("provenance.jsonl", "contamination.jsonl")}
-    real_read_models = Z.read_models
-    every = real_read_models(V)
-    idx = Z.Index(Z.read_files(V), every)
-    lister, cache = Z.Lister(), {"version": V}
-    prov = {k: Z.provenance_one(m, idx, c, lister, cache) for k, m in synth.items()}
-    ct, rows = {}, {}
-    try:
-        Z._write_jsonl(zd / "provenance.jsonl", Z._read_jsonl(zd / "provenance.jsonl") + list(prov.values()))
-        Z.read_models = lambda version: [dict(m) for m in every] + [dict(m) for m in synth.values()]
-        quiet(Z.contamination_step, V, c, csha, 2)
-        cont = Z.read_contamination(V)
-        ct = {k: cont[m["model_id"]] for k, m in synth.items()}
-        rows = {r["model_id"]: r for r in Z.build_rows(V, c)}
-    finally:
-        Z.read_models = real_read_models
-        for n, b in saved.items():
-            (zd / n).write_bytes(b)
+    prov, ct, rows = synth_contamination(synth)
     dpr = {k: (p["data"]["rating"], p["data"]["n_unresolved"], p["data"]["n_unreadable"]) for k, p in prov.items()}
     check("provenance records the unread entries of a training list: 2 relative lines, 1 unreadable .txt; a "
           "complete list none (each listed_exact)",
@@ -1073,15 +1092,15 @@ def test_unread():
     check("each row records its unread entries (n_unresolved, n_unreadable) and a note; the report row carries them",
           [(ct[k].get("n_unresolved"), ct[k].get("n_unreadable")) for k in ("relative", "unreadable", "complete")]
           == [(2, 0), (0, 1), (0, 0)] and any("could not be read" in n for n in ct["relative"]["notes"])
-          and rows[synth["relative"]["model_id"]]["data"].get("n_unresolved") == 2
-          and rows[synth["unreadable"]["model_id"]]["data"].get("n_unreadable") == 1,
+          and rows["relative"]["data"].get("n_unresolved") == 2
+          and rows["unreadable"]["data"].get("n_unreadable") == 1,
           {k: (x.get("n_unresolved"), x.get("n_unreadable")) for k, x in ct.items()})
-    rc, rr, ru = (rows[synth[k]["model_id"]] for k in ("complete", "relative", "unreadable"))
+    rc, rr, ru = (rows[k] for k in ("complete", "relative", "unreadable"))
     check("dev-clean only on the complete list: the rows with unread entries are not dev-clean (dev U)",
           rc["dev_clean"] and rc["flags"]["dev"] == "N" and not rr["dev_clean"] and rr["flags"]["dev"] == "U"
           and not ru["dev_clean"] and ru["flags"]["dev"] == "U",
           (rc["dev_clean"], rr["flags"]["dev"], ru["flags"]["dev"]))
-    ov, ro = ct["own_val"], rows[synth["own_val"]["model_id"]]
+    ov, ro = ct["own_val"], rows["own_val"]
     check("best.pt chosen on its own val set, which could not be read: test_selected unknown (never none), dev "
           "selection unknown (+sel?), so not dev-clean though its training list is N",
           prov["own_val"]["selected_on"] == "own_split" and prov["own_val"]["val"]["n_unreadable"] == 1
@@ -1089,6 +1108,91 @@ def test_unread():
           and not ro["dev_clean"] and ro["flags"]["dev_selected_unknown"] and "+sel?" in Z._flag_string(ro),
           (prov["own_val"]["selected_on"], prov["own_val"].get("val"), ov.get("test_selected"),
            ov.get("dev_selected_unknown"), ro["dev_clean"]))
+    after = Z.read_contamination(V)
+    check("the world's provenance and contamination records are restored", not any(
+        m["model_id"] in after for m in synth.values()))
+
+
+def test_val_selection():
+    print("selection by the val set: a best.pt, or a last.pt of an early stop, on a val set the zoo places by its "
+          "list (its own split, or one outside its root) is selected on dev or test by the list's hits, and its "
+          "selection is unknown when the val cannot be listed or the early stop cannot be told")
+    T0 = WORLD["T0"]
+    d = TMP / "valsel_src"
+    train = d / "train"
+    for i in range(2):
+        os.utime(img(train / ("t%d.jpg" % i), 1110 + i), (T0, T0))
+    devl, testl, cleanv = d / "devlinks", d / "testlinks", d / "cleanval"
+    hold = d / "cwd12_holdout" / "images"             # named as a cwd12 test copy, holding dev images
+    for i, r in enumerate(WORLD["dev"]):
+        link(devl / ("dv%d.jpg" % i), r["image"])
+        link(hold / ("dv%d.jpg" % i), r["image"])
+    for i, r in enumerate(WORLD["test"][:3]):
+        link(testl / ("ts%d.jpg" % i), r["image"])
+    img(cleanv / "cv0.jpg", 1112)
+    devv = TMP / "inc_dev" / "images"                 # a val staged from dev (the world's z fixture): selected_on dev
+    early = [0.1, 0.5, 0.4, 0.3, 0.2, 0.1]            # 6 of 10 epochs, best at epoch 2, patience 3: an early stop
+    full = [0.1 * i for i in range(1, 11)]            # all 10 epochs
+    synth = {"own_clean": synth_run("own_clean", [train]),
+             "out_dev": synth_run("out_dev", [train], val=[devl]),
+             "out_test": synth_run("out_test", [train], val=[testl]),
+             "out_clean": synth_run("out_clean", [train], val=[cleanv]),
+             "out_gone": synth_run("out_gone", [train], val=[d / "gone"]),
+             "marked_test_dev": synth_run("marked_test_dev", [train], val=[hold]),
+             "no_val": synth_run("no_val", [train], val=[]),
+             "last_early_dev": synth_run("last_early_dev", [train], val=[devv], role="last", fitness=early),
+             "last_full_dev": synth_run("last_full_dev", [train], val=[devv], role="last", fitness=full),
+             "last_nores_dev": synth_run("last_nores_dev", [train], val=[devv], role="last"),
+             "last_early_out_dev": synth_run("last_early_out_dev", [train], val=[devl], role="last", fitness=early),
+             "last_early_out_test": synth_run("last_early_out_test", [train], val=[testl], role="last",
+                                              fitness=early),
+             "last_full_out_dev": synth_run("last_full_out_dev", [train], val=[devl], role="last", fitness=full)}
+    prov, ct, rows = synth_contamination(synth)
+    so = {k: p["selected_on"] for k, p in prov.items()}
+    check("selected_on: the own clean val own_split; every val outside the run's root (a dev copy, a test copy, a "
+          "clean folder, a gone folder) and a yaml without a val unknown; a val staged from dev dev",
+          so["own_clean"] == "own_split" and all(so[k] == "unknown" for k in (
+              "out_dev", "out_test", "out_clean", "out_gone", "no_val", "last_early_out_dev"))
+          and so["last_early_dev"] == "dev" and so["last_full_dev"] == "dev" and so["marked_test_dev"] == "cwd12_test",
+          so)
+    got = {k: (x["test_selected"], bool(x.get("dev_selected")), bool(x.get("dev_selected_unknown")),
+               rows[k]["dev_clean"]) for k, x in ct.items()}
+    check("a list read whole with no hit, under the root or outside it: not selected on dev or test, dev-clean "
+          "(its training list is N)", got["own_clean"] == ("none", False, False, True)
+          and got["out_clean"] == ("none", False, False, True) and ct["out_clean"]["own"]["dev"] == "N", got)
+    od = ct["out_dev"]
+    check("best.pt on a val outside its root holding every dev image: dev_selected (+sel), not dev-clean, though "
+          "its training list is N", od["val"]["dev_hits"] == len(WORLD["dev"]) and got["out_dev"][1]
+          and not got["out_dev"][3] and od["own"]["dev"] == "N" and "+sel " in Z._flag_string(rows["out_dev"]) + " "
+          and any("dev images" in n for n in od["notes"]), (od.get("val"), got["out_dev"]))
+    check("best.pt on a val outside its root holding cwd12 test images: best_partial (S)",
+          ct["out_test"]["val"]["test_hits"] == 3 and got["out_test"][0] == "best_partial"
+          and " test:S" in Z._flag_string(rows["out_test"]), (ct["out_test"].get("val"), got["out_test"]))
+    check("best.pt on a val named as a cwd12 test copy (selected_on cwd12_test) that holds dev images: best (S) "
+          "and dev_selected by its list, not dev-clean", got["marked_test_dev"] == ("best", True, False, False), got)
+    check("best.pt whose val outside its root cannot be listed, and one whose yaml has no val: test selection and "
+          "dev selection unknown (+sel?), not dev-clean",
+          got["out_gone"] == ("unknown", False, True, False) and got["no_val"] == ("unknown", False, True, False)
+          and "+sel?" in Z._flag_string(rows["out_gone"]) and "+sel?" in Z._flag_string(rows["no_val"]),
+          (got["out_gone"], got["no_val"]))
+    check("last.pt of an early stop (6 of 10 epochs, patience 3) on a val staged from dev: dev_selected, not "
+          "dev-clean; the same run's last.pt after all its epochs is neither, dev-clean; without results.csv its "
+          "dev selection is unknown (+sel?)",
+          prov["last_early_dev"]["chosen_on_val"] == "yes" and got["last_early_dev"] == ("none", True, False, False)
+          and prov["last_full_dev"]["chosen_on_val"] == "no" and got["last_full_dev"] == ("none", False, False, True)
+          and prov["last_nores_dev"]["chosen_on_val"] == "unknown"
+          and got["last_nores_dev"] == ("none", False, True, False), {k: got[k] for k in got if k.startswith("last")})
+    check("last.pt of an early stop on a val outside its root: dev_selected by the list's dev images, "
+          "early_stop_partial (S) by its test images; after all its epochs, neither",
+          got["last_early_out_dev"] == ("none", True, False, False)
+          and got["last_early_out_test"] == ("early_stop_partial", False, False, True)
+          and " test:S" in Z._flag_string(rows["last_early_out_test"])
+          and got["last_full_out_dev"] == ("none", False, False, True), got)
+    zc = d / "validation.yaml"
+    zc.write_text("path: %s\ntrain: train\nvalidation: cleanval\nnames: ['weed']\n" % d)
+    dd, _w = Z.dataset_dirs(str(zc), "val")
+    check("a yaml whose val is under a 'validation' key (check_det_dataset renames it) is read as its val",
+          dd == [os.path.realpath(str(cleanv))], dd)
     after = Z.read_contamination(V)
     check("the world's provenance and contamination records are restored", not any(
         m["model_id"] in after for m in synth.values()))
@@ -1382,6 +1486,60 @@ def test_report():
     check("the platform record: complete, counts and sha256s only (no non-dev key, no score path)",
           rec["status"] == "complete" and R.non_dev_keys(rec) == [] and not E._NON_DEV_SCORE.search(json.dumps(rec))
           and rec["counts"]["files_listed"] == rep["counts"]["files_listed"], rec)
+    # a conversion that failed its check is the convert step's decision unscorable_fidelity: counted as that in
+    # report.json, report.md and the platform record, moved out of keep (d alone; then e, whose weights w holds too)
+    cnt0, rc0 = rep["counts"], rec["counts"]
+    keep0, uns0 = cnt0["by_decision"].get("keep", 0), cnt0["by_decision"].get("unscorable", 0)
+    cps = {k: Z.conversion_path(V, mid(k), ".json") for k in ("d", "e")}
+    saved = {k: p.read_bytes() for k, p in cps.items()}
+    got = {}
+    try:
+        for step, keys in (("d", ("d",)), ("d+e", ("d", "e"))):
+            for k in keys:
+                cps[k].write_text(json.dumps(dict(json.loads(saved[k]), ok=False)))
+            r, _o = quiet(Z.report_step, V, c, csha)
+            got[step] = (r, (Z.zoo_dir(V) / "report.md").read_text(), Z.read_record(V)["counts"])
+    finally:
+        for k, p in cps.items():
+            p.write_bytes(saved[k])
+        restored, _o = quiet(Z.report_step, V, c, csha)
+
+    def fid(step):
+        r, md_, rc_ = got.get(step) or ({"counts": {}, "rows": [], "sections": {}}, "", {})
+        cn = r["counts"]
+        by = {x["model_id"]: x for x in r["rows"]}
+        return {"json": ((cn.get("unscorable_by_reason") or {}).get("unscorable_fidelity"),
+                         (cn.get("by_decision") or {}).get("keep"), (cn.get("by_decision") or {}).get("unscorable"),
+                         sum((cn.get("by_decision") or {}).values()) == cn.get("files_listed", 0) + cn.get(
+                             "inc_glob_added", 0)),
+                "md": [ln for ln in md_.splitlines() if ln.startswith("| unscorable_fidelity |")],
+                "md_keep": '"keep": %d' % (keep0 - (1 if step == "d" else 3)) in md_,
+                "record": (rc_.get("kept"), rc_.get("unscorable"),
+                           (rc_.get("unscorable_by_reason") or {}).get("unscorable_fidelity"), rc_.get("converted")),
+                "table_e": sorted(k for k in ("d", "e", "w") if mid(k) in (r["sections"].get("unscorable") or [])
+                                  and by[mid(k)]["unscorable_reason"] == "unscorable_fidelity"
+                                  and "| %s | %s | %s | unscorable_fidelity |" % (by[mid(k)]["short_id"],
+                                                                                 by[mid(k)]["family"],
+                                                                                 by[mid(k)]["rel"]) in md_)}
+    f1, f3 = fid("d"), fid("d+e")
+    check("before: no failed conversion in the world (unscorable_fidelity 0 in report.json, report.md and the "
+          "platform record)", cnt0["unscorable_by_reason"]["unscorable_fidelity"] == 0
+          and "| unscorable_fidelity | 0 |" in md
+          and (rc0.get("unscorable_by_reason") or {}).get("unscorable_fidelity") == 0,
+          (cnt0["unscorable_by_reason"], rc0.get("unscorable_by_reason")))
+    check("d's conversion failed: unscorable_fidelity 1 and keep one fewer in report.json (reconciled), report.md "
+          "and the platform record (converted one fewer); d in Table E with that reason",
+          f1["json"] == (1, keep0 - 1, uns0 + 1, True) and f1["md"] == ["| unscorable_fidelity | 1 |"]
+          and f1["md_keep"] and f1["record"] == (rc0["kept"] - 1, rc0["unscorable"] + 1, 1, rc0["converted"] - 1)
+          and f1["table_e"] == ["d"], f1)
+    check("e's too: e and w (the same weights, never converted on their own) are unscorable_fidelity, 3 in all",
+          f3["json"] == (3, keep0 - 3, uns0 + 3, True) and f3["md"] == ["| unscorable_fidelity | 3 |"]
+          and f3["md_keep"] and f3["record"][:3] == (rc0["kept"] - 3, rc0["unscorable"] + 3, 3)
+          and f3["table_e"] == ["d", "e", "w"], f3)
+    check("the conversion records restored, the counts are the world's again",
+          restored["counts"]["by_decision"] == cnt0["by_decision"]
+          and restored["counts"]["unscorable_by_reason"] == cnt0["unscorable_by_reason"],
+          restored["counts"]["by_decision"])
 
 
 def _perturb(obj, f):
@@ -1697,8 +1855,8 @@ def test_pinned_unchanged():
 def main():
     world()
     for t in (test_list, test_class_maps, test_meta, test_convert, test_provenance, test_exams,
-              test_contamination, test_unread, test_plan, test_select, test_report, test_test_blind, test_sections,
-              test_submit, test_script, test_pinned_unchanged):
+              test_contamination, test_unread, test_val_selection, test_plan, test_select, test_report,
+              test_test_blind, test_sections, test_submit, test_script, test_pinned_unchanged):
         t()
     print("\n%d failure(s)" % len(FAILURES))
     shutil.rmtree(TMP, ignore_errors=True)
