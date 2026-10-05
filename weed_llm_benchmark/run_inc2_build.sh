@@ -21,6 +21,7 @@
 #   python -m weed_optimizer_framework.tools.inc2.baseline rescore-agnostic --exp E --reference R
 #   python -m weed_optimizer_framework.tools.inc2.baseline rescore-e2
 #   python -m weed_optimizer_framework.tools.inc2.baseline rescore-e2-attr
+#   python -m weed_optimizer_framework.tools.inc2.twostage score-arm --arm M|A|B | verdict | score-test --arm X
 #   python -m weed_optimizer_framework.tools.inc2.base3    build --stream SID
 #   python -m weed_optimizer_framework.tools.inc2.pilot4   build --exp E [...]
 #   python -m weed_optimizer_framework.tools.inc2.stream   init | build | milestone | fork | feasibility | bisect
@@ -46,7 +47,14 @@
 # --exp (E2's six experiments are pre-registered): no advance, provenance and
 # lock e2_v1. inc2.baseline rescore-e2-attr (L23D, 2026-10-04, later: E2-C's
 # final runs scored on dev at 640, then E2-C's attribution record) is the same:
-# no --exp, no advance, provenance and lock e2_attr_v1. inc2.base3 build (L23V,
+# no --exp, no advance, provenance and lock e2_attr_v1. inc2.twostage (E3,
+# 2026-10-05: two-stage species detection) builds nothing either: score-arm
+# (L23F, one arm's dev scores; --arm M, A or B) is named e3_score_<arm in
+# lower case>, verdict (L23G) e3_v1, and score-test (a person's one read of a
+# qualifying arm's sealed test, after inc2.twostage test-read) e3test_<arm>;
+# no advance; it runs with HF_HUB_OFFLINE=1 (BioCLIP-2 from the Hugging Face
+# cache), YOLO_OFFLINE=true and YOLO_AUTOINSTALL=false, after an import check
+# of torch, ultralytics, scikit-learn and open_clip. inc2.base3 build (L23V,
 # 2026-10-03: splits v3, E1's base) builds no experiment: no advance, its
 # provenance and lock are named base3_v3; it runs with HF_HUB_OFFLINE=1 (its
 # embedding check loads DINOv2 from the Hugging Face cache; compute nodes have
@@ -107,6 +115,7 @@ export INC_JOB_SCRIPT="$REPO/weed_llm_benchmark/run_inc2_job.sh"
 usage() {
     echo "usage: sbatch run_inc2_build.sh {inc2.splits build|lock | inc2.baseline build|rescore-native|" \
          "rescore-agnostic|rescore-e2|rescore-e2-attr | inc2.base3 build | inc2.pilot4 build |" \
+         "inc2.twostage score-arm --arm M|A|B | verdict | score-test --arm M|A|B |" \
          "inc2.stream init|build|milestone|fork|feasibility|bisect} [flags ...]" >&2
     exit 2
 }
@@ -122,17 +131,20 @@ esac
 case "$MOD $CMD" in
     "splits build"|"splits lock"|"baseline build"|"baseline rescore-native"|"baseline rescore-agnostic") shift 2 ;;
     "baseline rescore-e2"|"baseline rescore-e2-attr") shift 2 ;;
+    "twostage score-arm"|"twostage verdict"|"twostage score-test") shift 2 ;;
     "pilot4 build"|"base3 build") shift 2 ;;
     "stream init"|"stream build"|"stream milestone"|"stream fork"|"stream feasibility"|"stream bisect") shift 2 ;;
     *) usage ;;
 esac
 EXP=""
 SID=""
+ARM=""
 prev=""
 for a in "$@"; do
-    case "$a" in --exp=*) EXP="${a#--exp=}" ;; --stream=*) SID="${a#--stream=}" ;; esac
+    case "$a" in --exp=*) EXP="${a#--exp=}" ;; --stream=*) SID="${a#--stream=}" ;; --arm=*) ARM="${a#--arm=}" ;; esac
     [ "$prev" = "--exp" ] && EXP="$a"
     [ "$prev" = "--stream" ] && SID="$a"
+    [ "$prev" = "--arm" ] && ARM="$a"
     prev="$a"
 done
 NAME_RE='^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'
@@ -152,6 +164,20 @@ elif [ "$MOD $CMD" = "baseline rescore-e2" ]; then
     NAME="e2_v1"
 elif [ "$MOD $CMD" = "baseline rescore-e2-attr" ]; then
     NAME="e2_attr_v1"
+elif [ "$MOD $CMD" = "twostage verdict" ]; then
+    NAME="e3_v1"
+elif [ "$MOD" = twostage ]; then
+    case "$ARM" in
+        M|A|B) ;;
+        *) echo "FATAL: inc2.twostage $CMD needs --arm M, A or B" >&2
+           usage ;;
+    esac
+    ARM_LC="$(echo "$ARM" | tr 'MAB' 'mab')"
+    if [ "$CMD" = score-arm ]; then
+        NAME="e3_score_$ARM_LC"
+    else
+        NAME="e3test_$ARM_LC"
+    fi
 elif [ -n "$EXP" ]; then
     if ! [[ "$EXP" =~ $NAME_RE ]]; then
         echo "FATAL: --exp '$EXP' is not an experiment name" >&2
@@ -246,6 +272,7 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/scorer_sidecar.py tools/inc2/scorer_native.py tools/inc2/step1_stream.py tools/inc2/mask.py
          tools/inc2/eval_hits.py tools/inc2/stream.py
          tools/inc2/stream_report.py tools/inc2/base3.py tools/inc2/base3_v2.json tools/inc2/scorer_agnostic.py
+         tools/inc2/twostage.py tools/inc/audit.py
          tools/inc_autopilot/stream_thresholds.json)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 
@@ -367,6 +394,13 @@ if [ "$MOD $CMD" = "base3 build" ]; then
     python -u -c "import torch, transformers, ultralytics, scipy, cv2; print('torch', torch.__version__, 'transformers', transformers.__version__, 'ultralytics', ultralytics.__version__)" \
         || { prov update status=env_failed finish; exit 1; }
 fi
+if [ "$MOD" = twostage ]; then
+    # E3: BioCLIP-2 from the Hugging Face cache (no internet on compute nodes); Ultralytics installs and fetches
+    # nothing; the classifier is scikit-learn's
+    export HF_HUB_OFFLINE=1 YOLO_OFFLINE=true YOLO_AUTOINSTALL=false
+    python -u -c "import torch, ultralytics, sklearn, open_clip; print('torch', torch.__version__, 'ultralytics', ultralytics.__version__, 'sklearn', sklearn.__version__, 'open_clip', open_clip.__version__)" \
+        || { prov update status=env_failed finish; exit 1; }
+fi
 
 OUT_TMP="$(mktemp "${TMPDIR:-/tmp}/inc2_build_${NAME}.XXXXXX")" || OUT_TMP=""
 PHASE=build
@@ -393,7 +427,8 @@ if [ "$rc" != 0 ]; then
     exit "$rc"
 fi
 if [ "$MOD $CMD" = "baseline rescore-native" ] || [ "$MOD $CMD" = "baseline rescore-agnostic" ] \
-        || [ "$MOD $CMD" = "baseline rescore-e2" ] || [ "$MOD $CMD" = "baseline rescore-e2-attr" ]; then
+        || [ "$MOD $CMD" = "baseline rescore-e2" ] || [ "$MOD $CMD" = "baseline rescore-e2-attr" ] \
+        || [ "$MOD" = twostage ]; then
     # scores only: nothing was built, nothing is advanced
     prov update status=scored build_rc=0 finish
     echo "=== done $(date) ==="

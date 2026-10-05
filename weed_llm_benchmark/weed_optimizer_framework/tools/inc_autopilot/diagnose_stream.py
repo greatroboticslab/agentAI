@@ -1668,6 +1668,39 @@ def _e1a_done(v, exps):
     return True, [v.cite(rec_name, "/reference"), v.ccite(E.pointer("stage", "exp_status", ea))]
 
 
+def _e3_gate(v, exps, st):
+    """(True, cites) when E3's scoring jobs may be proposed (amendment
+    2026-10-05): E2's verdict is recorded (/stage/e2 done) and its record
+    (capacity/e2_v1.json) is decided, the three source experiments are done,
+    and E2-C's attribution (L23D) is settled: its record complete or L23D
+    failed, or one of E2-C's builds failed (L23D can then not be due without
+    a person). The MAINT lane holds one item at a time, so an E3 job never
+    holds L23D back. Else (False, why). Cites only after presence is
+    checked."""
+    e3 = v.dom.get("e3") or {}
+    e2 = v.dom.get("e2") or {}
+    rec_name = e2.get("record") or "capacity/e2_v1.json"
+    if st.get("e2") != "done":
+        return False, "E2's verdict is not recorded"
+    rec = v.ev.json(rec_name)
+    if not isinstance(rec, dict) or rec.get("status") != "decided":
+        return False, "E2's verdict is not decided"
+    srcs = [e3["arms"][k] for k in e3.get("order") or [] if k in (e3.get("arms") or {})]
+    if not srcs or any(exps.get(x) != "done" for x in srcs):
+        return False, "E3's source experiments %s are not all done" % srcs
+    cites = [v.ccite("/stage/e2"), v.cite(rec_name, "/status")] + [v.ccite(E.pointer("stage", "exp_status", x))
+                                                                    for x in srcs]
+    ea2 = v.dom.get("e2_attr") or {}
+    if ea2.get("arms"):
+        c_ids = list((ea2.get("arms") or {}).get(ea2.get("control") or "C") or [])
+        build_failed = [i for i in c_ids if (st.get("baselines") or {}).get(i) == "failed"]
+        if st.get("e2_attr") not in ("done", "failed") and not build_failed:
+            return False, "E2-C's attribution (L23D) is not settled: it goes first"
+        cites.append(v.ccite("/stage/e2_attr"))
+        cites += [v.ccite("/stage/baselines/%s" % i) for i in build_failed]
+    return True, cites
+
+
 def r0(v, d28=None):
     """DR0: the rollout's prerequisites (contract 10 R0, R0b, R1, R2), each
     proposed once in its lane when due, in order: MAINT -- the splits build
@@ -1692,7 +1725,11 @@ def r0(v, d28=None):
     once); E2-C (2026-10-04, later): its three builds after E2's six, under
     E2's gate and E1-A done (_e1a_done), in E2's group of builds, and once
     E2's verdict is recorded and E2-W's and E2-C's experiments are done,
-    the attribution's rescore and record (L23D, once). DATA --
+    the attribution's rescore and record (L23D, once); E3 (2026-10-05):
+    once E2's verdict is recorded and decided, the three source
+    experiments are done and L23D is settled (_e3_gate), one scoring job
+    per arm in the domain's order (L23F; an arm whose job failed holds the
+    others: one card), then E3's verdict (L23G, once). DATA --
     the network probe (LP), then Step 1's one-time jobs after the lock (L17
     bootstrap, knowntruth, backfill), then D28-v2's sidecars for batches
     committed before the amendment (L17 eval-hits, _eval_hits_due)."""
@@ -1898,6 +1935,34 @@ def r0(v, d28=None):
                                    "attribution (record only, dev)" % ", ".join(b["exp"] for b in at_items)}
             cites = [v.ccite("/stage/lock")] + [v.ccite(E.pointer("stage", "exp_status", b["exp"]))
                                                 for b in at_items] + [v.ccite("/stage/e2"), v.ccite("/stage/e2_attr")]
+    # E3 (2026-10-05): its scoring jobs, one per arm in the domain's order (each record only), then its verdict,
+    # once; an arm whose job failed holds the others (one card: a person reruns it); /stage/e3_score/<arm> is done
+    # once capacity/e3_score_<arm>.json says complete, /stage/e3 once capacity/e3_rescore.json does
+    e3 = v.dom.get("e3") or {}
+    if out["MAINT"] is None and out["DATA"] is None and st.get("lock") and ss["arm"] and ss["stage_c_read"] \
+            and e3.get("arms") and e3.get("order"):
+        ok, gc = _e3_gate(v, exps, st)
+        es = st.get("e3_score") or {}
+        order = list(e3["order"])
+        if ok and not any(es.get(x) == "failed" for x in order):
+            for x in order:
+                state = es.get(x)
+                if state in (None, "missing"):
+                    out["MAINT"] = {"lever": "L23F", "arm": x,
+                                    "why": "E2's verdict is decided and E2-C's attribution settled: E3-%s (%s's boxes, "
+                                           "the crop classifier) is not scored on dev (record only)"
+                                           % (x, e3["arms"][x])}
+                    cites = [v.ccite("/stage/lock")] + gc + [v.ccite("/stage/e3_score/%s" % x)]
+                    break
+                if state != "done":
+                    break
+            else:
+                if st.get("e3") in (None, "missing"):
+                    out["MAINT"] = {"lever": "L23G",
+                                    "why": "E3's arms %s are scored on dev without E3's verdict (record only)"
+                                           % ", ".join(order)}
+                    cites = [v.ccite("/stage/lock")] + gc + [v.ccite("/stage/e3_score/%s" % x) for x in order] \
+                        + [v.ccite("/stage/e3")]
     items = {k: x for k, x in out.items() if x}
     wait = wait if wait and wait["state"] == "waiting" else None
     if not items and not wait:

@@ -455,6 +455,33 @@
   "rescore_record": "capacity/e2_attr_rescore.json",
   "why": "E2-C, the attribution control (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04, later, pre-registered): E2-W's definition with E1-A's weights as the init (base_v2's 6,811 images pre-trained as one class under the same 1.2M image-epochs), so E2-W against E2-C differs in the pre-training data only. Once E2's verdict is recorded (L23C's record complete: E2-S - E2-C is computed only when E2 chose S) and E2-W's and E2-C's six experiments are done, DR0 proposes L23D once (inc2.baseline rescore-e2-attr: E2-C's finals scored on dev at 640, then capacity/e2_attr_v1.json and its record capacity/e2_attr_rescore.json). Rule (dev, record only): E2's gain is credited to base v3's data when D_data = mean(E2-W) - mean(E2-C) > 2 x pooled sd and > the paired image-bootstrap SE (stable_int('inc2/e2/attribution_se'), 1,000 resamples). It never rewrites capacity/e2_v1.json; E2-C can neither qualify nor be chosen. A failure is a card and it is not proposed again. Once the record is decided the ticker raises one card; E2-C's sealed test is read once with the chosen arm's, by a person, beside the headline."
  },
+ "e3": {
+  "arms": {
+   "M": "b_v2_m640",
+   "A": "e1_a_m640",
+   "B": "e1_b_m640"
+  },
+  "order": [
+   "M",
+   "A",
+   "B"
+  ],
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "requires": "e2",
+  "reference_exp": "b_v2_m640",
+  "score_records": {
+   "M": "capacity/e3_score_M.json",
+   "A": "capacity/e3_score_A.json",
+   "B": "capacity/e3_score_B.json"
+  },
+  "record": "capacity/e3_v1.json",
+  "rescore_record": "capacity/e3_rescore.json",
+  "why": "E3, two-stage species detection (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-05, pre-registered): a one-class box detector (no retraining: E3-M b_v2_m640's own boxes with its classes collapsed by one_per_box, E3-A E1-A's, E3-B E1-B's, seeds 0-2, the locked scorer's own inference and NMS) and one BioCLIP-2 logistic-regression crop classifier fitted once on base_v2's ground-truth boxes (pinned); each box emitted as its top 3 classes at q x p within the locked conf and max_det, scored by the locked scorer's own matching and AP. Once E2's verdict is recorded and decided, the three source experiments are done and E2-C's attribution (L23D) is settled (its record complete, it failed, or an E2-C build failed), DR0 proposes L23F once per arm in the order M, A, B (inc2.twostage score-arm; the first also fits the classifier and runs the identity equivalence check), then L23G once (inc2.twostage verdict: capacity/e3_v1.json and capacity/e3_rescore.json). Rule (dev, record only): an arm qualifies when D = mean(arm's dev species mAP50-95) - mean(b_v2_m640's native dev files) > 2 x pooled sd and > the paired image-bootstrap SE (stable_int('inc2/e3/species_se'), 1,000 resamples); the largest qualifying D is chosen, a tie goes to M, then A, then B; the attribution E3-B - E3-A is recorded beside. Nothing switches. A failed arm's job is a card and holds the other arms; each qualifying arm's sealed test is read once, after the verdict, by a person (inc2.twostage test-read); the ticker raises one card with the exact commands."
+ },
  "stage_a": {
   "exp": "pilot_v4",
   "from_exp": "pilot_v3",
@@ -493,7 +520,10 @@
   "splits_hours": 4.0,
   "rescore_hours_per_run": 0.25,
   "base3_job_hours": 12.0,
-  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job is priced at 4 GPU-h, the 4 h walltime it had until 2026-10-03 (its limit is 12 h since, for the base v3 build; the other build jobs ran within 4 h), the base v3 build job (L23V) at its 12 h walltime (base3_job_hours; the upper end, so its price is never low), and the price of every build job is settled from sacct when it ends, a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed. A native-resolution rescore (L23N, 2026-10-01) is one scoring pass per final run: dev and ImageWeeds are 3,825 images, at up to 210 ms per image (54.5 ms measured for n640 at 640, x 2.2 for YOLO11m measured at 640, x 1.69 for 832 px) 0.22 GPU-h, rounded up to 0.25 per run; the reference's dev pass is priced as a run too."
+  "why": "Contract 5.6 (V100, 1 SU per GPU-h, est.): cold 6.0-7.0 ms per image-epoch (the upper end is used, so a price is never low), incremental 7.4 (realloop_v1), finals 0.6-0.8 GPU-h, a build job is priced at 4 GPU-h, the 4 h walltime it had until 2026-10-03 (its limit is 12 h since, for the base v3 build; the other build jobs ran within 4 h), the base v3 build job (L23V) at its 12 h walltime (base3_job_hours; the upper end, so its price is never low), and the price of every build job is settled from sacct when it ends, a collect job 1-4 GPU-h per source, Step 1 admission about 75 s per 1,000 images plus <= 0.5 h fixed. A native-resolution rescore (L23N, 2026-10-01) is one scoring pass per final run: dev and ImageWeeds are 3,825 images, at up to 210 ms per image (54.5 ms measured for n640 at 640, x 2.2 for YOLO11m measured at 640, x 1.69 for 832 px) 0.22 GPU-h, rounded up to 0.25 per run; the reference's dev pass is priced as a run too. E3 (2026-10-05): a scoring job of one arm is priced at 0.25 GPU-h per arm-seed (dev about 1.5 min, the reported passes and ImageWeeds about 5-7 min: detector, image decodes and crops at about 400-700 crops/s), plus 0.75 GPU-h in the first arm's job for the classifier's fit (base_v2 checked and hashed, about 25.7K crops cut and embedded, 46 logistic-regression fits), the dev ground-truth crops and the equivalence check (e3_fit_hours); E3's verdict job 0.5 GPU-h (four bootstraps of 1,000 resamples on the CPU). E3 commits 3.5 SU, settled from sacct.",
+  "e3_hours_per_run": 0.25,
+  "e3_fit_hours": 0.75,
+  "e3_verdict_hours": 0.5
  },
  "walltime": {
   "cold_h": 8.0,

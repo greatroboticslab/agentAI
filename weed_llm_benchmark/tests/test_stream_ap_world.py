@@ -763,6 +763,37 @@ class World(object):
                                                                       "credited_to_data": credited},
                                                       "written_utc": utc(self.t[0])})
 
+    def e3_records(self, arms=("M", "A", "B"), verdict=False, rescore=True, qualifying=(), chosen=None,
+                   credited=False, status="decided"):
+        """inc2.twostage's records: each arm's score record (capacity/e3_score_<arm>.json, complete, dev only),
+        with verdict E3's verdict (capacity/e3_v1.json, dev only; the ticker raises its card once), and with
+        rescore its record (capacity/e3_rescore.json, complete)."""
+        for x in arms:
+            self._w("capacity/e3_score_%s.json" % x, {"format": "inc2-e3-score-record/1", "status": "complete",
+                                                      "arm": x, "exam": "dev", "seeds": [0, 1, 2],
+                                                      "reported": {"status": "complete", "passes": 3, "failed": 0},
+                                                      "written_utc": utc(self.t[0])})
+        q = [k for k in ("M", "A", "B") if k in qualifying]
+        ch = chosen if chosen is not None else (q[0] if q else None)
+        if verdict:
+            arms_ = {k: {"status": "decided", "seeds": [0, 1, 2], "diff": 0.013 if k in q else -0.004,
+                         "pooled_sd": 0.002, "two_pooled_sd": 0.004, "se_diff": 0.003, "qualifies": k in q,
+                         "conditions": {"above_2_pooled_sd": k in q, "above_se": k in q},
+                         "reported": {"stage1_agnostic": {"mean": 0.87 if k != "B" else 0.88}}}
+                     for k in ("M", "A", "B")}
+            self._w("capacity/e3_v1.json", {"format": "inc2-e3-verdict/1", "status": status, "exam": "dev",
+                                            "arms": arms_, "qualifying": q, "chosen": ch,
+                                            "attribution": {"status": "decided", "diff": 0.011 if credited else 0.001,
+                                                            "two_pooled_sd": 0.004, "se_diff": 0.003,
+                                                            "credited_to_data": credited},
+                                            "reported": {"dev_gt": {"n": 1094, "top1": 0.97}},
+                                            "generated_utc": utc(self.t[0])})
+        if rescore:
+            self._w("capacity/e3_rescore.json", {"format": "inc2-e3-rescore/1", "status": "complete", "exam": "dev",
+                                                 "verdict": {"name": "e3_v1.json", "status": status,
+                                                             "qualifying": q, "chosen": ch},
+                                                 "written_utc": utc(self.t[0])})
+
     def native_verdict_file(self, qualifying=(), decided=None):
         """inc2.baseline native-verdict's record (capacity/native_v1.json, dev
         only): each decided arm with its rule's numbers; `qualifying` the arms
@@ -1005,7 +1036,10 @@ class World(object):
         on E2's builds or L23C (no e2_v1.json: no S-case carries E2's verdict
         card); E2-C's three are done with the attribution's rescore record
         (capacity/e2_attr_rescore.json), so none waits on E2-C's builds or
-        L23D (no e2_attr_v1.json: no attribution card)."""
+        L23D (no e2_attr_v1.json: no attribution card); E3's three arms are
+        scored with its rescore record (capacity/e3_score_<arm>.json,
+        e3_rescore.json), so none waits on L23F or L23G (no e3_v1.json: no
+        E3 card)."""
         self.lock()
         if bootstrap:
             self.step1_status()
@@ -1025,6 +1059,8 @@ class World(object):
             self.e2_records(verdict=False)
         if (self.dom.get("e2_attr") or {}).get("arms"):
             self.e2_attr_records(record=False)
+        if (self.dom.get("e3") or {}).get("arms"):
+            self.e3_records()
         self.canary_file()
         self.capacity_file()
         sa = self.dom["stage_a"]

@@ -26,7 +26,7 @@ prints exactly one "INCAP <json>" line (remote.emit).
         admit (run_inc2_stream.sh admit|bootstrap|knowntruth|backfill|scan-holds|eval-hits),
         build (run_inc2_build.sh <pkg>.stream init|build|milestone|fork|feasibility|bisect,
         <pkg>.splits build|lock, <pkg>.baseline build|rescore-native|rescore-agnostic|rescore-e2|
-        rescore-e2-attr,
+        rescore-e2-attr, <pkg>.twostage score-arm|verdict,
         <pkg>.base3 build, <pkg>.pilot4 build).
         Always GPU-shared: the allocation refuses RM-shared ("Invalid qos"),
         and a qos refusal comes back as error_kind 'qos', a platform defect,
@@ -69,7 +69,9 @@ VERBS = {"collect": ("fetch", "intake", "probe"),
 BUILD_VERBS = {"stream": ("init", "build", "milestone", "fork", "feasibility", "bisect"), "splits": ("build", "lock"),
                "baseline": ("build", "rescore-native", "rescore-agnostic", "rescore-e2", "rescore-e2-attr"),
                "pilot4": ("build",),
-               "base3": ("build",)}
+               "base3": ("build",),
+               # E3 (2026-10-05): one arm's scores (L23F) and the verdict (L23G); its score-test is a person's job
+               "twostage": ("score-arm", "verdict")}
 RUN_VERBS = {"stream": ("commit", "compare", "choose-arm", "rollback", "quarantine", "release"),
              "baseline": ("canary-verdict", "capacity-verdict"), "pilot4": ("verdict",)}
 EXIT_BUSY = 3                                   # inc2.stream: another writer holds stream.lease
@@ -87,6 +89,10 @@ E2_JOB_NAME = "inc_build_e2_v1"
 # E2-C (2026-10-04, later): inc2.baseline rescore-e2-attr's job (L23D: E2-C's final runs on dev at 640, then the
 # attribution record), one name for the one record, followed by it the same way
 E2_ATTR_JOB_NAME = "inc_build_e2_attr_v1"
+# E3 (2026-10-05): inc2.twostage score-arm's job per arm (L23F; the arm lower-cased, as run_inc2_build.sh names its
+# provenance e3_score_<arm>) and inc2.twostage verdict's (L23G), followed by them the same way
+E3_SCORE_JOB_NAME = "inc_build_e3_score_%s"
+E3_JOB_NAME = "inc_build_e3_v1"
 PKG_RE = re.compile(r"(?:weed_optimizer_framework\.tools\.)?(?P<pkg>[a-z][a-z0-9_]{0,31})\.(?P<mod>[a-z0-9_]+)\Z")
 SOURCE_RE = re.compile(r"(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}\Z")
 BATCH_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
@@ -563,6 +569,12 @@ def stream_summary(sid, dev_exps=()):
     # and E2-C's test read are for people, never read here)
     put("capacity/e2_attr_v1.json", inc / "capacity" / "e2_attr_v1.json")
     put("capacity/e2_attr_rescore.json", inc / "capacity" / "e2_attr_rescore.json")
+    # E3 (2026-10-05): each arm's score record, the verdict and its rescore's record (dev only; e3_v1_report.*,
+    # the test read's e3_test_*.* and INC_DIR/twostage are for people, never read here)
+    for arm in ("M", "A", "B"):
+        put("capacity/e3_score_%s.json" % arm, inc / "capacity" / ("e3_score_%s.json" % arm))
+    put("capacity/e3_v1.json", inc / "capacity" / "e3_v1.json")
+    put("capacity/e3_rescore.json", inc / "capacity" / "e3_rescore.json")
     try:
         tops = sorted(p.name for p in inc.iterdir() if p.is_dir())   # INC_DIR's top level only, as remote.status
     except OSError:
@@ -681,6 +693,8 @@ BUILD_FLAGS = {
     ("baseline", "rescore-native"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
     ("baseline", "rescore-e2"): {},
     ("baseline", "rescore-e2-attr"): {},
+    ("twostage", "score-arm"): {"--arm": ("arm", _ENUM("M", "A", "B"))},
+    ("twostage", "verdict"): {},
     ("baseline", "rescore-agnostic"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
     ("base3", "build"): {"--stream": ("stream", _NAME)},
     ("pilot4", "build"): {"--exp": ("exp", _NAME), "--from": ("from_exp", _NAME), "--recipes": ("recipes", _RECIPES)},
@@ -699,7 +713,7 @@ REQUIRED = {("collect", "fetch"): ("source", "max_bytes"), ("collect", "intake")
             ("stream", "bisect"): ("stream", "from_pool"), ("baseline", "build"): ("exp", "seeds", "arm", "role"),
             ("baseline", "rescore-native"): ("exp", "reference"),
             ("baseline", "rescore-agnostic"): ("exp", "reference"), ("base3", "build"): ("stream",),
-            ("pilot4", "build"): ("exp", "from_exp", "recipes")}
+            ("pilot4", "build"): ("exp", "from_exp", "recipes"), ("twostage", "score-arm"): ("arm",)}
 
 
 def parse_submit(kind, args):
@@ -749,6 +763,10 @@ def job_name(req, meta):
             return E2_JOB_NAME
         if (req["module"], req["verb"]) == ("baseline", "rescore-e2-attr"):
             return E2_ATTR_JOB_NAME
+        if (req["module"], req["verb"]) == ("twostage", "score-arm"):
+            return E3_SCORE_JOB_NAME % p["arm"].lower()
+        if (req["module"], req["verb"]) == ("twostage", "verdict"):
+            return E3_JOB_NAME
         if (req["module"], req["verb"]) == ("base3", "build"):
             return BASE3_JOB_NAME
         tag = meta.get("child_exp") or (p.get("exp") if req["module"] in ("baseline", "pilot4") else None) \

@@ -51,7 +51,9 @@ Pinned:
   * run_inc2_build.sh: verbs, INC_JOB_SCRIPT, the module drift check, the
     provenance record and the advance of the experiment a stream verb built;
     inc2.baseline rescore-native runs under its own provenance name and is
-    never advanced.
+    never advanced; inc2.twostage's job verbs (score-arm, verdict,
+    score-test, E3) run under e3_score_<arm>, e3_v1 and e3test_<arm>
+    after an import check, never advanced.
 
 Run:  python3 tests/test_inc2_stream.py
 """
@@ -1687,7 +1689,7 @@ def test_build_script():
     # loads semisup_labeler lazily), computed from the real modules, not restated
     code = ("import importlib, sys\n"
             "for m in ('splits', 'baseline', 'pilot4', 'stream', 'stream_report', 'step1_stream', 'guard', 'gate3',"
-            " 'recipes', 'base3', 'scorer_agnostic', 'mask', 'eval_hits', 'train'):\n"
+            " 'recipes', 'base3', 'scorer_agnostic', 'mask', 'eval_hits', 'train', 'twostage'):\n"
             "    importlib.import_module('weed_optimizer_framework.tools.inc2.' + m)\n"
             "for m in ('funnel.embed', 'funnel.leak', 'funnel.estimate', 'semisup_labeler'):\n"
             "    importlib.import_module('weed_optimizer_framework.tools.' + m)\n"
@@ -1744,7 +1746,7 @@ def test_build_script():
             p = root / m
             p.parent.mkdir(parents=True, exist_ok=True)
             base = os.path.basename(m)[:-3]
-            if m.startswith("tools/inc2/") and base in ("stream", "splits", "baseline", "pilot4", "base3"):
+            if m.startswith("tools/inc2/") and base in ("stream", "splits", "baseline", "pilot4", "base3", "twostage"):
                 p.write_text(stub_mod % {"m": base})
             elif m == "tools/inc/driver.py":
                 p.write_text(stub_driver)
@@ -1808,6 +1810,40 @@ def test_build_script():
           p.returncode == 0 and "[stub baseline] rescore-e2-attr" in p.stdout and "[stub driver]" not in p.stdout
           and a.get("status") == "scored" and a.get("build_rc") == 0
           and len((prov("e2_v1") or {}).get("attempts") or []) == 1, (p.returncode, p.stdout[-400:], a))
+    oc = TMP / "sh_open_clip"
+    (oc / "open_clip").mkdir(parents=True, exist_ok=True)
+    (oc / "open_clip" / "__init__.py").write_text("__version__ = 'stub'\n")
+    with_oc = {"PYTHONPATH": str(oc)}
+    for args, name in ((["inc2.twostage", "score-arm", "--arm", "M"], "e3_score_m"),
+                       (["inc2.twostage", "verdict"], "e3_v1"),
+                       (["inc2.twostage", "score-test", "--arm", "B"], "e3test_b")):
+        p = run(args, extra=with_oc)
+        a = ((prov(name) or {}).get("attempts") or [{}])[-1]
+        check("inc2.twostage %s (E3, 2026-10-05): run under the provenance and lock %s with HF_HUB_OFFLINE=1 after the "
+              "import check, recorded as scored, no advance (it builds nothing)" % (" ".join(args[1:]), name),
+              p.returncode == 0 and "[stub twostage] %s" % " ".join(args[1:]) in p.stdout
+              and "[stub driver]" not in p.stdout and a.get("status") == "scored" and a.get("build_rc") == 0
+              and "HF_HUB_OFFLINE=1" in p.stdout and "open_clip stub" in p.stdout,
+              (p.returncode, p.stdout[-500:], p.stderr[-300:], a))
+    p = run(["inc2.twostage", "score-arm", "--arm", "A", "--refuse"], extra=with_oc)
+    a = ((prov("e3_score_a") or {}).get("attempts") or [{}])[-1]
+    check("  an inc2.twostage refusal: its exit status and ERROR line recorded (build_failed), no advance",
+          p.returncode == 1 and a.get("status") == "build_failed" and "[inc2.twostage] ERROR" in str(a.get("refusal"))
+          and "[stub driver]" not in p.stdout, (p.returncode, a))
+    no_oc = TMP / "sh_no_open_clip"
+    (no_oc / "open_clip").mkdir(parents=True, exist_ok=True)
+    (no_oc / "open_clip" / "__init__.py").write_text("raise ImportError('open_clip is not installed here')\n")
+    p = run(["inc2.twostage", "score-arm", "--arm", "B"], extra={"PYTHONPATH": str(no_oc)})
+    a = ((prov("e3_score_b") or {}).get("attempts") or [{}])[-1]
+    check("  without open_clip importable: env_failed before the module runs",
+          p.returncode == 1 and a.get("status") == "env_failed" and "[stub twostage]" not in p.stdout,
+          (p.returncode, a))
+    for args in (["inc2.twostage", "score-arm", "--arm", "Z"], ["inc2.twostage", "score-arm"],
+                 ["inc2.twostage", "score-test"], ["inc2.twostage", "test-read", "--arm", "M"],
+                 ["inc2.twostage", "fit-classifier"]):
+        p = run(args, extra=with_oc)
+        check("  inc2.twostage %s: usage error (exit 2), nothing run" % " ".join(args[1:]),
+              p.returncode == 2 and "usage:" in p.stderr and "[stub" not in p.stdout, (p.returncode, p.stderr[-200:]))
     p = run(["inc2.base3", "build", "--stream", "wsv"])
     a = ((prov("base3_v3") or {}).get("attempts") or [{}])[-1]
     check("inc2.base3 build (L23V, 2026-10-03): run under the provenance and lock base3_v3 with HF_HUB_OFFLINE=1, "

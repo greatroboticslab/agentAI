@@ -388,6 +388,18 @@ def price(lid, params, dom, info=None):
         per = float(cost(dom, "rescore_hours_per_run"))
         return round(runs * per, 3), dict(detail, runs=runs, hours_per_run=per,
                                           why="scoring only: one pass per final run, no training")
+    if kind == "e3_score":
+        # E3 (2026-10-05): one arm's scoring job, priced per arm-seed (dev and the reported passes), plus
+        # the classifier's fit, the dev ground-truth crops and the equivalence check in the first arm's job
+        runs = int(info.get("runs") or seeds)
+        per = float(cost(dom, "e3_hours_per_run"))
+        fit = float(cost(dom, "e3_fit_hours")) if info.get("fit") else 0.0
+        return round(runs * per + fit, 3), dict(detail, runs=runs, hours_per_run=per, fit_hours=fit,
+                                                why="scoring only: one arm's seeds, and the classifier's one fit in "
+                                                    "the first arm's job")
+    if kind == "e3_verdict":
+        h = float(cost(dom, "e3_verdict_hours"))
+        return h, dict(detail, job_hours=h, why="E3's verdict: the paired bootstraps on the dev files, no pass")
     factor = arm_factor(dom, p.get("arm") or info.get("arm"))
     recipes = tuple(x for x in str(p.get("recipes") or info.get("recipes") or "r0").split(",") if x)
     finals = float(cost(dom, "finals_hours"))

@@ -1271,6 +1271,10 @@ def stage_e1_base3(w):
           len(e2) == 9 and not [e for e in w.events("proposed") if e.get("lever") in ("L23C", "L23D")
                                 or (e.get("lever") == "L23B" and e.get("child_exp") in e2)]
           and not [x for x in e2 if (INC / x).exists()], e2)
+    check("E3 (2026-10-05) is never scored here: it requires E2's decided verdict, which this world never reaches (no "
+          "L23F, no L23G, no twostage directory)",
+          not [e for e in w.events("proposed") if e.get("lever") in ("L23F", "L23G")]
+          and not (INC / "twostage").exists() and not list((INC / "capacity").glob("e3_*")))
 
 
 def d28_now(w):
@@ -1360,10 +1364,10 @@ def stage_milestone2_rollback(w):
     check("milestone 2 vs milestone 1 on dev: hurts (one-sided permutation p %s <= 0.025, lower mean), rollback "
           "recommended to P_1" % c.get("perm_p"), c.get("verdict") == "hurts" and c.get("rollback_recommended")
           and c.get("to_pool") == "P_1" and c.get("compared_with") == "%s_m001" % w.sid, c)
-    # the measurement arms' builds and rescores (L23B, L23N; E1's L23V, L23E; E2's L23C; E2-C's L23D: record only,
-    # R0 long complete) may take the idle MAINT lane between them
+    # the measurement arms' builds and rescores (L23B, L23N; E1's L23V, L23E; E2's L23C; E2-C's L23D; E3's L23F,
+    # L23G: record only, R0 long complete) may take the idle MAINT lane between them
     maint = [lv for lv, ln in w.executed() if ln == "MAINT"
-             and lv not in ("L23B", "L23N", "L23V", "L23E", "L23C", "L23D")]
+             and lv not in ("L23B", "L23N", "L23V", "L23E", "L23C", "L23D", "L23F", "L23G")]
     tail_ = maint[maint.index("L21") - 2:] if "L21" in maint else maint
     lcs = [e for e in w.events("proposed") if e.get("lever") == "LC"]
     check("the autopilot ran L20, LC, then L21 (D25), L27 (bisect) and LC (compare --exp on a bisect arm), and no "

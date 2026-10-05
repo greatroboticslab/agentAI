@@ -1581,7 +1581,8 @@ def s_r0():
     rescore L23E), E2 (2026-10-04: once E1's verdict qualifies E1-B, its six
     single-seed builds L23B --e2 W|S), E2-C (2026-10-04, later: its three
     builds L23B --e2 C), E2's rescore and verdict L23C, then E2-C's
-    attribution L23D, then the first segment."""
+    attribution L23D, E3 (2026-10-05: its three arms' scoring jobs L23F
+    in the order M, A, B, then its verdict L23G), then the first segment."""
     w = World("r0")
     w.lock()
     w.step1_status()
@@ -1762,6 +1763,24 @@ def s_r0():
           and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23D"] == ["envelope"]
           and [x["name"] for x in w.submits if "rescore-e2-attr" in x["argv"]] == ["inc_build_e2_attr_v1"]
           and (w.inc / "capacity" / "e2_v1.json").read_bytes() == e2v, tail(pd, 2))
+    # 2026-10-05: E3. E2's verdict decided and E2-C's attribution recorded: one scoring job per arm, M, A, B, then
+    # E3's verdict, each once, within the envelope
+    pf = []
+    for arm in ("M", "A", "B"):
+        pf.append(_step(w, "L23F", lambda arm=arm: (w.job_done("inc_build_e3_score_%s" % arm.lower()),
+                                                    w.e3_records(arms=(arm,), rescore=False))))
+    check("E3: then L23F three times (inc2.twostage score-arm --arm M, A, B), in order, within the envelope, each one "
+          "job named inc_build_e3_score_<arm>; the grammar reads --arm",
+          [tail(x, 4) for x in pf] == [[MOD + "inc2.twostage", "score-arm", "--arm", k] for k in "MAB"]
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23F"] == ["envelope"] * 3
+          and [x["name"] for x in w.submits if "score-arm" in x["argv"]] == ["inc_build_e3_score_%s" % k
+                                                                             for k in "mab"], [tail(x, 4) for x in pf])
+    pg = _step(w, "L23G", lambda: (w.job_done("inc_build_e3_v1"), w.e3_records(arms=(), verdict=True)))
+    check("  then L23G once (inc2.twostage verdict), within the envelope, one job named inc_build_e3_v1; capacity/"
+          "e2_v1.json unchanged", tail(pg, 2) == [MOD + "inc2.twostage", "verdict"]
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23G"] == ["envelope"]
+          and [x["name"] for x in w.submits if x["argv"][-1] == "verdict"] == ["inc_build_e3_v1"]
+          and (w.inc / "capacity" / "e2_v1.json").read_bytes() == e2v, tail(pg, 2))
     w.tick(2)
     check("  once both exist, no measurement arm is proposed again, nor its rescore",
           [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_m832") == 1
@@ -1775,7 +1794,7 @@ def s_r0():
     check("the whole sequence ran by the platform, in order, one MAINT item at a time, each once",
           lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure)
           + ["L23V"] + ["L23B"] * len(e1) + ["L23N"] * len(measure) + ["L23E"] + ["L23B"] * len(e2)
-          + ["L23B"] * len(e2c) + ["L23C", "L23D"], lv)
+          + ["L23B"] * len(e2c) + ["L23C", "L23D"] + ["L23F"] * 3 + ["L23G"], lv)
 
 
 def _commits_ev(segments, ctx):

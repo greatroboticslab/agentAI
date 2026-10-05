@@ -17,6 +17,8 @@ Three lanes, one item in flight per lane:
                 build) | AGNOSTIC (L23E, E1's agnostic rescore and verdict)
                 | E2_VERDICT (L23C, E2's rescore and verdict)
                 | E2_ATTR (L23D, E2-C's attribution rescore and record)
+                | E3_SCORE (L23F, one E3 arm's two-stage dev scores)
+                | E3_VERDICT (L23G, E3's verdict)
                 | MILESTONE (L20) | COMPARE (LC)
                 | ROLLBACK (L21) | BISECT (L27) | AUDIT (L4) -> IDLE
 
@@ -162,24 +164,27 @@ LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "D
            "L16RL": "DATA", "L16I": "DATA", "L16S": "DATA", "L17": "DATA", "L24": "STOP", "LH": "DATA",
            "L18": "TRAIN", "L19": "TRAIN", "L22": "TRAIN",
            "L20": "MAINT", "L21": "MAINT", "L23": "MAINT", "L23B": "MAINT", "L23N": "MAINT", "L23V": "MAINT",
-           "L23E": "MAINT", "L23C": "MAINT", "L23D": "MAINT", "L25": "MAINT",
+           "L23E": "MAINT", "L23C": "MAINT", "L23D": "MAINT", "L23F": "MAINT", "L23G": "MAINT", "L25": "MAINT",
            "L27": "MAINT", "L28": "MAINT", "L4": "MAINT", "LV": "MAINT", "LI": "MAINT", "LA": "MAINT", "LC": "MAINT"}
 # Record-only levers (a measurement arm's native-resolution rescore, L23N;
 # E1's base v3 build, L23V, and its agnostic rescore, L23E, 2026-10-03; E2's
 # rescore and verdict, L23C, 2026-10-04; E2-C's attribution rescore and
-# record, L23D, 2026-10-04, later): a
+# record, L23D, 2026-10-04, later; E3's scores of one arm, L23F, and its
+# verdict, L23G, 2026-10-05): a
 # failure is a person's card, never a failed step of its lane (no stop-loss
 # counts it), and the item is not proposed again (_failed); a submission whose
 # outcome is unknown is followed by its job name and its record, never a pause
 # (_follow_record_only). A qos refusal is a platform defect and holds the lane
 # as for every lever (S21).
-RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E", "L23C", "L23D")
-# The failure card title of each record-only lever (_failed; "%s" is its --exp)
+RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E", "L23C", "L23D", "L23F", "L23G")
+# The failure card title of each record-only lever (_failed; "%s" is its --exp, or L23F's --arm)
 RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
                       "L23V": "Base v3 build (splits v3, E1) failed (L23V)",
                       "L23E": "E1's agnostic rescore of %s failed (L23E)",
                       "L23C": "E2's 12-class rescore and verdict failed (L23C)",
-                      "L23D": "E2-C's attribution rescore and record failed (L23D)"}
+                      "L23D": "E2-C's attribution rescore and record failed (L23D)",
+                      "L23F": "E3's two-stage scores of arm %s failed (L23F)",
+                      "L23G": "E3's verdict failed (L23G)"}
 # A measurement arm's build (L23B of a baselines item marked measure) whose job
 # ran and ended without its experiment: record only as well (a card; no lane
 # failure; DR0 skips the item, /stage/baselines says failed), since no lane
@@ -1299,13 +1304,22 @@ class StreamRun(object):
         ear = self._artifact((self.dom.get("e2_attr") or {}).get("rescore_record")
                              or "capacity/e2_attr_rescore.json") or {}
         e2_attr = "done" if ear.get("status") == "complete" else (r0.get("e2_attr") or "missing")
+        # E3 (2026-10-05): an arm's scores (L23F) are done once capacity/e3_score_<arm>.json says complete, else
+        # what the platform ran; E3's verdict (L23G) once capacity/e3_rescore.json says complete
+        e3d = self.dom.get("e3") or {}
+        e3_score = {}
+        for x in e3d.get("order") or []:
+            rec = self._artifact((e3d.get("score_records") or {}).get(x) or "capacity/e3_score_%s.json" % x) or {}
+            e3_score[x] = "done" if rec.get("status") == "complete" else (r0.get("e3_score_%s" % x) or "missing")
+        e3r = self._artifact(e3d.get("rescore_record") or "capacity/e3_rescore.json") or {}
+        e3 = "done" if e3r.get("status") == "complete" else (r0.get("e3") or "missing")
 
         def state_of(exp, key):
             x = exp_status.get(exp)
             return x if x in ("done", "built") else ("building" if r0.get(key) == "building" else "missing")
         return {"lock": bool(lock.get("locked")), "splits_built": bool(r0.get("splits_built")),
                 "train_manifests": lock.get("train_manifests") or [], "baselines": base, "native": native,
-                "base3": base3, "agnostic": agnostic, "e2": e2, "e2_attr": e2_attr,
+                "base3": base3, "agnostic": agnostic, "e2": e2, "e2_attr": e2_attr, "e3_score": e3_score, "e3": e3,
                 "exp_status": exp_status, "verdicts": dict(r0.get("verdicts") or {}),
                 "protocol_v3_accepted": bool(self.cfg.get("protocol_v3_accepted_by")),
                 "stage_a": {"exp": sa_exp, "status": state_of(sa_exp, "stage_a")},
@@ -1431,6 +1445,8 @@ class StreamRun(object):
         self._e2_card()
         # E2-C's decided attribution (2026-10-04, later): one card, and E2-C's test read beside the headline
         self._e2_attr_card()
+        # E3's decided verdict (2026-10-05): one card, with each qualifying arm's test read, a person's step
+        self._e3_card()
         # cards and holds
         for d in fired:
             for lv in d.get("levers") or []:
@@ -1795,6 +1811,7 @@ class StreamRun(object):
                 "L24": "QUARANTINE", "LH": "HOLD_RELEASE", "L18": "SEGMENT", "L19": "COMMIT", "L22": "FORK",
                 "L20": "MILESTONE", "L21": "ROLLBACK", "L23": "SPLITS", "L23B": "BASELINE", "L23N": "NATIVE",
                 "L23V": "BASE3", "L23E": "AGNOSTIC", "L23C": "E2_VERDICT", "L23D": "E2_ATTR",
+                "L23F": "E3_SCORE", "L23G": "E3_VERDICT",
                 "L25": "STAGE_A", "L27": "BISECT",
                 "L28": "STAGE_C", "L4": "AUDIT", "LV": "VERDICT", "LI": "INIT", "LA": "ARM",
                 "LC": "COMPARE"}.get(lever, "ITEM")
@@ -2033,6 +2050,18 @@ class StreamRun(object):
             # one scoring pass per E2-C final run (three) and per E2-W and reference final run whose file may be
             # missing (six), as L23C's are priced
             info["runs"] = sum(nseeds(b) for v_ in arms.values() for b in v_) + nseeds(rb)
+        elif lever == "L23F":
+            e3 = dom.get("e3") or {}
+            order = list(e3.get("order") or [])
+            if pr.get("arm") not in order:
+                return None
+            params = {"pkg": pkg, "arm": pr["arm"]}
+            # its three arm-seeds (dev and the reported passes); the first arm's job also fits the
+            # classifier, takes the dev ground-truth accuracy and runs the equivalence check
+            info["runs"] = len(e3.get("seeds") or [0, 1, 2])
+            info["fit"] = pr["arm"] == order[0]
+        elif lever == "L23G":
+            params = {"pkg": pkg}
         elif lever == "L25":
             sa = dom.get("stage_a") or {}
             params = {"pkg": pkg, "exp": sa["exp"], "from_exp": sa["from_exp"], "recipes": sa["recipes"]}
@@ -2730,6 +2759,10 @@ class StreamRun(object):
             r0["e2"] = "running"
         elif lever == "L23D":
             r0["e2_attr"] = "running"
+        elif lever == "L23F":
+            r0["e3_score_%s" % params.get("arm")] = "running"
+        elif lever == "L23G":
+            r0["e3"] = "running"
         elif lever == "L25":
             r0["stage_a"] = "building"
         elif lever == "L28":
@@ -2847,9 +2880,11 @@ class StreamRun(object):
             b = self._native_item(params)
             if b:
                 st["stage"].setdefault("r0", {})["native_%s" % b["id"]] = "done"
-        elif lever in ("L23V", "L23E", "L23C", "L23D"):
+        elif lever in ("L23V", "L23E", "L23C", "L23D", "L23G"):
             st["stage"].setdefault("r0", {})[{"L23V": "base3", "L23E": "agnostic", "L23C": "e2",
-                                              "L23D": "e2_attr"}[lever]] = "done"
+                                              "L23D": "e2_attr", "L23G": "e3"}[lever]] = "done"
+        elif lever == "L23F":
+            st["stage"].setdefault("r0", {})["e3_score_%s" % params.get("arm")] = "done"
         elif lever == "LV":
             key = p.get("verdict_key") or params.get("exp") or params.get("verb")
             st["stage"]["r0"].setdefault("verdicts", {})[key] = self.utc
@@ -2944,13 +2979,22 @@ class StreamRun(object):
             elif lever == "L23D":
                 r0["e2_attr"] = "failed"
                 rerun = "inc2.baseline rescore-e2-attr (sbatch run_inc2_build.sh inc2.baseline rescore-e2-attr)"
+            elif lever == "L23F":
+                r0["e3_score_%s" % params.get("arm")] = "failed"
+                rerun = ("inc2.twostage score-arm --arm %s (sbatch run_inc2_build.sh inc2.twostage score-arm --arm %s; "
+                         "E3's other arms wait until its record is complete, and E3's verdict (L23G) needs all three "
+                         "arms; E2-C's attribution (L23D) never waits for E3)" % (params.get("arm"), params.get("arm")))
+            elif lever == "L23G":
+                r0["e3"] = "failed"
+                rerun = ("inc2.twostage verdict (sbatch run_inc2_build.sh inc2.twostage verdict; it needs all three "
+                         "arms' scores; E2-C's attribution (L23D) never waits for E3)")
             else:
                 rerun = "the lever's command"
             st["declined"] = (list(st.get("declined") or []) + [p["id"]])[-200:]
             self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
                          charged=charged, record_only=True)
             title = RECORD_ONLY_TITLES[lever]
-            self._card("escalation", title % params.get("exp") if "%s" in title else title,
+            self._card("escalation", title % (params.get("exp") or params.get("arm")) if "%s" in title else title,
                        "%s. Record only: the stream runs on and it is not proposed again; a person reruns %s or "
                        "leaves it" % (_short(why, 400), rerun), lever=lever, trigger=list(p.get("trigger") or []))
             self._clear(ln)
@@ -3628,16 +3672,22 @@ class StreamRun(object):
             return SR.E2_JOB_NAME, "capacity/e2_rescore.json"
         if it["lever"] == "L23D":
             return SR.E2_ATTR_JOB_NAME, "capacity/e2_attr_rescore.json"
+        if it["lever"] == "L23F":
+            arm = str(prm.get("arm"))
+            return SR.E3_SCORE_JOB_NAME % arm.lower(), "capacity/e3_score_%s.json" % arm
+        if it["lever"] == "L23G":
+            return SR.E3_JOB_NAME, "capacity/e3_rescore.json"
         return SR.NATIVE_JOB_NAME % prm.get("exp"), "%s/native_rescore.json" % prm.get("exp")
 
     def _follow_record_only(self, ln, it, queued, names, arts):
-        """A record-only item (L23N, L23V, L23E, L23C, L23D) whose
-        submission's outcome is unknown: it runs while a job of its name is
-        queued; then it is done once its record (<exp>/native_rescore.json,
-        splits/v3/summary.json, <exp>/agnostic_rescore.json,
-        capacity/e2_rescore.json, capacity/e2_attr_rescore.json) says
-        complete, and failed (record only: a card) after
-        BUILD_LOST_SNAPSHOTS snapshots with neither."""
+        """A record-only item (L23N, L23V, L23E, L23C, L23D, L23F, L23G)
+        whose submission's outcome is unknown: it runs while a job of its
+        name is queued; then it is done once its record
+        (<exp>/native_rescore.json, splits/v3/summary.json,
+        <exp>/agnostic_rescore.json, capacity/e2_rescore.json,
+        capacity/e2_attr_rescore.json, capacity/e3_score_<arm>.json,
+        capacity/e3_rescore.json) says complete, and failed (record only: a
+        card) after BUILD_LOST_SNAPSHOTS snapshots with neither."""
         job, record = self._record_only_follow(it)
         if queued is None or job in names:
             return
@@ -3927,6 +3977,60 @@ class StreamRun(object):
                                             "one-class pre-training, not data scale")
         self._card("research", title, "\n".join(lines), trigger=["L23D"])
         st["e2_attr_card"] = self.utc
+
+    def _e3_card(self):
+        """One card once E3's verdict (capacity/e3_v1.json, shipped) is
+        decided: each arm's D, 2 pooled sd, SE and whether it qualifies, the
+        choice, the attribution (E3-B - E3-A) and what it is credited to,
+        the classifier's dev ground-truth top-1 and each arm's stage-1
+        agnostic AP, and for each qualifying arm the exact commands of a
+        person's one read of its sealed test (reported against 0.8786, the
+        gap to 0.90; the chosen arm's is E3's headline). Raised once (state
+        e3_card)."""
+        st = self.st
+        if st.get("e3_card"):
+            return
+        rec = ((self.dom or {}).get("e3") or {}).get("record") or "capacity/e3_v1.json"
+        v = self._artifact(rec) or {}
+        if v.get("status") != "decided":
+            return
+        order = list(((self.dom or {}).get("e3") or {}).get("order") or ["M", "A", "B"])
+        q = [k for k in v.get("qualifying") or [] if k in order]
+        chosen = v.get("chosen")
+        lines = []
+        for k in order:
+            a = (v.get("arms") or {}).get(k) or {}
+            if a.get("status") == "decided":
+                s1 = ((a.get("reported") or {}).get("stage1_agnostic") or {}).get("mean")
+                lines.append("E3-%s: D %s, 2 x pooled sd %s, SE %s -> %s (stage-1 agnostic %s)" % (
+                    k, _fmt4(a.get("diff")), _fmt4(a.get("two_pooled_sd")), _fmt4(a.get("se_diff")),
+                    "qualifies" if a.get("qualifies") else "does not qualify", _fmt4(s1)))
+        at = v.get("attribution") or {}
+        if at.get("status") == "decided":
+            lines.append("Attribution E3-B - E3-A: D_data %s, 2 x pooled sd %s, SE %s -> %s" % (
+                _fmt4(at.get("diff")), _fmt4(at.get("two_pooled_sd")), _fmt4(at.get("se_diff")),
+                "E3's box gain is credited to base v3's data" if at.get("credited_to_data")
+                else "not credited to base v3's data"))
+        dg = (v.get("reported") or {}).get("dev_gt") or {}
+        if dg.get("top1") is not None:
+            lines.append("The classifier on dev's ground-truth crops: top-1 %s (%s crops)" % (_fmt4(dg.get("top1")),
+                                                                                         dg.get("n")))
+        if q:
+            title = "E3's verdict: E3-%s qualif%s" % (", E3-".join(q), "ies" if len(q) == 1 else "y")
+            if chosen in q:
+                title += " (chosen: E3-%s)" % chosen
+                lines.append("E3's choice is E3-%s (the largest D; a tie goes to M, then A, then B): its sealed test "
+                             "is E3's headline number. Nothing switches." % chosen)
+            for k in q:
+                lines.append("A person reads E3-%s's sealed test once: python -m weed_optimizer_framework.tools.inc2."
+                             "twostage test-read --arm %s, submit the printed sbatch argv, then python -m "
+                             "weed_optimizer_framework.tools.inc2.twostage test-report --arm %s (reported against "
+                             "b_v2_m640's 0.8786, with the gap to 0.90)." % (k, k, k))
+        else:
+            lines.append("No arm qualifies: no test is read; nothing switches.")
+            title = "E3's verdict: no arm qualifies"
+        self._card("research", title, "\n".join(lines), trigger=["L23G"])
+        st["e3_card"] = self.utc
 
     def _measure_exps(self):
         """The measurement arms' experiments (baselines marked measure)."""

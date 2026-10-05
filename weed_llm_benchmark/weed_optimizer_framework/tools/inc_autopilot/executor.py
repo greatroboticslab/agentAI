@@ -156,6 +156,7 @@ STREAM_ENVELOPE_LEVERS = {"L18": ("inc_build_segment",), "L20": ("inc_build_cons
                           "L23B": ("inc_build_baseline_v2",), "L23N": ("inc_rescore_native",),
                           "L23V": ("inc_build_base3",), "L23E": ("inc_rescore_agnostic",),
                           "L23C": ("inc_rescore_e2",), "L23D": ("inc_rescore_e2_attr",),
+                          "L23F": ("inc_score_e3",), "L23G": ("inc_verdict_e3",),
                           "L25": ("inc_build_pilot4",), "L27": ("inc_build_consolidation",),
                           "L28": ("inc_build_segment",), "LI": ("inc_stream_init",)}
 # The R2 data levers that run directly only with data_autonomy on, a stream
@@ -187,7 +188,8 @@ REMOTE_TIMEOUT_S = {"inc_snapshot": 300, "inc_report": 300, "inc_advance": 240,
                     "inc_stream_rollback": 600, "inc_stream_quarantine": 300, "inc_stream_release": 300,
                     "inc_stream_init": 300, "inc_stream_choose_arm": 600, "inc_stream_compare": 600,
                     "inc_stream_verdict": 600, "inc_rescore_native": 300, "inc_build_base3": 300,
-                    "inc_rescore_agnostic": 300, "inc_rescore_e2": 300, "inc_rescore_e2_attr": 300}
+                    "inc_rescore_agnostic": 300, "inc_rescore_e2": 300, "inc_rescore_e2_attr": 300,
+                    "inc_score_e3": 300, "inc_verdict_e3": 300}
 DEFAULT_REMOTE_TIMEOUT_S = 120
 # ssh's own messages for a connection that was never made (read off the last
 # stderr line of a call that printed nothing): the remote command never ran.
@@ -371,6 +373,10 @@ ARGV_FORMS = {
     # E2-C (2026-10-04, later): L23D scores E2-C's final runs on dev at 640 (and any missing E2-W or reference file)
     # and records the attribution (inc2.baseline rescore-e2-attr; its experiments are pre-registered: no flag)
     "inc_rescore_e2_attr": ("{pkg}.baseline", "rescore-e2-attr", (), ("pkg",)),
+    # E3 (2026-10-05): L23F scores one E3 arm on dev (and the reported passes; the first arm also fits the
+    # classifier and runs the equivalence check), L23G records E3's verdict (inc2.twostage score-arm, verdict)
+    "inc_score_e3": ("{pkg}.twostage", "score-arm", (("--arm", "arm", "str"),), ("pkg", "arm")),
+    "inc_verdict_e3": ("{pkg}.twostage", "verdict", (), ("pkg",)),
     "inc_stream_collect": ("run_inc_collect.sh", "fetch",
                            (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
                             ("--candidates", "candidates", "str")),
@@ -403,7 +409,7 @@ ARGV_FORMS = {
 STREAM_REMOTE = {"inc_build_segment": "build", "inc_build_consolidation": "build", "inc_splits_build": "build",
                  "inc_build_baseline_v2": "build", "inc_build_pilot4": "build", "inc_rescore_native": "build",
                  "inc_build_base3": "build", "inc_rescore_agnostic": "build", "inc_rescore_e2": "build",
-                 "inc_rescore_e2_attr": "build",
+                 "inc_rescore_e2_attr": "build", "inc_score_e3": "build", "inc_verdict_e3": "build",
                  "inc_stream_collect": "collect", "inc_stream_collect_review": "collect",
                  "inc_stream_intake": "collect", "inc_stream_probe": "collect", "inc_stream_admit": "admit",
                  "inc_stream_commit": "run", "inc_stream_rollback": "run", "inc_stream_quarantine": "run",

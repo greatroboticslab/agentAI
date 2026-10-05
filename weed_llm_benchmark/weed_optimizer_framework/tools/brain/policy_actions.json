@@ -2446,6 +2446,77 @@
       ],
       "description": "Lever L23D (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-04, later: E2-C, the attribution control, pre-registered): inc2.baseline rescore-e2-attr scores E2-C's three final runs on dev at 640 (inc2.scorer_native, the locked scorer as a library; never test, never a protocol score) and records the attribution of E2's result (capacity/e2_attr_v1.json, dev only: D_data = E2-W - E2-C) and its record (capacity/e2_attr_rescore.json). Record only: nothing switches and capacity/e2_v1.json is never rewritten."
     },
+    "inc_score_e3": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.twostage score-arm --arm {arm}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "arm": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "M",
+            "A",
+            "B"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 2.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that scores, never trains a detector: one E3 arm's three seeds on dev, its reported passes (ImageWeeds; E3-M's agnostic-NMS dev reading) and, in the first arm's job, the classifier's one fit, the dev ground-truth crops and the equivalence check. est_gpu_hours is levers_stream.price's 'e3_score' estimate (stream-domain cost e3_hours_per_run per arm-seed, plus e3_fit_hours in the first arm's job, est.), charged to the campaign envelope and settled from sacct when the job ends."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23F (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-05: E3, two-stage species detection, pre-registered): inc2.twostage score-arm --arm M|A|B scores one E3 arm on dev (a stage-1 detector's locked-scorer boxes named by one BioCLIP-2 classifier, through the locked scorer's own matching and AP; never test, never a protocol score) and writes capacity/e3_score_<arm>.json (dev only). The first arm's job also fits the classifier once (pinned) and runs the identity equivalence check. Record only: nothing switches."
+    },
+    "inc_verdict_e3": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.twostage verdict",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that reads E3's dev files and runs the paired image bootstraps (CPU): no pass. est_gpu_hours is levers_stream.price's 'e3_verdict' estimate (stream-domain cost e3_verdict_hours, est.), settled from sacct when the job ends."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23G (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-05: E3, pre-registered): inc2.twostage verdict records E3's pre-registered verdict (capacity/e3_v1.json, dev only) and its record (capacity/e3_rescore.json). Record only: nothing switches; a person reads each qualifying arm's sealed test once (inc2.twostage test-read)."
+    },
     "inc_build_pilot4": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.pilot4 build --exp {exp} --from {from_exp} --recipes {recipes}",
       "param_bounds": {

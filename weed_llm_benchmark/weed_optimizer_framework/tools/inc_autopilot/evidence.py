@@ -134,7 +134,7 @@ VERIFIER_FIT_INFO = "verifier_fit_info.json"   # remote.py's projection of step1
 
 EXP_RE = r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}"
 RESERVED_DIRS = ("step1", "splits", "exams", "logs", "audit", "funnel",   # INC_DIR entries that are not experiments
-                 "stream", "step1_stream", "intake")
+                 "stream", "step1_stream", "intake", "twostage")
 ROOT_AUDIT = "audit/%s_audit.json"          # a label audit run with --out $INC/audit/<exp>_audit.json
 EXP_FILES = ("exp.json", "state.json", "report.json", "build_summary.json", "ledger.jsonl",
              "audit/label_audit.json", "manifests/increments_summary.json")
@@ -185,7 +185,13 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # sealed test) are never on the list; E2-C's (2026-10-04, later):
 # capacity/e2_attr_v1.json (the attribution record, dev only) and
 # capacity/e2_attr_rescore.json (inc2.baseline rescore-e2-attr: the dev files'
-# names and sha256s and the record's sha256), never e2_attr_v1_report.md. A Step 1 sidecar,
+# names and sha256s and the record's sha256), never e2_attr_v1_report.md; E3's
+# (2026-10-05): capacity/e3_score_<M|A|B>.json (inc2.twostage score-arm: the
+# dev files' names and sha256s), capacity/e3_v1.json (E3's verdict, dev only)
+# and capacity/e3_rescore.json (inc2.twostage verdict: the records' names and
+# sha256s); e3_v1_report.* (ImageWeeds, for people), e3_test_*.*, the
+# classifier's pin and INC_DIR/twostage/ (a reserved directory) are never on
+# the list. A Step 1 sidecar,
 # step1_stream/eval_hits/<batch>.json, is not on the list: status.json carries
 # its fold, and the sidecar names each hit's matched evaluation key. A stream
 # ledger has no experiment: it is kept as a JSON list artifact, not under
@@ -202,7 +208,8 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"intake/(?P<batch>%s)/(?:summary|eval_hits)\.json\Z" % BATCH_RE,
     r"intake/(?P<file>sources|placement)\.json\Z",
     r"splits/(?P<ver>v[0-9]{1,3})/lock_status\.json\Z",
-    r"capacity/(?:(?:capacity|native|e1|e2|e2_attr)_v1|e2_rescore|e2_attr_rescore)\.json\Z",
+    r"capacity/(?:(?:capacity|native|e1|e2|e2_attr|e3)_v1|e2_rescore|e2_attr_rescore|e3_rescore|e3_score_[MAB])"
+    r"\.json\Z",
     r"splits/v3/summary\.json\Z",
     r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore|agnostic_rescore)\.json\Z"
     % ("|".join(RESERVED_DIRS), EXP_RE),

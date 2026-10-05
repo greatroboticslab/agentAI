@@ -13,7 +13,10 @@ single-seed builds gated on E1-B qualifying, priced from their image-epochs,
 then L23C once, record only; a failed build is a card; one verdict card;
 E2-C, 2026-10-04, later: three builds after E2's six under E2's gate and
 E1-A done, then L23D once after E2's verdict, record only; one attribution
-card; on a forked stream version as well), the
+card; on a forked stream version as well; E3, 2026-10-05: one scoring job
+per arm (L23F, M, A, B) once E2's verdict is decided, the sources done and
+E2-C's attribution settled, then L23G once, record only; one card with the
+test-read commands), the
 dispositions, the replay gate's stream cases, the
 config and the campaign dispatch, and the lab runner. No network, no GPU, no
 ssh.
@@ -65,6 +68,8 @@ PARAMS = {
     "L23E": {"pkg": "inc2", "exp": "e1_b_m640", "reference": "e1_a_m640"},
     "L23C": {"pkg": "inc2"},
     "L23D": {"pkg": "inc2"},
+    "L23F": {"pkg": "inc2", "arm": "M"},
+    "L23G": {"pkg": "inc2"},
     "LV": {"pkg": "inc2", "module": "baseline", "verb": "canary-verdict", "exp": "canary_v2"},
     "LI": {"pkg": "inc2", "stream": "weed_stream_v1", "stage_b": "r0,x1a"},
     "LA": {"pkg": "inc2", "stream": "weed_stream_v1"},
@@ -169,8 +174,9 @@ def t_menu():
     check("the gated R2 levers and the envelope levers are the contract's (and LI, the stream's creation)",
           LS.gated_r2() == ("L16", "L17", "L24")
           and set(LS.envelope_levers()) == {"L18", "L20", "L21", "L22", "L23B", "L23N", "L23V", "L23E", "L23C", "L23D",
-                                            "L25", "L27", "L28", "LI"} and "inc_rescore_e2" in AP.ENVELOPE_ACTIONS
-          and "inc_rescore_e2_attr" in AP.ENVELOPE_ACTIONS)
+                                            "L23F", "L23G", "L25", "L27", "L28", "LI"}
+          and "inc_rescore_e2" in AP.ENVELOPE_ACTIONS and "inc_rescore_e2_attr" in AP.ENVELOPE_ACTIONS
+          and "inc_score_e3" in AP.ENVELOPE_ACTIONS and "inc_verdict_e3" in AP.ENVELOPE_ACTIONS)
     check("the executor's gated actions cover L16 (fetch on the cluster or the lab, intake), L17 and L24",
           set(X.GATED_R2_ACTIONS.values()) == {"L16", "L17", "L24"})
     check("every envelope action of a stream lever is in approvals.ENVELOPE_ACTIONS",
@@ -2843,6 +2849,284 @@ def _t_e2c_fork():
           (pro, [e.get("lever") for e in w.events("proposed")]))
 
 
+def _e3_world(tag, records=False, e2_decided=True):
+    """R0 complete, E1, E2 and E2-C done with their records (E2's verdict decided with no qualifying arm, the
+    attribution's rescore record complete); E3's records missing (with records: kept)."""
+    w = World(tag)
+    w.ready_r0()
+    if not records:
+        for f in ("capacity/e3_score_M.json", "capacity/e3_score_A.json", "capacity/e3_score_B.json",
+                  "capacity/e3_rescore.json"):
+            (w.inc / f).unlink()
+    w.e2_records(qualifying=(), chosen=None, status="decided" if e2_decided else "pending")
+    return w
+
+
+def _e3_pro(w, lever="L23F"):
+    return [e for e in w.events("proposed") if e.get("lever") == lever]
+
+
+def _arm(e):
+    """The --arm of a proposed L23F (the ledger's proposal line carries its argv)."""
+    a = e.get("argv") or []
+    return a[a.index("--arm") + 1] if "--arm" in a else None
+
+
+def _e3_step(w, arm):
+    """E3 arm `arm`'s job ends with its score record complete."""
+    w.job_done("inc_build_e3_score_%s" % arm.lower())
+    w.e3_records(arms=(arm,), rescore=False)
+
+
+def t_e3():
+    section("E3 (2026-10-05): one scoring job per arm (L23F) in the order M, A, B once E2's verdict is decided, the "
+            "sources are done and E2-C's attribution is settled; then L23G once; record only; one card")
+    dom = LS.load_domain("weed")
+    e3 = dom["e3"]
+    check("the domain's e3 block: arms M b_v2_m640, A e1_a_m640, B e1_b_m640, order M, A, B, seeds 0-2, the records; "
+          "the costs 0.25 per arm-seed, 0.75 for the fit, 0.5 for the verdict",
+          e3["arms"] == {"M": "b_v2_m640", "A": "e1_a_m640", "B": "e1_b_m640"} and e3["order"] == ["M", "A", "B"]
+          and e3["seeds"] == [0, 1, 2] and e3["record"] == "capacity/e3_v1.json"
+          and e3["rescore_record"] == "capacity/e3_rescore.json"
+          and e3["score_records"] == {k: "capacity/e3_score_%s.json" % k for k in "MAB"}
+          and (dom["cost"]["e3_hours_per_run"], dom["cost"]["e3_fit_hours"], dom["cost"]["e3_verdict_hours"])
+          == (0.25, 0.75, 0.5), e3)
+    pm, dm = LS.price("L23F", {"pkg": "inc2", "arm": "M"}, dom, {"runs": 3, "fit": True})
+    pa, _d = LS.price("L23F", {"pkg": "inc2", "arm": "A"}, dom, {"runs": 3, "fit": False})
+    pg, dg = LS.price("L23G", PARAMS["L23G"], dom, {})
+    okf, badf = LS.check_params("L23F", LS.policy_params("L23F", dict(PARAMS["L23F"], est_gpu_hours=pm)))
+    okg, badg = LS.check_params("L23G", LS.policy_params("L23G", dict(PARAMS["L23G"], est_gpu_hours=pg)))
+    check("prices: L23F M 1.5 GPU-h (three arm-seeds and the fit), A and B 0.75, L23G 0.5 (3.5 in all); each inside "
+          "its policy row", (pm, pa, pg) == (1.5, 0.75, 0.5) and dm["estimator"] == "e3_score"
+          and dg["estimator"] == "e3_verdict" and okf and okg and pm + 2 * pa + pg == 3.5, (pm, pa, pg, badf, badg))
+    bad = LS.check_params("L23F", LS.policy_params("L23F", dict(PARAMS["L23F"], arm="Z", est_gpu_hours=0.75)))
+    check("  an arm other than M, A, B is outside L23F's policy row", not bad[0], bad)
+    argv = LS.render("L23F", LS.policy_params("L23F", {"pkg": "inc2", "arm": "B"}))
+    check("L23F renders inc2.twostage score-arm --arm B and the executor reads it back; L23G renders inc2.twostage "
+          "verdict", argv[-4:] == ["weed_optimizer_framework.tools.inc2.twostage", "score-arm", "--arm", "B"]
+          and X.params_from_argv("inc_score_e3", argv) == {"pkg": "inc2", "arm": "B"}
+          and LS.render("L23G", LS.policy_params("L23G", PARAMS["L23G"]))[-2:] == [
+              "weed_optimizer_framework.tools.inc2.twostage", "verdict"], argv)
+    for args, want_ok, name in ((["inc2.twostage", "score-arm", "--arm", "M"], True, "inc_build_e3_score_m"),
+                                (["inc2.twostage", "score-arm", "--arm", "B"], True, "inc_build_e3_score_b"),
+                                (["inc2.twostage", "verdict"], True, "inc_build_e3_v1"),
+                                (["inc2.twostage", "score-arm", "--arm", "Z"], False, None),
+                                (["inc2.twostage", "score-arm"], False, None),
+                                (["inc2.twostage", "verdict", "--arm", "M"], False, None),
+                                (["inc2.twostage", "score-test", "--arm", "M"], False, None),
+                                (["inc2.twostage", "test-read", "--arm", "M"], False, None)):
+        try:
+            req = SR.parse_submit("build", args)
+            got, jn = True, SR.job_name(req, {})
+        except R.Refused:
+            got, jn = False, None
+        check("the cluster's build grammar %s %s%s" % ("admits" if want_ok else "refuses", " ".join(args[1:]),
+                                                       " (job %s)" % name if name else ""),
+              got == want_ok and (name is None or jn == name), (got, jn))
+    check("the evidence allow-lists E3's score records, its verdict and its rescore record; never the report, the test "
+          "read, the pin or INC_DIR/twostage",
+          all(E.allowed(x) for x in ("capacity/e3_v1.json", "capacity/e3_rescore.json", "capacity/e3_score_M.json",
+                                     "capacity/e3_score_A.json", "capacity/e3_score_B.json"))
+          and not any(E.allowed(x) for x in ("capacity/e3_v1_report.json", "capacity/e3_test_M.json",
+                                             "capacity/e3_classifier_pin.json", "capacity/e3_score_C.json"))
+          and "twostage" in E.RESERVED_DIRS)
+    # the gate in six states
+    res = {}
+    w = _e3_world("e3_gate_e2pending", e2_decided=False)
+    w.tick(3)
+    res["E2's verdict pending"] = [_arm(e) for e in _e3_pro(w)]
+    w = _e3_world("e3_gate_src")
+    w.experiment("e1_b_m640", done=False)
+    w.tick(3)
+    res["E2 decided, E1-B not done"] = [_arm(e) for e in _e3_pro(w)]
+    check("no L23F while %s" % "; ".join(res), all(v == [] for v in res.values()), res)
+    w = _e3_world("e3_gate_l23d")
+    (w.inc / "capacity" / "e2_attr_rescore.json").unlink()
+    w.tick(2)
+    lv = [e.get("lever") for e in w.events("proposed") if e.get("lever") in ("L23D", "L23F")]
+    ok_due = lv == ["L23D"]
+    w.tick(2)
+    lv2 = [e.get("lever") for e in w.events("proposed") if e.get("lever") in ("L23D", "L23F")]
+    running = w.state()["stage"]["r0"].get("e2_attr") == "running"
+    w.job_done("inc_build_e2_attr_v1")
+    w.e2_attr_records(record=False)
+    w.tick(3)
+    lv3 = [e.get("lever") for e in w.events("proposed") if e.get("lever") in ("L23D", "L23F")]
+    check("L23D due goes first; no L23F while L23D runs; once its record is complete, L23F M",
+          ok_due and lv2 == ["L23D"] and running and lv3 == ["L23D", "L23F"]
+          and _arm(_e3_pro(w)[0]) == "M", (lv, lv2, running, lv3))
+    w = _e3_world("e3_gate_l23d_failed")
+    (w.inc / "capacity" / "e2_attr_rescore.json").unlink()
+    w.tick(2)
+    w.job_done("inc_build_e2_attr_v1", state="FAILED", refusal="[inc2.baseline] ERROR: refused")
+    w.tick(3)
+    check("a failed L23D (a card) does not hold E3: L23F M follows",
+          w.state()["stage"]["r0"].get("e2_attr") == "failed" and [_arm(e) for e in _e3_pro(w)]
+          == ["M"], [e.get("lever") for e in w.events("proposed")])
+    w = _e3_world("e3_gate_e2c_build_failed")
+    (w.inc / "capacity" / "e2_attr_rescore.json").unlink()
+    shutil.rmtree(str(w.inc / "e2_c_m640_seed2"))
+    w.tick(3)
+    w.build_refused("e2_c_m640_seed2", refusal="[inc2.baseline] ERROR: refused")
+    w.tick(4)
+    check("an E2-C build that failed (L23D cannot be due without a person): E3 is not held, L23F M follows; no L23D",
+          [_arm(e) for e in _e3_pro(w)] == ["M"]
+          and not [e for e in w.events("proposed") if e.get("lever") == "L23D"],
+          [e.get("lever") for e in w.events("proposed")])
+    w = _e3_world("e3_gate_e2c_running")
+    (w.inc / "capacity" / "e2_attr_rescore.json").unlink()
+    w.experiment("e2_c_m640_seed1", done=False)
+    w.tick(3)
+    check("an E2-C experiment still running (L23D could become due): no L23F, no L23D",
+          not _e3_pro(w) and not [e for e in w.events("proposed") if e.get("lever") == "L23D"],
+          [e.get("lever") for e in w.events("proposed")])
+    # all clear: M, A, B in order, then L23G
+    w = _e3_world("e3")
+    w.tick(3)
+    pro = _e3_pro(w)
+    first = pro[0] if pro else {}
+    cites = sorted((x.get("artifact"), x.get("pointer")) for x in first.get("cites") or [])
+    check("all clear: L23F M (inc2.twostage score-arm --arm M, 1.5 GPU-h) within the envelope, one job "
+          "inc_build_e3_score_m, citing the lock, /stage/e2, E2's /status, the sources' status, /stage/e2_attr and "
+          "its own /stage/e3_score/M; r0 running",
+          len(pro) == 1 and (first.get("argv") or [])[-2:] == ["--arm", "M"]
+          and abs(float(first.get("est_gpu_hours") or 0) - 1.5) < 1e-9
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23F"] == ["envelope"]
+          and [x["name"] for x in w.submits if "score-arm" in x["argv"]] == ["inc_build_e3_score_m"]
+          and w.state()["stage"]["r0"].get("e3_score_M") == "running"
+          and cites == sorted([("campaign/context.json", "/stage/lock"), ("campaign/context.json", "/stage/e2"),
+                               ("capacity/e2_v1.json", "/status"),
+                               ("campaign/context.json", "/stage/exp_status/b_v2_m640"),
+                               ("campaign/context.json", "/stage/exp_status/e1_a_m640"),
+                               ("campaign/context.json", "/stage/exp_status/e1_b_m640"),
+                               ("campaign/context.json", "/stage/e2_attr"),
+                               ("campaign/context.json", "/stage/e3_score/M")]), (first.get("argv"), cites))
+    _e3_step(w, "M")
+    w.tick(3)
+    _e3_step(w, "A")
+    w.tick(2)
+    ok_two = not _e3_pro(w, "L23G")
+    pro = _e3_pro(w)
+    _e3_step(w, "B")
+    w.tick(3)
+    pg_ = _e3_pro(w, "L23G")
+    check("then L23F A (0.75) and L23F B (0.75), each once, in order; L23G not at two of three",
+          [_arm(e) for e in pro] == ["M", "A", "B"] and ok_two
+          and [round(float(e.get("est_gpu_hours")), 3) for e in pro] == [1.5, 0.75, 0.75]
+          and [x["name"] for x in w.submits if "score-arm" in x["argv"]] == ["inc_build_e3_score_%s" % k
+                                                                             for k in "mab"],
+          [e.get("argv") for e in pro])
+    check("all three scored: L23G once (inc2.twostage verdict, 0.5 GPU-h), one job inc_build_e3_v1",
+          len(pg_) == 1 and (pg_[0].get("argv") or [])[-1] == "verdict"
+          and abs(float(pg_[0].get("est_gpu_hours") or 0) - 0.5) < 1e-9
+          and [x["name"] for x in w.submits if x["argv"][-1] == "verdict"] == ["inc_build_e3_v1"]
+          and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23G"] == ["envelope"],
+          [e.get("argv") for e in pg_])
+    w.job_done("inc_build_e3_v1")
+    w.e3_records(arms=(), verdict=True, qualifying=("A", "B"), chosen="B", credited=True)
+    w.tick(3)
+    cards = [c for c in w.state().get("cards") or [] if c["title"].startswith("E3's verdict")]
+    d = _diags(w)
+    check("its record complete: DR0 silent about E3, one card naming each arm's D, the choice, the attribution and "
+          "the exact read commands of both qualifying arms, against 0.8786 with the gap to 0.90",
+          not d["DR0"]["fired"] and len(cards) == 1 and cards[0]["title"] == "E3's verdict: E3-A, E3-B qualify "
+          "(chosen: E3-B)" and "test-read --arm A" in cards[0]["detail"] and "test-read --arm B" in cards[0]["detail"]
+          and "test-report --arm B" in cards[0]["detail"] and "0.8786" in cards[0]["detail"]
+          and "credited to base v3's data" in cards[0]["detail"], (d["DR0"].get("summary"),
+                                                                   [c.get("detail") for c in cards]))
+    w.tick(2)
+    check("  no second card", len([c for c in w.state().get("cards") or [] if c["title"].startswith("E3's verdict")])
+          == 1)
+    for tag, kw, want in (("e3_card_none", {"qualifying": ()}, ("no arm qualifies", "no test is read")),
+                          ("e3_card_one", {"qualifying": ("M",)}, ("E3-M qualifies (chosen: E3-M)",
+                                                                    "test-read --arm M"))):
+        wc = _e3_world(tag, records=True)
+        wc.e3_records(arms=(), verdict=True, **kw)
+        wc.tick(2)
+        cc = [c for c in wc.state().get("cards") or [] if c["title"].startswith("E3's verdict")]
+        check("the card when %s" % want[0], len(cc) == 1 and want[0] in cc[0]["title"] and want[1] in cc[0]["detail"]
+              and ("test-read" in cc[0]["detail"]) == bool(kw["qualifying"]), [c.get("detail") for c in cc])
+    # a failed L23F: record only; the other arms wait; a person's rerun ends the wait
+    wf = _e3_world("e3_fail")
+    wf.tick(3)
+    _e3_step(wf, "M")
+    wf.tick(3)
+    wf.job_done("inc_build_e3_score_a", state="FAILED", refusal="[inc2.twostage] ERROR: refused")
+    wf.tick(4)
+    st = wf.state()
+    cards = [c["title"] for c in st.get("cards") or [] if "L23F" in c["title"]]
+    pro = [_arm(e) for e in _e3_pro(wf)]
+    dr0 = _diags(wf)["DR0"]
+    check("a failed L23F of arm A (sacct FAILED): one card naming the arm, r0.e3_score_A failed, no lane failure, no "
+          "pause, not proposed again, B waits (one card, not three), no L23G",
+          cards == ["E3's two-stage scores of arm A failed (L23F)"] and st["stage"]["r0"].get("e3_score_A") == "failed"
+          and not st.get("paused") and not wf.lane("MAINT").get("hold") and not int(wf.lane("MAINT").get("fails") or 0)
+          and pro == ["M", "A"] and not _e3_pro(wf, "L23G") and "L23F" not in (dr0.get("levers") or []),
+          (cards, pro, st["stage"]["r0"]))
+    card = [c for c in st.get("cards") or [] if "L23F" in c["title"]][0]
+    check("  the card gives the rerun command and says L23G needs all three and L23D never waits",
+          "inc2.twostage score-arm --arm A" in card["detail"] and "L23G" in card["detail"]
+          and "L23D" in card["detail"], card["detail"])
+    wf.e3_records(arms=("A",), rescore=False)
+    wf.tick(3)
+    pro = [_arm(e) for e in _e3_pro(wf)]
+    check("  a person reruns it (its record complete): the wait ends, L23F B is proposed", pro == ["M", "A", "B"], pro)
+    # an unknown outcome: followed by its job name and its record
+    wu = _e3_world("e3_unc")
+    wu.lose_reply = "score-arm"
+    wu.tick(2)
+    it = wu.lane("MAINT").get("item") or {}
+    ok0 = it.get("lever") == "L23F" and it.get("status") == "running" and it.get("uncertain") \
+        and not wu.state().get("paused")
+    wu.tick(S.BUILD_LOST_SNAPSHOTS + 3)
+    it2 = wu.lane("MAINT").get("item") or {}
+    ok1 = it2.get("lever") == "L23F" and it2.get("status") == "running" \
+        and any(j["name"] == "inc_build_e3_score_m" for j in wu.squeue) \
+        and not [c for c in wu.state().get("cards") or [] if "L23F" in c["title"]]
+    _e3_step(wu, "M")
+    wu.tick(3)
+    check("an L23F submission whose outcome is unknown: running while inc_build_e3_score_m is queued (also past %d "
+          "snapshots), then done once capacity/e3_score_M.json is complete; L23F A follows" % S.BUILD_LOST_SNAPSHOTS,
+          ok0 and ok1 and any(e.get("lever") == "L23F" for e in wu.events("item_done"))
+          and [_arm(e) for e in _e3_pro(wu)] == ["M", "A"],
+          (it.get("status"), it2.get("status"), [e.get("lever") for e in wu.events("proposed")]))
+    # the lab stopped between L23G's submission and the state write: the restart meets 'already executed'
+    wk = _e3_world("e3_kill")
+    for k in "MAB":
+        wk.e3_records(arms=(k,), rescore=False)
+    real_submit = S.StreamRun._submit_ready
+    killed = {"n": 0}
+
+    def killer(self, _real=real_submit, _w=wk, _k=killed):
+        r = _real(self)
+        if not _k["n"] and any(x["argv"][-1] == "verdict" for x in _w.submits):
+            _k["n"] += 1
+            raise _Killed()
+        return r
+    S.StreamRun._submit_ready = killer
+    try:
+        for _ in range(4):
+            try:
+                wk.tick(1)
+            except _Killed:
+                break
+    finally:
+        S.StreamRun._submit_ready = real_submit
+    wk.tick(2)
+    it = wk.lane("MAINT").get("item") or {}
+    ok0 = killed["n"] == 1 and it.get("lever") == "L23G" and it.get("status") == "running" and it.get("uncertain") \
+        and wk.state()["stage"]["r0"].get("e3") == "running" \
+        and [x["name"] for x in wk.submits if x["argv"][-1] == "verdict"] == ["inc_build_e3_v1"]
+    wk.job_done("inc_build_e3_v1", state="FAILED")
+    wk.tick(5)
+    stk = wk.state()
+    check("L23G submitted, then the lab stopped before its state was written: the restart follows inc_build_e3_v1; "
+          "the job FAILED -> r0.e3 failed with one card",
+          ok0 and stk["stage"]["r0"].get("e3") == "failed"
+          and [c["title"] for c in stk.get("cards") or [] if "L23G" in c["title"]] == ["E3's verdict failed (L23G)"],
+          (killed, it.get("lever"), it.get("status"), stk["stage"]["r0"].get("e3")))
+
+
 def _lift_world(tag, quarantined=("src_lift",)):
     """_e1_world plus an intake batch of src_lift whose one dHash hit D28-v2 judges chance (pair cos 0.31), and
     the stream's queue summary quarantining the given sources."""
@@ -3135,7 +3419,7 @@ def t_fork_stage_c():
 
 def main():
     for fn in (t_menu, t_prices, t_remote, t_evidence, t_budget, t_records, t_measure, t_native, t_e1, t_e1_lift_wait, t_e1_lift_faults, t_e1_cut_order,
-               t_e2, t_fork_stage_c,
+               t_e2, t_e3, t_fork_stage_c,
                t_formats,
                t_replay_gate,
                t_config, t_lab, t_lanes, t_d28, t_d28_v2, t_d28_v2_sources, t_d28_v2_round3):
