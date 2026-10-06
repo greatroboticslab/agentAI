@@ -14,6 +14,14 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
 
+
+## 2026-10-06 — E3: two-stage species detection reaches 0.8950 on the sealed 12-class test (gap 0.0050); data scale credited
+
+- **Verdict** (`capacity/e3_v1.json`, dev, 3 seeds, pre-registered): all three arms qualify against b_v2_m640 (0.8524 ± 0.0025): E3-M +0.0177 (2 pooled sd 0.0063, SE 0.0055), E3-A +0.0116 (0.0043, 0.0079), E3-B +0.0335 (0.0040, 0.0085); E3-B chosen. Attribution E3-B − E3-A = +0.0220 (2 pooled sd 0.0031, SE 0.0073): credited to base v3's data.
+- **Sealed test** (`capacity/e3_test_{B,M,A}.md`, one read per qualifying arm, jobs 47450967–47450969, submitted by a person under the 2026-09-30 grant): 12-class mAP50-95 E3-B 0.8950 ± 0.0029 (agnostic 0.8992 ± 0.0016), E3-M 0.8882 ± 0.0022, E3-A 0.8806 ± 0.0011, against 0.8786 ± 0.0018 for the best single-stage detector. Gap to 0.90: 0.0050. E3-B − E3-A on test: +0.0144.
+- ImageWeeds (not deciding): 12-class E3-B 0.2492 ± 0.0064, E3-A 0.1714, E3-M 0.1510, reference 0.0529.
+- Reading: the single-stage detector's species head, not its boxes alone, held the 12-class score back; separating box detection (trained on 44,485 one-class images) from species naming (BioCLIP-2 + logistic regression on 6,811 images' boxes) carries the box-level data gain into species detection, which warm-starting a single detector (E2) did not.
+
 ## 2026-10-05 — E2 decided (no transfer), E2-C attributes it to one-class pre-training; E3 submitted
 
 - **E2** (pre-registered, dev, 3 seeds; `capacity/e2_v1.json`): no arm qualifies. Starting a 12-class YOLO11m from E1-B's one-class weights gave 0.8401 ± 0.0034 (100-epoch cold recipe, D = −0.0123, beyond 2 pooled sd and SE) and 0.8479 ± 0.0067 (50-epoch x1b, D = −0.0045, within noise) against b_v2_m640's 0.8524 ± 0.0025. The sealed test was not read; the best 12-class test score stays 0.8786 ± 0.0018.
