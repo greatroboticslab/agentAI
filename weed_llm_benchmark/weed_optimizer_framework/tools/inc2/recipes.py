@@ -165,6 +165,17 @@ recipe) except the init, E1-A's seed-s weights (E2C_INIT_EXP). E2_BUILD_ARMS
 holds the three letters a build takes; E2_ARMS stays E2's two, the only arms
 E2's verdict reads (E2-C can neither qualify nor be chosen).
 
+V3F's builds (docs/CONTINUOUS_LOOP.md, "Amendment (2026-10-11): V3F, the v3
+experiment family D0-D9", V3F.3.8, V3F.6.1): inc2.baseline build --v3fam ARM
+trains one of the family's twelve build arms (V3FAM_ARMS), each under its
+pre-registered experiment name (V3FAM_EXPS) and detector (V3FAM_DETECTOR).
+The one-class arms at equal compute (V3FAM_BUDGET_ARMS: D1A1, D1B1, D4F, D4N,
+D4R15 and D0BCLEAN) train E1's cold_budget recomputed from the arm's final
+image count; the 12-class arms (V3FAM_COLD_ARMS: D1A12, D5B0, D5B25, D5B100,
+D8S, D8M) train the cold table. v3fam_recipe(arm, n) writes either, and
+cold_budget is admitted under a v3fam record for the budget arms only
+(inc2.train.v3fam_problems).
+
 Cost (estimates, V100, 1 SU per GPU-hour). The measured rates are YOLO11n at
 640 px (docs/CONTINUOUS_LOOP.md §5.6): cold 6.0-7.0 ms per image-epoch
 (realloop_v1 base 1.974 h / 3 / 3,927 / 100 = 6.0; b0_v1 base 1.768 h / 3 /
@@ -298,6 +309,17 @@ E2C_INIT_EXP = "e1_a_m640"                # E1's arm A (base_v2 as one class, co
 # can neither qualify nor be chosen (its own record, capacity/e2_attr_v1.json)
 E2_BUILD_ARMS = dict(E2_ARMS, **{E2C_ARM: COLD_NAME})
 E2_BUILD_EXPS = dict(E2_EXPS, **{E2C_ARM: E2C_EXP})
+# ------------------------- V3F's builds (amendment 2026-10-11, V3F.3.8, V3F.6.1)
+# inc2.baseline build --v3fam ARM: the one-class arms at equal compute (E1's cold_budget, recomputed from the arm's
+# final count) and the 12-class arms on the cold table; nothing else names cold_budget under a v3fam record
+V3FAM_BUDGET_ARMS = ("D1A1", "D1B1", "D4F", "D4N", "D4R15", "D0BCLEAN")
+V3FAM_COLD_ARMS = ("D1A12", "D5B0", "D5B25", "D5B100", "D8S", "D8M")
+V3FAM_ARMS = V3FAM_BUDGET_ARMS + V3FAM_COLD_ARMS
+V3FAM_DETECTOR = dict({a: "m640" for a in V3FAM_ARMS}, D8S="s640")
+V3FAM_EXPS = {"D1A1": "v3_d1_a1_m640", "D1B1": "v3_d1_b1_m640", "D1A12": "v3_d1_a12_m640",
+              "D4F": "v3_d4_f_m640", "D4N": "v3_d4_n_m640", "D4R15": "v3_d4_r15_m640",
+              "D5B0": "v3_d5b_0_m640", "D5B25": "v3_d5b_25_m640", "D5B100": "v3_d5b_100_m640",
+              "D8S": "v3_d8_s640_tc", "D8M": "v3_d8_m640_tc", "D0BCLEAN": "v3_d0_bclean_m640"}
 # the E1 arm each E2 arm starts from (E1's verdict names B as its `exp` and A as its `reference`)
 E2_INIT_ARM = {"W": "B", "S": "B", E2C_ARM: "A"}
 E2C_DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-04, later): E2-C, the attribution control "
@@ -466,6 +488,26 @@ def e2_recipe(letter, arm=E2_ARM):
     if aid != E2_ARM:
         raise RecipeError("E2 is pre-registered on %s only, not %s" % (E2_ARM, aid))
     return cold(aid) if E2_BUILD_ARMS[letter] == COLD_NAME else incremental(E2_BUILD_ARMS[letter], aid)
+
+
+def v3fam_arm(arm):
+    if arm not in V3FAM_ARMS:
+        raise RecipeError("V3F's build arms are %s (pre-registered), not %r" % (list(V3FAM_ARMS), arm))
+    return arm
+
+
+def v3fam_recipe_name(arm):
+    """cold_budget for V3F's one-class arms at equal compute, the cold table's name for its 12-class arms."""
+    return BUDGET_NAME if v3fam_arm(arm) in V3FAM_BUDGET_ARMS else COLD_NAME
+
+
+def v3fam_recipe(arm, n_images):
+    """The base runs' recipe of V3F's build arm `arm` on a base of n_images, in exp.json's form (no seed):
+    cold_budget(m640, n_images) for the budget arms, cold(<the arm's detector>) for the others."""
+    det = V3FAM_DETECTOR[v3fam_arm(arm)]
+    if arm in V3FAM_BUDGET_ARMS:
+        return cold_budget(det, n_images)
+    return cold(det)
 
 
 def _diff(recipe, want):

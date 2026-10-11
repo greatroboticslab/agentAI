@@ -9,6 +9,13 @@ as one family)", kept byte for byte as docs/prereg/V3F_2026-10-11.md).
     python -m weed_optimizer_framework.tools.inc2.v3fam exif-preflight
     python -m weed_optimizer_framework.tools.inc2.v3fam exif-verdict --frame yes|no --read-by owner|delegate
     python -m weed_optimizer_framework.tools.inc2.v3fam frozen
+    python -m weed_optimizer_framework.tools.inc2.v3fam score --arm X          (L23J; SCORE_ARMS, the arm's module)
+    python -m weed_optimizer_framework.tools.inc2.v3fam verdict                (L23L; inc2/v3fam_verdict.py)
+    python -m weed_optimizer_framework.tools.inc2.v3fam test-read --arm X --read-by owner|delegate   (a person's)
+    python -m weed_optimizer_framework.tools.inc2.v3fam score-test --arm X     (the job test-read prepares)
+    python -m weed_optimizer_framework.tools.inc2.v3fam test-report --arm X
+    python -m weed_optimizer_framework.tools.inc2.v3fam reanalyse-test --read-by owner|delegate     (a person's job)
+    python -m weed_optimizer_framework.tools.inc2.v3fam spend                  (the family's GPU-h, read-only)
     python -m weed_optimizer_framework.tools.inc2.v3fam _pass --spec SPEC.json      (internal: another root)
         [--batch N --device D --no-lock-check-for-tests]   (test mode only, INC_SCORER_TESTING=1)
 
@@ -1725,13 +1732,15 @@ def _same_runs(a_runs, b_runs):
 
 def comparison(cid, x_values, y_values, x_runs, y_runs, statistic="species", species=SC.SPECIES, sessions=None,
                se_rule="image", one_system=False, selection=None, keep=None, resamples=RESAMPLES, ap_fn=None,
-               paired=False):
+               paired=False, image_seed_text=None):
     """One pre-declared comparison "X over Y" (V3F.3.3). x_values, y_values: per-seed full-set values (the score
     files' species_map50_95, a subset mean or P7's value); x_runs, y_runs: their per-image arrays (one exam, key
     order). se_rule image | max (P6-P9: the larger of the image and session SEs) | selection (P2, P3, P5:
     selection = {"runs": {M, A, B: [arrays]}, "values": {M, A, B: [...]}}, X being E3-B). sessions: one per image
     (the session SE, reported beside on dev; deciding with se_rule max). keep: the images the comparison is
-    decided on (D0-S's dev minus H): every array is restricted and the full-set values recomputed from them."""
+    decided on (D0-S's dev minus H): every array is restricted and the full-set values recomputed from them.
+    image_seed_text: a seed text the amendment fixes for this comparison (BCLEAN's rule: inc2/v3fam/bclean/
+    species_se), in place of seed_text(cid, "image")."""
     if se_rule not in ("image", "max", "selection"):
         raise V3famRefused("se_rule %r" % se_rule)
     if keep is not None:
@@ -1749,7 +1758,7 @@ def comparison(cid, x_values, y_values, x_runs, y_runs, statistic="species", spe
                                         for r in rs] for a, rs in selection["runs"].items()}}
     d = statistics.fmean(float(v) for v in x_values) - statistics.fmean(float(v) for v in y_values)
     n = len(x_runs[0]["keys"])
-    st_i = seed_text(cid, "image")
+    st_i = image_seed_text or seed_text(cid, "image")
     counts = image_counts(n, st_i, resamples)
     img = _bootstrap(x_runs, y_runs, counts, statistic, species, ap_fn)
     rec = {"id": cid, "statistic": statistic, "species": list(species) if statistic == "species" else None,
@@ -1912,10 +1921,34 @@ def check_cap(items, item, estimate, record=True):
 
 
 # ------------------------------------------------------------------ CLI
+# ------------------------------------------------------------------ the score verb (L23J)
+def score_module(arm):
+    """The module whose score_arm (or score) takes arm: the system arms (E3RS, D3, D6, D8), D2's nine and D9, the
+    trained arms (D1, D4F, D4N, D4R15, D5B, BCLEAN)."""
+    if arm not in SCORE_ARMS:
+        raise V3famRefused("--arm %r is not one of the family's score arms %s" % (arm, list(SCORE_ARMS)))
+    if arm in ("E3RS", "D3", "D6", "D8"):
+        from . import v3fam_systems as M
+        return M, M.score_arm
+    if arm.startswith("D2") or arm == "D9":
+        from . import v3fam_embed as M
+        return M, M.score
+    from . import v3fam_trained as M
+    return M, M.score_arm
+
+
+def score(arm, **kw):
+    """inc2.v3fam score --arm X (L23J): the arm's scoring job, in its module."""
+    _m, fn = score_module(arm)
+    return fn(arm, **kw)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="V3F: the v3 family's shared core (reproductions, EXIF pre-flight, "
                                              "the frozen check, a pass in another root).")
-    ap.add_argument("command", choices=("equivalence", "exif-preflight", "exif-verdict", "frozen", "_pass"))
+    ap.add_argument("command", choices=("equivalence", "exif-preflight", "exif-verdict", "frozen", "_pass", "score",
+                                        "verdict", "test-read", "score-test", "test-report", "reanalyse-test",
+                                        "spend"))
     ap.add_argument("--item", default=None, choices=EQUIV_ITEMS)
     ap.add_argument("--e3-arm", default=None)
     ap.add_argument("--exam", default=None)
@@ -1948,6 +1981,25 @@ def main(argv=None):
             exif_preflight()
         elif a.command == "exif-verdict":
             exif_verdict(a.frame, a.read_by)
+        elif a.command == "score":
+            score(a.arm, **kw)
+        elif a.command in ("verdict", "test-read", "score-test", "test-report", "reanalyse-test", "spend"):
+            from . import v3fam_verdict as VR
+            if a.command == "verdict":
+                VR.verdict()
+            elif a.command == "spend":
+                print(json.dumps(VR.spend(), indent=1, sort_keys=True))
+            elif a.command == "reanalyse-test":
+                VR.reanalyse_test(a.read_by)
+            elif not a.arm:
+                raise V3famRefused("%s needs --arm" % a.command)
+            elif a.command == "test-read":
+                rec = VR.test_read(a.arm, a.read_by)
+                print(" ".join(rec["argv"]))
+            elif a.command == "score-test":
+                VR.score_test(a.arm, **kw)
+            else:
+                VR.test_report(a.arm)
         elif a.item == "dev_identity":
             equivalence_dev_identity(**kw)
         elif a.item == "two_stage":

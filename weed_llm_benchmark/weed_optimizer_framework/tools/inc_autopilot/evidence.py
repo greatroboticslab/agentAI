@@ -134,7 +134,7 @@ VERIFIER_FIT_INFO = "verifier_fit_info.json"   # remote.py's projection of step1
 
 EXP_RE = r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}"
 RESERVED_DIRS = ("step1", "splits", "exams", "logs", "audit", "funnel",   # INC_DIR entries that are not experiments
-                 "stream", "step1_stream", "intake", "twostage")
+                 "stream", "step1_stream", "intake", "twostage", "v3fam")
 ROOT_AUDIT = "audit/%s_audit.json"          # a label audit run with --out $INC/audit/<exp>_audit.json
 EXP_FILES = ("exp.json", "state.json", "report.json", "build_summary.json", "ledger.jsonl",
              "audit/label_audit.json", "manifests/increments_summary.json")
@@ -194,6 +194,16 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # capacity/e3_rescore.json (inc2.twostage verdict: the records' names and
 # sha256s); e3_v1_report.* (ImageWeeds, for people), e3_test_*.*, the
 # classifier's pin and INC_DIR/twostage/ (a reserved directory) are never on
+# the list; V3F's (2026-10-11, the v3 experiment family): capacity/v3fam_v1.json
+# (the family's verdict, dev only), capacity/v3fam_score_<arm>.json (each
+# arm's score record: dev file names, sha256s, status and counts),
+# splits/v3fam/summary.json (the family's manifests by sha256 and counts) and
+# v3fam/v1/status.json (derived on the cluster, stream_remote.v3fam_status:
+# the time stamp, D0-S's record, the EXIF pre-flight, D6's smoke and seeds,
+# the items refused at the family cap and the person steps' GPU-h; booleans,
+# counts and sha256s, no score); capacity/v3fam_v1_external.json,
+# v3fam_ext_v1.json, v3fam_v1_report.*, v3fam_test_*.*, v3fam_retest.json,
+# the classifier pins and INC_DIR/v3fam/ (a reserved directory) are never on
 # the list. A Step 1 sidecar,
 # step1_stream/eval_hits/<batch>.json, is not on the list: status.json carries
 # its fold, and the sidecar names each hit's matched evaluation key. A stream
@@ -216,6 +226,12 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"capacity/(?:(?:capacity|native|e1|e2|e2_attr|zoo|e3)_v1|e2_rescore|e2_attr_rescore|e3_rescore|e3_score_[MAB])"
     r"\.json\Z",
     r"splits/v3/summary\.json\Z",
+    # V3F (2026-10-11): the family's verdict and score records (dev only), its data summary, its derived status
+    r"capacity/v3fam_(?:v1|score_(?:%s))\.json\Z" % "|".join(
+        ("e3rs", "d2laion", "d2clip", "d2dinol", "d2dinob", "d2siglip", "d2rn50", "d2bc1", "d2bc2640", "d2ft", "d3",
+         "d9", "d1", "d4f", "d4n", "d4r15", "d5b", "d6", "d8", "bclean")),
+    r"splits/v3fam/summary\.json\Z",
+    r"v3fam/v1/status\.json\Z",
     r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore|agnostic_rescore)\.json\Z"
     % ("|".join(RESERVED_DIRS), EXP_RE),
 ))

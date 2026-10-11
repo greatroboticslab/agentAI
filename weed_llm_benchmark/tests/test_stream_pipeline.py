@@ -1277,6 +1277,11 @@ def stage_e1_base3(w):
           "L23F, no L23G, no twostage directory)",
           not [e for e in w.events("proposed") if e.get("lever") in ("L23F", "L23G")]
           and not (INC / "twostage").exists() and not list((INC / "capacity").glob("e3_*")))
+    check("V3F (2026-10-11) is never proposed here: its gate needs E3's decided verdict, which this world never "
+          "reaches (no L23H, L23I, L23J, L23K or L23L, no v3fam directory, no family record)",
+          not [e for e in w.events("proposed") if e.get("lever") in ("L23H", "L23I", "L23J", "L23K", "L23L")]
+          and not (INC / "v3fam").exists() and not list((INC / "capacity").glob("v3fam_*"))
+          and not (INC / "splits" / "v3fam").exists())
 
 
 def d28_now(w):
@@ -1369,7 +1374,8 @@ def stage_milestone2_rollback(w):
     # the measurement arms' builds and rescores (L23B, L23N; E1's L23V, L23E; E2's L23C; E2-C's L23D; E3's L23F,
     # L23G: record only, R0 long complete) may take the idle MAINT lane between them
     maint = [lv for lv, ln in w.executed() if ln == "MAINT"
-             and lv not in ("L23B", "L23N", "L23V", "L23E", "L23C", "L23D", "L23F", "L23G")]
+             and lv not in ("L23B", "L23N", "L23V", "L23E", "L23C", "L23D", "L23F", "L23G", "L23H", "L23I", "L23J",
+                            "L23L")]
     tail_ = maint[maint.index("L21") - 2:] if "L21" in maint else maint
     lcs = [e for e in w.events("proposed") if e.get("lever") == "LC"]
     check("the autopilot ran L20, LC, then L21 (D25), L27 (bisect) and LC (compare --exp on a bisect arm), and no "

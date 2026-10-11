@@ -1729,6 +1729,141 @@ def _e3_gate(v, exps, st):
     return True, cites
 
 
+# V3F (2026-10-11): the v3 experiment family's items, in V3F.7's order
+V3FAM_TERMINAL = ("done", "failed", "blocked", "not needed")
+
+
+def v3fam_terminal(state):
+    """True for an item state that never changes again: done, failed (after its second failure), blocked (D5b,
+    until a Revision), not needed (BCLEAN without D0-S's trigger) and every 'not run (...)' (the family cap, the
+    walltime, a download, a dependency that ended without its effect)."""
+    return state in V3FAM_TERMINAL or str(state or "").startswith("not run")
+
+
+def _v3fam_due(state):
+    """An item DR0 proposes: never proposed (missing) or failed once (proposed once more under a new id)."""
+    return state in (None, "missing", "failed_once")
+
+
+def _v3fam_gate(v, st, fam):
+    """(True, cites) when the family's items may be proposed (V3F.6.4): E3's verdict decided (/stage/e3 done and
+    its record's status), the model-zoo audit complete (/stage/zoo done), the deployed tree holding the amendment
+    (its file's sha256, /stage/v3fam/amendment), v3fam/v1/timestamp.json present and D0-S's record complete (the
+    derived status the snapshot ships). Else (False, why). Storage and the family cap are checked per item."""
+    fs = st.get("v3fam") or {}
+    rec = v.ev.json((fam.get("requires") or {}).get("e3_record") or "capacity/e3_v1.json")
+    if st.get("e3") != "done" or not isinstance(rec, dict) or rec.get("status") != "decided":
+        return False, "E3's verdict is not decided"
+    if st.get("zoo") != "done":
+        return False, "the model-zoo audit is not complete"
+    if not fs.get("amendment"):
+        return False, "the deployed tree does not hold the amendment (%s)" % fam.get("amendment_file")
+    if not fs.get("timestamp"):
+        return False, "v3fam/v1/timestamp.json does not exist (V3F.12)"
+    if not fs.get("sweep"):
+        return False, "D0-S's record is not complete (its sweep and verdicts are the delegate's)"
+    return True, [v.ccite("/stage/e3"), v.cite("capacity/e3_v1.json", "/status"), v.ccite("/stage/zoo"),
+                  v.ccite("/stage/v3fam/amendment"), v.ccite("/stage/v3fam/timestamp"), v.ccite("/stage/v3fam/sweep")]
+
+
+def _v3fam_storage(v, fam, item_gb):
+    """'' when /ocean has at least storage_margin_gib above D27's floor for the item's bytes, else why not."""
+    qu = v.c("/quota") or {}
+    quota, free = _num(qu.get("quota_gb")), _num(qu.get("free_gb"))
+    if quota is None or free is None:
+        return "the quota is unknown"
+    floor = float(fam.get("storage_floor_share") or 0.03) * quota
+    margin = float(fam.get("storage_margin_gib") or 30.0) * 1.073741824
+    left = free - floor - float(item_gb or 0.0)
+    if left < margin:
+        return "/ocean: %.0f GB free - the floor %.0f GB - the item's %.1f GB = %.0f GB, under the %.0f GB margin" % (
+            free, floor, float(item_gb or 0.0), left, margin)
+    return ""
+
+
+def _v3fam_deps(fs, deps):
+    """'ok', 'wait' or 'not run' of a score arm's dependencies (score_after: another score arm, build:<arm>,
+    detr:train, exif)."""
+    out = "ok"
+    for dep in deps or []:
+        if dep == "exif":
+            st = "done" if fs.get("exif") else "missing"
+        elif dep.startswith("build:"):
+            st = (fs.get("build") or {}).get(dep[6:])
+            st = "done" if st == "done" else st
+        elif dep == "detr:train":
+            st = (fs.get("detr") or {}).get("train")
+        else:
+            st = (fs.get("score") or {}).get(dep)
+        if st == "done":
+            continue
+        if v3fam_terminal(st):
+            return "not run"
+        out = "wait"
+    return out
+
+
+def v3fam_plan(fam, fs):
+    """{lane: item} the family wants next and {item: why} of its waits, from /stage/v3fam (pure: DR0 and the
+    family card read it). One MAINT item in V3F.7's order (L23H; L23J for the arms scored before the builds;
+    L23I per build; L23J per arm once its runs are done; L23L once everything is terminal) and, on TRAIN, L23K's
+    smoke after L23H and then its seeds."""
+    out, waits = {}, {}
+    data = fs.get("data")
+    score, build = fs.get("score") or {}, fs.get("build") or {}
+    after = fam.get("score_after") or {}
+
+    def score_item(arm):
+        st = score.get(arm)
+        if not _v3fam_due(st):
+            return None
+        dep = _v3fam_deps(fs, after.get(arm))
+        if dep == "ok":
+            return {"lever": "L23J", "arm": arm, "item": "score:%s" % arm}
+        waits["score:%s" % arm] = "its dependencies %s are not done" % after.get(arm) if dep == "wait" else \
+            "a dependency of %s ended without its effect: not run" % after.get(arm)
+        return None
+    if _v3fam_due(data):
+        out["MAINT"] = {"lever": "L23H", "item": "data"}
+    elif data == "done" or v3fam_terminal(data):
+        for arm in fam.get("pre_build_scores") or []:
+            it = score_item(arm)
+            if it:
+                out["MAINT"] = it
+                break
+            if not v3fam_terminal(score.get(arm)) and score.get(arm) not in (None, "missing", "failed_once"):
+                break                               # running: the lane holds it
+        else:
+            if data == "done":
+                for arm in fam.get("builds") or []:
+                    if _v3fam_due(build.get(arm)):
+                        out["MAINT"] = {"lever": "L23I", "arm": arm, "item": "build:%s" % arm}
+                        break
+            if "MAINT" not in out:
+                for arm in fam.get("post_build_scores") or []:
+                    it = score_item(arm)
+                    if it:
+                        out["MAINT"] = it
+                        break
+            if "MAINT" not in out:
+                arms = list(fam.get("pre_build_scores") or []) + list(fam.get("post_build_scores") or [])
+                pending = [a for a in arms if not v3fam_terminal(score.get(a))]
+                pending += ["build:%s" % a for a in fam.get("builds") or [] if not v3fam_terminal(build.get(a))]
+                pending += ["detr:%s" % k for k in ("smoke", "train") if not v3fam_terminal((fs.get("detr") or {})
+                                                                                          .get(k))]
+                if not pending and _v3fam_due(fs.get("verdict")):
+                    out["MAINT"] = {"lever": "L23L", "item": "verdict"}
+                elif pending:
+                    waits["verdict"] = "waits for %s" % ", ".join(pending[:6])
+    det = fs.get("detr") or {}
+    if data == "done":
+        if _v3fam_due(det.get("smoke")):
+            out["TRAIN"] = {"lever": "L23K", "verb": "smoke", "item": "detr:smoke"}
+        elif det.get("smoke") == "done" and _v3fam_due(det.get("train")):
+            out["TRAIN"] = {"lever": "L23K", "verb": "train", "item": "detr:train"}
+    return out, waits
+
+
 def r0(v, d28=None):
     """DR0: the rollout's prerequisites (contract 10 R0, R0b, R1, R2), each
     proposed once in its lane when due, in order: MAINT -- the splits build
@@ -2014,15 +2149,51 @@ def r0(v, d28=None):
                         "under one protocol (record only, descriptive)"
                         % (z["record"], "; %s done" % ", ".join("/stage/%s" % k for k in req) if req else "")}
         cites = [v.ccite("/stage/lock"), v.ccite("/stage/zoo")] + [v.ccite("/stage/%s" % k) for k in req]
+    # V3F (2026-10-11): the v3 experiment family, once its gate is open (_v3fam_gate), in V3F.7's order
+    # (v3fam_plan), one MAINT item at a time and L23K on TRAIN; an item whose bytes the storage margin does not
+    # cover waits (DR0's detail names it; the ticker raises one card); the family cap is the ticker's, at pricing
+    fam = v.dom.get("v3fam") or {}
+    fwait = {}
+    if fam and st.get("lock") and ss["arm"] and ss["stage_c_read"]:
+        ok, gc = _v3fam_gate(v, st, fam)
+        if ok:
+            fs = st.get("v3fam") or {}
+            plan, fwait = v3fam_plan(fam, fs)
+            sizes = fam.get("storage_gb") or {}
+            others = any(out.values())
+            fcites = []
+            for ln, it in sorted(plan.items()):
+                if out.get(ln) is not None or (ln == "MAINT" and out["DATA"] is not None):
+                    continue
+                kind = {"L23H": "data", "L23I": "build", "L23J": "score", "L23L": "verdict"}.get(it["lever"]) or \
+                    "detr_%s" % it.get("verb")
+                short = _v3fam_storage(v, fam, sizes.get(kind))
+                if short:
+                    fwait[it["item"]] = "storage: %s" % short
+                    continue
+                out[ln] = dict(it, why="V3F (record only): %s is next in the family's order" % it["item"])
+                # each item cites its own state (stable until it starts), so a proposal taken on a tick that also
+                # proposed the other lane's family item still carries every cite of the next tick's DR0
+                fcites.append(v.ccite(E.pointer("stage", "v3fam", *it["item"].split(":"))))
+            if fcites:
+                fam_cites = [v.ccite("/stage/lock")] + gc + fcites
+                cites = cites + [c for c in fam_cites if c not in cites] if others else fam_cites
+        else:
+            fwait["gate"] = gc
     items = {k: x for k, x in out.items() if x}
     wait = wait if wait and wait["state"] == "waiting" else None
-    if not items and not wait:
+    fshort = {k: x for k, x in fwait.items() if str(x).startswith("storage")}
+    if not items and not wait and not fshort:
         return _silent("DR0", "no rollout prerequisite is due", cites=cites)
     levers = sorted({x["lever"] for x in items.values()})
     summary = ["%s: %s -> %s" % (k, x["why"], x["lever"]) for k, x in sorted(items.items())]
     if wait:
         summary.append("L23V waits: %s" % wait["why"])
+    for k, x in sorted(fshort.items()):
+        summary.append("V3F's %s waits: %s" % (k, x))
     extra = {"lift_wait": wait} if wait else ({"lift_wait_end": ended} if ended else {})
+    if fwait:
+        extra["v3fam_waits"] = fwait
     return _diag("DR0", True, "info", "; ".join(summary), cites, levers, None, dict({"due": items}, **extra))
 
 

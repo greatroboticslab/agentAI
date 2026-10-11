@@ -10,7 +10,8 @@ Three lanes, one item in flight per lane:
                 -> ADMIT (L17) -> IDLE, or INTAKE again while the intake left images
                 deferred (shard_pending: the next shard); WAIT_DATA when collection
                 is exhausted (D29)
-    TRAIN  IDLE -> SEGMENT (L18, the experiment runs) -> COMMIT (L19) -> IDLE; L22 forks
+    TRAIN  IDLE -> SEGMENT (L18, the experiment runs) -> COMMIT (L19) -> IDLE; L22 forks;
+                V3FAM_DETR (L23K, D6's RF-DETR smoke, then its three seeds)
     MAINT  IDLE -> R0 (L23 splits, L23B baselines, LV verdicts, L25 Stage A, LI init,
                 LA choose-arm, L28 Stage C) | NATIVE (L23N, a done measurement
                 arm's native-resolution rescore) | BASE3 (L23V, E1's base v3
@@ -20,6 +21,8 @@ Three lanes, one item in flight per lane:
                 | ZOO (L23Z, the model-zoo audit: one chain of five jobs)
                 | E3_SCORE (L23F, one E3 arm's two-stage dev scores)
                 | E3_VERDICT (L23G, E3's verdict)
+                | V3FAM_DATA (L23H) | V3FAM_BUILD (L23I) | V3FAM_SCORE (L23J)
+                | V3FAM_VERDICT (L23L): the v3 experiment family, record only
                 | MILESTONE (L20) | COMPARE (LC)
                 | ROLLBACK (L21) | BISECT (L27) | AUDIT (L4) -> IDLE
 
@@ -166,6 +169,7 @@ LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "D
            "L18": "TRAIN", "L19": "TRAIN", "L22": "TRAIN",
            "L20": "MAINT", "L21": "MAINT", "L23": "MAINT", "L23B": "MAINT", "L23N": "MAINT", "L23V": "MAINT",
            "L23E": "MAINT", "L23C": "MAINT", "L23D": "MAINT", "L23Z": "MAINT", "L23F": "MAINT", "L23G": "MAINT",
+           "L23H": "MAINT", "L23I": "MAINT", "L23J": "MAINT", "L23K": "TRAIN", "L23L": "MAINT",
            "L25": "MAINT", "L27": "MAINT", "L28": "MAINT", "L4": "MAINT", "LV": "MAINT", "LI": "MAINT", "LA": "MAINT",
            "LC": "MAINT"}
 # Record-only levers (a measurement arm's native-resolution rescore, L23N;
@@ -178,7 +182,8 @@ LANE_OF = {"L15": "DATA", "L26": "DATA", "LP": "DATA", "L16": "DATA", "L16L": "D
 # outcome is unknown is followed by its job name and its record, never a pause
 # (_follow_record_only). A qos refusal is a platform defect and holds the lane
 # as for every lever (S21).
-RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E", "L23C", "L23D", "L23Z", "L23F", "L23G")
+RECORD_ONLY_LEVERS = ("L23N", "L23V", "L23E", "L23C", "L23D", "L23Z", "L23F", "L23G", "L23H", "L23J", "L23K",
+                      "L23L")
 # The failure card title of each record-only lever (_failed; "%s" is its --exp, or L23F's --arm)
 RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
                       "L23V": "Base v3 build (splits v3, E1) failed (L23V)",
@@ -187,7 +192,21 @@ RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
                       "L23D": "E2-C's attribution rescore and record failed (L23D)",
                       "L23Z": "The model-zoo audit v1 (every detector under one protocol) failed (L23Z)",
                       "L23F": "E3's two-stage scores of arm %s failed (L23F)",
-                      "L23G": "E3's verdict failed (L23G)"}
+                      "L23G": "E3's verdict failed (L23G)",
+                      "L23H": "V3F's data build failed (L23H)", "L23I": "V3F's build of %s failed (L23I)",
+                      "L23J": "V3F's scores of arm %s failed (L23J)", "L23K": "V3F's RF-DETR %s job failed (L23K)",
+                      "L23L": "V3F's verdict failed (L23L)"}
+# V3F (2026-10-11, the v3 experiment family; docs/CONTINUOUS_LOOP.md, V3F.6.2-V3F.6.4): its five levers, all record
+# only. A failure is one card and the item is proposed once more under a new id; after its second failure
+# (v3fam.max_failures) it is recorded failed and never holds the family's other items (_v3fam_failed). Every item
+# is priced and counted against the family cap (260 GPU-h, decision 25: running items at their estimates, ended
+# ones settled from sacct or, for a build, from its experiment's report; the person steps from the derived status):
+# an item whose estimate would pass it is recorded "not run (family cap)" with one card and never retried. An L23K
+# item whose jobs are still queued V3FAM_DETR_OVERDUE_H after its submission is one card (the seeds' walltime is 36 h).
+V3FAM_LEVERS = ("L23H", "L23I", "L23J", "L23K", "L23L")
+V3FAM_NOT_RUN_CAP = "not run (family cap)"
+V3FAM_DETR_OVERDUE_H = 37.0
+V3FAM_CAP_EPS = 1e-6
 # The zoo audit's rerun commands (a person's, on the login node; written records are kept, so both resume)
 ZOO_RERUN = ("bash run_inc2_zoo.sh submit --version %(v)s --shards-a %(a)s --shards-c %(c)s --concurrency %(p)s "
              "--max-gpu-hours %(h)s (resumable: written records are kept; refused while a zoo job is queued); or, "
@@ -1356,7 +1375,7 @@ class StreamRun(object):
         return {"lock": bool(lock.get("locked")), "splits_built": bool(r0.get("splits_built")),
                 "train_manifests": lock.get("train_manifests") or [], "baselines": base, "native": native,
                 "base3": base3, "agnostic": agnostic, "e2": e2, "e2_attr": e2_attr, "zoo": zoo,
-                "e3_score": e3_score, "e3": e3,
+                "e3_score": e3_score, "e3": e3, "v3fam": self._v3fam_stage(exp_status, payload),
                 "exp_status": exp_status, "verdicts": dict(r0.get("verdicts") or {}),
                 "protocol_v3_accepted": bool(self.cfg.get("protocol_v3_accepted_by")),
                 "stage_a": {"exp": sa_exp, "status": state_of(sa_exp, "stage_a")},
@@ -1486,6 +1505,9 @@ class StreamRun(object):
         self._zoo_stale_card()
         # E3's decided verdict (2026-10-05): one card, with each qualifying arm's test read, a person's step
         self._e3_card()
+        # V3F (2026-10-11): the family's person steps, its waits, D5b's block, and its decided verdict with the
+        # exact commands of every sealed-test read (each a card, raised once per content)
+        self._v3fam_cards(by)
         # cards and holds
         for d in fired:
             for lv in d.get("levers") or []:
@@ -1937,7 +1959,8 @@ class StreamRun(object):
                 "L24": "QUARANTINE", "LH": "HOLD_RELEASE", "L18": "SEGMENT", "L19": "COMMIT", "L22": "FORK",
                 "L20": "MILESTONE", "L21": "ROLLBACK", "L23": "SPLITS", "L23B": "BASELINE", "L23N": "NATIVE",
                 "L23V": "BASE3", "L23E": "AGNOSTIC", "L23C": "E2_VERDICT", "L23D": "E2_ATTR", "L23Z": "ZOO",
-                "L23F": "E3_SCORE", "L23G": "E3_VERDICT",
+                "L23F": "E3_SCORE", "L23G": "E3_VERDICT", "L23H": "V3FAM_DATA", "L23I": "V3FAM_BUILD",
+                "L23J": "V3FAM_SCORE", "L23K": "V3FAM_DETR", "L23L": "V3FAM_VERDICT",
                 "L25": "STAGE_A", "L27": "BISECT",
                 "L28": "STAGE_C", "L4": "AUDIT", "LV": "VERDICT", "LI": "INIT", "LA": "ARM",
                 "LC": "COMPARE"}.get(lever, "ITEM")
@@ -2194,6 +2217,11 @@ class StreamRun(object):
             info["fit"] = pr["arm"] == order[0]
         elif lever == "L23G":
             params = {"pkg": pkg}
+        elif lever in V3FAM_LEVERS:
+            got = self._v3fam_params(lever, pr, pkg, info)
+            if got is None:
+                return None
+            params, child = got
         elif lever == "L25":
             sa = dom.get("stage_a") or {}
             params = {"pkg": pkg, "exp": sa["exp"], "from_exp": sa["from_exp"], "recipes": sa["recipes"]}
@@ -2222,6 +2250,8 @@ class StreamRun(object):
             est, estimate = LS.price(lid, params, dom, info)
         else:
             estimate = {"estimator": "zero"}
+        if lid in V3FAM_LEVERS and not self._v3fam_cap_ok(lid, params, est):
+            return None
         akey = step_key(lid, LS.policy_params(lid, params))
         attempt = int((st.get("attempts") or {}).get(akey) or 0)
         failed_ids = set(self._failed_ids())
@@ -3286,6 +3316,8 @@ class StreamRun(object):
             r0["e3_score_%s" % params.get("arm")] = "running"
         elif lever == "L23G":
             r0["e3"] = "running"
+        elif lever in V3FAM_LEVERS:
+            self._v3fam_started(it)
         elif lever == "L25":
             r0["stage_a"] = "building"
         elif lever == "L28":
@@ -3421,6 +3453,8 @@ class StreamRun(object):
             self._zoo_card(params, p)
         elif lever == "L23F":
             st["stage"].setdefault("r0", {})["e3_score_%s" % params.get("arm")] = "done"
+        elif lever in V3FAM_LEVERS:
+            self._v3fam_item(lever, params)["state"] = "done"
         elif lever == "LV":
             key = p.get("verdict_key") or params.get("exp") or params.get("verb")
             st["stage"]["r0"].setdefault("verdicts", {})[key] = self.utc
@@ -3490,6 +3524,8 @@ class StreamRun(object):
                              charged=charged, fails=int(lane.get("fails") or 0), lost=True, lost_runs=lr[key])
                 self._clear(ln)
                 return
+        if lever in V3FAM_LEVERS and not submission:
+            return self._v3fam_failed(ln, it, why, charged)
         if lever in RECORD_ONLY_LEVERS and not submission:
             # record only (a measurement arm's native-resolution rescore; E1's base v3 build and agnostic
             # rescore): a person's card; the lane's failure count, its step count and its stop-loss are not
@@ -4155,6 +4191,8 @@ class StreamRun(object):
                     self._follow_record_only(ln, it, queued, names, arts)
                     continue
                 if queued is None or any(j.split("_")[0] in queued for j in ids):
+                    if it["lever"] == "L23K":
+                        self._v3fam_overdue(it)
                     continue
                 states = [((sacct.get(j) or {}).get("state") or "") for j in ids]
                 if ids and not all(states):
@@ -4170,6 +4208,8 @@ class StreamRun(object):
                         if sacct.get(j):
                             B.record_job_spend(j, self.name, sacct[j], p["policy_action"], domain=self.domain,
                                                base_dir=self.xctx.su_base_dir, ts=self.utc)
+                if it["lever"] in V3FAM_LEVERS:
+                    self._v3fam_settle(it, [sacct.get(j) for j in ids])
                 s_ = st["sources"].get((p.get("params") or {}).get("source")) or {}
                 if not ok and it["lever"] == "L16I" and (s_.get("status") == "names_pending" or (
                         s_.get("status") == "held" and s_.get("names_held")) or NAMES_REFUSAL in refusal):
@@ -4272,6 +4312,15 @@ class StreamRun(object):
             return SR.E3_SCORE_JOB_NAME % arm.lower(), "capacity/e3_score_%s.json" % arm
         if it["lever"] == "L23G":
             return SR.E3_JOB_NAME, "capacity/e3_rescore.json"
+        if it["lever"] == "L23H":
+            return SR.V3FAM_DATA_JOB_NAME, "splits/v3fam/summary.json"
+        if it["lever"] == "L23J":
+            arm = str(prm.get("arm"))
+            return SR.V3FAM_SCORE_JOB_NAME % arm.lower(), "capacity/v3fam_score_%s.json" % arm.lower()
+        if it["lever"] == "L23K":
+            return tuple(SR.V3FAM_DETR_JOB_NAMES[str(prm.get("verb"))]), SR.V3FAM_STATUS
+        if it["lever"] == "L23L":
+            return SR.V3FAM_JOB_NAME, "capacity/v3fam_v1.json"
         return SR.NATIVE_JOB_NAME % prm.get("exp"), "%s/native_rescore.json" % prm.get("exp")
 
     def _follow_record_only(self, ln, it, queued, names, arts):
@@ -4289,6 +4338,9 @@ class StreamRun(object):
         if queued is None or any(j in names for j in jobs):
             return
         rs = (arts.get(record) or {}).get("status")
+        if it["lever"] in V3FAM_LEVERS:
+            # V3F: its records' own words for done (the verdict's 'decided'; L23K's from the derived status)
+            rs = "complete" if self._v3fam_record_done(it, arts.get(record) or {}) else None
         if rs == "complete" or (it["lever"] == "L23Z" and rs == "partial"):
             self._done(ln, it)
             return
@@ -4718,9 +4770,389 @@ class StreamRun(object):
         self._card("research", title, "\n".join(lines), trigger=["L23G"])
         st["e3_card"] = self.utc
 
+    # ------------------------------------------------------------------ V3F (2026-10-11)
+    def _v3fam(self):
+        """The family's own record in the stream state: items {key: {state, fails, estimate, spend, settled,
+        proposal, exp}} (key data, score:<arm>, build:<arm>, detr:smoke|train, verdict) and the cards raised."""
+        f = self.st.setdefault("v3fam", {})
+        f.setdefault("items", {})
+        return f
+
+    @staticmethod
+    def _v3fam_key(lever, params):
+        return {"L23H": "data", "L23L": "verdict"}.get(lever) or {
+            "L23J": "score:%s", "L23I": "build:%s", "L23K": "detr:%s"}[lever] % (
+            params.get("verb") if lever == "L23K" else params.get("arm"))
+
+    def _v3fam_item(self, lever, params):
+        return self._v3fam()["items"].setdefault(self._v3fam_key(lever, params), {})
+
+    def _v3fam_amendment(self):
+        """True when the deployed tree (the lab's, which the S23 check keeps equal to the cluster's) holds the
+        amendment's file with the sha256 the domain records: the deployed commit descends from the amendment's."""
+        fam = (self.dom or {}).get("v3fam") or {}
+        if not fam.get("amendment_file"):
+            return False
+        path = self.paths.lab_inc.parents[3] / fam["amendment_file"]
+        try:
+            return hashlib.sha256(path.read_bytes()).hexdigest() == fam.get("amendment_sha256")
+        except OSError:
+            return False
+
+    def _v3fam_stage(self, exp_status, payload=None):
+        """/stage/v3fam (V3F.6.4), what DR0's family block and the cards read: the gate's inputs (the amendment
+        deployed, the time stamp, D0-S's record and trigger, the EXIF pre-flight), every item's state (done from
+        its own record where one exists: the data summary, an arm's score record (complete, or 'not run' with its
+        reason), an experiment done, D6's smoke and seeds, the verdict decided; else what the platform ran:
+        running, failed_once, failed, not run (family cap); blocked and not needed from the domain and the
+        trigger; an arm whose dependency ended without its effect is not run), and the family's GPU-h against
+        its cap. None without a family block."""
+        from . import stream_remote as SR
+        fam = (self.dom or {}).get("v3fam") or {}
+        if not fam:
+            return None
+        items = self._v3fam()["items"]
+        status = self._artifact(fam.get("status") or SR.V3FAM_STATUS) or {}
+
+        def mine(key):
+            return (items.get(key) or {}).get("state")
+        sw = status.get("sweep") or {}
+        out = {"amendment": self._v3fam_amendment(),
+               "timestamp": bool((status.get("timestamp") or {}).get("exists")), "sweep": bool(sw.get("complete")),
+               "exif": bool((status.get("exif") or {}).get("passed")),
+               "trigger": {k: bool(sw.get(k)) for k in ("bclean", "dev_branch", "test_branch")}}
+        summ = self._artifact(fam.get("data_record") or "splits/v3fam/summary.json") or {}
+        data_ok = summ.get("status") == "complete" or bool((status.get("data") or {}).get("complete"))
+        out["data"] = "done" if data_ok else (mine("data") or "missing")
+        b = {}
+        for arm in fam.get("builds") or []:
+            x = exp_status.get((fam.get("build_exps") or {}).get(arm))
+            own = mine("build:%s" % arm)
+            if arm in (fam.get("blocked_builds") or {}):
+                b[arm] = "blocked"
+            elif arm == "D0BCLEAN" and not out["trigger"]["bclean"]:
+                b[arm] = "not needed"
+            elif x == "done":
+                b[arm] = "done"
+            elif own in ("failed", V3FAM_NOT_RUN_CAP):
+                b[arm] = own
+            elif x == "built":
+                b[arm] = "built"
+            elif own == "done":
+                b[arm] = "running"               # its build job ended; the experiment shows in the next snapshot
+            else:
+                b[arm] = own or "missing"
+        out["build"] = b
+        det = status.get("detr") or {}
+        sm = det.get("smoke")
+        if sm == "complete" and det.get("walltime_ok") is True:
+            smoke = "done"
+        elif sm and str(sm).startswith("not run"):
+            smoke = str(sm)
+        else:
+            smoke = mine("detr:smoke") or "missing"
+            smoke = "running" if smoke == "done" else smoke     # its job ended; its record shows next snapshot
+        if sorted(int(k) for k in det.get("trained") or []) == [0, 1, 2]:
+            train = "done"
+        elif DS.v3fam_terminal(smoke) and smoke != "done":
+            train = smoke
+        else:
+            train = mine("detr:train") or "missing"
+            train = "running" if train == "done" else train
+        out["detr"] = {"smoke": smoke, "train": train}
+        if out["data"] == "failed":
+            # the data build ended without its summary after its second failure: nothing that trains on the family's
+            # manifests (the builds) or stages after it (D6) can run; recorded so, terminal, so the verdict still comes
+            why = "not run (the family's data build failed)"
+            for arm in b:
+                if b[arm] in ("missing", "failed_once"):
+                    b[arm] = why
+            for k in ("smoke", "train"):
+                if out["detr"][k] in ("missing", "failed_once"):
+                    out["detr"][k] = why
+        sc = {}
+        arms = list(fam.get("pre_build_scores") or []) + list(fam.get("post_build_scores") or [])
+        for arm in arms:
+            rec = self._artifact((fam.get("score_record") or "capacity/v3fam_score_%s.json") % arm.lower()) or {}
+            if rec.get("status") == "complete":
+                sc[arm] = "done"
+            elif rec.get("status") == "not run":
+                sc[arm] = "not run (%s)" % (rec.get("reason") or "recorded")
+            else:
+                own = mine("score:%s" % arm)
+                sc[arm] = "running" if own == "done" else (own or "missing")
+        out["score"] = sc
+        for arm in arms:
+            if sc[arm] in ("missing", "failed_once") \
+                    and DS._v3fam_deps(out, (fam.get("score_after") or {}).get(arm)) == "not run":
+                sc[arm] = "not needed" if arm == "BCLEAN" and b.get("D0BCLEAN") == "not needed" else \
+                    "not run (a dependency ended without its effect)"
+        vr = self._artifact(fam.get("verdict_record") or "capacity/v3fam_v1.json") or {}
+        out["verdict"] = "done" if vr.get("status") == "decided" else (
+            "running" if mine("verdict") == "done" else (mine("verdict") or "missing"))
+        out["spend_gpuh"] = round(self._v3fam_spend(exp_status, status, payload), 4)
+        out["cap_gpuh"] = float(fam.get("cap_gpu_hours") or 260.0)
+        out["cap_refused"] = sorted(k for k, v in items.items() if v.get("state") == V3FAM_NOT_RUN_CAP)
+        return out
+
+    def _v3fam_report(self, exp, payload):
+        """An experiment's report.json from this snapshot, else from its frozen record."""
+        snap = (((payload or {}).get("experiments") or {}).get(exp) or {}).get("snapshot") or {}
+        rep = ((snap.get("decision") or {}).get("artifacts") or {}).get("%s/report.json" % exp)
+        if not isinstance(rep, dict):
+            fz = _read_json(self.paths.frozen(self.name, exp)) or {}
+            rep = (((fz.get("snapshot") or {}).get("decision") or {}).get("artifacts") or {}).get(
+                "%s/report.json" % exp)
+        return rep if isinstance(rep, dict) else None
+
+    def _v3fam_spend(self, exp_status, status, payload=None):
+        """The family's GPU-h (decision 25): each item the platform ran at its estimate until it settled (a job
+        from sacct, a build from its experiment's report once done), a refused item nothing; the person steps
+        (the sweep, the reads, the re-analysis) from the derived status, a running one at its estimate."""
+        fam = (self.dom or {}).get("v3fam") or {}
+        total = 0.0
+        for key, it in self._v3fam()["items"].items():
+            if it.get("state") == V3FAM_NOT_RUN_CAP or it.get("spend") is None:
+                continue
+            if key.startswith("build:") and it.get("spend") == "open" and exp_status.get(it.get("exp")) == "done":
+                rep = self._v3fam_report(it["exp"], payload)
+                gh = (rep or {}).get("gpu_hours") if isinstance(rep, dict) and rep.get("done") else None
+                if isinstance(gh, dict):
+                    it["settled"] = round(sum(float((x or {}).get("hours") or 0.0) for x in gh.values()
+                                              if isinstance(x, dict)), 4)
+                    it["spend"] = "settled"
+            total += float(it["settled"]) if it.get("spend") == "settled" and it.get("settled") is not None \
+                else float(it.get("estimate") or 0.0)
+        ph = ((fam.get("costs") or {}).get("person_hours") or {})
+        total += float(status.get("person_settled_gpuh") or 0.0)
+        for j in status.get("person_jobs") or []:
+            if j.get("state") == "running":
+                n = str(j.get("job") or "")
+                total += float(ph.get("sweep") if n.startswith("v3fam_sweep") else
+                               ph.get("retest") if n.startswith("v3fam_retest") else ph.get("read") or 0.0)
+        return total
+
+    def _v3fam_params(self, lever, pr, pkg, info):
+        """(params, child_exp) of a family lever from DR0's item, or None."""
+        fam = (self.dom or {}).get("v3fam") or {}
+        if lever == "L23H":
+            return {"pkg": pkg}, None
+        if lever == "L23L":
+            return {"pkg": pkg}, None
+        if lever == "L23J":
+            arms = list(fam.get("pre_build_scores") or []) + list(fam.get("post_build_scores") or [])
+            if pr.get("arm") not in arms:
+                return None
+            info["arm"] = pr["arm"]
+            return {"pkg": pkg, "arm": pr["arm"]}, None
+        if lever == "L23K":
+            if pr.get("verb") not in ("smoke", "train"):
+                return None
+            return dict({"pkg": pkg, "verb": pr["verb"]}, **({"seeds": "0,1,2"} if pr["verb"] == "train" else {})), \
+                None
+        arm = pr.get("arm")
+        exp = (fam.get("build_exps") or {}).get(arm)
+        if not exp or arm in (fam.get("blocked_builds") or {}):
+            return None
+        from . import stream_remote as SR
+        st_ = self._artifact(fam.get("status") or SR.V3FAM_STATUS) or {}
+        a = ((st_.get("data") or {}).get("arms") or {}).get(arm) or \
+            ((self._artifact(fam.get("data_record") or "splits/v3fam/summary.json") or {}).get("arms") or {}).get(arm) \
+            or {}
+        if arm in ("D8M", "D8S"):
+            a = dict(a, images=a.get("images") or 3048)          # D8 trains LOCK v2's train_core (3,048 rows)
+        if not a.get("images"):
+            return None
+        info.update(images=int(a["images"]), arm=arm)
+        return {"pkg": pkg, "exp": exp, "arm": arm, "seeds": "0,1,2", "role": "baseline"}, exp
+
+    def _v3fam_cap_ok(self, lever, params, est):
+        """False (recorded 'not run (family cap)', one card, never retried) when est would take the family past
+        its cap: the family's GPU-h as this tick's context gives it, plus the estimates proposed this tick."""
+        fam = (self.dom or {}).get("v3fam") or {}
+        cap = float(fam.get("cap_gpu_hours") or 260.0)
+        ctx = (self.ev.json(E.CONTEXT) or {}) if self.ev is not None else {}
+        spent = float((((ctx.get("stage") or {}).get("v3fam") or {}).get("spend_gpuh")) or 0.0)
+        tick = getattr(self, "_v3fam_tick", None)
+        if tick is None or tick[0] != self.utc:
+            tick = self._v3fam_tick = [self.utc, 0.0]
+        after = spent + tick[1] + float(est or 0.0)
+        if after <= cap + V3FAM_CAP_EPS:
+            tick[1] += float(est or 0.0)
+            return True
+        rec = self._v3fam_item(lever, params)
+        if rec.get("state") != V3FAM_NOT_RUN_CAP:
+            key = self._v3fam_key(lever, params)
+            rec.update(state=V3FAM_NOT_RUN_CAP, refused_utc=self.utc, spent_gpuh=round(spent + tick[1], 4),
+                       estimate=float(est or 0.0), spend=None)
+            self._ledger("not_taken", lever=lever, v3fam_item=key, reasons=[
+                "%s: %s (%.2f GPU-h) would take the family from %.2f past its cap of %.0f GPU-h (decision 25)"
+                % (V3FAM_NOT_RUN_CAP, key, float(est or 0.0), spent + tick[1], cap)])
+            self._card("escalation", "V3F's %s: %s" % (key, V3FAM_NOT_RUN_CAP),
+                       "%s (%.2f GPU-h est.) would take the v3 family from %.2f GPU-h (running items at their "
+                       "estimates, ended ones settled) past its cap of %.0f GPU-h (decision 25). It is recorded "
+                       "'%s', keeps its place in the family table, in C and in its Holm set, and is never retried."
+                       % (key, float(est or 0.0), spent + tick[1], cap, V3FAM_NOT_RUN_CAP), lever=lever)
+        return False
+
+    def _v3fam_started(self, it):
+        p = it["proposal"]
+        rec = self._v3fam_item(it["lever"], p.get("params") or {})
+        rec.update(state="running", estimate=float(p.get("est_gpu_hours") or 0.0), spend="open", settled=None,
+                   proposal=p["id"], lever=it["lever"], started_utc=self.utc, exp=p.get("child_exp"))
+
+    def _v3fam_settle(self, it, rows):
+        """A family job's spend settled from sacct once every job of it ended (V100 GPU-h)."""
+        if not rows or not all(r and r.get("elapsed_s") is not None for r in rows):
+            return
+        rec = self._v3fam_item(it["lever"], it["proposal"].get("params") or {})
+        if it["lever"] == "L23I":
+            return                                # its runs are settled by the experiment's report
+        rec["settled"] = round(sum(float(r["elapsed_s"]) * float(r.get("gpu_count") or 1) / 3600.0 for r in rows), 4)
+        rec["spend"] = "settled"
+
+    def _v3fam_failed(self, ln, it, why, charged):
+        """A family item that ended without its effect: one card; proposed once more under a new id; after its
+        second failure (v3fam.max_failures) recorded failed, its id declined, the family's other items go on. No
+        lane failure, no stop-loss."""
+        st = self.st
+        p = it["proposal"]
+        lever, params = it["lever"], p.get("params") or {}
+        fam = (self.dom or {}).get("v3fam") or {}
+        key = self._v3fam_key(lever, params)
+        rec = self._v3fam_item(lever, params)
+        rec["fails"] = int(rec.get("fails") or 0) + 1
+        if rec.get("spend") == "open":
+            rec["settled"] = float(rec.get("estimate") or 0.0) if charged else 0.0
+            rec["spend"] = "settled"
+        last = rec["fails"] >= int(fam.get("max_failures") or 2)
+        rec["state"] = "failed" if last else "failed_once"
+        if last:
+            st["declined"] = (list(st.get("declined") or []) + [p["id"]])[-200:]
+        else:
+            st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+        self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
+                     charged=charged, record_only=True, v3fam_item=key, fails=rec["fails"])
+        title = RECORD_ONLY_TITLES[lever]
+        title = title % (params.get("arm") or params.get("verb")) if "%s" in title else title
+        self._card("escalation", "%s%s" % (title, ": recorded failed" if last else ""),
+                   "%s. Record only: %s; the family's other items go on. A person may rerun it: %s" % (
+                       _short(why, 400), "after its second failure it is recorded failed and keeps its place in the "
+                                         "family's verdict as failed" if last else
+                       "it is proposed once more under a new id", " ".join(p.get("argv") or [])),
+                   lever=lever, trigger=list(p.get("trigger") or []))
+        self._clear(ln)
+
+    def _v3fam_record_done(self, it, rec):
+        """A family item followed after an unknown outcome is done once its record says so."""
+        lever = it["lever"]
+        if lever == "L23L":
+            return rec.get("status") == "decided"
+        if lever == "L23K":
+            det = rec.get("detr") or {}
+            if (it["proposal"].get("params") or {}).get("verb") == "smoke":
+                return bool(det.get("smoke"))
+            return sorted(int(k) for k in det.get("trained") or []) == [0, 1, 2]
+        if lever == "L23J":
+            return rec.get("status") in ("complete", "not run")
+        return rec.get("status") == "complete"
+
+    def _v3fam_overdue(self, it):
+        """One card when an L23K item's jobs are still queued V3FAM_DETR_OVERDUE_H after its submission."""
+        t0 = _secs(it.get("since_utc"))
+        if it.get("v3fam_overdue") or t0 is None or self.now - t0 < V3FAM_DETR_OVERDUE_H * 3600.0:
+            return
+        it["v3fam_overdue"] = self.utc
+        self._card("escalation", "V3F's RF-DETR %s jobs are queued or running after %.0f h (L23K)" % (
+            (it["proposal"].get("params") or {}).get("verb"), V3FAM_DETR_OVERDUE_H),
+            "job(s) %s: each has a 36 h walltime (run_inc2_detr.sh), so a job still queued or running after %.0f h "
+            "waits in the queue or outlived its limit; a person checks squeue and sacct. The TRAIN lane stays held "
+            "until they end." % (",".join(str(j) for j in it.get("job_ids") or []), V3FAM_DETR_OVERDUE_H),
+            lever="L23K")
+
+    def _v3fam_cards(self, by):
+        """The family's cards (each raised once per content), once the deployed tree holds the amendment and its
+        prerequisites hold (E3's verdict decided, the zoo complete): its person steps while any is pending; each
+        storage wait DR0 names; D5b's block; the decided verdict with the exact commands of every sealed-test read
+        in the order it fixed."""
+        fam = (self.dom or {}).get("v3fam") or {}
+        if not fam:
+            return
+        f = self._v3fam()
+        stg = ((self.ev.json(E.CONTEXT) or {}).get("stage") or {}) if self.ev is not None else {}
+        fs = stg.get("v3fam") or {}
+        e3v = self._artifact(((fam.get("requires") or {}).get("e3_record")) or "capacity/e3_v1.json") or {}
+        if stg.get("e3") != "done" or e3v.get("status") != "decided" or stg.get("zoo") != "done" \
+                or not fs.get("amendment"):
+            return
+        mod = "python -m weed_optimizer_framework.tools.inc2"
+        steps = []
+        if not fs.get("timestamp"):
+            steps.append("write v3fam/v1/timestamp.json (the OpenTimestamps proof's file name and sha256, V3F.12)")
+        if not fs.get("sweep"):
+            steps.append("D0-S (the delegate): INCAP_DECIDED_BY=assistant:claude-delegate sbatch -p GPU-shared "
+                         "--job-name=inc_build_v3fam_sweep run_inc2_build.sh inc2.v3fam_sweep run; then, per verified "
+                         "pair, %s.v3fam_sweep verdict --pair <id> --copy yes|no --read-by owner|delegate" % mod)
+        if not fs.get("exif"):
+            steps.append("the EXIF frame pre-flight before D1's scores: %s.v3fam exif-preflight, then %s.v3fam "
+                         "exif-verdict --frame yes|no --read-by owner|delegate" % (mod, mod))
+        if fs.get("score") and any(str(v).startswith("not run (download") for v in (fs.get("score") or {}).values()):
+            steps.append("D2's weights: %s.v3fam_embed plan, the downloads on the login node, then %s.v3fam_embed "
+                         "downloads --commands <log>" % (mod, mod))
+        if steps and f.get("steps_card") != steps:
+            f["steps_card"] = steps
+            self._card("research", "V3F waits for a person's step%s" % ("s" if len(steps) > 1 else ""),
+                       "The v3 experiment family (record only) proposes nothing until: " + "; ".join(steps)
+                       + ". D7 (the lab RTX 3060's latency) is the delegate's at any time after the downloads.",
+                       lever="L23H")
+        for k, why in sorted((((by.get("DR0") or {}).get("detail") or {}).get("v3fam_waits") or {}).items()):
+            if str(why).startswith("storage") and (f.setdefault("wait_cards", {})).get(k) != why:
+                f["wait_cards"][k] = why
+                self._card("quota", "V3F's %s waits for storage" % k, "%s (V3F.6.4: 30 GiB above the 3 %% floor for "
+                           "the item's bytes); a person frees space" % why, lever="L23H")
+        blocked = sorted((fam.get("blocked_builds") or {}).items())
+        if blocked and not f.get("blocked_card"):
+            f["blocked_card"] = self.utc
+            self._card("research", "V3F: D5b's builds wait for a Revision", "%s: %s. P8 and P9 stay in the probe's "
+                       "Holm set and are reported 'not run' until then." % (", ".join(k for k, _v in blocked),
+                                                                           blocked[0][1]), lever="L23I")
+        v = self._artifact(fam.get("verdict_record") or "capacity/v3fam_v1.json") or {}
+        if v.get("status") != "decided" or f.get("verdict_card"):
+            return
+        lines = []
+        for pid, r in sorted((v.get("primaries") or {}).items()):
+            d = r.get("decision") or {}
+            h = (v.get("holm") or {}).get(pid) or {}
+            if r.get("status") == "decided":
+                lines.append("%s %s over %s: D %s, z %s, 90%% interval [%s, %s] -> %s%s%s" % (
+                    pid, r.get("x_label") or r.get("x"), r.get("y_label") or r.get("y"), _fmt4(d.get("diff")),
+                    _fmt4(d.get("z")), _fmt4((d.get("interval_90") or [None, None])[0]),
+                    _fmt4((d.get("interval_90") or [None, None])[1]), d.get("outcome"),
+                    " (%s)" % ", ".join(d.get("flags") or []) if d.get("flags") else "",
+                    "; family-confirmed" if h.get("family_confirmed") else ""))
+            else:
+                lines.append("%s: not run (%s)" % (pid, _short(r.get("why"), 120)))
+        ch = v.get("challengers") or {}
+        lines.append("Tier C: C = %s, bar z > %s; opening a read: %s" % (ch.get("C"), _fmt4(ch.get("bar")),
+                                                                         ", ".join(ch.get("opening") or []) or "none"))
+        order = (v.get("reads") or {}).get("order") or []
+        for o in order:
+            lines.append("Read %s (%s): %s.v3fam test-read --arm %s --read-by owner|delegate; the person named "
+                         "submits the printed sbatch argv with INCAP_DECIDED_BY naming them (the owner's account, or "
+                         "assistant:claude-delegate); then %s.v3fam test-report --arm %s" % (
+                             o.get("arm"), o.get("kind"), mod, o.get("arm"), mod, o.get("arm")))
+        lines.append("After the reads, the re-analysis (no inference): INCAP_DECIDED_BY=<the person> sbatch -p "
+                     "GPU-shared --job-name=inc_build_v3fam_retest run_inc2_build.sh inc2.v3fam reanalyse-test "
+                     "--read-by owner|delegate. Nothing switches; the headline stays E3-B (V3F.3.6).")
+        f["verdict_card"] = self.utc
+        self._card("research", "V3F's verdict is decided (%s)" % v.get("decided_on", "dev"), "\n".join(lines),
+                   lever="L23L", trigger=["L23L"])
+
     def _measure_exps(self):
-        """The measurement arms' experiments (baselines marked measure)."""
-        return {b["exp"] for b in ((self.dom or {}).get("baselines") or {}).get("items") or [] if b.get("measure")}
+        """The measurement arms' experiments (baselines marked measure) and V3F's build experiments (2026-10-11):
+        record only, so their D5 and D6 are a person's card, never a pause."""
+        out = {b["exp"] for b in ((self.dom or {}).get("baselines") or {}).get("items") or [] if b.get("measure")}
+        return out | set((((self.dom or {}).get("v3fam") or {}).get("build_exps") or {}).values())
 
     def _e1_items(self):
         """{'A': item, 'B': item} of E1's baselines (stream-domain e1.arms), or {}."""

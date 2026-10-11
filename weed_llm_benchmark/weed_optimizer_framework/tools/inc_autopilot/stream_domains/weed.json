@@ -495,6 +495,237 @@
   "rescore_record": "capacity/e3_rescore.json",
   "why": "E3, two-stage species detection (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-05, pre-registered): a one-class box detector (no retraining, seeds 0-2, the locked scorer's own inference settings: E3-M b_v2_m640's boxes under class-agnostic NMS, E3-A E1-A's and E3-B E1-B's under the locked scorer's own NMS, each reduced by one_per_box) and one BioCLIP-2 logistic-regression crop classifier fitted once on base_v2's ground-truth boxes (pinned); each box emitted as its top 3 classes at q x p within the locked conf and max_det, scored by the locked scorer's own matching and AP. Once E2's verdict is recorded and decided, the three source experiments are done and E2-C's attribution (L23D) is settled (its record complete, it failed, or an E2-C build failed), DR0 proposes L23F once per arm in the order M, A, B (inc2.twostage score-arm; the first also fits the classifier and runs the identity equivalence check), then L23G once (inc2.twostage verdict: capacity/e3_v1.json and capacity/e3_rescore.json). Rule (dev, record only): an arm qualifies when D = mean(arm's dev species mAP50-95) - mean(b_v2_m640's native dev files) > 2 x pooled sd and > the paired image-bootstrap SE (stable_int('inc2/e3/species_se'), 1,000 resamples); the largest qualifying D is chosen, a tie goes to M, then A, then B; the attribution E3-B - E3-A is recorded beside. Nothing switches. A failed arm's job is a card and holds the other arms; each qualifying arm's sealed test is read once, after the verdict, by a person (inc2.twostage test-read); the ticker raises one card with the exact commands."
  },
+ "v3fam": {
+  "family": "v1",
+  "amendment_commit": "55cc2d97cd2147d01644c1e193098b73aeba0a06",
+  "amendment_file": "docs/prereg/V3F_2026-10-11.md",
+  "amendment_sha256": "5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f",
+  "requires": {
+   "e3_record": "capacity/e3_v1.json",
+   "zoo": "zoo"
+  },
+  "status": "v3fam/v1/status.json",
+  "data_record": "splits/v3fam/summary.json",
+  "score_record": "capacity/v3fam_score_%s.json",
+  "verdict_record": "capacity/v3fam_v1.json",
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "pre_build_scores": [
+   "E3RS",
+   "D2LAION",
+   "D2CLIP",
+   "D2DINOL",
+   "D2DINOB",
+   "D2SIGLIP",
+   "D2RN50",
+   "D2BC1",
+   "D2BC2640",
+   "D2FT",
+   "D3",
+   "D9"
+  ],
+  "builds": [
+   "D0BCLEAN",
+   "D8M",
+   "D8S",
+   "D4F",
+   "D4N",
+   "D4R15",
+   "D1A1",
+   "D1B1",
+   "D1A12",
+   "D5B0",
+   "D5B25",
+   "D5B100"
+  ],
+  "build_exps": {
+   "D0BCLEAN": "v3_d0_bclean_m640",
+   "D8M": "v3_d8_m640_tc",
+   "D8S": "v3_d8_s640_tc",
+   "D4F": "v3_d4_f_m640",
+   "D4N": "v3_d4_n_m640",
+   "D4R15": "v3_d4_r15_m640",
+   "D1A1": "v3_d1_a1_m640",
+   "D1B1": "v3_d1_b1_m640",
+   "D1A12": "v3_d1_a12_m640",
+   "D5B0": "v3_d5b_0_m640",
+   "D5B25": "v3_d5b_25_m640",
+   "D5B100": "v3_d5b_100_m640"
+  },
+  "build_detector": {
+   "D0BCLEAN": "m640",
+   "D8M": "m640",
+   "D8S": "s640",
+   "D4F": "m640",
+   "D4N": "m640",
+   "D4R15": "m640",
+   "D1A1": "m640",
+   "D1B1": "m640",
+   "D1A12": "m640",
+   "D5B0": "m640",
+   "D5B25": "m640",
+   "D5B100": "m640"
+  },
+  "budget_builds": [
+   "D1A1",
+   "D1B1",
+   "D4F",
+   "D4N",
+   "D4R15",
+   "D0BCLEAN"
+  ],
+  "post_build_scores": [
+   "BCLEAN",
+   "D8",
+   "D4F",
+   "D4N",
+   "D4R15",
+   "D1",
+   "D5B",
+   "D6"
+  ],
+  "score_after": {
+   "D2LAION": [
+    "E3RS"
+   ],
+   "D2CLIP": [
+    "E3RS"
+   ],
+   "D2DINOL": [
+    "E3RS"
+   ],
+   "D2DINOB": [
+    "E3RS"
+   ],
+   "D2SIGLIP": [
+    "E3RS"
+   ],
+   "D2RN50": [
+    "E3RS"
+   ],
+   "D2BC1": [
+    "E3RS"
+   ],
+   "D2BC2640": [
+    "E3RS"
+   ],
+   "D2FT": [
+    "E3RS"
+   ],
+   "D3": [
+    "E3RS"
+   ],
+   "D9": [
+    "E3RS"
+   ],
+   "BCLEAN": [
+    "E3RS",
+    "build:D0BCLEAN"
+   ],
+   "D8": [
+    "E3RS",
+    "build:D8M",
+    "build:D8S"
+   ],
+   "D4F": [
+    "E3RS",
+    "build:D4F"
+   ],
+   "D4N": [
+    "E3RS",
+    "build:D4N"
+   ],
+   "D4R15": [
+    "E3RS",
+    "build:D4R15"
+   ],
+   "D1": [
+    "E3RS",
+    "build:D1A1",
+    "build:D1B1",
+    "build:D1A12",
+    "exif"
+   ],
+   "D5B": [
+    "E3RS",
+    "build:D5B0",
+    "build:D5B25",
+    "build:D5B100"
+   ],
+   "D6": [
+    "E3RS",
+    "detr:train"
+   ]
+  },
+  "blocked_builds": {
+   "D5B0": "the pinned driver (inc/driver.py) requires dev among a definition's finals and scores dev in every base run, while V3F.5 D5b's builds have no finals and never read dev (V3F.6.1): built only after a dated Revision settles how; inc2.baseline build --v3fam refuses it until then",
+   "D5B25": "the pinned driver (inc/driver.py) requires dev among a definition's finals and scores dev in every base run, while V3F.5 D5b's builds have no finals and never read dev (V3F.6.1): built only after a dated Revision settles how; inc2.baseline build --v3fam refuses it until then",
+   "D5B100": "the pinned driver (inc/driver.py) requires dev among a definition's finals and scores dev in every base run, while V3F.5 D5b's builds have no finals and never read dev (V3F.6.1): built only after a dated Revision settles how; inc2.baseline build --v3fam refuses it until then"
+  },
+  "max_failures": 2,
+  "cap_gpu_hours": 260.0,
+  "storage_margin_gib": 30.0,
+  "storage_floor_share": 0.03,
+  "costs": {
+   "data_hours": 2.0,
+   "data_cap": 4.0,
+   "score_hours": {
+    "E3RS": 4.3,
+    "D2LAION": 1.0,
+    "D2CLIP": 1.0,
+    "D2DINOL": 1.0,
+    "D2DINOB": 1.0,
+    "D2SIGLIP": 1.5,
+    "D2RN50": 1.0,
+    "D2BC1": 1.0,
+    "D2BC2640": 1.0,
+    "D2FT": 2.75,
+    "D3": 0.5,
+    "D9": 4.4,
+    "D1": 4.1,
+    "D4F": 1.0,
+    "D4N": 1.0,
+    "D4R15": 1.0,
+    "D5B": 0.6,
+    "D6": 1.5,
+    "D8": 0.6,
+    "BCLEAN": 1.0
+   },
+   "score_cap": 6.0,
+   "build_ms_per_image_epoch": {
+    "m640": 14.2,
+    "s640": 8.3
+   },
+   "budget_image_epochs": 1200000,
+   "cold_epochs": 100,
+   "finals_hours_per_run": 0.1,
+   "build_job_hours": 4.0,
+   "build_cap": 20.0,
+   "detr_smoke_hours": 0.5,
+   "detr_smoke_cap": 1.0,
+   "detr_train_hours": 72.0,
+   "detr_train_cap": 108.0,
+   "verdict_hours": 0.5,
+   "verdict_cap": 1.0,
+   "person_hours": {
+    "sweep": 1.5,
+    "read": 0.5,
+    "retest": 0.1
+   }
+  },
+  "storage_gb": {
+   "data": 0.5,
+   "score": 0.2,
+   "build": 0.3,
+   "detr_smoke": 3.0,
+   "detr_train": 7.0,
+   "verdict": 0.01
+  },
+  "why": "V3F, the v3 experiment family D0-D9 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, pre-registered as one family; docs/prereg/V3F_2026-10-11.md): once E3's verdict is decided and the model-zoo audit is complete, the deployed tree holds the amendment (its sha256), v3fam/v1/timestamp.json exists and D0-S's record is complete (the derived status v3fam/v1/status.json the snapshot ships), DR0 proposes, one MAINT item at a time and in V3F.7's order: L23H once (inc2.v3fam_data build), then L23J for E3RS, D2's nine arms, D3 and D9 (inc2.v3fam score --arm X), then L23I for each build (inc2.baseline build --exp E --v3fam ARM; D0BCLEAN first and only when D0-S triggered it; a lane item ends when its build job ends and the seeds' runs overlap), then L23J for BCLEAN, D8, D4F, D4N, D4R15, D1 (after the EXIF frame pre-flight passed) and D6 once its runs (or D6's three seed exports) are done, then L23L once (inc2.v3fam verdict) when every arm is done, failed or not run; on TRAIN, L23K's smoke after L23H, then its three seeds in one item when the smoke's projection is within 28.8 h. Every item is record only: a failure is one card and the item is proposed once more; after a second failure it is recorded failed, never holds the other arms, and keeps its place in the verdict. No item is proposed while storage is under 30 GiB above the 3 % floor for its bytes (a card names the shortfall), or while its estimate would take the family past 260 GPU-h (the family cap, decision 25: running items at their estimates, ended ones settled from sacct or the experiment's report, the person steps from the derived status; it is recorded 'not run (family cap)' and never retried). D5b's three builds wait for a Revision (blocked_builds). Person and delegate steps are never levers: D0-S's sweep and verdicts, the weight downloads, D7, the EXIF verdict, every sealed-test read and the re-analysis; the family card gives their exact commands."
+ },
  "stage_a": {
   "exp": "pilot_v4",
   "from_exp": "pilot_v3",
