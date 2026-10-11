@@ -22,6 +22,11 @@
 #   python -m weed_optimizer_framework.tools.inc2.baseline rescore-e2
 #   python -m weed_optimizer_framework.tools.inc2.baseline rescore-e2-attr
 #   python -m weed_optimizer_framework.tools.inc2.twostage score-arm --arm M|A|B | verdict | score-test --arm X
+#   python -m weed_optimizer_framework.tools.inc2.v3fam_data build
+#   python -m weed_optimizer_framework.tools.inc2.v3fam score --arm X | verdict | score-test --arm X |
+#                                                       reanalyse-test --read-by owner|delegate
+#   python -m weed_optimizer_framework.tools.inc2.v3fam_sweep run
+#   python -m weed_optimizer_framework.tools.inc2.baseline build --exp E --v3fam ARM --seeds 0,1,2 --role baseline
 #   python -m weed_optimizer_framework.tools.inc2.base3    build --stream SID
 #   python -m weed_optimizer_framework.tools.inc2.pilot4   build --exp E [...]
 #   python -m weed_optimizer_framework.tools.inc2.stream   init | build | milestone | fork | feasibility | bisect
@@ -54,7 +59,18 @@
 # qualifying arm's sealed test, after inc2.twostage test-read) e3test_<arm>;
 # no advance; it runs with HF_HUB_OFFLINE=1 (BioCLIP-2 from the Hugging Face
 # cache), YOLO_OFFLINE=true and YOLO_AUTOINSTALL=false, after an import check
-# of torch, ultralytics, scikit-learn and open_clip. inc2.base3 build (L23V,
+# of torch, ultralytics, scikit-learn and open_clip. V3F (2026-10-11, the v3
+# experiment family, V3F.6.2) builds nothing either but through inc2.baseline
+# build --v3fam ARM (L23I: the experiment is named after --exp and advanced as
+# every build): inc2.v3fam_data build (L23H: the family's manifests, the probe,
+# the copies) is named v3fam_data, inc2.v3fam score --arm X (L23J) v3fam_score_<x
+# in lower case>, inc2.v3fam verdict (L23L) v3fam_v1, and a person's
+# inc2.v3fam score-test --arm X (after inc2.v3fam test-read) v3famtest_<x>,
+# inc2.v3fam reanalyse-test v3fam_retest, and the delegate's inc2.v3fam_sweep run
+# (D0-S) v3fam_sweep; none is advanced; they run with HF_HUB_OFFLINE=1,
+# YOLO_OFFLINE=true and YOLO_AUTOINSTALL=false after an import check of torch,
+# ultralytics, scikit-learn, open_clip, transformers, timm, ensemble_boxes and
+# cv2. inc2.base3 build (L23V,
 # 2026-10-03: splits v3, E1's base) builds no experiment: no advance, its
 # provenance and lock are named base3_v3; it runs with HF_HUB_OFFLINE=1 (its
 # embedding check loads DINOv2 from the Hugging Face cache; compute nodes have
@@ -116,6 +132,8 @@ usage() {
     echo "usage: sbatch run_inc2_build.sh {inc2.splits build|lock | inc2.baseline build|rescore-native|" \
          "rescore-agnostic|rescore-e2|rescore-e2-attr | inc2.base3 build | inc2.pilot4 build |" \
          "inc2.twostage score-arm --arm M|A|B | verdict | score-test --arm M|A|B |" \
+         "inc2.v3fam_data build | inc2.v3fam score --arm X | verdict | score-test --arm X | reanalyse-test |" \
+         "inc2.v3fam_sweep run |" \
          "inc2.stream init|build|milestone|fork|feasibility|bisect} [flags ...]" >&2
     exit 2
 }
@@ -132,6 +150,8 @@ case "$MOD $CMD" in
     "splits build"|"splits lock"|"baseline build"|"baseline rescore-native"|"baseline rescore-agnostic") shift 2 ;;
     "baseline rescore-e2"|"baseline rescore-e2-attr") shift 2 ;;
     "twostage score-arm"|"twostage verdict"|"twostage score-test") shift 2 ;;
+    "v3fam_data build"|"v3fam score"|"v3fam verdict"|"v3fam score-test"|"v3fam reanalyse-test"|"v3fam_sweep run")
+        shift 2 ;;
     "pilot4 build"|"base3 build") shift 2 ;;
     "stream init"|"stream build"|"stream milestone"|"stream fork"|"stream feasibility"|"stream bisect") shift 2 ;;
     *) usage ;;
@@ -166,6 +186,28 @@ elif [ "$MOD $CMD" = "baseline rescore-e2-attr" ]; then
     NAME="e2_attr_v1"
 elif [ "$MOD $CMD" = "twostage verdict" ]; then
     NAME="e3_v1"
+elif [ "$MOD $CMD" = "v3fam_data build" ]; then
+    NAME="v3fam_data"
+elif [ "$MOD $CMD" = "v3fam_sweep run" ]; then
+    NAME="v3fam_sweep"
+elif [ "$MOD $CMD" = "v3fam verdict" ]; then
+    NAME="v3fam_v1"
+elif [ "$MOD $CMD" = "v3fam reanalyse-test" ]; then
+    NAME="v3fam_retest"
+elif [ "$MOD" = v3fam ]; then
+    # V3F's score arms (inc2.v3fam.SCORE_ARMS) and, for score-test, the arms a read may name
+    case "$ARM" in
+        E3RS|D2LAION|D2CLIP|D2DINOL|D2DINOB|D2SIGLIP|D2RN50|D2BC1|D2BC2640|D2FT|D3|D9|D1|D4F|D4N|D4R15|D5B|D6|D8|BCLEAN) ;;
+        D8M) [ "$CMD" = score-test ] || { echo "FATAL: inc2.v3fam score takes --arm D8 (D8M is read only)" >&2; usage; } ;;
+        *) echo "FATAL: inc2.v3fam $CMD needs --arm, one of the family's arms" >&2
+           usage ;;
+    esac
+    ARM_LC="$(echo "$ARM" | tr '[:upper:]' '[:lower:]')"
+    if [ "$CMD" = score ]; then
+        NAME="v3fam_score_$ARM_LC"
+    else
+        NAME="v3famtest_$ARM_LC"
+    fi
 elif [ "$MOD" = twostage ]; then
     case "$ARM" in
         M|A|B) ;;
@@ -273,6 +315,9 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/eval_hits.py tools/inc2/stream.py
          tools/inc2/stream_report.py tools/inc2/base3.py tools/inc2/base3_v2.json tools/inc2/scorer_agnostic.py
          tools/inc2/twostage.py tools/inc/audit.py
+         tools/inc2/v3fam.py tools/inc2/v3fam_data.py tools/inc2/v3fam_sweep.py tools/inc2/v3fam_embed.py
+         tools/inc2/v3fam_wbf.py tools/inc2/v3fam_detr.py tools/inc2/v3fam_systems.py tools/inc2/v3fam_trained.py
+         tools/inc2/v3fam_verdict.py
          tools/inc_autopilot/stream_thresholds.json)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 
@@ -394,6 +439,13 @@ if [ "$MOD $CMD" = "base3 build" ]; then
     python -u -c "import torch, transformers, ultralytics, scipy, cv2; print('torch', torch.__version__, 'transformers', transformers.__version__, 'ultralytics', ultralytics.__version__)" \
         || { prov update status=env_failed finish; exit 1; }
 fi
+if [ "$MOD" = v3fam ] || [ "$MOD" = v3fam_data ] || [ "$MOD" = v3fam_sweep ]; then
+    # V3F: the backbones from the Hugging Face cache (no internet on compute nodes; another snapshot refuses);
+    # Ultralytics installs and fetches nothing; ensemble_boxes for D3, timm for ResNet-50, cv2 for D0-S's SIFT
+    export HF_HUB_OFFLINE=1 YOLO_OFFLINE=true YOLO_AUTOINSTALL=false
+    python -u -c "import torch, ultralytics, sklearn, open_clip, transformers, timm, ensemble_boxes, cv2; print('torch', torch.__version__, 'ultralytics', ultralytics.__version__, 'sklearn', sklearn.__version__, 'open_clip', open_clip.__version__, 'transformers', transformers.__version__, 'timm', timm.__version__, 'cv2', cv2.__version__)" \
+        || { prov update status=env_failed finish; exit 1; }
+fi
 if [ "$MOD" = twostage ]; then
     # E3: BioCLIP-2 from the Hugging Face cache (no internet on compute nodes); Ultralytics installs and fetches
     # nothing; the classifier is scikit-learn's
@@ -428,8 +480,9 @@ if [ "$rc" != 0 ]; then
 fi
 if [ "$MOD $CMD" = "baseline rescore-native" ] || [ "$MOD $CMD" = "baseline rescore-agnostic" ] \
         || [ "$MOD $CMD" = "baseline rescore-e2" ] || [ "$MOD $CMD" = "baseline rescore-e2-attr" ] \
-        || [ "$MOD" = twostage ]; then
-    # scores only: nothing was built, nothing is advanced
+        || [ "$MOD" = twostage ] || [ "$MOD" = v3fam ] || [ "$MOD" = v3fam_data ] || [ "$MOD" = v3fam_sweep ]; then
+    # scores only (V3F's data builder and sweep write records, no experiment): nothing was built, nothing is
+    # advanced
     prov update status=scored build_rc=0 finish
     echo "=== done $(date) ==="
     exit 0

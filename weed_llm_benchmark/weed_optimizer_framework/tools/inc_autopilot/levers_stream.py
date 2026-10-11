@@ -406,6 +406,8 @@ def price(lid, params, dom, info=None):
     if kind == "e3_verdict":
         h = float(cost(dom, "e3_verdict_hours"))
         return h, dict(detail, job_hours=h, why="E3's verdict: the paired bootstraps on the dev files, no pass")
+    if kind and kind.startswith("v3fam_"):
+        return price_v3fam(kind, p, dom, info, detail)
     factor = arm_factor(dom, p.get("arm") or info.get("arm"))
     recipes = tuple(x for x in str(p.get("recipes") or info.get("recipes") or "r0").split(",") if x)
     finals = float(cost(dom, "finals_hours"))
@@ -460,6 +462,78 @@ def price(lid, params, dom, info=None):
 
 
 # ---------------------------------------------------------------- proposals
+def v3fam_cost(dom, key):
+    """A cost of the v3 family's domain block (stream_domains/<d>.json "v3fam" -> costs). Raises LeverError."""
+    c = ((dom.get("v3fam") or {}).get("costs") or {})
+    if key not in c:
+        raise LeverError("the stream domain's v3fam block prices no %r" % key)
+    return c[key]
+
+
+def _capped(h, cap, detail, why):
+    if h > float(cap) + 1e-9:
+        raise LeverError("the estimate %.3f GPU-h is above its cap of %g (V3F.6.3)" % (h, float(cap)))
+    return round(h, 3), dict(detail, cap=float(cap), why=why)
+
+
+def price_v3fam(kind, p, dom, info, detail):
+    """The v3 family's estimators (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, V3F.6.3; V100, 1 SU per GPU-h,
+    est.), each under its cap: v3fam_data 2.0 (<= 4); v3fam_build seeds x image-epochs x the detector's measured
+    rate + finals + the build job's hours (<= 20; the image count from the family summary, info["images"]);
+    v3fam_score per arm, V3F.5's prices (<= 6); v3fam_detr the smoke 0.5 (<= 1) or 24 per seed submitted (<= 36
+    each; the three: 72, <= 108); v3fam_verdict 0.5 (<= 1). Every job is settled from sacct, a build's runs from its
+    experiment's report."""
+    detail = dict(detail, rates="the v3 family's domain block (V3F.5 prices, est.)")
+    if kind == "v3fam_data":
+        return _capped(float(v3fam_cost(dom, "data_hours")), v3fam_cost(dom, "data_cap"), detail,
+                       "the family's data build: manifests, both-direction checks, the probe, the copies")
+    if kind == "v3fam_score":
+        arm = p.get("arm") or info.get("arm")
+        table = v3fam_cost(dom, "score_hours")
+        if arm not in table:
+            raise LeverError("no price for the family's score arm %r" % (arm,))
+        return _capped(float(table[arm]), v3fam_cost(dom, "score_cap"), dict(detail, arm=arm),
+                       "one arm's family passes (V3F.5's price for the arm)")
+    if kind == "v3fam_verdict":
+        return _capped(float(v3fam_cost(dom, "verdict_hours")), v3fam_cost(dom, "verdict_cap"), detail,
+                       "the family's bootstraps on its committed arrays, no pass")
+    if kind == "v3fam_detr":
+        verb = p.get("verb")
+        if verb == "smoke":
+            return _capped(float(v3fam_cost(dom, "detr_smoke_hours")), v3fam_cost(dom, "detr_smoke_cap"), detail,
+                           "D6's smoke: staging and one epoch")
+        if verb == "train":
+            # the seeds the item submits (0,1,2; a retry only those not yet trained), each a third of the three's
+            n = len([x for x in str(p.get("seeds") or "0,1,2").split(",") if x != ""])
+            if not 1 <= n <= 3:
+                raise LeverError("L23K's train submits 1-3 seeds, not %r" % (p.get("seeds"),))
+            return _capped(float(v3fam_cost(dom, "detr_train_hours")) * n / 3.0,
+                           float(v3fam_cost(dom, "detr_train_cap")) * n / 3.0, dict(detail, seeds=n),
+                           "D6's seed jobs, %d x 24 GPU-h (the open term, V3F.7)" % n)
+        raise LeverError("L23K's verb is smoke or train, not %r" % (verb,))
+    if kind == "v3fam_build":
+        fam = dom.get("v3fam") or {}
+        arm = p.get("arm") or info.get("arm")
+        det = (fam.get("build_detector") or {}).get(arm)
+        n = info.get("images")
+        if det is None or not n:
+            raise LeverError("the family build %r has no detector or image count (the family summary's)" % (arm,))
+        seeds = len([x for x in str(p.get("seeds") or "0,1,2").split(",") if x != ""])
+        ms = float(v3fam_cost(dom, "build_ms_per_image_epoch")[det])
+        if arm in (fam.get("budget_builds") or []):
+            epochs = max(1, int(math.floor(float(v3fam_cost(dom, "budget_image_epochs")) / int(n) + 0.5)))
+        else:
+            epochs = int(v3fam_cost(dom, "cold_epochs"))
+        runs = _hours(seeds * int(n), epochs, ms)
+        finals = seeds * float(v3fam_cost(dom, "finals_hours_per_run"))
+        job = float(v3fam_cost(dom, "build_job_hours"))
+        return _capped(runs + finals + job, v3fam_cost(dom, "build_cap"),
+                       dict(detail, arm=arm, detector=det, images=int(n), epochs=epochs, seeds=seeds,
+                            ms_per_image_epoch=ms, runs=round(runs, 3), finals=finals, build_job_hours=job),
+                       "seeds x image-epochs x the detector's measured rate, the finals and the build job")
+    raise LeverError("no v3fam estimator %r" % kind)
+
+
 def _sha(obj):
     return hashlib.sha256(json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
                           .encode("utf-8")).hexdigest()

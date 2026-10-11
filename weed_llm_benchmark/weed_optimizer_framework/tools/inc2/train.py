@@ -436,7 +436,8 @@ def experiment_budget(exp, arm):
     if not _is_int(n) or n < 1:
         return name, None, probs + ["exp.json's base records no image count for %s" % name] + e2p
     probs += RC.check_budget_record(data.get("budget"), arm["id"], n)
-    probs += e1_problems(data)
+    # V3F (amendment 2026-10-11): a family build names cold_budget under its v3fam record, never an e1 one
+    probs += v3fam_problems(data) if "v3fam" in data else e1_problems(data)
     return name, n, probs + e2p
 
 
@@ -564,6 +565,33 @@ def e1_problems(data):
     if e1.get("summary_sha256") != cur:
         probs.append("exp.json was built from splits v3 summary %s; %s is now %s"
                      % (str(e1.get("summary_sha256"))[:12], sp, str(cur)[:12]))
+    return probs
+
+
+def v3fam_problems(data):
+    """How an exp.json naming cold_budget under a v3fam record fails to be one of V3F's one-class arms at equal
+    compute (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, V3F.6.1; the analogue of e1_problems): the record
+    names one of inc2.recipes.V3FAM_BUDGET_ARMS, its base manifest (by sha256) is that arm's in the complete
+    splits/v3fam/summary.json, and that summary still hashes as the record says. [] when it is one."""
+    from . import v3fam_data as VD
+    v = data.get("v3fam")
+    if not isinstance(v, dict) or v.get("arm") not in RC.V3FAM_BUDGET_ARMS:
+        return ["exp.json names %s under a v3fam record that names none of V3F's arms at equal compute %s"
+                % (RC.BUDGET_NAME, list(RC.V3FAM_BUDGET_ARMS))]
+    probs = []
+    sp = VD.out_dir() / VD.SUMMARY
+    cur = C.sha256_file(sp) if sp.is_file() else None
+    if v.get("summary_sha256") != cur:
+        probs.append("exp.json was built from the family summary %s; %s is now %s"
+                     % (str(v.get("summary_sha256"))[:12], sp, str(cur)[:12]))
+    summ = VD.read_summary()
+    a = ((summ or {}).get("arms") or {}).get(v["arm"])
+    msha = (data.get("base") or {}).get("manifest_sha256")
+    if not isinstance(a, dict):
+        probs.append("no complete %s holds arm %s" % (sp, v["arm"]))
+    elif a.get("sha256") != msha or v.get("manifest_sha256") != msha:
+        probs.append("its base manifest %s is not arm %s's %s in %s" % (str(msha)[:12], v["arm"],
+                                                                         str(a.get("sha256"))[:12], sp))
     return probs
 
 

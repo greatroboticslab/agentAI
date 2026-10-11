@@ -2568,6 +2568,262 @@
       ],
       "description": "Lever L23G (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-05: E3, pre-registered): inc2.twostage verdict records E3's pre-registered verdict (capacity/e3_v1.json, dev only) and its record (capacity/e3_rescore.json). Record only: nothing switches; a person reads each qualifying arm's sealed test once (inc2.twostage test-read)."
     },
+    "inc_build_v3fam_data": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.v3fam_data build",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 4.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that writes V3F's training manifests (the both-direction dHash and DINOv2 checks on every row), the probe root and the near copies with their catch index; it trains nothing. est_gpu_hours is levers_stream.price's 'v3fam_data' estimate (2.0 GPU-h, cap 4; V3F.6.3), charged to the campaign envelope and settled from sacct."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23H (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): inc2.v3fam_data build writes splits/v3fam/ (D1's A' and B', D4's F, N and R15, D5b's doses, BCLEAN's manifest when D0-S triggered it) and splits/v3fam/summary.json, each list equal to the amendment's before the checks. Record only: nothing switches."
+    },
+    "inc_build_v3fam": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.baseline build --exp {exp} --v3fam {arm} --seeds {seeds} --role {role}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "exp": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "v3_d1_a1_m640",
+            "v3_d1_b1_m640",
+            "v3_d1_a12_m640",
+            "v3_d4_f_m640",
+            "v3_d4_n_m640",
+            "v3_d4_r15_m640",
+            "v3_d5b_0_m640",
+            "v3_d5b_25_m640",
+            "v3_d5b_100_m640",
+            "v3_d8_s640_tc",
+            "v3_d8_m640_tc",
+            "v3_d0_bclean_m640"
+          ]
+        },
+        "arm": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "D1A1",
+            "D1B1",
+            "D1A12",
+            "D4F",
+            "D4N",
+            "D4R15",
+            "D5B0",
+            "D5B25",
+            "D5B100",
+            "D8S",
+            "D8M",
+            "D0BCLEAN"
+          ]
+        },
+        "seeds": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "0,1,2"
+          ]
+        },
+        "role": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "baseline"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 20.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A family build: the build job (run_inc2_build.sh, one V100) plus the three seeds' base runs and finals it defines (run_inc2_job.sh, one V100 each): est_gpu_hours is levers_stream.price's 'v3fam_build' estimate (seeds x image-epochs x the arm's measured rate + finals + the build job's 4.0 GPU-h, cap 20; V3F.6.3), charged to the campaign envelope and settled from sacct and the experiment's report spend."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23I (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): inc2.baseline build --exp E --v3fam ARM builds one of V3F's training arms (D1A1, D1B1, D1A12, D4F, D4N, D4R15, D5B0, D5B25, D5B100, D8S, D8M, D0BCLEAN) under its pre-registered experiment name, manifest (the family summary's, by sha256), detector, recipe (cold_budget for the one-class arms at equal compute, the cold table otherwise) and finals (dev and ImageWeeds). Record only: nothing switches."
+    },
+    "inc_score_v3fam": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.v3fam score --arm {arm}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "arm": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "E3RS",
+            "D2LAION",
+            "D2CLIP",
+            "D2DINOL",
+            "D2DINOB",
+            "D2SIGLIP",
+            "D2RN50",
+            "D2BC1",
+            "D2BC2640",
+            "D2FT",
+            "D3",
+            "D9",
+            "D1",
+            "D4F",
+            "D4N",
+            "D4R15",
+            "D5B",
+            "D6",
+            "D8",
+            "BCLEAN"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 6.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that scores one family arm through the family pass (and, for D2, fits its classifier; for D9, refits it 30 times): est_gpu_hours is levers_stream.price's 'v3fam_score' estimate per arm (V3F.5's prices, cap 6; V3F.6.3), settled from sacct."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23J (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): inc2.v3fam score --arm X scores one of the family's arms (E3RS, D2's nine backbones, D3, D9, D1, D4F, D4N, D4R15, D5B, D6, D8, BCLEAN) through the one family path; dev decides, the other exams are reported; capacity/v3fam_score_<arm>.json (dev only). Never test. Record only: nothing switches."
+    },
+    "inc_build_v3fam_detr": {
+      "template": "sbatch -p GPU-shared run_inc2_detr.sh {pkg}.v3fam_detr {verb} [--seeds {seeds}]",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "smoke",
+            "train"
+          ]
+        },
+        "seeds": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "0,1,2",
+            "0,1",
+            "0,2",
+            "1,2",
+            "0",
+            "1",
+            "2"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 108.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "D6's RF-DETR-L jobs (run_inc2_detr.sh, one V100-32 each, 36 h walltime): the smoke (one epoch, 0.5 GPU-h, cap 1), then the three seed jobs together (3 x 24 = 72 GPU-h, cap 108; V3F.6.3), on the TRAIN lane (decision 27); settled from sacct."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23K (R3, envelope-eligible, TRAIN lane; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): run_inc2_detr.sh inc2.v3fam_detr smoke stages base_v2 (no test folder, no holdout image) and trains one epoch, recording the 50-epoch projection; once it is within 0.8 x 36 h, train --seed 0, 1 and 2 are submitted together (run_test false, checkpoint_interval 1000, the final EMA weights exported once). Record only: nothing switches."
+    },
+    "inc_verdict_v3fam": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.v3fam verdict [--cap-refused {cap_refused}]",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "cap_refused": {
+          "type": "str",
+          "pattern": "^(data|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))(,(data|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))){0,39}$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that reads the family's committed per-image arrays and runs the image, session and selection-corrected bootstraps (CPU): no pass. est_gpu_hours is levers_stream.price's 'v3fam_verdict' estimate (0.5 GPU-h, cap 1), settled from sacct."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L23L (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): inc2.v3fam verdict records the family's verdict: capacity/v3fam_v1.json (dev only: P1-P5 with Holm on dev, the Tier C gate, the order of the sealed-test reads), written once; P6-P9 and the reported exams in records the platform's evidence never admits. Record only: nothing switches; every sealed-test read is a person's (inc2.v3fam test-read)."
+    },
     "inc_build_pilot4": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.pilot4 build --exp {exp} --from {from_exp} --recipes {recipes}",
       "param_bounds": {

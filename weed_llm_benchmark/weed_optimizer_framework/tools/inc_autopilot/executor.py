@@ -158,6 +158,9 @@ STREAM_ENVELOPE_LEVERS = {"L18": ("inc_build_segment",), "L20": ("inc_build_cons
                           "L23C": ("inc_rescore_e2",), "L23D": ("inc_rescore_e2_attr",),
                           "L23Z": ("inc_audit_zoo",),
                           "L23F": ("inc_score_e3",), "L23G": ("inc_verdict_e3",),
+                          "L23H": ("inc_build_v3fam_data",), "L23I": ("inc_build_v3fam",),
+                          "L23J": ("inc_score_v3fam",), "L23K": ("inc_build_v3fam_detr",),
+                          "L23L": ("inc_verdict_v3fam",),
                           "L25": ("inc_build_pilot4",), "L27": ("inc_build_consolidation",),
                           "L28": ("inc_build_segment",), "LI": ("inc_stream_init",)}
 # The R2 data levers that run directly only with data_autonomy on, a stream
@@ -190,7 +193,10 @@ REMOTE_TIMEOUT_S = {"inc_snapshot": 300, "inc_report": 300, "inc_advance": 240,
                     "inc_stream_init": 300, "inc_stream_choose_arm": 600, "inc_stream_compare": 600,
                     "inc_stream_verdict": 600, "inc_rescore_native": 300, "inc_build_base3": 300,
                     "inc_rescore_agnostic": 300, "inc_rescore_e2": 300, "inc_rescore_e2_attr": 300,
-                    "inc_audit_zoo": 300, "inc_score_e3": 300, "inc_verdict_e3": 300}
+                    "inc_audit_zoo": 300, "inc_score_e3": 300, "inc_verdict_e3": 300,
+                    # V3F (2026-10-11): one sbatch each, but L23K's train submits its three seeds in one call
+                    "inc_build_v3fam_data": 300, "inc_build_v3fam": 300, "inc_score_v3fam": 300,
+                    "inc_build_v3fam_detr": 420, "inc_verdict_v3fam": 300}
 DEFAULT_REMOTE_TIMEOUT_S = 120
 # ssh's own messages for a connection that was never made (read off the last
 # stderr line of a call that printed nothing): the remote command never ran.
@@ -384,6 +390,19 @@ ARGV_FORMS = {
     # classifier and runs the equivalence check), L23G records E3's verdict (inc2.twostage score-arm, verdict)
     "inc_score_e3": ("{pkg}.twostage", "score-arm", (("--arm", "arm", "str"),), ("pkg", "arm")),
     "inc_verdict_e3": ("{pkg}.twostage", "verdict", (), ("pkg",)),
+    # V3F (2026-10-11, the v3 experiment family): L23H writes the family's training data (inc2.v3fam_data build),
+    # L23I builds one training arm (inc2.baseline build --v3fam), L23J scores one arm (inc2.v3fam score), L23K runs
+    # D6's RF-DETR jobs on the TRAIN lane (run_inc2_detr.sh inc2.v3fam_detr smoke | train --seeds 0,1,2: the three
+    # seed jobs in one submission; a retry names only the seeds not yet trained), L23L records the family's verdict
+    # (inc2.v3fam verdict; --cap-refused names the items the ticker recorded 'not run (family cap)')
+    "inc_build_v3fam_data": ("{pkg}.v3fam_data", "build", (), ("pkg",)),
+    "inc_build_v3fam": ("{pkg}.baseline", "build",
+                        (("--exp", "exp", "str"), ("--v3fam", "arm", "str"), ("--seeds", "seeds", "str"),
+                         ("--role", "role", "str")),
+                        ("pkg", "exp", "arm", "seeds", "role")),
+    "inc_score_v3fam": ("{pkg}.v3fam", "score", (("--arm", "arm", "str"),), ("pkg", "arm")),
+    "inc_build_v3fam_detr": ("{pkg}.v3fam_detr", "{verb}", (("--seeds", "seeds", "str"),), ("pkg", "verb")),
+    "inc_verdict_v3fam": ("{pkg}.v3fam", "verdict", (("--cap-refused", "cap_refused", "str"),), ("pkg",)),
     "inc_stream_collect": ("run_inc_collect.sh", "fetch",
                            (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
                             ("--candidates", "candidates", "str")),
@@ -418,6 +437,8 @@ STREAM_REMOTE = {"inc_build_segment": "build", "inc_build_consolidation": "build
                  "inc_build_base3": "build", "inc_rescore_agnostic": "build", "inc_rescore_e2": "build",
                  "inc_rescore_e2_attr": "build", "inc_score_e3": "build", "inc_verdict_e3": "build",
                  "inc_audit_zoo": "zoo",
+                 "inc_build_v3fam_data": "build", "inc_build_v3fam": "build", "inc_score_v3fam": "build",
+                 "inc_verdict_v3fam": "build", "inc_build_v3fam_detr": "detr",
                  "inc_stream_collect": "collect", "inc_stream_collect_review": "collect",
                  "inc_stream_intake": "collect", "inc_stream_probe": "collect", "inc_stream_admit": "admit",
                  "inc_stream_commit": "run", "inc_stream_rollback": "run", "inc_stream_quarantine": "run",
@@ -977,7 +998,7 @@ def render(action, params, meta=None):
         if kind == "run":
             remote = ["stream-run", first, command] + _stream_meta_tokens(meta or {}, run=True) + ["--"] + flags
         else:
-            args = ([first] if kind == "build" else []) + ([command] if command else []) + flags
+            args = ([first] if kind in ("build", "detr") else []) + ([command] if command else []) + flags
             remote = ["stream-submit", kind] + _stream_meta_tokens(meta or {}) + ["--"] + args
         return {"builder": builder, "remote": remote, "local": False}
     if action == "inc_unblock_transient":

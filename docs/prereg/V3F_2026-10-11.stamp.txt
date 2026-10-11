@@ -1,0 +1,24 @@
+V3F time-stamp file (docs/CONTINUOUS_LOOP.md, Amendment (2026-10-11): V3F, section V3F.12)
+
+amendment_sha256: 5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f
+amendment_text: docs/CONTINUOUS_LOOP.md from line 3963 ('## Amendment (2026-10-11): V3F, ...') to the end of the file at the commit below; byte-identical to docs/prereg/V3F_2026-10-11.md
+amendment_commit: 55cc2d97cd2147d01644c1e193098b73aeba0a06
+written_utc: 2026-10-11T11:10:00Z
+decided_by: Claude, the owner's delegate under the owner's 2026-09-30 admin grant (V3F.0, decisions 1-28)
+
+outside-repository records cited in the amendment's header (sha256, file name):
+c2a645ab8acf7635cf3a2b072cabcc5e7f5343c3c95dd367f5244fdc530bc3ca  P0_AUDIT.md
+8f0399bc906728df91860f7ed898a98154da1d70429174f10fe2a31ab734108f  verify.json
+df5597926729562e91713cd3f1664bc7c7dbea879e5313d81d6f058b3620e7c5  zoo_hits_le7.json
+4df2394674611c105ae7f7a7e429e1f568a32b65c4a8bcf16d2a3b4b32cfd05c  zoo_hits_montage.jpg
+d0baa60af189214b6ab91bef4b06df161ac08b05b7e41119b4fbc5f216eb4256  imageweeds_class_ids.jpg
+ed963f1ac335cc87c02c064370fc38a8d7c46e2c04d8e75a5f7b64cd4744d311  SETTING_MAP.md
+c1c9d4b68a96722e9c0313b741e4cd74f31a244c8b915e3344dc1960f4abcc84  MANIFEST.sha256 (of SETTING_MAP.md's sheets and scripts)
+a35b3ebb7d2424104d07a3f9856b0e1755aff59abe180bd076e23c909ce0db5a  REVIEW.md
+c89225a2b4475153aaad1c753aabfd27cc173e011926935d03adc454d5f397f6  V3_FAMILY_PREREG_DRAFT.md (the draft)
+526a09d395e23f58e8a62d0a82ad9dd39d411abc1046f3db2a343db91caa9bbd  evidence_cluster_reads_2026-10-11.txt (the draft's cluster reads)
+cf60da7526dd10f7430c1e1a27ba456bb57b6759c6ed9f7bad0e7f2200282c7b  evidence_final_reads_2026-10-11.txt (F1-F4, W1)
+b47014c3c2b577be012bb9e172360d9cc142dc49cf0d4f87924270bbe2c87731  evidence_revision_reads_2026-10-11.txt (W2)
+2b8a36a1dde6fa65be39866d1104079e3b75007982bf0ebd907ff5d37e7e9568  VERIFY.md (the pre-commit verification; cites the text before decisions 24-28)
+
+Proofs: OpenTimestamps (`ots stamp`) of this file and of docs/prereg/V3F_2026-10-11.md, as V3F_2026-10-11.md.ots and V3F_2026-10-11.stamp.txt.ots beside them.

@@ -648,6 +648,130 @@
    "estimator": "e3_verdict",
    "note": "Record only: proposed once, when all three arms' score records are complete and E3's rescore record is missing; a failure is a person's card and it is not proposed again."
   },
+  "L23H": {
+   "name": "v3fam_data",
+   "title": "Build V3F's training data: the D1, D4 and D5b manifests (BCLEAN's when D0-S triggered it), each checked in both directions against the exams, the probe exam in its own root, the near copies and their catch index",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_build_v3fam_data",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.v3fam_data",
+    "build"
+   ],
+   "control": "Base B (splits/v3/base_v3_weed.jsonl, 18d24ead...899a) and base_v2 under LOCK v2: every manifest is an exact filter of its parent.",
+   "success": "splits/v3fam/summary.json complete (format inc2-v3fam-data/1): F, N, R15 and B' equal to the amendment's key lists before the checks, A' 3,088 rows, the probe 10 sessions and 476 images, the doses 6,335 / 6,454 / 6,811 images.",
+   "falsifier": "The build refuses on any list, count or sha256 other than the amendment's; every hit of the both-direction check is dropped and counted except P0's known false match and base_v2's rows against dev, test and ImageWeeds (V3F.3.7).",
+   "estimator": "v3fam_data",
+   "note": "Record only (V3F.7 step 2): proposed once, after D0-S's record is complete, the time stamp exists and the deployed tree holds the amendment; a failure is one card and it is proposed once more; after a second failure it is recorded failed."
+  },
+  "L23I": {
+   "name": "build_v3fam",
+   "title": "Build one of V3F's training arms (inc2.baseline build --v3fam: the manifest, detector, finals and role from the family's definition); its three seeds' runs follow",
+   "lane": "MAINT",
+   "follow": "build",
+   "policy_action": "inc_build_v3fam",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.baseline",
+    "build",
+    "--exp",
+    "{exp}",
+    "--v3fam",
+    "{arm}",
+    "--seeds",
+    "{seeds}",
+    "--role",
+    "{role}"
+   ],
+   "control": "The arm's comparator of V3F.5 (E1-A, E1-B or b_v2_m640), never retrained.",
+   "success": "The experiment built (exp.json with its v3fam record; cold_budget arms checked by inc2.train.v3fam_problems) and, later, its three base runs and finals done.",
+   "falsifier": "Nothing is decided here: the arm is scored by L23J and judged in the family's verdict (L23L).",
+   "estimator": "v3fam_build",
+   "note": "Record only (V3F.7 step 8): one build per MAINT item in the order D0BCLEAN (only if D0-S triggered it), D8M, D8S, D4F, D4N, D4R15, D1A1, D1B1, D1A12, D5B0, D5B25, D5B100; D5b's builds take dev as their only final (Revision 30: the pinned driver's minimum, never read by the family); a lane item ends when its build job ends; a build that ends without its experiment is charged its build job's sacct GPU-h."
+  },
+  "L23J": {
+   "name": "score_v3fam",
+   "title": "Score one V3F arm through the family path (inc2.v3fam score --arm X): dev deciding, the other exams reported",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_score_v3fam",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.v3fam",
+    "score",
+    "--arm",
+    "{arm}"
+   ],
+   "control": "Every comparator re-scored through the same family pass (E3RS, decision 17); reproductions to 1e-6 first.",
+   "success": "capacity/v3fam_score_<arm>.json complete (or 'not run' with its reason) and the arm's family scores written once.",
+   "falsifier": "No decision here: the family's verdict (L23L) applies V3F.3.3's rule, Holm per exam and the Tier C gate.",
+   "estimator": "v3fam_score",
+   "note": "Record only (V3F.7 steps 4-7 and 10): E3RS first, then D2's nine arms, D3 and D9; then, once their runs are done, BCLEAN, D8, D4F, D4N, D4R15, D1 (after the EXIF frame pre-flight) and D6; a failure is one card, proposed once more, recorded failed after a second, never holding the other arms."
+  },
+  "L23K": {
+   "name": "detr_v3fam",
+   "title": "D6's RF-DETR-L jobs on the TRAIN lane: the smoke (one epoch, the walltime projection), then the three seeds in parallel",
+   "lane": "TRAIN",
+   "follow": "job",
+   "policy_action": "inc_build_v3fam_detr",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "bash",
+    "run_inc2_detr.sh",
+    "weed_optimizer_framework.tools.{pkg}.v3fam_detr",
+    "{verb}",
+    {
+     "if": "seeds",
+     "tokens": [
+      "--seeds",
+      "{seeds}"
+     ]
+    }
+   ],
+   "control": "E3-B on dev through the family path (P5, selection-corrected).",
+   "success": "v3fam/v1/d6/smoke/smoke.json complete within 0.8 x 36 h, then s<k>/train.json and final_ema.pth of seeds 0, 1 and 2.",
+   "falsifier": "A projection above 28.8 h records D6 'not run (walltime)' and its seeds are never proposed; a seed killed at its walltime (sacct TIMEOUT) fails D6 at once and is never retried or shortened.",
+   "estimator": "v3fam_detr",
+   "note": "Record only (V3F.7 steps 3 and 9; decision 27): on TRAIN so that the 19-24 h seed jobs never hold MAINT; while it holds TRAIN the stream's own segments wait. A train item that failed otherwise is proposed once more with --seeds naming only the seeds not yet trained."
+  },
+  "L23L": {
+   "name": "verdict_v3fam",
+   "title": "Record V3F's verdict (inc2.v3fam verdict): P1-P5 on dev with Holm, the Tier C gate and the order of the sealed-test reads; P6-P9 kept off the platform",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_verdict_v3fam",
+   "risk": "R3",
+   "lever": "L23",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.v3fam",
+    "verdict",
+    {
+     "if": "cap_refused",
+     "tokens": [
+      "--cap-refused",
+      "{cap_refused}"
+     ]
+    }
+   ],
+   "control": "Every comparison's two sides through the one family path (decision 17).",
+   "success": "capacity/v3fam_v1.json decided (dev only), written once and last.",
+   "falsifier": "V3F.3.3's rule, V3F.3.4's Holm overlay and Tier C bar Phi^-1(1 - 0.05/14); nothing switches.",
+   "estimator": "v3fam_verdict",
+   "note": "Record only (V3F.7 step 11): proposed once every arm's record is complete, failed or not run; --cap-refused names the items the ticker recorded 'not run (family cap)', which the verdict writes under v3fam/v1/cap first; the sealed-test reads are a person's (inc2.v3fam test-read)."
+  },
   "LV": {
    "name": "verdict",
    "title": "Record an R0 verdict: the canary, the capacity decision (L-4), Stage A",
@@ -991,11 +1115,16 @@
    "L23Z",
    "L23F",
    "L23G",
+   "L23H",
+   "L23I",
+   "L23J",
+   "L23K",
+   "L23L",
    "L25",
    "L27",
    "L28",
    "LI"
   ],
-  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04; L23D, E2-C's attribution rescore, one GPU job, 2026-10-04, later; L23Z, the zoo audit, one held-free chain of five GPU-shared jobs within its 40 GPU-h cap, 2026-10-04; L23F, one E3 arm's scores, and L23G, E3's verdict, one GPU job each, 2026-10-05). L23's splits build and lock always wait for a person (D-A's exact command)."
+  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04; L23D, E2-C's attribution rescore, one GPU job, 2026-10-04, later; L23Z, the zoo audit, one held-free chain of five GPU-shared jobs within its 40 GPU-h cap, 2026-10-04; L23F, one E3 arm's scores, and L23G, E3's verdict, one GPU job each, 2026-10-05; L23H, L23I, L23J, L23K (on TRAIN) and L23L, the v3 family's data build, builds, scores, D6's RF-DETR jobs and verdict, record only within the family cap of 260 GPU-h, 2026-10-11). L23's splits build and lock always wait for a person (D-A's exact command)."
  }
 }

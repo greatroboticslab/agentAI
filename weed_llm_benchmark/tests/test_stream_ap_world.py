@@ -254,7 +254,7 @@ class World(object):
         for d in (self.lab, self.inc, self.scripts):
             d.mkdir(parents=True)
         for n in ("run_inc_collect.sh", "run_inc2_stream.sh", "run_inc2_build.sh", "run_inc2_job.sh", "run_inc_job.sh",
-                  "run_inc2_zoo.sh"):
+                  "run_inc2_zoo.sh", "run_inc2_detr.sh"):
             (self.scripts / n).write_text("#!/bin/bash\n")
         self.cfg = self.dir / "round_scheduler.json"
         self.hooks = C._local_cfg_hooks(self.cfg)
@@ -799,6 +799,104 @@ class World(object):
                                                              "qualifying": q, "chosen": ch},
                                                  "written_utc": utc(self.t[0])})
 
+    # ---- V3F (2026-10-11): the v3 experiment family's files, in their own formats
+    V3FAM_ARMS = ("D1A1", "D1B1", "D1A12", "D4F", "D4N", "D4R15", "D5B0", "D5B25", "D5B100", "D0BCLEAN")
+    V3FAM_IMAGES = {"D1A1": 3088, "D1B1": 40762, "D1A12": 3088, "D4F": 15432, "D4N": 28953, "D4R15": 15432,
+                    "D5B0": 6335, "D5B25": 6454, "D5B100": 6811, "D0BCLEAN": 44470}
+
+    def v3fam_ready(self, amendment=True, timestamp=True, sweep=True, bclean=False, exif=True, e3_verdict=True):
+        """The family's gate in place: E3's verdict decided (the zoo is complete after ready_r0), the deployed
+        tree's copies of the amendment and its Revisions 29-31 (their sha256s, at the lab tree's parent), the time
+        stamp record (naming the Revisions' stamp), D0-S's record
+        complete (bclean: its test branch triggered), the EXIF frame pre-flight passed."""
+        if e3_verdict:
+            self.e3_records(arms=(), verdict=True, rescore=False, qualifying=("M", "A", "B"), chosen="B")
+        dst = self.dir / "docs" / "prereg" / "V3F_2026-10-11.md"
+        if amendment:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            for n in ("V3F_2026-10-11.md", "V3F_rev29-31_2026-10-11.md"):
+                shutil.copyfile(str(PKG_ROOT.parent / "docs" / "prereg" / n), str(dst.parent / n))
+        if timestamp:
+            self._w("v3fam/v1/timestamp.json", {"proof": "V3F_2026-10-11.stamp.txt.ots", "sha256": "a" * 64,
+                                                "revisions": [{"file": "V3F_rev29-31_2026-10-11.md.ots",
+                                                               "sha256": self.dom["v3fam"]["revision_sha256"]}]})
+        if sweep:
+            self._w("v3fam/v1/sweep/record.json", {
+                "format": "inc2-v3fam-sweep-record/1", "status": "complete", "H": ["test/k1"] if bclean else [],
+                "trigger": {"h_empty": not bclean, "test_branch": bclean, "dev_branch": False, "bclean": bclean},
+                "copies": [], "removal": {"keys": [], "sha256": "b" * 64}})
+        if exif:
+            self._w("v3fam/v1/exif/preflight.json", {"format": "inc2-v3fam-exif-preflight/1", "numeric_passed": True})
+            pre = self.inc / "v3fam" / "v1" / "exif" / "preflight.json"
+            self._w("v3fam/v1/exif/verdict.json", {"format": "inc2-v3fam-exif-verdict/1", "frame": "yes",
+                                                   "preflight_sha256": hashlib.sha256(pre.read_bytes()).hexdigest()})
+
+    def v3fam_data(self, bclean=False):
+        """inc2.v3fam_data build's summary (splits/v3fam/summary.json, complete): each arm's manifest, sha256 and
+        image count (D0BCLEAN's only when D0-S triggered it)."""
+        arms = {a: {"manifest": "%s/splits/v3fam/%s.jsonl" % (M.CLUSTER_INC_DIR, a.lower()), "sha256": "%02d" % i * 32,
+                    "images": self.V3FAM_IMAGES[a]} for i, a in enumerate(self.V3FAM_ARMS)
+                if a != "D0BCLEAN" or bclean}
+        self._w("splits/v3fam/summary.json", {"format": "inc2-v3fam-data/1", "status": "complete", "arms": arms})
+
+    def v3fam_score(self, arm, status="complete", reason=None):
+        """inc2.v3fam score --arm X's platform record (capacity/v3fam_score_<arm>.json, dev only)."""
+        doc = {"format": "inc2-v3fam-score-record/1", "family": "v1", "arm": arm, "status": status, "exam": "dev",
+               "dev": [], "reported": {"status": "complete", "passes": 0, "failed": 0}}
+        if reason:
+            doc["reason"] = reason
+        self._w("capacity/v3fam_score_%s.json" % arm.lower(), doc)
+
+    def v3fam_detr(self, smoke=True, walltime_ok=True, trained=()):
+        """D6's records: the smoke's (complete within the walltime rule, or not run (walltime)) and each trained
+        seed's train.json."""
+        if smoke:
+            self._w("v3fam/v1/d6/smoke/smoke.json", {
+                "format": "inc2-v3fam-d6-smoke/1", "status": "complete" if walltime_ok else "not run (walltime)",
+                "walltime_ok": walltime_ok, "projection_h": 21.0 if walltime_ok else 31.0, "cap_h": 28.8})
+        for k in trained:
+            self._w("v3fam/v1/d6/s%d/train.json" % k, {"format": "inc2-v3fam-d6-train/1", "seed": k, "status": "done"})
+
+    def v3fam_verdict(self, order=(("D6", "reference"), ("D8M", "reference"))):
+        """inc2.v3fam verdict's platform record (capacity/v3fam_v1.json, dev only)."""
+        prim = {p: {"id": p, "status": "decided", "x": "E3B", "y": "Y", "x_label": "E3-B", "y_label": "Y",
+                    "decision": {"diff": 0.004, "z": 1.2, "interval_90": [-0.001, 0.009], "outcome": "inconclusive",
+                                 "flags": [], "qualifies": False}} for p in ("P1", "P2", "P3", "P4", "P5")}
+        self._w("capacity/v3fam_v1.json", {
+            "format": "inc2-v3fam-verdict/1", "status": "decided", "exam": "dev", "decided_on": "dev",
+            "primaries": prim, "holm": {p: {"family_confirmed": False} for p in prim},
+            "challengers": {"C": 14, "bar": 2.69011, "opening": []},
+            "reads": {"order": [{"arm": a, "kind": k} for a, k in order], "cap": 5}})
+
+    def v3fam_cluster(self, skip=()):
+        """The cluster's side of the family's jobs: each queued family job ends now and writes its record (L23H the
+        data summary, L23J the arm's score record, L23K the smoke's or the seeds' records, L23L the verdict, L23I
+        its experiment built and done). skip: job names left queued."""
+        fam = self.dom["v3fam"]
+        arms = {a.lower(): a for a in list(fam["pre_build_scores"]) + list(fam["post_build_scores"])}
+        for j in list(self.squeue):
+            n = j["name"]
+            if n in skip or not any(j is x for x in self.squeue):
+                continue
+            if n == "inc_build_v3fam_data":
+                self.job_done(n)
+                self.v3fam_data()
+            elif n.startswith("inc_build_v3fam_score_"):
+                self.job_done(n)
+                self.v3fam_score(arms[n[len("inc_build_v3fam_score_"):]])
+            elif n == "inc_detr_v3fam_smoke":
+                self.job_done(n)
+                self.v3fam_detr()
+            elif n.startswith("inc_detr_v3fam_s"):
+                self.job_done("inc_detr_v3fam_s")
+                self.v3fam_detr(trained=(0, 1, 2))
+            elif n == "inc_build_v3fam_v1":
+                self.job_done(n)
+                self.v3fam_verdict()
+            elif n[len("inc_build_"):] in fam["build_exps"].values():
+                self.experiment(n[len("inc_build_"):], final=[self.final_row("base", 0.85, 0.002, 3)])
+                self.job_done(n)
+
     def native_verdict_file(self, qualifying=(), decided=None):
         """inc2.baseline native-verdict's record (capacity/native_v1.json, dev
         only): each decided arm with its rule's numbers; `qualifying` the arms
@@ -1103,7 +1201,8 @@ class World(object):
         says complete, so none waits on L23Z; E3's three arms are scored
         with its rescore record (capacity/e3_score_<arm>.json,
         e3_rescore.json), so none waits on L23F or L23G (no e3_v1.json: no
-        E3 card)."""
+        E3 card); the v3 family's gate stays closed (no E3 verdict, no time
+        stamp, no D0-S record: v3fam_ready opens it), so none waits on it."""
         self.lock()
         if bootstrap:
             self.step1_status()

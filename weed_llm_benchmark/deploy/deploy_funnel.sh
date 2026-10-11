@@ -91,6 +91,8 @@ PKG_PATHS=(
   weed_optimizer_framework/tools/round_scheduler.py
   weed_optimizer_framework/tools/brain/su_rates.json
   run_inc2_build.sh run_inc2_zoo.sh run_inc2_job.sh run_inc2_splits.sh run_inc2_stream.sh run_inc_collect.sh
+  # V3F (2026-10-11): D6's RF-DETR job script (lever L23K)
+  run_inc2_detr.sh
   tests/fixtures/collect
   # shared libraries the stream job scripts hash (SHARED_RE: never changed by this deploy)
   weed_optimizer_framework/tools/near_dup.py weed_optimizer_framework/tools/semisup_labeler.py
@@ -107,7 +109,12 @@ while IFS= read -r t; do PKG_PATHS+=("$t"); done < <(ls tests/test_funnel_*.py t
   tests/test_inc2_*.py tests/test_collect_*.py tests/test_stream_*.py tests/test_round_scheduler_stream_guard.py 2>/dev/null)
 ROOT_PATHS=(docs/FUNNEL_AUDIT.md docs/FUNNEL_AUDIT_RUNNER.md docs/FUNNEL_REPRODUCE.md RESEARCH_LOG.md
             docs/poster/figures_data.json
-            docs/CONTINUOUS_LOOP.md docs/INCREMENTAL_PROTOCOL.md docs/INCREMENTAL_PROTOCOL_RUNNER.md docs/INC_AUTOPILOT.md)
+            docs/CONTINUOUS_LOOP.md docs/INCREMENTAL_PROTOCOL.md docs/INCREMENTAL_PROTOCOL_RUNNER.md docs/INC_AUTOPILOT.md
+            docs/prereg/V3F_2026-10-11.md docs/prereg/V3F_rev29-31_2026-10-11.md)
+# V3F (2026-10-11): the ticker proposes the family's levers only once the deployed tree holds the amendment's byte
+# copy (docs/prereg/V3F_2026-10-11.md) and its Revisions 29-31's (docs/prereg/V3F_rev29-31_2026-10-11.md), each by
+# its sha256; the deploy record names whether HEAD descends from the amendment's commit
+V3F_COMMIT=55cc2d97cd2147d01644c1e193098b73aeba0a06
 # The replay set envelope autonomy needs a pass for (executor.REPLAY_SCRIPTS: inc, funnel and stream,
 # with both mutation harnesses) plus the stream's end-to-end pipeline: all must pass locally before any
 # copy (docs/CONTINUOUS_LOOP.md 6.5: a failing S-case blocks the funnel's autonomy too). Since 2026-10-04 it
@@ -124,6 +131,7 @@ if ! git -C "$GIT_ROOT" diff --quiet HEAD -- "${PKG_PATHS[@]}" 2>/dev/null; then
   echo "WARNING: the deployed package paths differ from HEAD (uncommitted changes); the deploy record names HEAD" >&2
 fi
 HEAD_SHA="$(git -C "$GIT_ROOT" rev-parse HEAD)"
+if git -C "$GIT_ROOT" merge-base --is-ancestor "$V3F_COMMIT" HEAD 2>/dev/null; then V3F_ANCESTOR=true; else V3F_ANCESTOR=false; fi
 
 if [ "$DRY" = 1 ]; then
   printf 'package: %s\n' "${PKG_PATHS[@]}"
@@ -255,7 +263,8 @@ fi
 # the stream's own record: the module hashes the snapshot's S23 check compares with the cluster's copy
 "${LSSH[@]}" "cat > ~/$LAB_TREE_REL/results/framework/inc/stream_deployed.json" <<REC
 {"deployed_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "git_head": "$HEAD_SHA", "script": "deploy/deploy_funnel.sh",
- "replay_rc": $REPLAY_RC, "stream_module_sha256": $(cat /tmp/deploy_stream_modules_$TS.json)}
+ "replay_rc": $REPLAY_RC, "v3fam_amendment_ancestor": $V3F_ANCESTOR,
+ "stream_module_sha256": $(cat /tmp/deploy_stream_modules_$TS.json)}
 REC
 echo "done: HEAD $HEAD_SHA"
 exit "$REPLAY_RC"

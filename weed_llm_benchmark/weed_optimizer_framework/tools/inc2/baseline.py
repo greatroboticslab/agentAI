@@ -25,6 +25,8 @@ B_v2, its capacity arms, the canary, B0 u tsw and the stream's milestones.
         --manifest INC_DIR/splits/v2/base_v2.jsonl --seeds 0 --arm m640 --role baseline --e2 C
     python -m weed_optimizer_framework.tools.inc2.baseline rescore-e2-attr [--out-dir DIR]
     python -m weed_optimizer_framework.tools.inc2.baseline e2-attr-verdict [--out-dir DIR]
+    python -m weed_optimizer_framework.tools.inc2.baseline build --exp v3_d4_f_m640 --v3fam D4F --seeds 0,1,2
+        --role baseline
 
 build writes a 'baseline' experiment for the pinned driver (inc/driver.py,
 unchanged): one cold base run per seed (the arm's Protocol v3 cold recipe,
@@ -873,12 +875,56 @@ def e1_claim(manifest, manifest_sha):
 
 
 # ------------------------------------------------------------------- build
+def v3fam_args(v3fam, exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None, role=None,
+               arch=None, imgsz=None, e2=None, extra=None):
+    """V3F (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, V3F.6.1): build --v3fam ARM takes the manifest, the
+    detector, the seeds, the finals and the role from the family's definition (inc2.v3fam_trained.build_kwargs:
+    the arm's manifest in the complete splits/v3fam/summary.json by sha256; D8's LOCK v2's train_core). Returns
+    (manifest, seeds, arm, final_exams, role, v3fam record)."""
+    from . import v3fam as F
+    from . import v3fam_trained as VT
+    given = [f for f, v in (("--manifest", manifest), ("--union", union), ("--arm", arm), ("--arch", arch),
+                            ("--imgsz", imgsz), ("--e2", e2)) if v is not None]
+    if given:
+        raise BaselineError("--v3fam %s takes the manifest, the detector and the finals from the family's definition: "
+                            "%s not taken" % (v3fam, ", ".join(given)))
+    if extra and "v3fam" in extra:
+        raise BaselineError("a v3fam record comes from --v3fam only")
+    try:
+        kw = VT.build_kwargs(v3fam, exp=exp, seeds=seeds, role=role, final_exams=final_exams)
+    except F.V3famRefused as e:
+        raise BaselineError("--v3fam %s: %s" % (v3fam, e))
+    return kw["manifest"], kw["seeds"], kw["arm"], kw["final_exams"], kw["role"], kw["extra"]["v3fam"]
+
+
+def v3fam_claim(manifest, manifest_sha):
+    """Why a manifest is one of V3F's (it lies under splits/v3fam, or the family summary records its sha256 as
+    an arm's), or None. Such a manifest trains only through build --v3fam (V3F.6.1)."""
+    from . import v3fam_data as VD
+    try:
+        if Path(os.path.abspath(str(manifest))).resolve().is_relative_to(VD.out_dir().resolve()):
+            return "it lies under %s" % VD.out_dir()
+    except (OSError, ValueError):
+        pass
+    s = _read_json(VD.out_dir() / VD.SUMMARY)
+    for k, a in sorted(((s or {}).get("arms") or {}).items() if isinstance(s, dict) else []):
+        if isinstance(a, dict) and a.get("sha256") == manifest_sha:
+            return "%s records it as arm %s" % (VD.out_dir() / VD.SUMMARY, k)
+    return None
+
+
 def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None,
-                     role=None, testing=False, extra=None, arch=None, imgsz=None, e2=None):
+                     role=None, testing=False, extra=None, arch=None, imgsz=None, e2=None, v3fam=None):
     """Check every input and write the manifest copy and the summary; returns
     (definition, summary). Nothing is written before every check passed.
     role None infers it (module docstring). e2 'W' or 'S' builds that arm of
-    E2 (module docstring, build --e2)."""
+    E2 (module docstring, build --e2). v3fam ARM builds that arm of V3F
+    (v3fam_args)."""
+    v3rec = None
+    if v3fam is not None:
+        manifest, seeds, arm, final_exams, role, v3rec = v3fam_args(
+            v3fam, exp, manifest=manifest, union=union, seeds=seeds, arm=arm, final_exams=final_exams, role=role,
+            arch=arch, imgsz=imgsz, e2=e2, extra=extra)
     if role is not None and role not in ROLES:
         raise BaselineError("role %r not in %s" % (role, list(ROLES)))
     if (manifest is None) == (not union):
@@ -919,6 +965,9 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
             if claim:
                 raise BaselineError("%s is a base v3 manifest (%s): it trains only as an E1 arm, never in a union"
                                     % (p, claim))
+            claim = v3fam_claim(p, _sha(p))
+            if claim:
+                raise BaselineError("%s is a V3F manifest (%s): it trains only through build --v3fam" % (p, claim))
         rows, guard, parts = check_union(srcs, production=production)
         name = sanitise("%s_union" % exp)
         dst = paths.manifests / ("%s.jsonl" % name)
@@ -941,6 +990,17 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
             raise BaselineError("%s is a base v3 manifest (%s): it trains only as an E1 arm (role baseline on one of "
                                 "the two manifests a complete splits/v3/summary.json records, recipe cold_budget); "
                                 "this build (role %s) is not one, and would train the cold table" % (src, claim, role))
+        fclaim = v3fam_claim(src, sha)
+        if fclaim and v3rec is None:
+            raise BaselineError("%s is a V3F manifest (%s): it trains only through build --v3fam (V3F.6.1)"
+                                % (src, fclaim))
+        if v3rec is not None:
+            if e1 is not None or claim:
+                raise BaselineError("%s is an E1 manifest: no V3F arm trains it" % src)
+            if sha != v3rec["manifest_sha256"]:
+                raise BaselineError("%s changed since the family's summary recorded it" % src)
+            if v3rec.get("images") is not None and len(rows) != int(v3rec["images"]):
+                raise BaselineError("%s holds %d rows, the family's summary %s" % (src, len(rows), v3rec["images"]))
         if e2 is not None:
             if e1 is not None:
                 raise BaselineError("%s is an E1 manifest: E2 trains LOCK v2's base_v2" % src)
@@ -956,7 +1016,8 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         if C.sha256_file(dst) != sha:
             raise BaselineError("copy of %s does not hash like the manifest that was checked" % src)
         source = {"source_manifest": str(src), "source_locked": locked_name(sha, lock)}
-    if e1 is not None:
+    v3budget = v3rec is not None and v3rec.get("arm") in RC.V3FAM_BUDGET_ARMS
+    if e1 is not None or v3budget:
         recipe = RC.cold_budget(arm_rec["id"], len(rows))
         cost = RC.budget_cost(len(rows), seeds, exams, arm_rec["id"])
     elif e2rec is not None:
@@ -975,6 +1036,15 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         defn["variant_drops"] = drops
     if e1 is not None:
         defn.update(recipe_name=RC.BUDGET_NAME, budget=RC.budget_record(arm_rec["id"], len(rows)), e1=e1)
+    if v3budget:
+        # V3F's one-class arms at equal compute: E1's cold_budget recomputed from the arm's final count, under the
+        # v3fam record (inc2.train.v3fam_problems checks it)
+        defn.update(recipe_name=RC.BUDGET_NAME, budget=RC.budget_record(arm_rec["id"], len(rows)))
+    if v3rec is not None:
+        if v3rec["recipe"] != RC.v3fam_recipe_name(v3rec["arm"]) or recipe != RC.v3fam_recipe(v3rec["arm"], len(rows)):
+            raise BaselineError("V3F's %s trains %s, not this recipe" % (v3rec["arm"],
+                                                                         RC.v3fam_recipe_name(v3rec["arm"])))
+        defn["v3fam"] = v3rec
     defn.update(RC.stamp(arm_rec))
     if e2rec is not None:
         # E2: seed s starts from E1-B's seed-s weights (E2-C: E1-A's; the pinned driver passes init_weights into
@@ -992,6 +1062,11 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         if probs:
             shutil.rmtree(str(paths.manifests), ignore_errors=True)
             raise BaselineError("the E2 definition fails inc2.train's own check: %s" % "; ".join(probs))
+    if v3budget:
+        probs = T.v3fam_problems(json.loads(json.dumps(defn)))
+        if probs:
+            shutil.rmtree(str(paths.manifests), ignore_errors=True)
+            raise BaselineError("the V3F definition fails inc2.train's own check: %s" % "; ".join(probs))
     try:
         D.validate_definition(json.loads(json.dumps(defn)))
         D.check_definition_data(defn)
@@ -1010,6 +1085,10 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         summary["variant_drops"] = drops
     if e1 is not None:
         summary.update(recipe_name=RC.BUDGET_NAME, budget=defn["budget"], e1=e1)
+    if v3rec is not None:
+        summary["v3fam"] = v3rec
+        if v3budget:
+            summary.update(recipe_name=RC.BUDGET_NAME, budget=defn["budget"])
     if e2rec is not None:
         summary["e2"] = e2rec
         if defn.get("recipe_name"):
@@ -1019,12 +1098,13 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
 
 
 def build(exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None, role=None,
-          testing=False, backend=None, init=True, quiet=False, extra=None, arch=None, imgsz=None, e2=None):
+          testing=False, backend=None, init=True, quiet=False, extra=None, arch=None, imgsz=None, e2=None,
+          v3fam=None):
     """build_definition, then driver init through run_inc2_job.sh. Returns
     (summary, definition, init result or None)."""
     defn, summary = build_definition(exp, manifest=manifest, union=union, seeds=seeds, arm=arm,
                                      final_exams=final_exams, role=role, testing=testing, extra=extra,
-                                     arch=arch, imgsz=imgsz, e2=e2)
+                                     arch=arch, imgsz=imgsz, e2=e2, v3fam=v3fam)
     log("%s (%s): baseline on %s, %d images, arm %s, seeds %s, finals %s; est. %s-%s GPU-h"
         % (exp, role, defn["base"]["manifest"], defn["base"]["n_images"], defn["arm"]["id"], defn["seeds"],
            defn["final_exams"], defn["cost_estimate"]["total_gpu_h"][0], defn["cost_estimate"]["total_gpu_h"][1]))
@@ -3224,6 +3304,9 @@ def main(argv=None):
                     help="build: this experiment's E2 arm (W: b_v2_m640's cold recipe, S: x1b; docs/CONTINUOUS_LOOP.md, "
                          "Amendment 2026-10-04; C: E2-C, the attribution control, E2-W from E1-A's weights, amendment "
                          "2026-10-04, later); e2-test-read, e2-test-report: the arm read")
+    ap.add_argument("--v3fam", default=None, choices=RC.V3FAM_ARMS,
+                    help="build: this experiment's V3F build arm (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, "
+                         "V3F.6.1): the manifest, detector, finals and role come from the family's definition")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
     if a.command in ("rescore-native", "native-verdict", "rescore-agnostic", "agnostic-verdict", "rescore-e2",
@@ -3240,7 +3323,7 @@ def main(argv=None):
             build(a.exp, manifest=a.manifest, union=a.union.split(",") if a.union else None,
                   seeds=a.seeds, arm=a.arm, arch=a.arch, imgsz=a.imgsz, role=a.role, testing=testing,
                   init=not a.no_init, quiet=a.quiet, final_exams=a.final_exams.split(",") if a.final_exams else None,
-                  e2=a.e2)
+                  e2=a.e2, v3fam=a.v3fam)
         elif a.command in ("rescore-e2", "e2-verdict"):
             if a.exp:
                 raise BaselineError("E2's six experiments are pre-registered (inc2.recipes.E2_EXPS); --exp is not "

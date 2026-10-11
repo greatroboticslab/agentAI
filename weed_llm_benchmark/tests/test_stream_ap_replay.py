@@ -1585,7 +1585,9 @@ def s_r0():
     builds L23B --e2 C), E2's rescore and verdict L23C, then E2-C's
     attribution L23D, E3 (2026-10-05: its three arms' scoring jobs L23F
     in the order M, A, B, then its verdict L23G), the model-zoo audit
-    (L23Z, once, last), then the first segment."""
+    (L23Z, once, last), V3F (2026-10-11: the v3 experiment family's
+    L23H, L23J, L23I, L23J and L23L on MAINT and L23K on TRAIN, each item
+    once), then the first segment."""
     w = World("r0")
     w.lock()
     w.step1_status()
@@ -1795,6 +1797,29 @@ def s_r0():
                            "16", "--concurrency", "4", "--max-gpu-hours", "40"]
           and [e.get("basis") for e in w.events("executed") if e.get("lever") == "L23Z"] == ["envelope"]
           and len(w.zoo_submits) == 1, (tail(pz, 13), len(w.zoo_submits)))
+    # 2026-10-11: V3F, the v3 experiment family. E3's verdict decided and the zoo complete; the deployed tree holds
+    # the amendment, the time stamp and D0-S's record exist (a person's and the delegate's steps): its items run by
+    # the platform in V3F.7's order, each once, within the envelope (L23K on TRAIN beside the MAINT items)
+    w.v3fam_ready(e3_verdict=False)
+    fam = w.dom["v3fam"]
+    for _ in range(120):
+        w.tick()
+        w.v3fam_cluster()
+        if ((w.state().get("v3fam") or {}).get("items") or {}).get("verdict", {}).get("state") == "done":
+            break
+    fpro = [(e.get("lever"), (e.get("argv") or [])[-1] if e.get("lever") in ("L23H", "L23L", "L23K")
+             else (e.get("argv") or [])[(e.get("argv") or []).index("--arm" if e.get("lever") == "L23J" else "--v3fam")
+                                        + 1]) for e in w.events("proposed") if e.get("lever") in S.V3FAM_LEVERS]
+    fex = [e.get("basis") for e in w.events("executed") if e.get("lever") in S.V3FAM_LEVERS]
+    want_f = ([("L23H", "build")] + [("L23J", a) for a in fam["pre_build_scores"]]
+              + [("L23I", a) for a in ("D8M", "D8S", "D4F", "D4N", "D4R15", "D1A1", "D1B1", "D1A12", "D5B0", "D5B25",
+                                       "D5B100")]
+              + [("L23J", a) for a in ("D8", "D4F", "D4N", "D4R15", "D1", "D5B", "D6")] + [("L23L", "verdict")])
+    check("V3F: then the family's levers, each item once, within the envelope: L23H, L23J for E3RS, D2's nine, D3 and "
+          "D9, L23I for D8M, D8S, D4F, D4N, D4R15, D1A1, D1B1, D1A12, D5B0, D5B25, D5B100 (BCLEAN not triggered), L23J "
+          "for D8, D4F, D4N, D4R15, D1, D5B, D6, then L23L; on TRAIN L23K's smoke and its three seeds",
+          [x for x in fpro if x[0] != "L23K"] == want_f and [x for x in fpro if x[0] == "L23K"]
+          == [("L23K", "smoke"), ("L23K", "0,1,2")] and fex == ["envelope"] * len(fpro), (fpro, fex))
     w.tick(2)
     check("  once both exist, no measurement arm is proposed again, nor its rescore",
           [e.get("child_exp") for e in w.events("proposed") if e.get("lever") == "L23B"].count("b_v2_m832") == 1
@@ -1808,7 +1833,8 @@ def s_r0():
     check("the whole sequence ran by the platform, in order, one MAINT item at a time, each once",
           lv == ["L23B"] * 5 + ["LV", "LV", "L25", "LV", "LI", "LA", "L28", "LC"] + ["L23B"] * len(measure)
           + ["L23V"] + ["L23B"] * len(e1) + ["L23N"] * len(measure) + ["L23E"] + ["L23B"] * len(e2)
-          + ["L23B"] * len(e2c) + ["L23C", "L23D"] + ["L23F"] * 3 + ["L23G", "L23Z"], lv)
+          + ["L23B"] * len(e2c) + ["L23C", "L23D"] + ["L23F"] * 3 + ["L23G", "L23Z"]
+          + [l for l, _a in want_f], lv)
     zc = [c for c in w.state()["cards"] if c.get("lever") == "L23Z"]
     check("  the zoo's chain ended complete: /stage/zoo done, one research card (counts and the report's path, no "
           "metric), never proposed again",

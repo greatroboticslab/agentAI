@@ -1746,7 +1746,8 @@ def test_build_script():
             p = root / m
             p.parent.mkdir(parents=True, exist_ok=True)
             base = os.path.basename(m)[:-3]
-            if m.startswith("tools/inc2/") and base in ("stream", "splits", "baseline", "pilot4", "base3", "twostage"):
+            if m.startswith("tools/inc2/") and base in ("stream", "splits", "baseline", "pilot4", "base3", "twostage",
+                                                        "v3fam", "v3fam_data", "v3fam_sweep"):
                 p.write_text(stub_mod % {"m": base})
             elif m == "tools/inc/driver.py":
                 p.write_text(stub_driver)
@@ -1843,6 +1844,52 @@ def test_build_script():
                  ["inc2.twostage", "fit-classifier"]):
         p = run(args, extra=with_oc)
         check("  inc2.twostage %s: usage error (exit 2), nothing run" % " ".join(args[1:]),
+              p.returncode == 2 and "usage:" in p.stderr and "[stub" not in p.stdout, (p.returncode, p.stderr[-200:]))
+    # V3F (2026-10-11): the family's verbs, each after an import check of the eight libraries its modules use
+    fam_libs = TMP / "sh_v3fam_libs"
+    for lib in ("torch", "ultralytics", "sklearn", "open_clip", "transformers", "timm", "ensemble_boxes", "cv2"):
+        (fam_libs / lib).mkdir(parents=True, exist_ok=True)
+        (fam_libs / lib / "__init__.py").write_text("__version__ = 'stub'\n")
+    with_fam = {"PYTHONPATH": str(fam_libs)}
+    for args, name in ((["inc2.v3fam_data", "build"], "v3fam_data"),
+                       (["inc2.v3fam", "score", "--arm", "E3RS"], "v3fam_score_e3rs"),
+                       (["inc2.v3fam", "score", "--arm", "D2BC2640"], "v3fam_score_d2bc2640"),
+                       (["inc2.v3fam", "verdict"], "v3fam_v1"),
+                       (["inc2.v3fam", "score-test", "--arm", "D8M"], "v3famtest_d8m"),
+                       (["inc2.v3fam", "reanalyse-test", "--read-by", "delegate"], "v3fam_retest"),
+                       (["inc2.v3fam_sweep", "run"], "v3fam_sweep")):
+        p = run(args, extra=with_fam)
+        a = ((prov(name) or {}).get("attempts") or [{}])[-1]
+        mod = args[0].split(".", 1)[1]
+        check("inc2.%s %s (V3F, 2026-10-11): run under the provenance and lock %s with HF_HUB_OFFLINE=1 after the "
+              "import check, recorded as scored, no advance" % (mod, " ".join(args[1:]), name),
+              p.returncode == 0 and "[stub %s] %s" % (mod, " ".join(args[1:])) in p.stdout
+              and "[stub driver]" not in p.stdout and a.get("status") == "scored" and a.get("build_rc") == 0
+              and "HF_HUB_OFFLINE=1" in p.stdout and "timm stub" in p.stdout and "ensemble_boxes" not in p.stderr,
+              (p.returncode, p.stdout[-500:], p.stderr[-300:], a))
+    p = run(["inc2.v3fam", "score", "--arm", "D4F", "--refuse"], extra=with_fam)
+    a = ((prov("v3fam_score_d4f") or {}).get("attempts") or [{}])[-1]
+    check("  an inc2.v3fam refusal: its exit status and ERROR line recorded (build_failed), no advance",
+          p.returncode == 1 and a.get("status") == "build_failed" and "[inc2.v3fam] ERROR" in str(a.get("refusal"))
+          and "[stub driver]" not in p.stdout, (p.returncode, a))
+    no_timm = TMP / "sh_v3fam_no_timm"
+    shutil.copytree(str(fam_libs), str(no_timm), dirs_exist_ok=True)
+    (no_timm / "timm" / "__init__.py").write_text("raise ImportError('timm is not installed here')\n")
+    p = run(["inc2.v3fam", "score", "--arm", "D2RN50"], extra={"PYTHONPATH": str(no_timm)})
+    a = ((prov("v3fam_score_d2rn50") or {}).get("attempts") or [{}])[-1]
+    check("  without timm importable: env_failed before the module runs",
+          p.returncode == 1 and a.get("status") == "env_failed" and "[stub v3fam]" not in p.stdout, (p.returncode, a))
+    p = run(["inc2.baseline", "build", "--exp", "v3_d4_f_m640", "--v3fam", "D4F", "--seeds", "0,1,2", "--role",
+             "baseline"], extra=with_fam)
+    check("inc2.baseline build --v3fam (L23I): the lock and provenance are named by --exp; the advance follows",
+          p.returncode == 0 and "[stub driver] advance --exp v3_d4_f_m640" in p.stdout
+          and (prov("v3_d4_f_m640") or {}).get("attempts", [{}])[-1].get("status") == "advanced", p.stdout[-400:])
+    for args in (["inc2.v3fam", "score"], ["inc2.v3fam", "score", "--arm", "D5"], ["inc2.v3fam", "score", "--arm", "D8M"],
+                 ["inc2.v3fam", "test-read", "--arm", "D6"], ["inc2.v3fam", "test-report", "--arm", "D6"],
+                 ["inc2.v3fam", "frozen"], ["inc2.v3fam_sweep", "verdict"], ["inc2.v3fam_data", "lists"],
+                 ["inc2.v3fam_detr", "smoke"]):
+        p = run(args, extra=with_fam)
+        check("  inc2.%s: usage error (exit 2), nothing run" % " ".join(args).split(".", 1)[1],
               p.returncode == 2 and "usage:" in p.stderr and "[stub" not in p.stdout, (p.returncode, p.stderr[-200:]))
     p = run(["inc2.base3", "build", "--stream", "wsv"])
     a = ((prov("base3_v3") or {}).get("attempts") or [{}])[-1]
