@@ -806,16 +806,20 @@ class World(object):
 
     def v3fam_ready(self, amendment=True, timestamp=True, sweep=True, bclean=False, exif=True, e3_verdict=True):
         """The family's gate in place: E3's verdict decided (the zoo is complete after ready_r0), the deployed
-        tree's copy of the amendment (its sha256, at the lab tree's parent), the time stamp record, D0-S's record
+        tree's copies of the amendment and its Revisions 29-31 (their sha256s, at the lab tree's parent), the time
+        stamp record (naming the Revisions' stamp), D0-S's record
         complete (bclean: its test branch triggered), the EXIF frame pre-flight passed."""
         if e3_verdict:
             self.e3_records(arms=(), verdict=True, rescore=False, qualifying=("M", "A", "B"), chosen="B")
         dst = self.dir / "docs" / "prereg" / "V3F_2026-10-11.md"
         if amendment:
             dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(str(PKG_ROOT.parent / "docs" / "prereg" / "V3F_2026-10-11.md"), str(dst))
+            for n in ("V3F_2026-10-11.md", "V3F_rev29-31_2026-10-11.md"):
+                shutil.copyfile(str(PKG_ROOT.parent / "docs" / "prereg" / n), str(dst.parent / n))
         if timestamp:
-            self._w("v3fam/v1/timestamp.json", {"proof": "V3F_2026-10-11.stamp.txt.ots", "sha256": "a" * 64})
+            self._w("v3fam/v1/timestamp.json", {"proof": "V3F_2026-10-11.stamp.txt.ots", "sha256": "a" * 64,
+                                                "revisions": [{"file": "V3F_rev29-31_2026-10-11.md.ots",
+                                                               "sha256": self.dom["v3fam"]["revision_sha256"]}]})
         if sweep:
             self._w("v3fam/v1/sweep/record.json", {
                 "format": "inc2-v3fam-sweep-record/1", "status": "complete", "H": ["test/k1"] if bclean else [],

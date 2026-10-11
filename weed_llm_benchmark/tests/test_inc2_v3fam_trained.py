@@ -9,8 +9,9 @@ Two groups. UNITS need no scoring pass (V3FAM_ONLY=units runs only them):
   0.502355, 3) and the cold table for the 12-class arms; another arm refused;
 - build_kwargs (what inc2.baseline build --v3fam takes): the arm's manifest from the complete family summary by
   sha256, seeds 0-2, role baseline, finals dev and ImageWeeds, exp.json's v3fam record; refused: another --exp,
-  other seeds, another role, finals with test, a manifest that no longer hashes, D5b's three builds (the pinned
-  driver's dev, D5B_CONFLICT), an unknown arm; baseline's --v3fam refuses --manifest, --union, --arm and --e2;
+  other seeds, another role, finals with test, a manifest that no longer hashes, an unknown arm; D5b's three
+  builds take dev as their only final (Revision 30), and their sources never open a run's protocol dev score;
+  baseline's --v3fam refuses --manifest, --union, --arm and --e2;
   a family manifest (under splits/v3fam, or by its sha256 elsewhere) is claimed, so it trains through --v3fam
   only;
 - inc2.train.v3fam_problems: a budget arm's record against the summary (another arm, a changed summary, another
@@ -137,10 +138,16 @@ def u_build_kwargs():
     with patched(VD, "arm_manifest", gone):
         errs["a manifest that no longer hashes"] = refused(VT.build_kwargs, "D4F")
     check("refused: %s" % ", ".join(errs), all(v is not None for v in errs.values()), errs)
-    e = refused(VT.build_kwargs, "D5B25")
-    check("D5b's builds refuse: the pinned driver scores dev in every base run and requires dev among the finals "
-          "(V3F.6.1's 'none for D5B*' cannot be built; a Revision decides)", e is not None and "pinned driver" in str(e)
-          and all(refused(VT.build_kwargs, a) is not None for a in VT.D5B_BUILDS), e)
+    m5 = write_summary({"D4F": rows[:-1], "D5B25": rows[:-2]})
+    k5 = VT.build_kwargs("D5B25")
+    e5 = refused(VT.build_kwargs, "D5B25", final_exams=["dev", "imageweeds"])
+    check("D5b's builds take dev as their only final (Revision 30: the pinned driver's minimum; the family never reads "
+          "those dev scores): v3_d5b_25_m640 on the summary's manifest, the cold table; ImageWeeds among its finals "
+          "refused; D4F's finals stay dev and ImageWeeds",
+          k5["final_exams"] == ["dev"] and k5["exp"] == "v3_d5b_25_m640" and k5["manifest"] == str(m5["D5B25"][0])
+          and k5["extra"]["v3fam"]["recipe"] == "cold" and e5 is not None and VT.finals_of("D4F") == ("dev", "imageweeds")
+          and all(VT.finals_of(a) == ("dev",) for a in VT.D5B_BUILDS), (k5["final_exams"], e5))
+    m = write_summary({"D4F": rows[:-1], "D1A12": [r for r in rows if r["key"].startswith("tc")]})
     bad = {}
     for flag, kw2 in (("--manifest", {"manifest": "/x.jsonl"}), ("--union", {"union": ["/x.jsonl"]}),
                       ("--arm", {"arm": "m640"}), ("--e2", {"e2": "W"})):
@@ -154,6 +161,53 @@ def u_build_kwargs():
           "trains through --v3fam only; base_v2 is not",
           B.v3fam_claim(m["D4F"][0], m["D4F"][1]) and B.v3fam_claim(copy, m["D4F"][1])
           and B.v3fam_claim(C2_base_v2(), W.sha(C2_base_v2())) is None)
+
+
+def u_d5b_sources():
+    print("D5b's sources never open a run's protocol dev score (Revision 30)")
+    exp = "v3_src_check"
+    root_ = C.INC_DIR / exp
+    shutil.rmtree(str(root_), ignore_errors=True)
+    w = root_ / "runs" / "base__s0" / "weights" / "final.pt"
+    w.parent.mkdir(parents=True)
+    w.write_bytes(b"weights")
+    sha = W.sha(w)
+    (root_ / "exp.json").write_text(json.dumps({"exp": exp, "seeds": [0, 1, 2]}))
+    for rid in ("base__s0", "final__base__s0"):
+        (root_ / "runs" / rid).mkdir(parents=True, exist_ok=True)
+        (root_ / "runs" / rid / "run.json").write_text(json.dumps({"status": "done", "weights_sha256": sha}))
+    dev = root_ / "runs" / "final__base__s0" / "scores" / "dev.json"
+    dev.parent.mkdir(parents=True)
+    dev.write_text("{not json")
+    import builtins
+    opened = []
+    real_open = builtins.open
+
+    def spy(f, *a, **k):
+        opened.append(str(f))
+        return real_open(f, *a, **k)
+    with patched(builtins, "open", spy):
+        try:
+            src = SYS.run_source(exp, 0, testing_ok=True, read_dev=False)
+        except F.V3famRefused as ex:             # a source that reads the dev score refuses this unreadable one
+            src = {"refused": str(ex)}
+    e = refused(SYS.run_source, exp, 0, testing_ok=True)
+    check("read_dev False: the base run's weights and the final run's record checked, scores/dev.json never opened, "
+          "no dev number returned; the default reads it (and refuses this unreadable one)",
+          src.get("weights_sha256") == sha and "recorded" not in src and "recorded_doc" not in src
+          and not any(x.endswith("scores/dev.json") for x in opened) and e is not None
+          and "recorded" not in SYS.source_record(src), (sorted(src), e))
+    shutil.rmtree(str(root_))
+    seen = {}
+
+    def rs(exp_, s, testing_ok=False, read_dev=True):
+        seen[(exp_, s)] = read_dev
+        return {}
+    with patched(VT, "check_definition", lambda build, testing_ok=False: {}), patched(SYS, "run_source", rs):
+        VT.sources("D5B25")
+        VT.sources("D4F")
+    check("  D5b's build sources take read_dev off, every other build's on",
+          all(seen[("v3_d5b_25_m640", s)] is False and seen[("v3_d4_f_m640", s)] is True for s in F.SEEDS), seen)
 
 
 def C2_base_v2():
@@ -260,7 +314,7 @@ def u_d1_preflight():
           e is not None and "pre-flight" in str(e), e)
 
 
-UNITS = ("u_recipes", "u_dispatch", "u_stage1_check", "u_d1_preflight")
+UNITS = ("u_recipes", "u_dispatch", "u_stage1_check", "u_d1_preflight", "u_d5b_sources")
 WORLD_UNITS = ("u_build_kwargs", "u_train_problems", "u_d1_classifier")
 
 
@@ -283,10 +337,10 @@ def w_builds():
     (C.REPO / "yolo11m.pt").write_bytes(os.urandom(2048))
     rows = WORLD["rows"]["base_v2"]
     a_rows = [r for r in rows if r["key"].startswith("tc")]
-    m = write_summary({"D4F": rows[:-1], "D1B1": rows[:-2], "D1A1": a_rows, "D1A12": a_rows})
+    m = write_summary({"D4F": rows[:-1], "D1B1": rows[:-2], "D1A1": a_rows, "D1A12": a_rows, "D5B25": rows[:-3]})
     WORLD["fam_manifests"] = m
     defs = {}
-    for arm in ("D4F", "D1A1", "D1B1", "D1A12"):
+    for arm in ("D4F", "D1A1", "D1B1", "D1A12", "D5B25"):
         exp = RC.V3FAM_EXPS[arm]
         shutil.rmtree(str(C.INC_DIR / exp), ignore_errors=True)
         defn, _summ = B.build_definition(exp, v3fam=arm, testing=True)
@@ -303,6 +357,12 @@ def w_builds():
     check("D1A12: the cold table, no budget record; D1A1 and D1B1 cold_budget",
           defs["D1A12"]["base"]["recipe"] == RC.cold("m640") and "budget" not in defs["D1A12"]
           and defs["D1A1"]["recipe_name"] == RC.BUDGET_NAME and defs["D1B1"]["recipe_name"] == RC.BUDGET_NAME)
+    d5 = defs["D5B25"]
+    check("D5B25 builds through the pinned driver's definition (Revision 30): finals dev only, the cold table, role "
+          "baseline, the family's manifest; its definition is the family's (check_definition)",
+          d5["final_exams"] == ["dev"] and d5["base"]["recipe"] == RC.cold("m640") and d5["role"] == "baseline"
+          and d5["base"]["manifest_sha256"] == m["D5B25"][1] and VT.check_definition("D5B25", testing_ok=True),
+          {k: d5.get(k) for k in ("final_exams", "role")})
     e = refused(B.build_definition, "plain_copy", manifest=str(m["D4F"][0]), role="baseline", arm="m640",
                 testing=True)
     check("  the family's manifest through a plain build (no --v3fam) refuses", e is not None and "V3F" in str(e), e)

@@ -187,12 +187,18 @@ def timestamp_path():
 
 
 def require_timestamp():
-    """The amendment's time stamp record (V3F.12), which every family step needs first: its sha256."""
+    """The amendment's time stamp record (V3F.12), which every family step needs first: its sha256. It must also
+    name the stamp of Revisions 29-31 ({"revisions": [{"file", "sha256", ...}]} with the sha256 of
+    F.REVISION_FILE), which V3F.12 has stamped before the next family step."""
     p = timestamp_path()
     doc = F._read_json(p)
     if not isinstance(doc, dict):
         raise SweepRefused("%s does not exist: the amendment is time-stamped before any family step (V3F.3.9, "
                            "V3F.12)" % p)
+    revs = [r for r in doc.get("revisions") or [] if isinstance(r, dict)]
+    if not any(r.get("sha256") == F.REVISION_SHA256 for r in revs):
+        raise SweepRefused("%s names no stamp of %s (sha256 %s): Revisions 29-31 are time-stamped before the next "
+                           "family step (V3F.12)" % (p, F.REVISION_FILE, F.REVISION_SHA256[:16]))
     return C.sha256_file(p)
 
 

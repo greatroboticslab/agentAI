@@ -694,7 +694,7 @@
    "success": "The experiment built (exp.json with its v3fam record; cold_budget arms checked by inc2.train.v3fam_problems) and, later, its three base runs and finals done.",
    "falsifier": "Nothing is decided here: the arm is scored by L23J and judged in the family's verdict (L23L).",
    "estimator": "v3fam_build",
-   "note": "Record only (V3F.7 step 8): one build per MAINT item in the order D0BCLEAN (only if D0-S triggered it), D8M, D8S, D4F, D4N, D4R15, D1A1, D1B1, D1A12, D5B0, D5B25, D5B100; D5b's builds wait for a Revision (the pinned driver scores dev); a lane item ends when its build job ends."
+   "note": "Record only (V3F.7 step 8): one build per MAINT item in the order D0BCLEAN (only if D0-S triggered it), D8M, D8S, D4F, D4N, D4R15, D1A1, D1B1, D1A12, D5B0, D5B25, D5B100; D5b's builds take dev as their only final (Revision 30: the pinned driver's minimum, never read by the family); a lane item ends when its build job ends; a build that ends without its experiment is charged its build job's sacct GPU-h."
   },
   "L23J": {
    "name": "score_v3fam",
@@ -741,9 +741,9 @@
    ],
    "control": "E3-B on dev through the family path (P5, selection-corrected).",
    "success": "v3fam/v1/d6/smoke/smoke.json complete within 0.8 x 36 h, then s<k>/train.json and final_ema.pth of seeds 0, 1 and 2.",
-   "falsifier": "A projection above 28.8 h records D6 'not run (walltime)' and its seeds are never proposed; a seed killed at its walltime fails D6, never shortened.",
+   "falsifier": "A projection above 28.8 h records D6 'not run (walltime)' and its seeds are never proposed; a seed killed at its walltime (sacct TIMEOUT) fails D6 at once and is never retried or shortened.",
    "estimator": "v3fam_detr",
-   "note": "Record only (V3F.7 steps 3 and 9; decision 27): on TRAIN so that the 19-24 h seed jobs never hold MAINT; while it holds TRAIN the stream's own segments wait."
+   "note": "Record only (V3F.7 steps 3 and 9; decision 27): on TRAIN so that the 19-24 h seed jobs never hold MAINT; while it holds TRAIN the stream's own segments wait. A train item that failed otherwise is proposed once more with --seeds naming only the seeds not yet trained."
   },
   "L23L": {
    "name": "verdict_v3fam",
@@ -757,13 +757,20 @@
     "python",
     "-m",
     "weed_optimizer_framework.tools.{pkg}.v3fam",
-    "verdict"
+    "verdict",
+    {
+     "if": "cap_refused",
+     "tokens": [
+      "--cap-refused",
+      "{cap_refused}"
+     ]
+    }
    ],
    "control": "Every comparison's two sides through the one family path (decision 17).",
    "success": "capacity/v3fam_v1.json decided (dev only), written once and last.",
    "falsifier": "V3F.3.3's rule, V3F.3.4's Holm overlay and Tier C bar Phi^-1(1 - 0.05/14); nothing switches.",
    "estimator": "v3fam_verdict",
-   "note": "Record only (V3F.7 step 11): proposed once every arm's record is complete, failed or not run; the sealed-test reads are a person's (inc2.v3fam test-read)."
+   "note": "Record only (V3F.7 step 11): proposed once every arm's record is complete, failed or not run; --cap-refused names the items the ticker recorded 'not run (family cap)', which the verdict writes under v3fam/v1/cap first; the sealed-test reads are a person's (inc2.v3fam test-read)."
   },
   "LV": {
    "name": "verdict",

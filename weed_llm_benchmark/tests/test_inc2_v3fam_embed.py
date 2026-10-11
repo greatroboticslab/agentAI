@@ -281,6 +281,34 @@ def fake_files(bb):
     return out
 
 
+def dl_log(times=True):
+    """A download log as download_plan's commands leave it (the UTC time before and after each download)."""
+    p = W.TMP / ("downloads%s.log" % ("" if times else "_untimed"))
+    lines = []
+    for bb in EM.DOWNLOAD_FILES:
+        lines += ["%s start" % bb] + (["2026-10-12T08:%02d:00Z" % len(lines)] if times else []) + [
+            "Fetching files for %s" % bb, "%s end" % bb] + (["2026-10-12T08:%02d:30Z" % len(lines)] if times else [])
+    p.write_text("\n".join(lines) + "\n")
+    return str(p)
+
+
+def u_download_log():
+    print("downloads.json keeps the delegate's command log and its UTC times (V3F.5 D2), or is not written")
+    plan = EM.download_plan()
+    with moved(EM.downloads_path()):
+        e0 = refused(EM.record_downloads)
+        e1 = refused(EM.record_downloads, commands=dl_log(times=False))
+        e2 = refused(EM.record_downloads, commands=str(W.TMP / "no_such.log"))
+        written = EM.downloads_path().exists()
+    check("the plan puts '%s' before and after every download and ends with downloads --commands; downloads.json "
+          "refuses without --commands, with a log that records no UTC time, with a missing log; nothing is written"
+          % EM.DATE_CMD, plan.count(EM.DATE_CMD) == 2 * len(EM.DOWNLOAD_FILES) and "--commands downloads.log" in plan
+          and all(e is not None for e in (e0, e1, e2)) and not written, (e0, e1, e2))
+    log = EM.command_log(dl_log())
+    check("  the record's log: its text, sha256, first and last UTC time", log["times"][0] == "2026-10-12T08:00:00Z"
+          and log["n_times"] == 2 * len(EM.DOWNLOAD_FILES) and log["sha256"] == W.sha(dl_log()), log["times"])
+
+
 def fake_cache(root):
     """Every backbone of the registry in a fake cache at root; returns the registry pointed at it (the
     amendment's revisions and hashes replaced by the fake files', the same backbones pinned or not)."""
@@ -394,8 +422,8 @@ def u_pins():
         check("every other backbone needs downloads.json's record: without it LAION is not run",
               e is not None and EM.NOT_RUN_DOWNLOAD in str(e), e)
         with moved(EM.downloads_path()):
-            dl = EM.record_downloads()
-            e_once = refused(EM.record_downloads)
+            dl = EM.record_downloads(commands=dl_log())
+            e_once = refused(EM.record_downloads, commands=dl_log())
             st = {k: v["status"] for k, v in dl["backbones"].items()}
             check("downloads.json: every backbone ok in the fake cache, its revision, files and weight file; written "
                   "once", set(st.values()) == {"ok"} and dl["backbones"]["RN50"]["revision"] == fake_rev("RN50")
@@ -471,7 +499,7 @@ def u_pins():
         cache2 = W.TMP / "hub_units_missing"
         put(cache2, reg["BC2"]["repo"], fake_rev("BC2"), fake_files("BC2"))
         with patched(EM, "hub_cache", lambda: cache2), moved(EM.downloads_path()):
-            d2 = EM.record_downloads()
+            d2 = EM.record_downloads(commands=dl_log())
             (EM.downloads_path()).unlink()
         check("record_downloads on a cache holding only BioCLIP-2: the others missing", d2["backbones"]["BC2"]["status"]
               == "ok" and all(d2["backbones"][k]["status"] == "missing" for k in reg if k != "BC2"),
@@ -487,7 +515,7 @@ def u_embedders():
     crops = [Image.fromarray((rng.random((224, 224, 3)) * 255).astype(np.uint8)) for _ in range(5)]
     with patched(SL, "_load_backbone", fake_open_clip), patched(SL, "_device", lambda: "cpu"), \
             fake_world_models(cache, reg), moved(EM.downloads_path()):
-        EM.record_downloads()
+        EM.record_downloads(commands=dl_log())
         ref = V.BioclipEmbedder()
         bc2, ck = EM.load_embedder("BC2")
         oc = EM.OpenClipEmbedder("hf-hub:imageomics/bioclip-2")
@@ -714,7 +742,7 @@ def u_cli():
           all(rc == 2 for rc, _e in out) and "[inc2.v3fam_embed] ERROR" in out[0][1], out)
 
 
-UNITS = ("u_constants", "u_pins", "u_embedders", "u_ft_encode", "u_view640", "u_ft_schedule", "u_half_sample", "u_cli")
+UNITS = ("u_constants", "u_pins", "u_download_log", "u_embedders", "u_ft_encode", "u_view640", "u_ft_schedule", "u_half_sample", "u_cli")
 
 
 # ================================================================== WORLD
@@ -732,7 +760,7 @@ def w_setup():
           % (json.loads((TS.classifier_dir() / "classifier.json").read_text())["embedder"]["name"], time.time() - t0),
           all((TS.arm_dir(a, s) / "dev.json").exists() for a in "MAB" for s in (0, 1, 2)))
     with fake_world_models(cache, reg):
-        EM.record_downloads()
+        EM.record_downloads(commands=dl_log())
         emb, ck = EM.load_embedder("BC2")
         WORLD["bc2"] = emb
         F.equivalence_dev_identity(**KW)

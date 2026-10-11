@@ -198,11 +198,15 @@ RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
                       "L23L": "V3F's verdict failed (L23L)"}
 # V3F (2026-10-11, the v3 experiment family; docs/CONTINUOUS_LOOP.md, V3F.6.2-V3F.6.4): its five levers, all record
 # only. A failure is one card and the item is proposed once more under a new id; after its second failure
-# (v3fam.max_failures) it is recorded failed and never holds the family's other items (_v3fam_failed). Every item
-# is priced and counted against the family cap (260 GPU-h, decision 25: running items at their estimates, ended
-# ones settled from sacct or, for a build, from its experiment's report; the person steps from the derived status):
-# an item whose estimate would pass it is recorded "not run (family cap)" with one card and never retried. An L23K
-# item whose jobs are still queued V3FAM_DETR_OVERDUE_H after its submission is one card (the seeds' walltime is 36 h).
+# (v3fam.max_failures) it is recorded failed and never holds the family's other items (_v3fam_failed). An L23K
+# seed job that ends TIMEOUT (killed at its 36 h walltime) fails D6 at once, never retried (V3F.7, L23K's
+# falsifier); a retry of L23K's train names only the seeds not yet trained. Every item is priced and counted against
+# the family cap (260 GPU-h, decision 25: running items at their estimates, ended ones settled from sacct or, for a
+# build, from its experiment's report, and every earlier attempt of an item proposed again kept in its prior_gpuh;
+# the person steps from the derived status): an item whose estimate would pass it is recorded "not run (family
+# cap)" with one card and never retried, and the verdict's argv names it (--cap-refused) so the cluster's records
+# say so too. An L23K item whose jobs are still queued V3FAM_DETR_OVERDUE_H after its submission is one card (the
+# seeds' walltime is 36 h).
 V3FAM_LEVERS = ("L23H", "L23I", "L23J", "L23K", "L23L")
 V3FAM_NOT_RUN_CAP = "not run (family cap)"
 V3FAM_DETR_OVERDUE_H = 37.0
@@ -3525,7 +3529,7 @@ class StreamRun(object):
                 self._clear(ln)
                 return
         if lever in V3FAM_LEVERS and not submission:
-            return self._v3fam_failed(ln, it, why, charged)
+            return self._v3fam_failed(ln, it, why, charged, ended=ended)
         if lever in RECORD_ONLY_LEVERS and not submission:
             # record only (a measurement arm's native-resolution rescore; E1's base v3 build and agnostic
             # rescore): a person's card; the lane's failure count, its step count and its stop-loss are not
@@ -4182,6 +4186,10 @@ class StreamRun(object):
                         why = "the build of %s ended without the experiment%s" % (
                             child, (": %s" % prov.get("refusal")) if prov.get("refusal") else "")
                         ended = {"refusal": prov.get("refusal"), "states": [str(s_) for s_ in states if s_]}
+                        if it["lever"] == "L23I":
+                            # a family build that ended without its experiment: its build job's GPU-h count against
+                            # the family cap (decision 25), never 0
+                            self._v3fam_settle(it, [sacct.get(j) for j in it.get("job_ids") or []], build_ended=True)
                         if not (it["lever"] == "L18" and self._cut_short(ln, it, why, ended, q)):
                             self._failed(ln, it, why, ended=ended)
                 continue
@@ -4210,6 +4218,7 @@ class StreamRun(object):
                                                base_dir=self.xctx.su_base_dir, ts=self.utc)
                 if it["lever"] in V3FAM_LEVERS:
                     self._v3fam_settle(it, [sacct.get(j) for j in ids])
+                    it["v3fam_states"] = states
                 s_ = st["sources"].get((p.get("params") or {}).get("source")) or {}
                 if not ok and it["lever"] == "L16I" and (s_.get("status") == "names_pending" or (
                         s_.get("status") == "held" and s_.get("names_held")) or NAMES_REFUSAL in refusal):
@@ -4789,15 +4798,21 @@ class StreamRun(object):
 
     def _v3fam_amendment(self):
         """True when the deployed tree (the lab's, which the S23 check keeps equal to the cluster's) holds the
-        amendment's file with the sha256 the domain records: the deployed commit descends from the amendment's."""
+        amendment's file and its Revisions' (29-31) with the sha256s the domain records: the deployed commit
+        descends from both."""
         fam = (self.dom or {}).get("v3fam") or {}
         if not fam.get("amendment_file"):
             return False
-        path = self.paths.lab_inc.parents[3] / fam["amendment_file"]
-        try:
-            return hashlib.sha256(path.read_bytes()).hexdigest() == fam.get("amendment_sha256")
-        except OSError:
-            return False
+        for f, sha in ((fam["amendment_file"], fam.get("amendment_sha256")),
+                       (fam.get("revision_file"), fam.get("revision_sha256"))):
+            if not f:
+                continue
+            try:
+                if hashlib.sha256((self.paths.lab_inc.parents[3] / f).read_bytes()).hexdigest() != sha:
+                    return False
+            except OSError:
+                return False
+        return True
 
     def _v3fam_stage(self, exp_status, payload=None):
         """/stage/v3fam (V3F.6.4), what DR0's family block and the cards read: the gate's inputs (the amendment
@@ -4907,11 +4922,13 @@ class StreamRun(object):
 
     def _v3fam_spend(self, exp_status, status, payload=None):
         """The family's GPU-h (decision 25): each item the platform ran at its estimate until it settled (a job
-        from sacct, a build from its experiment's report once done), a refused item nothing; the person steps
+        from sacct, a build from its experiment's report once done), plus what its earlier attempts settled
+        (prior_gpuh: a retry adds to the first, V3F.6.4 and V3F.7), a refused item nothing more; the person steps
         (the sweep, the reads, the re-analysis) from the derived status, a running one at its estimate."""
         fam = (self.dom or {}).get("v3fam") or {}
         total = 0.0
         for key, it in self._v3fam()["items"].items():
+            total += float(it.get("prior_gpuh") or 0.0)       # the item's earlier attempts (_v3fam_fold)
             if it.get("state") == V3FAM_NOT_RUN_CAP or it.get("spend") is None:
                 continue
             if key.startswith("build:") and it.get("spend") == "open" and exp_status.get(it.get("exp")) == "done":
@@ -4938,7 +4955,11 @@ class StreamRun(object):
         if lever == "L23H":
             return {"pkg": pkg}, None
         if lever == "L23L":
-            return {"pkg": pkg}, None
+            # the items this ticker recorded 'not run (family cap)': the verdict writes them under v3fam/v1/cap so
+            # the family table gives that reason (V3F.3.4, V3F.3.5)
+            refused = sorted(k for k, v in self._v3fam()["items"].items() if v.get("state") == V3FAM_NOT_RUN_CAP
+                             and k != "verdict")
+            return dict({"pkg": pkg}, **({"cap_refused": ",".join(refused)} if refused else {})), None
         if lever == "L23J":
             arms = list(fam.get("pre_build_scores") or []) + list(fam.get("post_build_scores") or [])
             if pr.get("arm") not in arms:
@@ -4948,8 +4969,16 @@ class StreamRun(object):
         if lever == "L23K":
             if pr.get("verb") not in ("smoke", "train"):
                 return None
-            return dict({"pkg": pkg, "verb": pr["verb"]}, **({"seeds": "0,1,2"} if pr["verb"] == "train" else {})), \
-                None
+            if pr["verb"] == "smoke":
+                return {"pkg": pkg, "verb": "smoke"}, None
+            # the seeds not yet trained (a retry never resubmits a trained seed, which refuses a second training)
+            from . import stream_remote as SR
+            st_ = self._artifact(fam.get("status") or SR.V3FAM_STATUS) or {}
+            done = {int(k) for k in ((st_.get("detr") or {}).get("trained") or [])}
+            seeds = [x for x in (fam.get("seeds") or [0, 1, 2]) if int(x) not in done]
+            if not seeds:
+                return None
+            return {"pkg": pkg, "verb": "train", "seeds": ",".join(str(int(x)) for x in seeds)}, None
         arm = pr.get("arm")
         exp = (fam.get("build_exps") or {}).get(arm)
         if not exp or arm in (fam.get("blocked_builds") or {}):
@@ -4983,6 +5012,7 @@ class StreamRun(object):
         rec = self._v3fam_item(lever, params)
         if rec.get("state") != V3FAM_NOT_RUN_CAP:
             key = self._v3fam_key(lever, params)
+            self._v3fam_fold(rec)                 # what an earlier attempt of it used stays counted
             rec.update(state=V3FAM_NOT_RUN_CAP, refused_utc=self.utc, spent_gpuh=round(spent + tick[1], 4),
                        estimate=float(est or 0.0), spend=None)
             self._ledger("not_taken", lever=lever, v3fam_item=key, reasons=[
@@ -4995,26 +5025,52 @@ class StreamRun(object):
                        % (key, float(est or 0.0), spent + tick[1], cap, V3FAM_NOT_RUN_CAP), lever=lever)
         return False
 
+    @staticmethod
+    def _v3fam_fold(rec):
+        """Move an item's spend so far into prior_gpuh (an attempt that ended, before the item is proposed again or
+        refused at the cap): what sacct settled, or, for an attempt never settled, its estimate (overstated, never
+        understated). The cap counts every attempt (V3F.6.4, V3F.7)."""
+        got = None
+        if rec.get("spend") == "settled" and rec.get("settled") is not None:
+            got = float(rec["settled"])
+        elif rec.get("spend") == "open":
+            got = float(rec.get("estimate") or 0.0)
+        if got is not None:
+            rec["prior_gpuh"] = round(float(rec.get("prior_gpuh") or 0.0) + got, 4)
+            rec.setdefault("attempts", []).append({"proposal": rec.get("proposal"), "gpuh": round(got, 4),
+                                                   "how": rec.get("spend")})
+        rec.update(spend=None, settled=None)
+
     def _v3fam_started(self, it):
         p = it["proposal"]
         rec = self._v3fam_item(it["lever"], p.get("params") or {})
+        if rec.get("proposal") == p["id"] and rec.get("spend") in ("open", "settled"):
+            # the same run taken back (adopted after a restart): its spend stands, it is not a new attempt
+            rec.update(state="running", lever=it["lever"], exp=p.get("child_exp"))
+            return
+        self._v3fam_fold(rec)
         rec.update(state="running", estimate=float(p.get("est_gpu_hours") or 0.0), spend="open", settled=None,
                    proposal=p["id"], lever=it["lever"], started_utc=self.utc, exp=p.get("child_exp"))
 
-    def _v3fam_settle(self, it, rows):
-        """A family job's spend settled from sacct once every job of it ended (V100 GPU-h)."""
+    def _v3fam_settle(self, it, rows, build_ended=False):
+        """A family job's spend settled from sacct once every job of it ended (V100 GPU-h). A build (L23I) is
+        settled by its experiment's report, unless its job ended without the experiment (build_ended): then by
+        its build job's sacct."""
         if not rows or not all(r and r.get("elapsed_s") is not None for r in rows):
             return
         rec = self._v3fam_item(it["lever"], it["proposal"].get("params") or {})
-        if it["lever"] == "L23I":
+        if it["lever"] == "L23I" and not build_ended:
             return                                # its runs are settled by the experiment's report
         rec["settled"] = round(sum(float(r["elapsed_s"]) * float(r.get("gpu_count") or 1) / 3600.0 for r in rows), 4)
         rec["spend"] = "settled"
 
-    def _v3fam_failed(self, ln, it, why, charged):
+    def _v3fam_failed(self, ln, it, why, charged, ended=None):
         """A family item that ended without its effect: one card; proposed once more under a new id; after its
         second failure (v3fam.max_failures) recorded failed, its id declined, the family's other items go on. No
-        lane failure, no stop-loss."""
+        lane failure, no stop-loss. An L23K seed job that ended TIMEOUT (its 36 h walltime) fails D6 at once and is
+        never retried (V3F.7: killed before its export, D6's scoring and read are not spent). A build that ended
+        without its experiment (ended) is charged its build job's sacct (settled by the follow), else the
+        domain's build-job hours; any other job its estimate when charged."""
         st = self.st
         p = it["proposal"]
         lever, params = it["lever"], p.get("params") or {}
@@ -5023,25 +5079,63 @@ class StreamRun(object):
         rec = self._v3fam_item(lever, params)
         rec["fails"] = int(rec.get("fails") or 0) + 1
         if rec.get("spend") == "open":
-            rec["settled"] = float(rec.get("estimate") or 0.0) if charged else 0.0
+            if ended is not None and lever == "L23I":
+                rec["settled"] = float(((fam.get("costs") or {}).get("build_job_hours")) or 0.0)
+            else:
+                rec["settled"] = float(rec.get("estimate") or 0.0) if charged else 0.0
             rec["spend"] = "settled"
-        last = rec["fails"] >= int(fam.get("max_failures") or 2)
+        walltime = lever == "L23K" and params.get("verb") == "train" and any(
+            str(x).startswith("TIMEOUT") for x in it.get("v3fam_states") or [])
+        last = walltime or rec["fails"] >= int(fam.get("max_failures") or 2)
         rec["state"] = "failed" if last else "failed_once"
+        if walltime:
+            rec["why"] = "walltime: a seed job was killed at its 36 h limit before its export (V3F.7)"
         if last:
             st["declined"] = (list(st.get("declined") or []) + [p["id"]])[-200:]
         else:
             st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
         self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
-                     charged=charged, record_only=True, v3fam_item=key, fails=rec["fails"])
+                     charged=charged, record_only=True, v3fam_item=key, fails=rec["fails"], walltime=walltime)
         title = RECORD_ONLY_TITLES[lever]
         title = title % (params.get("arm") or params.get("verb")) if "%s" in title else title
-        self._card("escalation", "%s%s" % (title, ": recorded failed" if last else ""),
-                   "%s. Record only: %s; the family's other items go on. A person may rerun it: %s" % (
-                       _short(why, 400), "after its second failure it is recorded failed and keeps its place in the "
-                                         "family's verdict as failed" if last else
-                       "it is proposed once more under a new id", " ".join(p.get("argv") or [])),
+        if walltime:
+            body = ("%s. A seed killed at its walltime fails D6 (V3F.7; L23K's falsifier): recorded failed, never "
+                    "retried; D6's scoring and its reference read are not spent, P5 and D6's Tier C arm are 'not "
+                    "run' and keep their places (V3F.3.4). The family's other items go on." % _short(why, 400))
+        else:
+            body = "%s. Record only: %s; the family's other items go on. A person may rerun it from the login node: %s" \
+                % (_short(why, 400), "after its second failure it is recorded failed and keeps its place in the "
+                                     "family's verdict as failed" if last else
+                   "it is proposed once more under a new id", self._v3fam_rerun(lever, params))
+        self._card("escalation", "%s%s" % (title, ": recorded failed" if last else ""), body,
                    lever=lever, trigger=list(p.get("trigger") or []))
         self._clear(ln)
+
+    def _v3fam_rerun(self, lever, params):
+        """The command a person submits to rerun a family item by hand (an sbatch job, never a foreground run on the
+        login node), with INCAP_DECIDED_BY naming them; L23K's train one sbatch per seed not yet trained."""
+        sb = "INCAP_DECIDED_BY=<the person> sbatch -p GPU-shared"
+        if lever == "L23H":
+            return "%s --job-name=inc_build_v3fam_data run_inc2_build.sh inc2.v3fam_data build" % sb
+        if lever == "L23J":
+            arm = str(params.get("arm"))
+            return "%s --job-name=inc_build_v3fam_score_%s run_inc2_build.sh inc2.v3fam score --arm %s" % (
+                sb, arm.lower(), arm)
+        if lever == "L23L":
+            cr = (" --cap-refused %s" % params["cap_refused"]) if params.get("cap_refused") else ""
+            return "%s --job-name=inc_build_v3fam_v1 run_inc2_build.sh inc2.v3fam verdict%s" % (sb, cr)
+        if lever == "L23I":
+            return ("%s --job-name=inc_build_%s run_inc2_build.sh inc2.baseline build --exp %s --v3fam %s --seeds "
+                    "0,1,2 --role baseline" % (sb, params.get("exp"), params.get("exp"), params.get("arm")))
+        if params.get("verb") == "smoke":
+            return "%s --job-name=inc_detr_v3fam_smoke run_inc2_detr.sh inc2.v3fam_detr smoke" % sb
+        from . import stream_remote as SR
+        fam = (self.dom or {}).get("v3fam") or {}
+        st_ = self._artifact(fam.get("status") or SR.V3FAM_STATUS) or {}
+        done = {str(int(k)) for k in ((st_.get("detr") or {}).get("trained") or [])}
+        seeds = [x for x in str(params.get("seeds") or "0,1,2").split(",") if x != "" and x not in done]
+        return "; ".join("%s --job-name=inc_detr_v3fam_s%s run_inc2_detr.sh inc2.v3fam_detr train --seed %s"
+                         % (sb, k, k) for k in seeds) or "nothing: every seed is trained"
 
     def _v3fam_record_done(self, it, rec):
         """A family item followed after an unknown outcome is done once its record says so."""
@@ -5070,6 +5164,52 @@ class StreamRun(object):
             "until they end." % (",".join(str(j) for j in it.get("job_ids") or []), V3FAM_DETR_OVERDUE_H),
             lever="L23K")
 
+    @staticmethod
+    def _v3fam_storage_need(fam, fs):
+        """GB the family's items that are not yet terminal will write (stream_domains' v3fam.storage_gb per kind)."""
+        sizes = fam.get("storage_gb") or {}
+        need = 0.0
+        if not DS.v3fam_terminal(fs.get("data")):
+            need += float(sizes.get("data") or 0.0)
+        need += sum(float(sizes.get("build") or 0.0) for v in (fs.get("build") or {}).values()
+                    if not DS.v3fam_terminal(v))
+        need += sum(float(sizes.get("score") or 0.0) for v in (fs.get("score") or {}).values()
+                    if not DS.v3fam_terminal(v))
+        for k in ("smoke", "train"):
+            if not DS.v3fam_terminal((fs.get("detr") or {}).get(k)):
+                need += float(sizes.get("detr_%s" % k) or 0.0)
+        if not DS.v3fam_terminal(fs.get("verdict")):
+            need += float(sizes.get("verdict") or 0.0)
+        return need
+
+    def _v3fam_storage_card(self, f, fam, fs):
+        """One card when the family's remaining items need more than /ocean holds above D27's 3 % floor and the 30 GiB
+        margin (V3F.6.4's per-item rule would stall the family midway): the shortfall a person frees first. Raised
+        again only when the shortfall grows by 1 GB or more."""
+        ctx = (self.ev.json(E.CONTEXT) or {}) if self.ev is not None else {}
+        qu = ctx.get("quota") or {}
+        quota, free = _num(qu.get("quota_gb")), _num(qu.get("free_gb"))
+        if quota is None or free is None:
+            return
+        need = self._v3fam_storage_need(fam, fs)
+        floor = float(fam.get("storage_floor_share") or 0.03) * quota
+        margin = float(fam.get("storage_margin_gib") or 30.0) * 1.073741824
+        room = free - floor - margin
+        short = need - room
+        if short <= 0:
+            f.pop("storage_projection", None)
+            return
+        if f.get("storage_projection") is not None and short < float(f["storage_projection"]) + 1.0:
+            return
+        f["storage_projection"] = round(short, 1)
+        self._card("quota", "V3F's remaining items need about %.1f GB more on /ocean than it holds above the floor "
+                   "and margin" % short,
+                   "/ocean: %.0f GB free - the 3 %% floor %.0f GB - the 30 GiB margin %.0f GB leaves %.1f GB; the "
+                   "family's items not yet done will write about %.1f GB (stream_domains' v3fam.storage_gb), so an "
+                   "item would wait for storage midway (V3F.6.4). A person frees at least %.1f GB on /ocean (the "
+                   "Hugging Face cache counts there too) before then." % (free, floor, margin, room, need, short),
+                   lever="L23H")
+
     def _v3fam_cards(self, by):
         """The family's cards (each raised once per content), once the deployed tree holds the amendment and its
         prerequisites hold (E3's verdict decided, the zoo complete): its person steps while any is pending; each
@@ -5088,7 +5228,9 @@ class StreamRun(object):
         mod = "python -m weed_optimizer_framework.tools.inc2"
         steps = []
         if not fs.get("timestamp"):
-            steps.append("write v3fam/v1/timestamp.json (the OpenTimestamps proof's file name and sha256, V3F.12)")
+            steps.append("write v3fam/v1/timestamp.json (the OpenTimestamps proofs' file names and sha256s, V3F.12: "
+                         "the amendment's and, under 'revisions', the stamp of %s)" % (fam.get("revision_file")
+                                                                                       or "the Revisions"))
         if not fs.get("sweep"):
             steps.append("D0-S (the delegate): INCAP_DECIDED_BY=assistant:claude-delegate sbatch -p GPU-shared "
                          "--job-name=inc_build_v3fam_sweep run_inc2_build.sh inc2.v3fam_sweep run; then, per verified "
@@ -5105,6 +5247,7 @@ class StreamRun(object):
                        "The v3 experiment family (record only) proposes nothing until: " + "; ".join(steps)
                        + ". D7 (the lab RTX 3060's latency) is the delegate's at any time after the downloads.",
                        lever="L23H")
+        self._v3fam_storage_card(f, fam, fs)
         for k, why in sorted((((by.get("DR0") or {}).get("detail") or {}).get("v3fam_waits") or {}).items()):
             if str(why).startswith("storage") and (f.setdefault("wait_cards", {})).get(k) != why:
                 f["wait_cards"][k] = why

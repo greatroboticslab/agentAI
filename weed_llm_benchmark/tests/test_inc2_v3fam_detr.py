@@ -16,12 +16,16 @@ UNITS (the synthetic world's splits, no scoring pass; V3FAM_ONLY=units):
 - the 0-12 class map round trip (data.yaml's names -> INC ids) and its
   refusals; the converter on planted predictions (background 13 dropped and
   counted, 14 / -1 / 2.5 / NaN / a score above 1 refused);
-- staging: refused without the rehearsal's outcome, refused on a planted
-  holdout row (and nothing left behind), on a reader that does not turn a
-  tag-6 image (symlink branch); written once with valid a subset of train and
-  never dev, no test/ folder, labels as their verified bytes; the transpose
-  branch on a tag-6 image (a transposed JPEG without a tag, linked from train/);
-  a planted test/ folder and a planted holdout link refused on verification;
+- staging: refused without the rehearsal's outcome, without D0-S's complete
+  record, on a planted holdout row (dev, test, ImageWeeds by key, sha256 or
+  path) or an image inside INC_DIR/exams (and nothing left behind), on a
+  reader that does not turn a tag-6 image (symlink branch); base rows sharing
+  ood22's images or the probe's keys staged and counted (Revision 29); D0-S's
+  base_v2 copies left out of train/ and valid/ and recorded; written once with
+  valid a subset of train and never dev, no test/ folder, labels as their
+  verified bytes; the transpose branch on a tag-6 image (a transposed JPEG
+  without a tag, linked from train/); a planted test/ folder, a planted holdout
+  link and a link into INC_DIR/exams refused on verification;
 - the attempt's clean-up: its own files removed, a file it did not write (old,
   a link, another name) refused; the trainer's facts (run_test, the archive
   interval, every epoch, no archive file) checked; the rehearsal writes nothing
@@ -31,7 +35,8 @@ UNITS (the synthetic world's splits, no scoring pass; V3FAM_ONLY=units):
   in-process EMA, the 20-image predictions, the clean-up, its export removed);
   each seed's export equal to the EMA weights and never to the planted best
   file's, written once; an archive checkpoint refused (nothing exported,
-  cleaned); SIGTERM in training cleans and exports nothing; another seed refused.
+  cleaned); SIGTERM in training cleans and exports nothing; another seed refused;
+  a change to E3's tree during a seed's training fails it (no train.json).
 WORLD (real Ultralytics CPU passes, E3's records as in tests/test_inc2_v3fam.py,
 a zoo root holding ooddev_v1): score_d6 with predictions planted as
 b_v2_m640 seed 0's own identity rows reproduces that seed's family identity
@@ -246,29 +251,58 @@ def tag6_row():
     return W.row_for("tsw23x_t6", p, [(3, 0.5, 0.25, 0.4, 0.3)], "3seasonweeddet10/data2023")
 
 
+def sweep_record(refs=()):
+    """D0-S's complete record (inc2.v3fam_sweep.read_record's form) with true copies whose reference rows are refs."""
+    p = F.root() / "sweep" / "record.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"format": "inc2-v3fam-sweep-record/1", "status": "complete",
+                             "copies": [{"pair": "p%d" % i, "query": "dev/q%d" % i, "ref": r}
+                                        for i, r in enumerate(refs)], "H": ["dev/q%d" % i for i in range(len(refs))]}))
+    return p
+
+
 def u_staging():
-    print("staging (no test/ folder, no holdout image, valid in train, the EXIF branch)")
+    print("staging (no test/ folder, no holdout image, valid in train, the EXIF branch, D0-S's copies left out)")
     import yaml
     rows = list(WORLD["rows"]["base_v2"]) + [tag6_row()]
     WORLD["stage_rows"] = rows
     e0 = refused(D.stage, rows=rows, backend=FakeBackend())
+    e_d0s = refused(D.stage, exif="symlink", rows=rows, backend=FakeBackend())
+    sweep_record()
     dev = WORLD["rows"]["dev"][0]
     hold = D.holdout_index()
     test_row = WORLD["rows"]["test"][0]
+    iw_row = WORLD["rows"]["imageweeds"][0]
     moved_dev = dict(dev, key="renamed_dev", image=str(W.TMP / "src" / "elsewhere.jpg"))
     dev_key = dict(rows[0], key=dev["key"])
-    check("the holdout index (dev, test, ImageWeeds, ood22, ood23; the probe when it exists) finds a dev row, a test "
-          "row, a renamed copy of a dev image (by its sha256), a base image under a dev key (by key), and no base row",
-          D.holdout_hits(rows + [dev, test_row, moved_dev, dev_key], hold) == [dev["key"], test_row["key"],
-                                                                              "renamed_dev", dev["key"]]
-          and D.holdout_hits(rows, hold) == [] and set(hold["counts"]) == {"dev", "test", "imageweeds", "ood22",
-                                                                            "ood23", "probe"}, hold["counts"])
+    ood = C.read_manifest(C.manifest_path("ood22"))[0]
+    shared22 = dict(rows[1], sha256=ood["sha256"])
+    probe_m = F.root_of("probe") / "splits" / "v1" / "probe.jsonl"
+    probe_m.parent.mkdir(parents=True, exist_ok=True)
+    probe_m.write_text(json.dumps(rows[2], sort_keys=True) + "\n")
+    ex = C.INC_DIR / "exams" / "v1" / "dev" / "images" / "planted_exam_copy.jpg"
+    ex.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(rows[3]["image"], str(ex))
+    in_exams = dict(rows[3], key="in_exams", sha256="0" * 64, image=str(ex))
+    check("the holdout index (dev, test, ImageWeeds: Revision 29) finds a dev row, a test row, an ImageWeeds row, a "
+          "renamed copy of a dev image (by its sha256), a base image under a dev key (by key) and an image resolving "
+          "into INC_DIR/exams; never a base row, a base row sharing an ood22 image's sha256 or a probe key",
+          D.holdout_hits(rows + [dev, test_row, iw_row, moved_dev, dev_key, in_exams, shared22], hold)
+          == [dev["key"], test_row["key"], iw_row["key"], "renamed_dev", dev["key"], "in_exams"]
+          and D.holdout_hits(rows, hold) == [] and set(hold["counts"]) == {"dev", "test", "imageweeds"}
+          and os.path.realpath(str(C.INC_DIR / "exams")) in hold["roots"], hold["counts"])
+    sh = D.shared_with_base([shared22, rows[2], rows[4]])
+    check("  ood22's, ood23's and the probe's images are base_v2's own rows: counted for the record, never refused "
+          "(ood22 1, the probe 1)", sh["ood22"] == 1 and sh["probe"] == 1 and sh["ood23"] == 0, sh)
     e1 = refused(D.stage, exif="symlink", rows=rows + [dev], backend=FakeBackend())
+    e1b = refused(D.stage, exif="symlink", rows=rows + [in_exams], backend=FakeBackend())
     e2 = refused(D.stage, exif="symlink", rows=rows, backend=FakeBackend(transposes=False))
     left = [p.name for p in D.d6_dir().iterdir()] if D.d6_dir().exists() else []
-    check("refused: without the rehearsal's outcome, a planted dev row, a reader that does not turn the tag-6 image "
-          "(symlink branch); nothing left behind", e0 is not None and "rehearsal" in str(e0) and e1 is not None
-          and "holdout" in str(e1) and e2 is not None and "frame" in str(e2) and not left, (e0, e1, e2, left))
+    check("refused: without the rehearsal's outcome, without D0-S's complete record, a planted dev row, a row whose "
+          "image lies in INC_DIR/exams, a reader that does not turn the tag-6 image (symlink branch); nothing left "
+          "behind", e0 is not None and "rehearsal" in str(e0) and e_d0s is not None and "D0-S" in str(e_d0s)
+          and e1 is not None and "holdout" in str(e1) and e1b is not None and e2 is not None and "frame" in str(e2)
+          and not left, (e0, e_d0s, e1, e1b, e2, left))
     with moved(D.d6_dir()):
         st = D.stage(exif="transpose", rows=rows, backend=FakeBackend())
         t = D.stage_dir() / "transposed" / "tsw23x_t6.jpg"
@@ -281,6 +315,25 @@ def u_staging():
               and lk.is_symlink() and not os.path.isabs(os.readlink(str(lk))) and os.path.realpath(str(lk))
               == os.path.realpath(str(t)) and st["record"]["exif"]["transposed"] == {"tsw23x_t6": W.sha(t)}
               and st["record"]["exif"]["mode"] == "transpose", (size, tag))
+    with moved(D.d6_dir()):
+        gone = rows[5]["key"]
+        sweep_record(refs=(gone, "not_a_base_v2_row"))
+        st2 = D.stage(exif="symlink", rows=rows, backend=FakeBackend())
+        tr2 = sorted(os.path.splitext(f)[0] for f in os.listdir(str(D.stage_dir() / "train" / "images")))
+        r2 = st2["record"]
+    from weed_optimizer_framework.tools.inc2 import v3fam_data as VD
+    with moved(D.d6_dir()):
+        TS._write_json(VD._summary_path(), {"format": VD.FORMAT, "status": "complete",
+                                            "d0s": {"d6_staging_removals": ["something_else"]}})
+        e_sum = refused(D.stage, exif="symlink", rows=rows, backend=FakeBackend())
+        VD._summary_path().unlink()
+        check("D0-S's confirmed copies leave train/ (V3F.3.7 item 4): the base_v2 row on the removal list is not "
+              "staged (train/ %d of %d), valid/ is drawn from the rest, the drop recorded in stage.json; a family data "
+              "summary whose d6_staging_removals disagree refuses" % (len(tr2), len(rows)),
+              gone not in tr2 and len(tr2) == len(rows) - 1 and gone not in r2["valid"]["keys"]
+              and r2["d0s"]["dropped"] == [gone] and r2["d0s"]["removal_rows"] == 2 and r2["n_train"] == len(rows) - 1
+              and len(r2["valid"]["keys"]) == D.valid_count(len(rows) - 1) and e_sum is not None, (r2["d0s"], e_sum))
+        sweep_record()
     st = D.stage(exif="symlink", rows=rows, backend=FakeBackend())
     rec = st["record"]
     tr = sorted(os.path.splitext(f)[0] for f in os.listdir(str(D.stage_dir() / "train" / "images")))
@@ -292,12 +345,15 @@ def u_staging():
                   == pathlib.Path(r["label"]).read_bytes() for r in rows)
     check("staged once (symlink branch, the reader checked on the tag-6 image): train/ is every base row (%d), valid/ "
           "the %d smallest stable_int keys, a subset of train and never dev; no test/ folder; labels their verified "
-          "bytes; data.yaml without a test split" % (len(tr), len(va)), tr == sorted(r["key"] for r in rows)
+          "bytes; data.yaml without a test split; the probe's shared row counted, D0-S's empty removal recorded"
+          % (len(tr), len(va)), tr == sorted(r["key"] for r in rows)
           and va == rec["valid"]["keys"] and set(va) <= set(tr) and not (set(va) | set(tr)) & devk
           and len(va) == D.valid_count(len(rows)) and not tests and labs_ok and rec["test_folder"] is False
           and rec["exif"]["reader_check"]["failed"] == [] and "test" not in yaml.safe_load(
               (D.stage_dir() / "data.yaml").read_text())
-          and va == D.valid_keys(rows) == sorted(r["key"] for r in by_rank[:D.valid_count(len(rows))]), rec["valid"])
+          and va == D.valid_keys(rows) == sorted(r["key"] for r in by_rank[:D.valid_count(len(rows))])
+          and rec["holdout_check"]["base_v2_rows_shared_with"]["probe"] == 1 and rec["d0s"]["dropped"] == [],
+          rec["valid"])
     check("  stage() again only verifies (stage.json is written once)", D.stage()["sha256"] == st["sha256"])
     (D.stage_dir() / "train" / "test").mkdir()
     e3 = refused(D.verify_stage)
@@ -306,9 +362,15 @@ def u_staging():
     os.symlink(dev["image"], str(planted))
     e4 = refused(D.verify_stage)
     planted.unlink()
-    check("verification refuses a planted test/ folder and a planted link to a dev image; passes again after",
-          e3 is not None and "test" in str(e3) and e4 is not None and D.verify_stage()["sha256"] == st["sha256"],
-          (e3, e4))
+    planted = D.stage_dir() / "valid" / "images" / "zz_exam_link.jpg"
+    os.symlink(str(ex), str(planted))
+    e5 = refused(D.verify_stage)
+    planted.unlink()
+    check("verification refuses a planted test/ folder, a planted link to a dev image and one into INC_DIR/exams; "
+          "passes again after", e3 is not None and "test" in str(e3) and e4 is not None and e5 is not None
+          and D.verify_stage()["sha256"] == st["sha256"], (e3, e4, e5))
+    probe_m.unlink()
+    ex.unlink()
 
 
 def u_attempt():
@@ -407,6 +469,23 @@ def u_smoke_train():
         check("SIGTERM during training: SystemExit(143), the attempt cleans what it wrote, nothing exported",
               term == 143 and not D.final_path(1).exists() and len(lt["cleanup"]["removed"]) == 4
               and "SystemExit" in lt["failed"], (term, lt.get("failed")))
+        tw = C.INC_DIR / "twostage" / TS.E3_NAME / "planted_tree_check.json"
+        tw.parent.mkdir(parents=True, exist_ok=True)
+        tw.write_text("{}")
+
+        class Touching(FakeBackend):
+            def train(self, *a, **k):
+                tw.write_text('{"changed": true}')
+                return FakeBackend.train(self, *a, **k)
+        e_tree = refused(D.train, 1, backend=Touching())
+        tj1 = D.seed_dir(1) / "train.json"
+        tree_ok = not tj1.exists()
+        tw.unlink()
+        for p in (tj1, D.final_path(1)):
+            if p.exists():
+                p.unlink()                       # its export, written before the check failed (a person's to clear)
+        check("E3's tree changed while a seed trained (V3F.3.7): the job fails and writes no train.json",
+              e_tree is not None and "E-series" in str(e_tree) and tree_ok, e_tree)
         D.train(1, backend=fb)
         D.train(2, backend=fb)
     check("seeds 0, 1, 2 trained: their final weights differ by seed and hash as train.json records",

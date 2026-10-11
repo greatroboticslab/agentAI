@@ -480,8 +480,9 @@ def price_v3fam(kind, p, dom, info, detail):
     """The v3 family's estimators (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, V3F.6.3; V100, 1 SU per GPU-h,
     est.), each under its cap: v3fam_data 2.0 (<= 4); v3fam_build seeds x image-epochs x the detector's measured
     rate + finals + the build job's hours (<= 20; the image count from the family summary, info["images"]);
-    v3fam_score per arm, V3F.5's prices (<= 6); v3fam_detr the smoke 0.5 (<= 1) or the three seeds 72 (<= 108);
-    v3fam_verdict 0.5 (<= 1). Every job is settled from sacct, a build's runs from its experiment's report."""
+    v3fam_score per arm, V3F.5's prices (<= 6); v3fam_detr the smoke 0.5 (<= 1) or 24 per seed submitted (<= 36
+    each; the three: 72, <= 108); v3fam_verdict 0.5 (<= 1). Every job is settled from sacct, a build's runs from its
+    experiment's report."""
     detail = dict(detail, rates="the v3 family's domain block (V3F.5 prices, est.)")
     if kind == "v3fam_data":
         return _capped(float(v3fam_cost(dom, "data_hours")), v3fam_cost(dom, "data_cap"), detail,
@@ -502,8 +503,13 @@ def price_v3fam(kind, p, dom, info, detail):
             return _capped(float(v3fam_cost(dom, "detr_smoke_hours")), v3fam_cost(dom, "detr_smoke_cap"), detail,
                            "D6's smoke: staging and one epoch")
         if verb == "train":
-            return _capped(float(v3fam_cost(dom, "detr_train_hours")), v3fam_cost(dom, "detr_train_cap"),
-                           dict(detail, seeds=3), "D6's three seed jobs, 3 x 24 GPU-h (the open term, V3F.7)")
+            # the seeds the item submits (0,1,2; a retry only those not yet trained), each a third of the three's
+            n = len([x for x in str(p.get("seeds") or "0,1,2").split(",") if x != ""])
+            if not 1 <= n <= 3:
+                raise LeverError("L23K's train submits 1-3 seeds, not %r" % (p.get("seeds"),))
+            return _capped(float(v3fam_cost(dom, "detr_train_hours")) * n / 3.0,
+                           float(v3fam_cost(dom, "detr_train_cap")) * n / 3.0, dict(detail, seeds=n),
+                           "D6's seed jobs, %d x 24 GPU-h (the open term, V3F.7)" % n)
         raise LeverError("L23K's verb is smoke or train, not %r" % (verb,))
     if kind == "v3fam_build":
         fam = dom.get("v3fam") or {}

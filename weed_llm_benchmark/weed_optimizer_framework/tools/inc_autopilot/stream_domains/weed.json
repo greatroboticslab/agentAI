@@ -500,6 +500,8 @@
   "amendment_commit": "55cc2d97cd2147d01644c1e193098b73aeba0a06",
   "amendment_file": "docs/prereg/V3F_2026-10-11.md",
   "amendment_sha256": "5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f",
+  "revision_file": "docs/prereg/V3F_rev29-31_2026-10-11.md",
+  "revision_sha256": "36f4637898156ace639112f4605fbfe1192ecacad67b81ed47b1a6465bc0f814",
   "requires": {
    "e3_record": "capacity/e3_v1.json",
    "zoo": "zoo"
@@ -660,11 +662,7 @@
     "detr:train"
    ]
   },
-  "blocked_builds": {
-   "D5B0": "the pinned driver (inc/driver.py) requires dev among a definition's finals and scores dev in every base run, while V3F.5 D5b's builds have no finals and never read dev (V3F.6.1): built only after a dated Revision settles how; inc2.baseline build --v3fam refuses it until then",
-   "D5B25": "the pinned driver (inc/driver.py) requires dev among a definition's finals and scores dev in every base run, while V3F.5 D5b's builds have no finals and never read dev (V3F.6.1): built only after a dated Revision settles how; inc2.baseline build --v3fam refuses it until then",
-   "D5B100": "the pinned driver (inc/driver.py) requires dev among a definition's finals and scores dev in every base run, while V3F.5 D5b's builds have no finals and never read dev (V3F.6.1): built only after a dated Revision settles how; inc2.baseline build --v3fam refuses it until then"
-  },
+  "blocked_builds": {},
   "max_failures": 2,
   "cap_gpu_hours": 260.0,
   "storage_margin_gib": 30.0,
@@ -720,11 +718,12 @@
    "data": 0.5,
    "score": 0.2,
    "build": 0.3,
-   "detr_smoke": 3.0,
-   "detr_train": 7.0,
+   "detr_smoke": 4.1,
+   "detr_train": 3.7,
    "verdict": 0.01
   },
-  "why": "V3F, the v3 experiment family D0-D9 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, pre-registered as one family; docs/prereg/V3F_2026-10-11.md): once E3's verdict is decided and the model-zoo audit is complete, the deployed tree holds the amendment (its sha256), v3fam/v1/timestamp.json exists and D0-S's record is complete (the derived status v3fam/v1/status.json the snapshot ships), DR0 proposes, one MAINT item at a time and in V3F.7's order: L23H once (inc2.v3fam_data build), then L23J for E3RS, D2's nine arms, D3 and D9 (inc2.v3fam score --arm X), then L23I for each build (inc2.baseline build --exp E --v3fam ARM; D0BCLEAN first and only when D0-S triggered it; a lane item ends when its build job ends and the seeds' runs overlap), then L23J for BCLEAN, D8, D4F, D4N, D4R15, D1 (after the EXIF frame pre-flight passed) and D6 once its runs (or D6's three seed exports) are done, then L23L once (inc2.v3fam verdict) when every arm is done, failed or not run; on TRAIN, L23K's smoke after L23H, then its three seeds in one item when the smoke's projection is within 28.8 h. Every item is record only: a failure is one card and the item is proposed once more; after a second failure it is recorded failed, never holds the other arms, and keeps its place in the verdict. No item is proposed while storage is under 30 GiB above the 3 % floor for its bytes (a card names the shortfall), or while its estimate would take the family past 260 GPU-h (the family cap, decision 25: running items at their estimates, ended ones settled from sacct or the experiment's report, the person steps from the derived status; it is recorded 'not run (family cap)' and never retried). D5b's three builds wait for a Revision (blocked_builds). Person and delegate steps are never levers: D0-S's sweep and verdicts, the weight downloads, D7, the EXIF verdict, every sealed-test read and the re-analysis; the family card gives their exact commands."
+  "storage_why": "GB each item writes (V3F.5's storage lines): D6's smoke stages base_v2 (at most 3 GB, the transposed copies) and trains one epoch (at most 1.1 GB transient) = 4.1; its train writes at most 1.1 GB transient per running seed and 0.135 GB per final, 3 x 1.235 = 3.7 (the staging is the smoke's). /ocean holds the Hugging Face cache too, so the step-0c downloads (8.7 GB) come out of the same headroom; the ticker raises one card when the items not yet done need more than /ocean holds above the floor and margin.",
+  "why": "V3F, the v3 experiment family D0-D9 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, pre-registered as one family; docs/prereg/V3F_2026-10-11.md): once E3's verdict is decided and the model-zoo audit is complete, the deployed tree holds the amendment (its sha256), v3fam/v1/timestamp.json exists and D0-S's record is complete (the derived status v3fam/v1/status.json the snapshot ships), DR0 proposes, one MAINT item at a time and in V3F.7's order: L23H once (inc2.v3fam_data build), then L23J for E3RS, D2's nine arms, D3 and D9 (inc2.v3fam score --arm X), then L23I for each build (inc2.baseline build --exp E --v3fam ARM; D0BCLEAN first and only when D0-S triggered it; a lane item ends when its build job ends and the seeds' runs overlap), then L23J for BCLEAN, D8, D4F, D4N, D4R15, D1 (after the EXIF frame pre-flight passed) and D6 once its runs (or D6's three seed exports) are done, then L23L once (inc2.v3fam verdict) when every arm is done, failed or not run; on TRAIN, L23K's smoke after L23H, then its three seeds in one item when the smoke's projection is within 28.8 h. Every item is record only: a failure is one card and the item is proposed once more; after a second failure it is recorded failed, never holds the other arms, and keeps its place in the verdict. No item is proposed while storage is under 30 GiB above the 3 % floor for its bytes (a card names the shortfall), or while its estimate would take the family past 260 GPU-h (the family cap, decision 25: running items at their estimates, ended ones settled from sacct or the experiment's report, the person steps from the derived status; it is recorded 'not run (family cap)' and never retried). D5b's three builds train with dev as their only final (Revision 30: the pinned driver's minimum; the family never reads those dev scores). An L23K seed job killed at its walltime fails D6 and is not retried; a retry of L23K's train names only the seeds not yet trained; every attempt of an item counts against the cap; the verdict's argv names the items the ticker refused at the cap. Person and delegate steps are never levers: D0-S's sweep and verdicts, the weight downloads, D7, the EXIF verdict, every sealed-test read and the re-analysis; the family card gives their exact commands."
  },
  "stage_a": {
   "exp": "pilot_v4",

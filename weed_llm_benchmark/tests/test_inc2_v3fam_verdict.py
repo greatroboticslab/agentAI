@@ -21,8 +21,15 @@ pinned is how the verdict reads the committed scores and how the reads are guard
   person read_by names (decision 20), when the verdict or the sources changed, or a second time; test-report's
   stratum of the test images from dev's sessions and the gap to 0.90; the re-analysis of E3's stored test arrays
   (O4's stratum, test minus H), once, with the same submitter guard;
-- the family's GPU-h from the cluster's records (provenance attempts, running at their estimates; the family's
-  experiments' reports).
+- the family's GPU-h from the cluster's records (provenance attempts, running at their estimates; a read prepared
+  and not yet submitted at its estimate; the asking job's own running attempt left out; the family's experiments'
+  reports);
+- C_D3 is P4's record (one seed text); the report shows D and D_sel with the plain D and E3-B's share beside; the
+  dev pass count by kind; Tier S's array readings (stage-1 agnostic AP matched again to dev's labels and checked
+  against the recorded value, D1's species subsets, D5b's per-copy-family inflation); D0-S's dev branch with every
+  dev comparison's full-dev numbers beside and E3's comparisons re-read on dev minus H under E3's seed texts; the
+  declaration of D0-S's removals; the ticker's cap refusals passed in the verdict's argv; the re-analysis only
+  after the reads.
 
 Run:  python3 tests/test_inc2_v3fam_verdict.py
 """
@@ -165,6 +172,9 @@ def build_scores(skip=()):
         put("TSB", "ood22", s, 0.05, arm="D1")
         put("TSA", "ood22", s, 0.02, arm="D1")
         put("D1A12", "ood22", s, 0.0, arm="D1")
+        put("TSB", "ood23", s, 0.03, arm="D1")
+        put("TSA", "ood23", s, 0.01, arm="D1")
+        put("D1A12", "ood23", s, 0.0, arm="D1")
         put("D1B1", "ood23", s, 0.04, arm="D1", p7=True)
         put("D1A1", "ood23", s, 0.0, arm="D1", p7=True)
         if "D5B" not in skip:
@@ -248,8 +258,30 @@ def t_verdict():
     rep = json.loads((C.INC_DIR / "capacity" / (VR.REPORT + ".json")).read_text())
     md = (C.INC_DIR / "capacity" / (VR.REPORT + ".md")).read_text()
     check("the report: every comparison with D, 2 sd, both SEs, z, the interval, the outcome; the family table; "
-          "the dev pass count", len(rep["comparisons"]) == len(VR.COMPARISONS) + len(F.CHALLENGERS) + len(VR.TIER_S)
-          and rep["dev_passes"] == 3 * len(SHIFT) + 1 and "| P1 | dev |" in md and rep["table"], rep["dev_passes"])
+          "the dev pass count by kind",
+          len(rep["comparisons"]) == len(VR.COMPARISONS) + len(F.CHALLENGERS) + len(VR.TIER_S) + len(VR.TIER_S_ARRAYS)
+          and rep["dev_passes"] == 3 * len(SHIFT) + 1 == rep["dev_passes_by_kind"]["family_scores"]
+          and "| P1 | dev |" in md and rep["table"], (rep["dev_passes"], rep.get("dev_passes_by_kind")))
+    r2, c3, p4 = rep["comparisons"]["P2"], rep["comparisons"]["C_D3"], rep["comparisons"]["P4"]
+    check("the report's P2: D the plain D, D_sel the deciding one (z from D_sel and SE_sel), the plain SE and E3-B's "
+          "share of the resamples beside; the markdown row shows both",
+          r2["plain"]["diff"] == p["P2"]["plain"]["diff"] and r2["decision"]["diff"] == p["P2"]["selection"]["diff_sel"]
+          and r2["selection"]["se_sel"] == p["P2"]["selection"]["se_sel"] and "share_B_chosen" in r2["plain"]
+          and "| D | D_sel |" in md and "Selection-corrected" in md
+          and ("| P2 | dev | E3B | D4F | %.4f | %.4f |" % (r2["plain"]["diff"], r2["decision"]["diff"])) in md,
+          {k: r2.get(k) for k in ("plain", "selection")})
+    check("C_D3 is P4's record (V3F.5 D3: the same comparison): same D, SE, seed text and z; no second bootstrap",
+          c3["same_as"] == "P4" and c3["decision"] == p4["decision"] and c3["image"] == p4["image"]
+          and doc["challengers"]["comparisons"]["D3"]["image"]["seed_text"] == "inc2/v3fam/P4/image", c3.get("image"))
+    ts = json.loads((C.INC_DIR / "capacity" / VR.EXTERNAL).read_text())["tier_s"]
+    check("Tier S's array readings: D1's species subsets on ood22 (8 species) and ood23 (3) decided with the larger "
+          "SE; the stage-1 readings and D5b's not run here, with their reasons (no labels, no D5b scores)",
+          ts["S_tsb_over_a12_ood22_8sp"]["status"] == "decided"
+          and ts["S_tsb_over_a12_ood22_8sp"]["species"] == list(VR.OOD22_SPECIES_100)
+          and ts["S_tsb_over_a12_ood23_3sp"]["status"] == "decided" and ts["S_tsb_over_a12_ood23_3sp"]["se_rule"] == "max"
+          and doc["tier_s"]["S_s1_tsf_over_e1a"]["status"] == "not run"
+          and ts["S_d5b_copy_hflip"]["status"] == "not run" and "S_d3_stage1_over_e3b" in doc["tier_s"],
+          {k: (v.get("status"), str(v.get("why"))[:80]) for k, v in ts.items()})
     return doc
 
 
@@ -285,9 +317,33 @@ def t_not_run_and_dev_minus_h():
           and doc["reads"]["bclean_triggered"] is True
           and len([o for o in doc["reads"]["order"] if o["kind"] == "challenger"]) <= 2, (p["P1"].get("why"),
                                                                                        doc["reads"]))
-    check("D0-S's dev branch: decided on dev minus H (22 of 24 images), the full dev beside",
+    check("D0-S's dev branch: decided on dev minus H (22 of 24 images), the full dev beside every dev comparison "
+          "(P1-P5, Tier C, Tier S on dev)",
           doc["decided_on"] == "dev minus H" and doc["dev_minus_h"]["n_images"] == 22
-          and p["P2"]["n_images"] == 22 and doc["full_dev_beside"]["P2"]["status"] == "decided", doc["dev_minus_h"])
+          and p["P2"]["n_images"] == 22 and doc["full_dev_beside"]["P2"]["status"] == "decided"
+          and all("C_%s" % a in doc["full_dev_beside"] for a in F.CHALLENGERS)
+          and doc["full_dev_beside"]["C_D4F"]["status"] == "decided"
+          and doc["full_dev_beside"]["S_ref_over_d8m"]["status"] == "decided"
+          and doc["full_dev_beside"]["C_D3"]["same_as"] == "P4"
+          and doc["challengers"]["comparisons"]["D4F"]["n_images"] == 22, sorted(doc["full_dev_beside"])[:6])
+    e3 = doc["e3_reread"]
+    xr = [a for _d, a in SYS.family_runs("E3B", "dev")]
+    yr = [a for _d, a in SYS.family_runs("REF", "dev")]
+    keep = VR.dev_keep(VR.d0s_trigger())
+    want = F.comparison("E3_B_over_ref", [d["species_map50_95"] for d, _a in SYS.family_runs("E3B", "dev")],
+                        [d["species_map50_95"] for d, _a in SYS.family_runs("REF", "dev")], xr, yr,
+                        sessions=VR.sessions("dev"), resamples=RESAMPLES, keep=keep,
+                        image_seed_text=TS.SPECIES_SEED_TEXT)
+    check("E3's recorded dev comparisons re-read on dev minus H from E3RS's arrays (E3-M, E3-A, E3-B over the "
+          "reference under E3's species seed text, E3-B over E3-A under its attribution text), the full dev beside, "
+          "reported only", sorted(e3["dev_minus_h"]) == ["E3_A_over_ref", "E3_B_over_A", "E3_B_over_ref",
+                                                         "E3_M_over_ref"]
+          and e3["dev_minus_h"]["E3_B_over_ref"]["n_images"] == 22
+          and abs(e3["dev_minus_h"]["E3_B_over_ref"]["diff"] - want["diff"]) < 1e-12
+          and e3["dev_minus_h"]["E3_B_over_ref"]["image"]["seed_text"] == "inc2/e3/species_se"
+          and e3["dev_minus_h"]["E3_B_over_A"]["image"]["seed_text"] == "inc2/e3/attribution_se"
+          and e3["full_dev"]["E3_M_over_ref"]["status"] == "decided"
+          and "E3_B_over_ref" not in doc["primaries"], sorted(e3.get("dev_minus_h") or {}))
 
 
 def write_verdict(order=(("D6", "reference"), ("D8M", "reference"), ("D4N", "challenger"))):
@@ -405,12 +461,187 @@ def t_report_and_retest():
             sha = SC.save_npz(d / "x.images.npz", arrays)
             (d / jn).write_text(json.dumps({"images": {"name": "x.images.npz", "sha256": sha}}))
     e0 = refused(VR.reanalyse_test, "delegate", env={"INCAP_DECIDED_BY": "human:x"})
-    rec = VR.reanalyse_test("delegate", env={"INCAP_DECIDED_BY": "assistant:claude-delegate"})
+    write_verdict(order=(("D6", "reference"), ("D8M", "reference"), ("D4F", "challenger")))
+    ep = refused(VR.reanalyse_test, "delegate", env={"INCAP_DECIDED_BY": "assistant:claude-delegate"})
+    check("the re-analysis is the last of the reads: refused while D4F's read (third in the order) is neither "
+          "prepared nor recorded not run, writing nothing", ep is not None and "D4F" in str(ep)
+          and not (C.INC_DIR / "capacity" / VR.RETEST).exists(), ep)
+    F.write_once(F.cap_dir() / "test_read_D4F.json", {"format": F.FMT_CAP, "status": F.NOT_RUN_CAP})
+    pdir = C.INC_DIR / "_campaign" / "provenance"
+    pdir.mkdir(parents=True, exist_ok=True)
+    (pdir / "v3fam_retest.json").write_text(json.dumps({"attempts": [{"job_id": "777",
+                                                                      "started_utc": "2026-10-12T00:00:00Z"}]}))
+    near = 260.0 - 0.1 - 2 * VR.READ_GPUH - 0.05            # D6's and D8-m's prepared reads count at 0.5 each
+    (pdir / "v3fam_score_d9.json").write_text(json.dumps({"attempts": [
+        {"started_utc": "2026-10-12T00:00:00Z", "finished_utc": "2026-10-12T00:00:00Z"}]}))
+    real = VR._hours
+    VR._hours = lambda a, b: near if (a, b) == ("2026-10-12T00:00:00Z", "2026-10-12T00:00:00Z") else real(a, b)
+    try:
+        rec = VR.reanalyse_test("delegate", env={"INCAP_DECIDED_BY": "assistant:claude-delegate",
+                                                 "SLURM_JOB_ID": "777"})
+    finally:
+        VR._hours = real
     e1 = refused(VR.reanalyse_test, "delegate", env={"INCAP_DECIDED_BY": "assistant:claude-delegate"})
-    check("the re-analysis: refused for another submitter; O4's stratum of E3-A, E3-M, E3-B and the reference from "
-          "E3's stored arrays (no inference); once", e0 is not None and rec["stratum_images"] == 10
+    check("the re-analysis: refused for another submitter; once every read is prepared or recorded not run, O4's "
+          "stratum of E3-A, E3-M, E3-B and the reference from E3's stored arrays (no inference), its own running "
+          "attempt not counted twice against the cap (%.2f + 0.1 fits); once" % (near + 2 * VR.READ_GPUH),
+          e0 is not None and rec["stratum_images"] == 10 and rec["reads_before"] == ["D6", "D8M", "D4F"]
           and all(rec["arms"][k]["status"] == "ok" for k in ("A", "M", "B", "reference")) and e1 is not None,
           (e0, rec.get("arms", {}).get("A")))
+    for n in ("v3fam_retest.json", "v3fam_score_d9.json"):
+        (pdir / n).unlink()
+
+
+def real_dev():
+    """Real dev images (64 x 48 JPEGs) and labels (two boxes each), the dev manifest rewritten to them."""
+    from PIL import Image
+    d = TMP / "real_dev"
+    (d / "images").mkdir(parents=True, exist_ok=True)
+    (d / "labels").mkdir(parents=True, exist_ok=True)
+    rows = []
+    for i, k in enumerate(keys_for("dev", SIZES["dev"])):
+        ip, lp = d / "images" / ("%s.jpg" % k), d / "labels" / ("%s.txt" % k)
+        Image.new("RGB", (64, 48), ((7 * i) % 255, 90, 40)).save(str(ip))
+        lp.write_text("0 0.25 0.5 0.2 0.4\n1 0.7 0.5 0.3 0.5\n")
+        rows.append({"key": k, "image": str(ip), "label": str(lp), "label_sha256": C.sha256_file(lp),
+                     "sha256": "%064x" % i, "session": DEV_SESSIONS[i % 8], "source": "s"})
+    write_manifest(C.manifest_path("dev"), rows)
+    VR._GT.clear()
+    return rows
+
+
+GT_PX = np.asarray([[9.6, 14.4, 22.4, 33.6], [35.2, 12.0, 54.4, 36.0]])
+
+
+def put_s1(dirname, seed, jitter, offset=0.0, ens=None, n_boxes=None):
+    """A dev score whose stage-1 record holds, per image, both GT boxes moved by `jitter` px and one false box;
+    its recorded stage-1 agnostic AP the validator's way (Ultralytics' match, collapsed_ap on the rows as they
+    are), plus `offset`."""
+    import torch
+    from ultralytics.utils.metrics import box_iou
+    from weed_optimizer_framework.tools.inc import scorer as S
+    keys = sorted(keys_for("dev", SIZES["dev"]))
+    rng = np.random.default_rng(31 + int(1000 * jitter) + (seed or 0))
+    xyxy, q, img, tps = [], [], [], []
+    match = F.default_match()
+    for i, _k in enumerate(keys):
+        b = np.vstack([GT_PX + rng.normal(0, jitter, GT_PX.shape), [[0.0, 0.0, 6.0, 6.0]]])
+        c = np.round(rng.random(3), 3)
+        xyxy.append(b)
+        q.append(c)
+        img.append(np.full(3, i, dtype=np.int64))
+        tps.append(np.asarray(match(box_iou(torch.as_tensor(GT_PX), torch.as_tensor(b))), dtype=bool))
+    s1 = {"keys": np.asarray(keys), "img": np.concatenate(img), "xyxy": np.concatenate(xyxy), "q": np.concatenate(q)}
+    rec = S.collapsed_ap(np.concatenate(tps, 0), np.concatenate(q), 2 * len(keys))[0]
+    d = SYS.system_dir(dirname, seed, ens)
+    shutil.rmtree(str(d), ignore_errors=True)
+    arrays = synth("dev", seed if seed is not None else 9, 0.0)
+    doc = {"format": F.FMT_SCORE, "family": F.NAME, "dir": dirname, "seed": seed, "exam": "dev", "variant": None,
+           "species_map50_95": F.statistic_value(arrays, "species"), "stage1": {"agnostic_map50_95": rec + offset},
+           "n_boxes": 2 * len(keys) if n_boxes is None else n_boxes}
+    F.commit_pass(d, "dev", doc, {"arrays": arrays, "stage1": s1})
+    return rec
+
+
+def t_arrays_and_cap_argv():
+    print("Tier S's array readings, D0-S's declaration, the ticker's cap refusals")
+    import functools
+    reset()
+    build_manifests()
+    build_scores()
+    real_dev()
+    rec = {}
+    for name, jit in (("D4F", 1.0), ("E3A", 3.0), ("E3B", 2.0)):
+        rec[name] = [put_s1(name, s, jit + 0.2 * s) for s in F.SEEDS]
+    rec["D3"] = [put_s1("D3", None, 0.8, ens="ens")]
+    real = F.comparison
+    F.comparison = functools.partial(real, resamples=RESAMPLES)
+    try:
+        c1 = VR.compare("S_s1_tsf_over_e1a", "dev", "D4F", "E3A", "image", "stage1")
+        c2 = VR.compare("S_d3_stage1_over_e3b", "dev", "D3", "E3B", "one_system", "stage1")
+        put_s1("E3A", 0, 3.0, offset=0.01)
+        c3 = VR.compare("S_s1_tsf_over_e1a", "dev", "D4F", "E3A", "image", "stage1")
+        put_s1("E3B", 2, 2.4, n_boxes=5)
+        c3b = VR.compare("S_s1_tsf_over_e1b", "dev", "D4F", "E3B", "image", "stage1")
+        e_rm = refused(VR.copy_keys, "hflip")
+        plan = [[k, i, VR.COPY_FAMILIES[i % 4]] for i, k in enumerate(sorted(keys_for("probe", SIZES["probe"])))]
+        drop = "v3fam_d5b_copy__%s" % plan[3][0]
+        from weed_optimizer_framework.tools.inc2 import v3fam_data as VD
+        TS._write_json(VD._summary_path(), {"format": VD.FORMAT, "status": "complete",
+                                            "copies": {"plan": plan, "dropped": [drop]},
+                                            "d0s": {"removal_keys": ["b1", "b2", "nd1"], "removal_sha256": "ab" * 32,
+                                                    "d6_staging_removals": ["nd1"]}})
+        c4 = VR.run_spec(("S_d5b_copy_hflip", "probe", "D5B100", "D5B0", "max", "copy:hflip", None, None), None)
+        c5 = VR.run_spec(("S_d5b_copy_jpeg75", "probe", "D5B100", "D5B0", "max", "copy:jpeg75", None, None), None)
+    finally:
+        F.comparison = real
+    check("stage-1 agnostic readings: each side's committed stage-1 boxes matched again to dev's labels equal the "
+          "recorded value (within %g); D4's detector against E1-A's boxes decided with the image rule; D3's fused "
+          "set against E3-B's seeds as one system, each seed's difference beside" % VR.STAGE1_RECOMPUTE_TOL,
+          c1["status"] == "decided" and c1["statistic"] == "agnostic"
+          and max(abs(a - b) for a, b in zip(c1["x_values"], rec["D4F"])) <= VR.STAGE1_RECOMPUTE_TOL
+          and c1["stage1_recompute"]["x"]["max_abs_diff"] <= VR.STAGE1_RECOMPUTE_TOL
+          and c2["status"] == "decided" and c2["decision"]["one_system"] and len(c2["x_minus_each_y"]) == 3,
+          (c1.get("why"), c2.get("why"), c1.get("x_values"), rec["D4F"]))
+    check("  a recorded stage-1 value 0.01 off what its boxes give, or a score that counted other GT boxes than the "
+          "labels hold: the reading is not run, with the reason", c3["status"] == "not run" and "apart" in str(c3["why"])
+          and c3b["status"] == "not run" and "labels hold" in str(c3b["why"]), (c3.get("why"), c3b.get("why")))
+    fam_keys = [k for k, _i, f in plan if f == "hflip" and "v3fam_d5b_copy__%s" % k != drop]
+    check("D5b per copy family: refused without the family data summary; then dose 1.0 over dose 0 on the probe "
+          "images whose kept copy is of that family (hflip: %d of 5, one copy dropped), the larger SE" % len(fam_keys),
+          e_rm is not None and c4["status"] == "decided" and c4["n_images"] == len(fam_keys) == 4
+          and c4["subset"]["n_images"] == 4 and c4["se_rule"] == "max" and c5["n_images"] == 5,
+          (e_rm, c4.get("why"), c4.get("n_images"), c5.get("n_images")))
+    rm = VR.d0s_removals()
+    d1 = VR.declared("E3B", "D4F", rm)
+    d2 = VR.declared("D2LAION", "E3B", rm)
+    d3 = VR.declared("REF", "D8M", rm)
+    d4 = VR.declared("D6", "REF", dict(rm, base_v2_rows=0))
+    d5 = VR.declared("D6", "REF", rm)
+    check("D0-S's removals declared beside: a family-trained side lost the rows, the comparator was not retrained; "
+          "E3's crops keep the base_v2 rows' crops (Revision 31); nothing for two comparators off E3's crops, nor for "
+          "a base_v2-built side (D6) when no removed row is base_v2's",
+          rm == {"rows": 3, "sha256": "ab" * 32, "base_v2_rows": 1} and "TS-F" in d1 and "not retrained" in d1
+          and "Revision 31" in d2 and d3 is None and d4 is None and "RF-DETR-L" in (d5 or "")
+          and VR.declared("E3B", "D4F", None) is None, (rm, d1, d2, d3, d4, d5))
+    got = VR.record_ticker_refusals(["build:D4F", "score:D2CLIP", ""])
+    e_bad = refused(VR.record_ticker_refusals, ["score:../x"])
+    sd = VR.side("D4F", "dev")
+    check("the ticker's cap refusals passed in the verdict's argv: written once under v3fam/v1/cap (an existing one "
+          "kept), so a refused build's score arm and a refused score arm read 'not run (family cap)'; a name that is "
+          "not a family item refuses", got == ["build:D4F", "score:D2CLIP"] and VR.cap_refused("build:D4F")
+          and VR.arm_status("D4F") == F.NOT_RUN_CAP and VR.arm_status("D2CLIP") == F.NOT_RUN_CAP
+          and VR.arm_status("D4N") == "complete" and VR.record_ticker_refusals(["build:D4F"]) == ["build:D4F"]
+          and e_bad is not None, (got, VR.arm_status("D4F"), sd.get("why"), e_bad))
+    VR.record_ticker_refusals(["data"])
+    check("  a refused data build makes every arm that scores a build or D6 'not run (family cap)', never E3RS or D2",
+          VR.arm_status("D1") == F.NOT_RUN_CAP and VR.arm_status("D6") == F.NOT_RUN_CAP
+          and VR.arm_status("E3RS") == "complete" and VR.arm_status("D2LAION") == "complete",
+          {a: VR.arm_status(a) for a in ("D1", "D6", "E3RS", "D2LAION")})
+    base = VR.dev_passes()["by_kind"]
+    F.write_once(F.equiv_dir() / "dev_identity.json", {"per": {"0": {}, "1": {}, "2": {}}})
+    F.write_once(F.equiv_dir() / "injection.json", {"per": {"0": {}}})
+    for k in ("LAION", "CLIP"):
+        F.write_once(F.root() / "d2" / k / "dev_gt.json", {"top1": 0.9})
+    F.write_once(F.root() / "d2" / "FT" / "dev_gt.s0.json", {"top1": 0.9})
+    TS._write_json(TS.root() / "sensitivity.json", {"arms": {a: {"values": [0.1] * 5} for a in ("M", "A", "B")}})
+    for exp in ("v3_d5b_0_m640", "v3_d4_f_m640"):
+        for rid in ("base__s0", "final__base__s0"):
+            p_ = C.INC_DIR / exp / "runs" / rid / "scores" / "dev.json"
+            p_.parent.mkdir(parents=True, exist_ok=True)
+            p_.write_text("{}")
+    dp = VR.dev_passes()
+    check("the dev pass count by kind (V3F.3.5): the committed family scores, D2's ground-truth passes (3), D9a's "
+          "fold passes (15), the reproductions (dev identity 3, injection 2) and the builds' protocol dev scores, "
+          "D5b's included (4)", dp["by_kind"] == dict(base, d2_gt=3, d9a=15, reproductions=5, builds_protocol=4)
+          and dp["total"] == sum(dp["by_kind"].values()), dp)
+    (TS.root() / "sensitivity.json").unlink()
+    for exp in ("v3_d5b_0_m640", "v3_d4_f_m640"):
+        shutil.rmtree(str(C.INC_DIR / exp))
+    VD._summary_path().unlink()
+    shutil.rmtree(str(F.cap_dir()), ignore_errors=True)
+    build_manifests()
+    VR._GT.clear()
 
 
 def t_spend():
@@ -423,16 +654,39 @@ def t_spend():
     (pdir / "v3fam_v1.json").write_text(json.dumps({"attempts": [{"started_utc": "2026-10-12T04:00:00Z"}]}))
     (pdir / "e3_score_m.json").write_text(json.dumps({"attempts": [
         {"started_utc": "2026-10-12T00:00:00Z", "finished_utc": "2026-10-13T00:00:00Z"}]}))
+    shutil.rmtree(str(F.root() / "test"), ignore_errors=True)
     sp = VR.spend()
     check("spend: a family job's finished attempt at its wall time (3 h), a running one at its estimate (the verdict's "
           "0.5), never a non-family job (E3's)", abs(sp["gpuh"] - 3.5) < 1e-9 and len(sp["items"]) == 2, sp)
     ps = VR.person_spend()
     check("  the person steps alone: none here", ps["gpuh"] == 0.0 and ps["items"] == [], ps)
+    (pdir / "v3fam_score_e3rs.json").write_text(json.dumps({"attempts": [
+        {"started_utc": "2026-10-12T00:00:00Z", "finished_utc": "2026-10-12T03:00:00Z"},
+        {"started_utc": "2026-10-12T04:00:00Z", "finished_utc": "2026-10-12T05:00:00Z"}]}))
+    sp2 = VR.spend()
+    check("  a retried job: both attempts count (3 h + 1 h), the first never replaced by the second",
+          abs(sp2["gpuh"] - 4.5) < 1e-9, sp2)
+    for arm in ("D6", "D8M"):
+        F.write_once(VR.test_dir(arm) / "read.json", {"format": VR.FMT_READ, "arm": arm})
+    sp3 = VR.spend()
+    (pdir / "v3famtest_d6.json").write_text(json.dumps({"attempts": [{"started_utc": "2026-10-12T06:00:00Z"}]}))
+    sp4 = VR.spend()
+    ps4 = VR.person_spend()
+    sp5 = VR.spend_items(exclude_job="91")
+    (pdir / "v3fam_v1.json").write_text(json.dumps({"attempts": [{"job_id": "91",
+                                                                  "started_utc": "2026-10-12T04:00:00Z"}]}))
+    sp6 = VR.spend_items(exclude_job="91")
+    check("  reads prepared by test-read and not yet submitted count at their estimate (0.5 each); once a read's "
+          "score-test job has an attempt, that attempt counts instead (never both); the asking job's own running "
+          "attempt is left out", abs(sp3["gpuh"] - 5.5) < 1e-9 and abs(sp4["gpuh"] - 5.5) < 1e-9
+          and sum(1 for i in sp4["items"] if i["item"].endswith(":prepared")) == 1
+          and abs(ps4["gpuh"] - 1.0) < 1e-9 and len(sp6) == len(sp5) - 1, (sp3["gpuh"], sp4["gpuh"], ps4))
+    shutil.rmtree(str(F.root() / "test"), ignore_errors=True)
 
 
 def main():
     for fn in (t_verdict, t_not_run_and_dev_minus_h, t_reads, t_submitter_and_score_test, t_report_and_retest,
-               t_spend):
+               t_arrays_and_cap_argv, t_spend):
         try:
             fn()
         except Exception as e:                   # noqa: BLE001

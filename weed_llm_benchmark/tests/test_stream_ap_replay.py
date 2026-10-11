@@ -1802,7 +1802,7 @@ def s_r0():
     # the platform in V3F.7's order, each once, within the envelope (L23K on TRAIN beside the MAINT items)
     w.v3fam_ready(e3_verdict=False)
     fam = w.dom["v3fam"]
-    for _ in range(90):
+    for _ in range(120):
         w.tick()
         w.v3fam_cluster()
         if ((w.state().get("v3fam") or {}).get("items") or {}).get("verdict", {}).get("state") == "done":
@@ -1812,11 +1812,12 @@ def s_r0():
                                         + 1]) for e in w.events("proposed") if e.get("lever") in S.V3FAM_LEVERS]
     fex = [e.get("basis") for e in w.events("executed") if e.get("lever") in S.V3FAM_LEVERS]
     want_f = ([("L23H", "build")] + [("L23J", a) for a in fam["pre_build_scores"]]
-              + [("L23I", a) for a in ("D8M", "D8S", "D4F", "D4N", "D4R15", "D1A1", "D1B1", "D1A12")]
-              + [("L23J", a) for a in ("D8", "D4F", "D4N", "D4R15", "D1", "D6")] + [("L23L", "verdict")])
+              + [("L23I", a) for a in ("D8M", "D8S", "D4F", "D4N", "D4R15", "D1A1", "D1B1", "D1A12", "D5B0", "D5B25",
+                                       "D5B100")]
+              + [("L23J", a) for a in ("D8", "D4F", "D4N", "D4R15", "D1", "D5B", "D6")] + [("L23L", "verdict")])
     check("V3F: then the family's levers, each item once, within the envelope: L23H, L23J for E3RS, D2's nine, D3 and "
-          "D9, L23I for D8M, D8S, D4F, D4N, D4R15, D1A1, D1B1, D1A12 (D5b blocked, BCLEAN not triggered), L23J for D8, "
-          "D4F, D4N, D4R15, D1, D6, then L23L; on TRAIN L23K's smoke and its three seeds",
+          "D9, L23I for D8M, D8S, D4F, D4N, D4R15, D1A1, D1B1, D1A12, D5B0, D5B25, D5B100 (BCLEAN not triggered), L23J "
+          "for D8, D4F, D4N, D4R15, D1, D5B, D6, then L23L; on TRAIN L23K's smoke and its three seeds",
           [x for x in fpro if x[0] != "L23K"] == want_f and [x for x in fpro if x[0] == "L23K"]
           == [("L23K", "smoke"), ("L23K", "0,1,2")] and fex == ["envelope"] * len(fpro), (fpro, fex))
     w.tick(2)

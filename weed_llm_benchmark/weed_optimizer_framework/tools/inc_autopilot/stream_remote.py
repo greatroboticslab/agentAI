@@ -30,9 +30,11 @@ prints exactly one "INCAP <json>" line (remote.emit).
         <pkg>.base3 build, <pkg>.pilot4 build; V3F, 2026-10-11: <pkg>.v3fam_data build,
         <pkg>.v3fam score --arm X|verdict, <pkg>.baseline build --exp E --v3fam ARM
         --seeds 0,1,2 --role baseline; a person's score-test, reanalyse-test and the
-        D0-S sweep are refused); detr (run_inc2_detr.sh <pkg>.v3fam_detr smoke | train
-        --seeds 0,1,2: D6's RF-DETR jobs, L23K; train submits the three seed jobs,
-        inc_detr_v3fam_s0..s2, and returns their ids; refused while any is queued);
+        D0-S sweep are refused; verdict takes --cap-refused ITEM,... the ticker refused at
+        the family cap); detr (run_inc2_detr.sh <pkg>.v3fam_detr smoke | train
+        --seeds S: D6's RF-DETR jobs, L23K; train submits one job per seed named,
+        inc_detr_v3fam_s<k> (0,1,2 first; a retry names only the seeds not yet
+        trained), and returns their ids; refused while any is queued);
         zoo (run_inc2_zoo.sh submit: the model-zoo
         audit, L23Z, 2026-10-04: the script itself runs on the login node and submits its
         chain of five jobs; the last INCZOO line carries their ids; refused while any of the
@@ -116,6 +118,12 @@ E3_JOB_NAME = "inc_build_e3_v1"
 V3FAM_DATA_JOB_NAME = "inc_build_v3fam_data"
 V3FAM_SCORE_JOB_NAME = "inc_build_v3fam_score_%s"
 V3FAM_JOB_NAME = "inc_build_v3fam_v1"
+# L23K's train names the seeds it submits: 0,1,2 first, and on a retry only those not yet trained (a seed already
+# trained refuses a second training, so resubmitting it would fail the retry whatever the others do)
+V3FAM_DETR_SEEDS_RE = re.compile(r"(0,1,2|0,1|0,2|1,2|0|1|2)\Z")
+# L23L's --cap-refused: the family items (stream.py _v3fam_key) the ticker recorded "not run (family cap)"
+V3FAM_CAP_ITEMS_RE = re.compile(r"(data|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))"
+                                r"(,(data|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))){0,39}\Z")
 V3FAM_DETR_JOB_NAMES = {"smoke": ("inc_detr_v3fam_smoke",),
                         "train": ("inc_detr_v3fam_s0", "inc_detr_v3fam_s1", "inc_detr_v3fam_s2")}
 V3FAM_SCORE_ARMS = ("E3RS", "D2LAION", "D2CLIP", "D2DINOL", "D2DINOB", "D2SIGLIP", "D2RN50", "D2BC1", "D2BC2640",
@@ -867,7 +875,7 @@ BUILD_FLAGS = {
     ("twostage", "verdict"): {},
     ("v3fam_data", "build"): {},
     ("v3fam", "score"): {"--arm": ("arm", _ENUM(*V3FAM_SCORE_ARMS))},
-    ("v3fam", "verdict"): {},
+    ("v3fam", "verdict"): {"--cap-refused": ("cap_refused", V3FAM_CAP_ITEMS_RE)},
     ("baseline", "rescore-agnostic"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
     ("base3", "build"): {"--stream": ("stream", _NAME)},
     ("pilot4", "build"): {"--exp": ("exp", _NAME), "--from": ("from_exp", _NAME), "--recipes": ("recipes", _RECIPES)},
@@ -893,7 +901,7 @@ REQUIRED = {("collect", "fetch"): ("source", "max_bytes"), ("collect", "intake")
             ("baseline", "rescore-agnostic"): ("exp", "reference"), ("base3", "build"): ("stream",),
             ("pilot4", "build"): ("exp", "from_exp", "recipes"), ("twostage", "score-arm"): ("arm",),
             ("v3fam", "score"): ("arm",), ("v3fam_detr", "train"): ("seeds",)}
-DETR_FLAGS = {("v3fam_detr", "smoke"): {}, ("v3fam_detr", "train"): {"--seeds": ("seeds", _ENUM("0,1,2"))}}
+DETR_FLAGS = {("v3fam_detr", "smoke"): {}, ("v3fam_detr", "train"): {"--seeds": ("seeds", V3FAM_DETR_SEEDS_RE)}}
 
 
 def parse_submit(kind, args):
@@ -956,12 +964,21 @@ def parse_submit(kind, args):
     raise R.Refused("stream-submit kind %r is not one of %s" % (kind, sorted(SCRIPTS)))
 
 
+def detr_job_names(req):
+    """The job names of an L23K submission: the smoke's, or one per seed named by --seeds (ascending)."""
+    names = list(V3FAM_DETR_JOB_NAMES[req["verb"]])
+    if req["verb"] != "train":
+        return names
+    want = str(req["params"].get("seeds") or "").split(",")
+    return [n for n in names if n.rsplit("_s", 1)[1] in want]
+
+
 def job_name(req, meta):
     p = req["params"]
     if req["kind"] == "zoo":
         return ZOO_JOB_NAMES[0] % p["version"]
     if req["kind"] == "detr":
-        return V3FAM_DETR_JOB_NAMES[req["verb"]][0]
+        return detr_job_names(req)[0]
     if req["kind"] == "build":
         if (req["module"], req["verb"]) == ("baseline", "rescore-native"):
             # it builds nothing: its own name, never the arm's build job's (inc_build_<exp>)
@@ -1016,7 +1033,7 @@ def stream_submit(kind, args, meta=None, dry_run=False):
         elif kind == "detr":
             # V3F's D6 (L23K): the smoke, or the three seed jobs, each its own sbatch of run_inc2_detr.sh
             sbatch = os.environ.get("INCAP_SBATCH", "sbatch")
-            names = list(V3FAM_DETR_JOB_NAMES[req["verb"]])
+            names = detr_job_names(req)
             argvs = []
             for n in names:
                 tail = req["script_args"] + (["--seed", n.rsplit("_s", 1)[1]] if req["verb"] == "train" else [])

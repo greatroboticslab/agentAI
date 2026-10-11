@@ -16,9 +16,16 @@ valid/ holds the round(0.02 x 6,811) = 136 rows with the smallest
 stable_int("inc2/v3fam/d6/valid/<key>"), which are also in train/ (the
 training data is exactly base_v2; their per-epoch numbers are never used);
 data.yaml names the 13 INC classes. No test/ folder: a directory named test
-anywhere in the tree refuses, and so does any image of dev, test,
-ImageWeeds, ood22, ood23 or the probe (by key, image sha256 or resolved
-path). EXIF: rfdetr 1.6.5.post0 reads YOLO folders through supervision and
+anywhere in the tree refuses, and so does any image of dev, test or
+ImageWeeds (the exams D6 is scored or read on: by key, image sha256 or
+resolved path) and any staged file resolving into a materialised exam
+(INC_DIR/exams), the probe's root or the zoo's root (Revision 29: ood22's
+and ood23's images and the probe's are base_v2's own rows, which train/
+holds by V3F.5 D6; how many base_v2 rows they share is recorded). D0-S's
+confirmed copies leave train/ (V3F.3.7 item 4): staging requires D0-S's
+complete record and drops the base_v2 rows on its removal list (the family
+data summary's d6_staging_removals, when it exists, must agree), recording
+them; valid/ is drawn from what is left. EXIF: rfdetr 1.6.5.post0 reads YOLO folders through supervision and
 OpenCV; the read-only rehearsal (V3F.8 item 3, rehearse-exif) decides
 EXIF_STAGING: "symlink" (OpenCV yields the EXIF-transposed frame the labels
 are in; checked again on the staged tagged images, or the staging refuses)
@@ -41,6 +48,10 @@ weights exactly. No checkpoint_best_* file is ever loaded. Each attempt
 trains into a fresh directory (s<k>/attempt_<n>/); after the export, and on
 any failure, the attempt removes the files it wrote there itself (last.ckpt,
 checkpoint_best_{regular,ema,total}.pth) and refuses to remove anything else.
+
+The smoke, each seed's training and the scoring run inside
+v3fam.e_trees_unchanged (V3F.3.7: E3's tree and capacity/e{1,2,3}_* hashed
+before and after; the job fails if either changed).
 
 Smoke (first): one epoch on the full staging (v3fam/v1/d6/smoke/), the same
 checks, no archive checkpoint and no test folder, the export equal to the
@@ -126,7 +137,8 @@ ROTATED_TAGS = (3, 6, 8)
 TRANSPOSED_JPEG = {"format": "JPEG", "quality": 100, "subsampling": 0}
 EXIF_MAD_TOL = F.EXIF_MAD_TOL                # grey levels
 EXIF_BOX_TOL = 1.0                           # px: the reader's label boxes against the transposed frame's
-HOLDOUT_EXAMS = ("dev", "test", "imageweeds", "ood22", "ood23")
+HOLDOUT_EXAMS = ("dev", "test", "imageweeds")     # the exams D6 is scored or read on (Revision 29)
+SHARED_EXAMS = ("ood22", "ood23")             # their images are base_v2's tsw22/tsw23 rows: staged, counted
 OWN_FILES = ("last.ckpt", "checkpoint_best_regular.pth", "checkpoint_best_ema.pth", "checkpoint_best_total.pth")
 ARCHIVE_RE = re.compile(r"\Acheckpoint_\d+(\.\w+)?\Z")      # the interval archive (checkpoint_{epoch})
 FINAL = "final_ema.pth"
@@ -214,18 +226,27 @@ def class_map(names):
 
 
 # ------------------------------------------------------------------ the holdout index (never staged)
+def foreign_roots():
+    """The directories no staged file may resolve into: every materialised exam (INC_DIR/exams), the probe's root
+    and the zoo's root (resolved)."""
+    return sorted({os.path.realpath(str(p)) for p in (C.INC_DIR / "exams", F.root_of("probe"),
+                                                       F.root_of("ooddev_v1"))})
+
+
+def _under(path, roots):
+    return any(path == r or path.startswith(r.rstrip(os.sep) + os.sep) for r in roots)
+
+
 def holdout_index():
-    """{keys, sha256s, paths (resolved)} of every image of dev, test, ImageWeeds, ood22, ood23 (LOCK v1's
-    manifests) and the probe (its root's manifest, when it exists). Only the key, image and sha256 fields are
+    """{keys, sha256s, paths (resolved), roots, counts} of every image of dev, test and ImageWeeds (LOCK v1's
+    manifests; the exams D6 is scored or read on) and the directories no staged file may resolve into
+    (foreign_roots). ood22's and ood23's images and the probe's are base_v2's own rows (Revision 29), which train/
+    holds: not in the index; shared_with_base counts them for the record. Only the key, image and sha256 fields are
     read; no label is opened."""
     keys, shas, paths, n = set(), set(), set(), {}
-    mans = [(e, C.manifest_path(e)) for e in HOLDOUT_EXAMS]
-    mans.append(("probe", F.root_of("probe") / "splits" / "v1" / "probe.jsonl"))
-    for exam, p in mans:
+    for exam in HOLDOUT_EXAMS:
+        p = C.manifest_path(exam)
         if not p.is_file():
-            if exam == "probe":
-                n[exam] = 0
-                continue
             raise F.V3famRefused("the holdout manifest of %s is missing (%s): staging cannot be checked" % (exam, p))
         rows = C.read_manifest(p)
         n[exam] = len(rows)
@@ -234,18 +255,46 @@ def holdout_index():
             if r.get("sha256"):
                 shas.add(str(r["sha256"]))
             paths.add(os.path.realpath(str(r["image"])))
-    return {"keys": keys, "sha256": shas, "paths": paths, "counts": n}
+    return {"keys": keys, "sha256": shas, "paths": paths, "roots": foreign_roots(), "counts": n}
+
+
+def shared_with_base(rows):
+    """{exam: base rows sharing a key, image sha256 or resolved path with it} for ood22, ood23 (LOCK v1) and the
+    probe (its root's manifest, when it exists): base_v2's own rows, staged (Revision 29), recorded."""
+    out = {}
+    mans = [(e, C.manifest_path(e)) for e in SHARED_EXAMS]
+    mans.append(("probe", F.root_of("probe") / "splits" / "v1" / "probe.jsonl"))
+    for exam, p in mans:
+        if not p.is_file():
+            out[exam] = None
+            continue
+        ks, ss, ps = set(), set(), set()
+        for r in C.read_manifest(p):
+            ks.add(str(r["key"]))
+            if r.get("sha256"):
+                ss.add(str(r["sha256"]))
+            ps.add(os.path.realpath(str(r["image"])))
+        out[exam] = sum(1 for r in rows if str(r["key"]) in ks or str(r.get("sha256")) in ss
+                        or os.path.realpath(str(r["image"])) in ps)
+    return out
 
 
 def holdout_hits(rows, hold):
-    """Rows that are holdout images (by key, image sha256 or resolved path)."""
-    return [r["key"] for r in rows if str(r["key"]) in hold["keys"] or str(r.get("sha256")) in hold["sha256"]
-            or os.path.realpath(str(r["image"])) in hold["paths"]]
+    """Rows that are holdout images (by key, image sha256 or resolved path) or whose image resolves into a foreign
+    root."""
+    out = []
+    for r in rows:
+        rp = os.path.realpath(str(r["image"]))
+        if str(r["key"]) in hold["keys"] or str(r.get("sha256")) in hold["sha256"] or rp in hold["paths"] \
+                or _under(rp, hold["roots"]):
+            out.append(r["key"])
+    return out
 
 
 def check_tree(root_, hold):
     """Refuse a staging or output tree holding a test folder, or a file or link resolving to a holdout image (by
-    its resolved path, or a staged name whose stem is a holdout key). Returns the number of entries seen."""
+    its resolved path, or a staged name whose stem is a holdout key) or into a foreign root. Returns the number of
+    entries seen."""
     root_ = Path(root_)
     seen = 0
     for dp, dns, fns in os.walk(str(root_)):
@@ -257,9 +306,34 @@ def check_tree(root_, hold):
             seen += 1
             p = os.path.join(dp, fn)
             stem = os.path.splitext(fn)[0]
-            if stem in hold["keys"] or os.path.realpath(p) in hold["paths"]:
-                raise F.V3famRefused("%s is a holdout image (key or path of %s): never staged" % (p, "an exam"))
+            rp = os.path.realpath(p)
+            if stem in hold["keys"] or rp in hold["paths"] or _under(rp, hold["roots"]):
+                raise F.V3famRefused("%s is a holdout image or resolves into an exam's root (%s): never staged"
+                                     % (p, rp))
     return seen
+
+
+def d0s_staging_removals(base_keys):
+    """(the base_v2 keys D0-S's confirmed copies remove from train/, the record) (V3F.3.7 item 4): D0-S's complete
+    record is required (inc2.v3fam_sweep.removal_keys); the removal list's base_v2 rows. When the family data
+    summary exists its d6_staging_removals must be the same list."""
+    from . import v3fam_data as VD
+    from . import v3fam_sweep as SW
+    try:
+        keys, sha = SW.removal_keys()
+    except SW.SweepRefused as e:
+        raise F.V3famRefused("D6 stages base_v2 minus D0-S's confirmed copies: %s" % e)
+    drop = sorted(set(keys) & set(base_keys))
+    summ = VD.read_summary()
+    if summ is not None:
+        want = sorted((summ.get("d0s") or {}).get("d6_staging_removals") or [])
+        if want != drop:
+            raise F.V3famRefused("the family data summary's d6_staging_removals (%d) differ from D0-S's removals "
+                                 "among base_v2 (%d)" % (len(want), len(drop)))
+    rec = SW.read_record() or {}
+    return drop, {"record_sha256": _sha(SW.sweep_dir() / "record.json"), "removal_sha256": sha,
+                  "removal_rows": len(keys), "dropped": drop, "n_dropped": len(drop),
+                  "dropped_sha256": C.sha256_text("\n".join(drop)), "h": len(rec.get("H") or [])}
 
 
 # ------------------------------------------------------------------ the backend (rfdetr 1.6.5.post0)
@@ -530,10 +604,16 @@ def stage(exif=None, rows=None, backend=None):
     keys = [r["key"] for r in rows]
     if len(set(keys)) != len(keys):
         raise F.V3famRefused("the base holds duplicate keys")
+    drop, d0s = d0s_staging_removals(keys)
+    if drop:
+        rows = [r for r in rows if r["key"] not in set(drop)]
+        keys = [r["key"] for r in rows]
+        log("D0-S's confirmed copies: %d base_v2 row(s) left out of train/ (V3F.3.7 item 4)" % len(drop))
     hold = holdout_index()
     hits = holdout_hits(rows, hold)
     if hits:
         raise F.V3famRefused("%d base row(s) are holdout images (e.g. %s): never staged" % (len(hits), hits[:3]))
+    shared = shared_with_base(rows)
     vk = set(valid_keys(rows))
     tags = {r["key"]: TS.header(r["image"])[0] for r in rows}
     tagged = [r for r in rows if tags[r["key"]] in ROTATED_TAGS]
@@ -594,7 +674,12 @@ def stage(exif=None, rows=None, backend=None):
                      "keys": sorted(vk), "keys_sha256": C.sha256_text("\n".join(sorted(vk))),
                      "subset_of_train": vk <= set(keys)},
            "exif": exif_rec, "data_yaml_sha256": C.sha256_file(final / "data.yaml"),
-           "holdout_check": {"exams": dict(hold["counts"]), "hits": 0},
+           "holdout_check": {"exams": dict(hold["counts"]), "hits": 0, "roots": hold["roots"],
+                             "base_v2_rows_shared_with": shared,
+                             "rule": "dev, test and ImageWeeds by key, sha256 and resolved path; nothing resolving into "
+                                     "INC_DIR/exams, the probe's root or the zoo's root; ood22's, ood23's and the "
+                                     "probe's images are base_v2's own rows and are staged (Revision 29)"},
+           "d0s": d0s,
            "test_folder": False, "class_names": list(CLASS_NAMES), "decided_by": F.DECIDED_BY,
            "code": F.code_shas(), "created_utc": _utc()}
     F.write_once(stage_record_path(), rec)
@@ -860,20 +945,23 @@ def smoke(backend=None, exif=None, rows=None):
     if (smoke_dir() / "smoke.json").exists():
         raise F.V3famRefused("%s exists: the smoke runs once" % (smoke_dir() / "smoke.json"))
     backend = default_backend(backend)
-    stage(exif=exif, rows=rows, backend=backend)
-    dest = smoke_dir() / FINAL
-    rec, _res = _train_attempt(backend, smoke_dir(), 0, SMOKE_EPOCHS, dest, smoke=True)
-    secs = float(rec["fit_seconds"])
-    proj = projection_h(secs)
-    ok = proj <= walltime_cap_h() + 1e-9
-    exp = rec["export"]
-    os.unlink(str(dest))                     # the smoke's export served its checks; written by this job
-    doc = {"format": FMT_SMOKE, "status": "complete" if ok else NOT_RUN_WALLTIME, "epoch_seconds": secs,
-           "projection_h": proj, "cap_h": walltime_cap_h(), "walltime_h": WALLTIME_H, "walltime_ok": ok,
-           "rule": "epoch time x %d + %.1f h <= %.1f x %.0f h" % (EPOCHS, OVERHEAD_H, WALLTIME_SHARE, WALLTIME_H),
-           "attempt": rec, "export_removed": {"file": exp["file"], "sha256": exp["sha256"]},
-           "versions": _versions(backend), "decided_by": F.DECIDED_BY, "code": F.code_shas(), "created_utc": _utc()}
-    F.write_once(smoke_dir() / "smoke.json", doc)
+    with F.e_trees_unchanged() as before:
+        stage(exif=exif, rows=rows, backend=backend)
+        dest = smoke_dir() / FINAL
+        rec, _res = _train_attempt(backend, smoke_dir(), 0, SMOKE_EPOCHS, dest, smoke=True)
+        secs = float(rec["fit_seconds"])
+        proj = projection_h(secs)
+        ok = proj <= walltime_cap_h() + 1e-9
+        exp = rec["export"]
+        os.unlink(str(dest))                 # the smoke's export served its checks; written by this job
+        doc = {"format": FMT_SMOKE, "status": "complete" if ok else NOT_RUN_WALLTIME, "epoch_seconds": secs,
+               "projection_h": proj, "cap_h": walltime_cap_h(), "walltime_h": WALLTIME_H, "walltime_ok": ok,
+               "rule": "epoch time x %d + %.1f h <= %.1f x %.0f h" % (EPOCHS, OVERHEAD_H, WALLTIME_SHARE, WALLTIME_H),
+               "attempt": rec, "export_removed": {"file": exp["file"], "sha256": exp["sha256"]},
+               "e_trees": {"files": len(before), "sha256": C.sha256_text(json.dumps(before, sort_keys=True))},
+               "versions": _versions(backend), "decided_by": F.DECIDED_BY, "code": F.code_shas(),
+               "created_utc": _utc()}
+    F.write_once(smoke_dir() / "smoke.json", doc)     # only once the E-series trees were found unchanged
     log("smoke: one epoch in %.0fs, projection %.1f h (cap %.1f h): %s" % (secs, proj, walltime_cap_h(),
                                                                          doc["status"]))
     return doc
@@ -909,11 +997,13 @@ def train(seed, backend=None):
     if pretrain_check()["sha256"] != sm["attempt"]["pretrain"]["sha256"]:
         raise F.V3famRefused("the pretrained file changed since the smoke")
     backend = default_backend(backend)
-    rec, _res = _train_attempt(backend, seed_dir(seed), seed, EPOCHS, final_path(seed), smoke=False)
-    doc = {"format": FMT_TRAIN, "arm": ARM, "seed": seed, "status": "done", "final": rec["export"],
-           "attempt": rec, "smoke_sha256": _sha(smoke_dir() / "smoke.json"), "versions": _versions(backend),
-           "decided_by": F.DECIDED_BY, "code": F.code_shas(), "created_utc": _utc()}
-    F.write_once(tj, doc)
+    with F.e_trees_unchanged() as before:
+        rec, _res = _train_attempt(backend, seed_dir(seed), seed, EPOCHS, final_path(seed), smoke=False)
+        doc = {"format": FMT_TRAIN, "arm": ARM, "seed": seed, "status": "done", "final": rec["export"],
+               "attempt": rec, "smoke_sha256": _sha(smoke_dir() / "smoke.json"), "versions": _versions(backend),
+               "e_trees": {"files": len(before), "sha256": C.sha256_text(json.dumps(before, sort_keys=True))},
+               "decided_by": F.DECIDED_BY, "code": F.code_shas(), "created_utc": _utc()}
+    F.write_once(tj, doc)                    # only once the E-series trees were found unchanged
     log("D6 seed %d trained: %s (%s), %.1f h" % (seed, FINAL, rec["export"]["sha256"][:12],
                                                  float(rec["fit_seconds"]) / 3600.0))
     return doc

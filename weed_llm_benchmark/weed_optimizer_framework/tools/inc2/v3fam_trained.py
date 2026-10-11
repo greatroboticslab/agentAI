@@ -22,11 +22,13 @@ train_core, inc2.v3fam_systems.d8_build_kwargs); seeds 0-2; role baseline;
 finals dev and ImageWeeds (D1, D4, D8, BCLEAN). exp.json carries a v3fam
 record (format inc2-v3fam-build/1: the arm, the manifest and the summary by
 sha256, the recipe's name), which inc2.train.v3fam_problems checks for the
-arms at equal compute. D5b's three builds refuse (D5B_CONFLICT): V3F.6.1
-gives them no finals and V3F.5 D5b says they never read dev, while the
-pinned driver (inc/driver.py, unchanged) requires dev among a definition's
-finals and scores dev in every base run. They wait for a Revision; nothing
-here works around the pinned driver.
+arms at equal compute. D5b's three builds have the finals dev only
+(D5B_FINALS; Revision 30 of the amendment): the pinned driver (inc/driver.py,
+unchanged) requires dev among a definition's finals and scores dev in every
+base run, so D5b's runs carry the driver's own protocol dev scores; the
+family never reads, compares or reports them (their sources here never open
+a D5b run's scores/dev.json; D5b is scored on the probe only), and they are
+counted among the family's dev passes. No ImageWeeds, no test.
 
 D4 and BCLEAN (score_d4; V3F.5 D4, D0-S): each seed's base run (the final
 run's weights, its recorded protocol dev score) through the family
@@ -97,6 +99,7 @@ D5B_BUILDS = ("D5B0", "D5B25", "D5B100")
 SCORE_BUILDS = {"D1": D1_BUILDS, "D4F": ("D4F",), "D4N": ("D4N",), "D4R15": ("D4R15",), "D5B": D5B_BUILDS,
                 "BCLEAN": ("D0BCLEAN",)}
 FINALS = ("dev", "imageweeds")               # D1, D4, D8 and BCLEAN (V3F.6.1)
+D5B_FINALS = ("dev",)                        # D5b: the pinned driver's minimum, never read by the family (Revision 30)
 ROLE = "baseline"
 NMS = TS.NMS["B"]                            # one-class detectors' boxes, taken as E3-B's (locked NMS)
 NMS_REF = "B"
@@ -109,10 +112,6 @@ D1_PIN = "v3fam_d1_classifier_pin.json"      # under capacity/
 FMT_BUILD = SYS.FMT_D8                       # "inc2-v3fam-build/1"
 FMT_D1_CLASSIFIER = "inc2-v3fam-d1-classifier/1"
 FMT_D1_PIN = "inc2-v3fam-d1-classifier-pin/1"
-D5B_CONFLICT = ("D5b's builds (V3F.6.1: 'none for D5B*'; V3F.5 D5b: they never read dev) cannot be built through "
-                "the pinned driver, which requires dev among a definition's finals (inc/driver.py "
-                "validate_definition) and scores dev in every base run (_ensure_base): D5B0, D5B25 and D5B100 wait "
-                "for a dated Revision that settles how they are trained; nothing works around the pinned driver")
 
 
 def log(msg):
@@ -134,11 +133,15 @@ def build_record(arm, path, sha, n):
             "decided_by": F.DECIDED_BY}
 
 
+def finals_of(arm):
+    """A build arm's finals: dev and ImageWeeds (D1, D4, BCLEAN), dev only for D5b (Revision 30)."""
+    return D5B_FINALS if arm in D5B_BUILDS else FINALS
+
+
 def build_kwargs(arm, exp=None, seeds=None, role=None, final_exams=None):
     """inc2.baseline build's keyword arguments for V3F's build arm `arm` (L23I: --exp <the arm's> --v3fam ARM
     --seeds 0,1,2 --role baseline): the arm's experiment, its manifest from the family summary by sha256, its
-    detector, seeds 0-2, role baseline, finals dev and ImageWeeds, exp.json's v3fam record. Anything else refuses;
-    D5b's builds refuse (D5B_CONFLICT)."""
+    detector, seeds 0-2, role baseline, its finals (finals_of), exp.json's v3fam record. Anything else refuses."""
     from . import v3fam_data as VD
     try:
         RC.v3fam_arm(arm)
@@ -146,8 +149,6 @@ def build_kwargs(arm, exp=None, seeds=None, role=None, final_exams=None):
         raise F.V3famRefused(str(e))
     if arm in SYS.D8_ARMS:
         return SYS.d8_build_kwargs(arm, exp=exp, seeds=seeds, role=role, final_exams=final_exams)
-    if arm in D5B_BUILDS:
-        raise F.V3famRefused(D5B_CONFLICT)
     want = RC.V3FAM_EXPS[arm]
     if exp is not None and exp != want:
         raise F.V3famRefused("--v3fam %s builds %s, not %s" % (arm, want, exp))
@@ -156,12 +157,12 @@ def build_kwargs(arm, exp=None, seeds=None, role=None, final_exams=None):
         raise F.V3famRefused("V3F's builds train seeds %s" % list(F.SEEDS))
     if role not in (None, ROLE):
         raise F.V3famRefused("V3F's builds are role %s, not %s" % (ROLE, role))
-    if final_exams is not None and list(final_exams) != list(FINALS):
+    if final_exams is not None and list(final_exams) != list(finals_of(arm)):
         raise F.V3famRefused("%s's finals are %s (no test: the family's reads are its own, V3F.3.6)"
-                             % (arm, list(FINALS)))
+                             % (arm, list(finals_of(arm))))
     path, sha, n = VD.arm_manifest(arm)
     return {"exp": want, "manifest": str(path), "seeds": list(F.SEEDS), "arm": RC.V3FAM_DETECTOR[arm],
-            "final_exams": list(FINALS), "role": ROLE, "extra": {"v3fam": build_record(arm, path, sha, n)}}
+            "final_exams": list(finals_of(arm)), "role": ROLE, "extra": {"v3fam": build_record(arm, path, sha, n)}}
 
 
 def check_definition(arm, testing_ok=False):
@@ -187,7 +188,7 @@ def check_definition(arm, testing_ok=False):
         probs.append("arm %r, not %s" % ((defn.get("arm") or {}).get("id"), det))
     if defn.get("role") != ROLE:
         probs.append("role %r" % defn.get("role"))
-    if list(defn.get("final_exams") or []) != list(FINALS):
+    if list(defn.get("final_exams") or []) != list(finals_of(arm)):
         probs.append("finals %s" % defn.get("final_exams"))
     if [int(s) for s in defn.get("seeds") or []] != list(F.SEEDS):
         probs.append("seeds %s" % defn.get("seeds"))
@@ -207,10 +208,12 @@ def check_definition(arm, testing_ok=False):
 
 
 def sources(build, testing=None):
-    """{seed: run_source} of a build arm's experiment, every seed's base run done (checked first)."""
+    """{seed: run_source} of a build arm's experiment, every seed's base run done (checked first). D5b's never open
+    a run's scores/dev.json (Revision 30: the family does not read D5b's dev scores)."""
     testing = _testing() if testing is None else testing
     check_definition(build, testing_ok=testing)
-    return {s: SYS.run_source(RC.V3FAM_EXPS[build], s, testing_ok=testing) for s in F.SEEDS}
+    return {s: SYS.run_source(RC.V3FAM_EXPS[build], s, testing_ok=testing, read_dev=build not in D5B_BUILDS)
+            for s in F.SEEDS}
 
 
 def stage1_vs_recorded(ps, src, what):

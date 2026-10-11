@@ -10,7 +10,7 @@ as one family)", kept byte for byte as docs/prereg/V3F_2026-10-11.md).
     python -m weed_optimizer_framework.tools.inc2.v3fam exif-verdict --frame yes|no --read-by owner|delegate
     python -m weed_optimizer_framework.tools.inc2.v3fam frozen
     python -m weed_optimizer_framework.tools.inc2.v3fam score --arm X          (L23J; SCORE_ARMS, the arm's module)
-    python -m weed_optimizer_framework.tools.inc2.v3fam verdict                (L23L; inc2/v3fam_verdict.py)
+    python -m weed_optimizer_framework.tools.inc2.v3fam verdict [--cap-refused ITEM,...]   (L23L; inc2/v3fam_verdict.py)
     python -m weed_optimizer_framework.tools.inc2.v3fam test-read --arm X --read-by owner|delegate   (a person's)
     python -m weed_optimizer_framework.tools.inc2.v3fam score-test --arm X     (the job test-read prepares)
     python -m weed_optimizer_framework.tools.inc2.v3fam test-report --arm X
@@ -170,8 +170,13 @@ NAME = "v1"
 PREREG_FILE = "docs/prereg/V3F_2026-10-11.md"
 PREREG_SHA256 = "5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f"
 PREREG_COMMIT = "55cc2d97cd2147d01644c1e193098b73aeba0a06"
+# V3F.3.9: the Revisions made before any family number (Revisions 29-31, 2026-10-11), each section kept byte for byte
+# and time-stamped (V3F.12) before the next family step; v3fam/v1/timestamp.json names their stamps
+REVISION_FILE = "docs/prereg/V3F_rev29-31_2026-10-11.md"
+REVISION_SHA256 = "36f4637898156ace639112f4605fbfe1192ecacad67b81ed47b1a6465bc0f814"
 DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-11): V3F, the v3 experiment family D0-D9 (pre-registered "
-              "as one family); commit 55cc2d9; %s sha256 %s" % (PREREG_FILE, PREREG_SHA256))
+              "as one family); commit 55cc2d9; %s sha256 %s; Revisions 29-31: %s sha256 %s"
+              % (PREREG_FILE, PREREG_SHA256, REVISION_FILE, REVISION_SHA256))
 # V3F.1: the E3-frozen files, as twostage/e3_v1/equivalence.json -> code records them
 FROZEN_SHA256 = {
     "twostage": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
@@ -1848,13 +1853,19 @@ def challenger_gate(results):
 def read_order(gate, bclean_triggered=False, reference_available=REFERENCE_READS):
     """The sealed-test reads in the order they are taken (V3F.3.6, decision 25): BCLEAN (if D0-S triggered it),
     the reference reads D6 then D8-m (those whose arm exists), then the challengers that open a read, largest D
-    first, at most 3 (2 once BCLEAN takes a read); at most READ_CAP in all."""
+    first, at most 3 (2 once BCLEAN takes a read); at most READ_CAP in all. A challenger whose arm has a
+    reference read (D6) takes no challenger place, whether or not its reference read is in the order: D6's read
+    is 'a reference read ... never a candidate' (V3F.3.6), so the challenger places go to the other arms that open
+    a read. Every arm is read at most once."""
     order = []
     if bclean_triggered:
         order.append({"arm": BCLEAN_READ, "kind": "bclean"})
     order += [{"arm": a, "kind": "reference"} for a in REFERENCE_READS if a in reference_available]
     k = CHALLENGER_READS_BCLEAN if bclean_triggered else CHALLENGER_READS
-    order += [{"arm": a, "kind": "challenger"} for a in gate["opening"][:k]]
+    order += [{"arm": a, "kind": "challenger"} for a in [x for x in gate["opening"] if x not in REFERENCE_READS][:k]]
+    names = [o["arm"] for o in order]
+    if len(set(names)) != len(names):
+        raise RuntimeError("the read order names an arm twice: %s" % names)
     if len(order) > READ_CAP:
         raise RuntimeError("the read order holds %d reads, over the cap of %d" % (len(order), READ_CAP))
     return order
@@ -1956,6 +1967,8 @@ def main(argv=None):
     ap.add_argument("--frame", default=None)
     ap.add_argument("--read-by", default=None)
     ap.add_argument("--spec", default=None)
+    ap.add_argument("--cap-refused", default=None,
+                    help="verdict: the family items the ticker recorded 'not run (family cap)', comma-separated")
     ap.add_argument("--batch", type=int, default=None, help="protocol %d; another only with %s=1" % (S.BATCH,
                                                                                                     S.TEST_ENV))
     ap.add_argument("--device", default=None)
@@ -1986,7 +1999,7 @@ def main(argv=None):
         elif a.command in ("verdict", "test-read", "score-test", "test-report", "reanalyse-test", "spend"):
             from . import v3fam_verdict as VR
             if a.command == "verdict":
-                VR.verdict()
+                VR.verdict(cap_refused=[x for x in (a.cap_refused or "").split(",") if x])
             elif a.command == "spend":
                 print(json.dumps(VR.spend(), indent=1, sort_keys=True))
             elif a.command == "reanalyse-test":

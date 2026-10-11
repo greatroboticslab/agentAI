@@ -361,6 +361,11 @@ def w_run():
     check("run refuses before the amendment's time stamp exists", e is not None and "time-stamped" in str(e), e)
     ts.parent.mkdir(parents=True, exist_ok=True)
     ts.write_text(json.dumps({"ots": "V3F_2026-10-11.md.ots", "sha256": "0" * 64}))
+    e_rev = refused(SW.run, procs=1, embedder=EMB, testing=True, sets=sets)
+    check("  and while the time stamp names no stamp of Revisions 29-31 (V3F.12: stamped before the next family "
+          "step)", e_rev is not None and "Revisions 29-31" in str(e_rev), e_rev)
+    ts.write_text(json.dumps({"ots": "V3F_2026-10-11.md.ots", "sha256": "0" * 64,
+                              "revisions": [{"file": "V3F_rev29-31_2026-10-11.md", "sha256": F.REVISION_SHA256}]}))
     check("injected sets only in testing", refused(SW.run, procs=1, embedder=EMB, testing=False, sets=sets) is not None)
     consts = {k: getattr(SW, k) for k in ("SHORTLIST_TOP", "SHORTLIST_COS", "SHORTLIST_BITS", "INLIERS_MIN",
                                           "TRIM_TOL", "TRIM_STD")}

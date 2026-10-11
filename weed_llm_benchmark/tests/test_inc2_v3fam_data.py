@@ -612,7 +612,7 @@ def w_build():
         e = refused(D.build, inputs=inputs, testing=True, procs=1, embedder=EMB)
     check("the build refuses before the amendment's time stamp", e is not None and "time-stamped" in str(e), e)
     ts.parent.mkdir(parents=True, exist_ok=True)
-    ts.write_text(json.dumps({"ots": "fixture"}))
+    ts.write_text(json.dumps({"ots": "fixture", "revisions": [{"sha256": F.REVISION_SHA256}]}))
     with small_probe(P["kfm"]):
         e = refused(D.build, inputs=dict(inputs, sweep=None), testing=True, procs=1, embedder=EMB)
     check("the build refuses without D0-S's complete record (L23H writes no manifest before it)", e is not None

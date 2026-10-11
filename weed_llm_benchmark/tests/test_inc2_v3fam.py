@@ -452,6 +452,20 @@ def u_gate_and_reads():
           and [x["arm"] for x in ob] == ["BCLEAN", "D6", "D8M", "D4F", "D3"], (o, ob))
     no6 = F.read_order(four, reference_available=("D8M",))
     check("  D6 not run: its reference read is not in the order", [x["arm"] for x in no6][:2] == ["D8M", "D4F"])
+    with6 = F.challenger_gate({a: {"status": "decided", "qualifies": True, "z": 5.0, "diff": d} for a, d in
+                               (("D6", 0.05), ("D4F", 0.03), ("D3", 0.02), ("D2CLIP", 0.01))})
+    o6 = F.read_order(with6)
+    o6b = F.read_order(with6, bclean_triggered=True)
+    check("  D6 opening as a challenger takes no challenger place (its read is the reference read): D6, D8-m, then "
+          "three other challengers; with BCLEAN two; no arm twice; the third challenger's read is allowed",
+          with6["opening"][0] == "D6" and [x["arm"] for x in o6] == ["D6", "D8M", "D4F", "D3", "D2CLIP"]
+          and [x["kind"] for x in o6] == ["reference", "reference", "challenger", "challenger", "challenger"]
+          and [x["arm"] for x in o6b] == ["BCLEAN", "D6", "D8M", "D4F", "D3"]
+          and F.check_read("D2CLIP", o6, {"D6": "read", "D8M": "read", "D4F": "read", "D3": "read"})["position"]
+          == 5 and F.check_read("D4F", o6, {"D6": "read", "D8M": "read"})["position"] == 3, (o6, o6b))
+    o6n = F.read_order(with6, reference_available=("D8M",))
+    check("  and when D6's reference read is not in the order, D6 still takes no challenger place",
+          [x["arm"] for x in o6n] == ["D8M", "D4F", "D3", "D2CLIP"], o6n)
     out = {"a challenger before the references": refused(F.check_read, "D4F", o, {}),
            "an arm that opens no read": refused(F.check_read, "D4N", o, {"D6": "read", "D8M": "read"}),
            "a second read": refused(F.check_read, "D6", o, {"D6": "read"})}

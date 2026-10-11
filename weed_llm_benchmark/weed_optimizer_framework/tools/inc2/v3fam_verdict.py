@@ -22,9 +22,24 @@ with its reason, and keeps its place (Holm's m, C = 14). Then Holm per exam
 (inc2.v3fam.holm_overlay), the Tier C gate (challenger_gate: plain D over
 E3-B, z > Phi^-1(1 - 0.05/14)) and the order of the sealed-test reads
 (read_order: BCLEAN if D0-S triggered it, the reference reads D6 then D8-m
-when their arms were scored, the challengers that open a read). When D0-S
-found a dev image with a true copy, every dev comparison is decided on dev
-minus H (the full dev beside).
+when their arms were scored, the challengers that open a read; D6 never takes
+a challenger place). D3's Tier C comparison is P4's record (V3F.5 D3: "the
+same comparison"), never a second bootstrap. When D0-S found a dev image
+with a true copy, every dev comparison (P1-P5, Tier C, Tier S) is decided on
+dev minus H with its full-dev numbers beside, and E3's recorded dev
+comparisons (E3-M, E3-A, E3-B over the reference under E3's seed text, and
+E3-B over E3-A under its attribution text) are re-read on dev minus H from
+E3RS's arrays, reported only (V3F.5 D0-S). Tier S also holds the readings
+V3F.5 names that need their own arrays: the stage-1 agnostic AP of D3's
+fused boxes against E3-B's seeds and of D4's detectors against E1-A's and
+E1-B's (each committed stage-1 box set matched class-collapsed to dev's
+ground truth, its full-set value checked against the one its score records),
+D1's species subsets (ood23's three species with >= 100 GT boxes, ood22's
+eight), and D5b's inflation per copy family and its 12-class mean. A
+comparison a side of which lost training rows to D0-S's removals carries
+that declaration (V3F.3.7 item 4). Arms the ticker refused at the family
+cap reach the verdict in its argv (--cap-refused) and are recorded "not run
+(family cap)" under v3fam/v1/cap before anything is decided.
 
 Records (V3F.3.5): capacity/v3fam_v1.json, the platform's (dev only: P1-P5,
 Holm on dev, Tier C, the read order, Tier S on dev, the dev pass count),
@@ -38,7 +53,8 @@ Sealed-test reads (V3F.3.6). test-read checks the verdict, that the arm is
 next in the read order (check_read; a read refused at the family cap is
 recorded "not run (family cap)" and not retried), the family cap
 (check_cap over the family's GPU-h as the cluster's records give it: spend
-items), pins the verdict, the arm's weights and classifier by sha256, and
+items, a read prepared but not yet submitted at its estimate), pins the
+verdict, the arm's weights and classifier by sha256, and
 writes v3fam/v1/test/<X>/read.json once with read_by exactly "Harry He
 (owner)" or "Claude (delegate under the 2026-09-30 owner grant)" and the one
 argv. score-test refuses unless INCAP_DECIDED_BY names that person (the
@@ -48,9 +64,12 @@ identity path (1e-6, 0.002 as a recorded deviation, else refused before any
 family test score), then scores the arm once (written once; a second run
 refuses). test-report states the gap to 0.90, the stratum of the test images
 from dev's sessions (dev_session_stratum), read_by and the kind of read
-(capacity/v3fam_test_<x>.{json,md}). reanalyse-test (no inference) reads E3's
-stored test arrays: O4's stratum for E3-A, E3-M, E3-B and the reference, and
-test minus H when D0-S found test copies (capacity/v3fam_retest.json).
+(capacity/v3fam_test_<x>.{json,md}). reanalyse-test (no inference), the last
+of the reads (decision 25: every read of the order taken or recorded not run
+first; its own job's running attempt not counted twice against the cap),
+reads E3's stored test arrays: O4's stratum for E3-A, E3-M, E3-B and the
+reference, and test minus H when D0-S found test copies
+(capacity/v3fam_retest.json); it runs inside e_trees_unchanged.
 
 A refusal raises inc2.v3fam.V3famRefused (V3famCapRefused at the family cap).
 """
@@ -142,6 +161,54 @@ TIER_S = (
     ("S_bclean_over_e3b", "dev", "BCLEAN", "E3B", "image"),
     ("S_tsa_over_a12_ood22", "ood22", "TSA", "D1A12", "max"),
     ("S_tsb_over_tsa_ood22", "ood22", "TSB", "TSA", "max"))
+# The other comparisons V3F.5 names, each on arrays of its own (Tier S, reported): (id, exam, X, Y, se rule,
+# statistic, species). statistic: stage1 (the committed stage-1 box sets' class-collapsed AP50-95 on dev,
+# stage1_runs), subset (the species mean over the list given), species (the 12-class mean), copy:<family> (P8's
+# statistic on the probe images whose dose-1.0 copy is of that family, V3F.5 D5b)
+OOD23_SPECIES_100 = ("Purslane", "PalmerAmaranth", "Ragweed")              # ood23's species with >= 100 GT boxes
+OOD22_SPECIES_100 = ("Waterhemp", "MorningGlory", "Purslane", "SpottedSpurge", "Carpetweed", "Ragweed",
+                     "PalmerAmaranth", "Goosegrass")                         # ood22's eight (Eclipta's 33 left out)
+COPY_FAMILIES = ("jpeg75", "crop90", "letterbox640", "hflip")              # inc2.v3fam_data.COPY_FAMILIES
+TIER_S_ARRAYS = (
+    ("S_d3_stage1_over_e3b", "dev", "D3", "E3B", "one_system", "stage1", None),
+    ("S_s1_tsf_over_e1a", "dev", "D4F", "E3A", "image", "stage1", None),
+    ("S_s1_tsf_over_e1b", "dev", "D4F", "E3B", "image", "stage1", None),
+    ("S_s1_tsn_over_e1a", "dev", "D4N", "E3A", "image", "stage1", None),
+    ("S_s1_tsn_over_e1b", "dev", "D4N", "E3B", "image", "stage1", None),
+    ("S_s1_tsr15_over_e1a", "dev", "D4R15", "E3A", "image", "stage1", None),
+    ("S_s1_tsr15_over_e1b", "dev", "D4R15", "E3B", "image", "stage1", None),
+    ("S_tsb_over_a12_ood22_8sp", "ood22", "TSB", "D1A12", "max", "subset", OOD22_SPECIES_100),
+    ("S_tsa_over_a12_ood22_8sp", "ood22", "TSA", "D1A12", "max", "subset", OOD22_SPECIES_100),
+    ("S_tsb_over_tsa_ood22_8sp", "ood22", "TSB", "TSA", "max", "subset", OOD22_SPECIES_100),
+    ("S_tsb_over_a12_ood23_3sp", "ood23", "TSB", "D1A12", "max", "subset", OOD23_SPECIES_100),
+    ("S_tsa_over_a12_ood23_3sp", "ood23", "TSA", "D1A12", "max", "subset", OOD23_SPECIES_100),
+    ("S_tsb_over_tsa_ood23_3sp", "ood23", "TSB", "TSA", "max", "subset", OOD23_SPECIES_100),
+    ("S_p8_12class", "probe", "D5B100", "D5B0", "max", "species", None),
+    ("S_p9_12class", "probe", "D5B25", "D5B0", "max", "species", None)) + tuple(
+    ("S_d5b_copy_%s" % f, "probe", "D5B100", "D5B0", "max", "copy:%s" % f, None) for f in COPY_FAMILIES)
+# V3F.5 D3: "Tier C: the same comparison" as P4 -- one record (one seed text), so one comparison cannot both
+# qualify as P4 and open no read as C_D3
+SAME_COMPARISON = {"C_D3": "P4"}
+# V3F.5 D0-S's dev branch: E3's recorded dev comparisons, re-read on dev minus H from E3RS's arrays (reported only),
+# under E3's own seed texts (twostage.SPECIES_SEED_TEXT, ATTR_SEED_TEXT)
+E3_REREADS = (("E3_M_over_ref", "E3M", "REF", TS.SPECIES_SEED_TEXT),
+              ("E3_A_over_ref", "E3A", "REF", TS.SPECIES_SEED_TEXT),
+              ("E3_B_over_ref", "E3B", "REF", TS.SPECIES_SEED_TEXT),
+              ("E3_B_over_A", "E3B", "E3A", TS.ATTR_SEED_TEXT))
+STAGE1_RECOMPUTE_TOL = F.DEVIATION_TOL      # a recomputed stage-1 value against the one its score records
+# The sides whose training set is the family's own, built after D0-S's removals (V3F.3.7 item 4; D6's staging,
+# Revision 29): from base B (any removed row it held) or from base_v2 (only the removed rows that are base_v2's); D8's
+# train_core holds none of D0-S's reference rows
+TRAINED_SIDES_B = ("D4F", "D4N", "D4R15", "BCLEAN", "D1B1", "TSB")
+TRAINED_SIDES_V2 = ("D1A1", "D1A12", "TSA", "D5B0", "D5B25", "D5B100", "D6")
+# E3's classifier, D2's frozen-backbone fits and D9's refits are on exactly E3's crops (V3F.5 D2, D9)
+E3_CROP_SIDES = ("E3M", "E3A", "E3B", "ORACLE", "D3", "D4F", "D4N", "D4R15", "BCLEAN", "D2LAION", "D2CLIP",
+                 "D2DINOL", "D2DINOB", "D2SIGLIP", "D2RN50", "D2BC1", "D2BC2640", "D2FT")
+# The ticker's family items (stream.py _v3fam_key) a --cap-refused list may name, and the score arms each holds
+CAP_ITEM_RE = re.compile(r"(data|verdict|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))\Z")
+SCORE_DEPS = {"BCLEAN": ("build:D0BCLEAN",), "D8": ("build:D8M", "build:D8S"), "D4F": ("build:D4F",),
+              "D4N": ("build:D4N",), "D4R15": ("build:D4R15",), "D1": ("build:D1A1", "build:D1B1", "build:D1A12"),
+              "D5B": ("build:D5B0", "build:D5B25", "build:D5B100"), "D6": ("detr:smoke", "detr:train")}
 PAIRED = ("P1",) + tuple("C_%s" % a for a in F.CHALLENGERS if a.startswith("D2")) + (
     "S_bc2_over_bc2640", "S_ft_over_rn50", "S_bc2_over_clip", "S_laion_over_clip", "S_dinol_over_clip",
     "S_bc1_over_clip")
@@ -175,13 +242,42 @@ def score_record(arm):
     return d if isinstance(d, dict) else None
 
 
+def cap_file(item):
+    return F.cap_dir() / ("%s.json" % re.sub(r"[^A-Za-z0-9_.-]", "_", str(item)))
+
+
 def cap_refused(item):
-    return (F.cap_dir() / ("%s.json" % re.sub(r"[^A-Za-z0-9_.-]", "_", str(item)))).exists()
+    return cap_file(item).exists()
+
+
+def record_ticker_refusals(items):
+    """The items the ticker recorded 'not run (family cap)' (its stream state; stream.py _v3fam_cap_ok), passed in
+    the verdict's argv, each written once under v3fam/v1/cap/ as check_cap writes its own (one already there is
+    kept), so arm_status reads every cap refusal from the cluster's records (V3F.3.4, V3F.3.5). Returns the
+    names."""
+    out = []
+    for it in items or []:
+        it = str(it).strip()
+        if not it:
+            continue
+        if not CAP_ITEM_RE.match(it):
+            raise F.V3famRefused("--cap-refused names %r, not a family item (data, score:<ARM>, build:<ARM>, "
+                                 "detr:smoke|train, verdict)" % it)
+        p = cap_file(it)
+        if not p.exists():
+            F.write_once(p, {"format": F.FMT_CAP, "item": it, "status": F.NOT_RUN_CAP, "cap_gpuh": F.FAMILY_CAP_GPUH,
+                             "source": "the ticker's refusal (stream state), passed in the verdict's argv",
+                             "written_utc": F._utc()})
+        out.append(it)
+    return out
 
 
 def arm_status(arm):
-    """complete | not run (<why>) | failed | missing, from the arm's score record and the family cap's records."""
-    if cap_refused("score_%s" % arm) or cap_refused(arm):
+    """complete | not run (<why>) | failed | missing, from the arm's score record and the family cap's records
+    (the arm's own score item, or an item it depends on: a build it scores, D6's RF-DETR jobs, the data build)."""
+    deps = SCORE_DEPS.get(arm, ())
+    if cap_refused("score_%s" % arm) or cap_refused(arm) or any(cap_refused(d) for d in deps) \
+            or (deps and cap_refused("data")):
         return F.NOT_RUN_CAP
     r = score_record(arm)
     if r is None:
@@ -223,6 +319,104 @@ def p7_runs(name):
     return runs, [F.statistic_value(a, "agnostic") for a in runs]
 
 
+_GT = {}
+
+
+def exam_gt(exam):
+    """{key: [m, 4] float64} of every ground-truth box of exam's images in original pixels (the label's normalised
+    boxes times the image's EXIF-transposed size, the frame the family pass's geometry returns boxes in; a label
+    row repeated exactly is read once, as Ultralytics' label check reads it), each label checked against its
+    manifest's label_sha256. Read once per process."""
+    import numpy as np
+    if exam in _GT:
+        return _GT[exam]
+    rows = SYS.exam_rows(exam)
+    sizes = SYS.image_sizes(rows)
+    out = {}
+    for r in rows:
+        lp = r.get("label")
+        if not lp or not os.path.isfile(str(lp)):
+            raise F.V3famRefused("%s's label %s is missing: its stage-1 boxes cannot be matched" % (r["key"], lp))
+        if r.get("label_sha256") and C.sha256_file(lp) != r["label_sha256"]:
+            raise F.V3famRefused("the label of %s does not hash as its manifest records" % r["key"])
+        w, h = sizes[r["key"]]
+        rows_ = [tuple(x) for x in C.read_yolo(lp)]
+        rows_ = [x for i, x in enumerate(rows_) if x not in rows_[:i]]
+        b = [((cx - bw / 2.0) * w, (cy - bh / 2.0) * h, (cx + bw / 2.0) * w, (cy + bh / 2.0) * h)
+             for _c, cx, cy, bw, bh in rows_]
+        out[r["key"]] = np.asarray(b, dtype=np.float64).reshape(-1, 4)
+    _GT[exam] = out
+    return out
+
+
+def stage1_runs(name, exam="dev"):
+    """A side's committed stage-1 box sets on exam (its stage1.npz: one_per_box's boxes in original pixels and q)
+    as agnostic arrays {keys, tp, conf, pred_img, n_gt}, matched class-collapsed to the exam's ground-truth boxes at
+    IoU 0.50:0.95 by Ultralytics' match_predictions (inc2.v3fam.default_match, as twostage's stage-1 helper
+    matches them); D3's fused set is one run. Each run's full-set value must equal the stage-1 agnostic AP50-95
+    its score records within STAGE1_RECOMPUTE_TOL, or the comparison is refused. Returns (runs, values,
+    {recorded, max_abs_diff})."""
+    import numpy as np
+    import torch
+    from ultralytics.utils.metrics import box_iou
+    dirname, variant, ens, _arm = SIDES[name]
+    gt = exam_gt(exam)
+    match = F.default_match()
+    runs, vals, recorded, diffs = [], [], [], []
+    for s in ([None] if ens else F.SEEDS):
+        doc, z = SYS.family_side(dirname, s, exam, "stage1_images", variant=variant, ens=ens)
+        keys = [str(k) for k in z["keys"]]
+        if sorted(keys) != sorted(gt):
+            raise F.V3famRefused("%s's stage-1 record does not hold %s's images" % (name, exam))
+        img = np.asarray(z["img"], dtype=np.int64).reshape(-1)
+        xyxy = np.asarray(z["xyxy"], dtype=np.float64).reshape(-1, 4)
+        q = np.asarray(z["q"], dtype=np.float64).reshape(-1)
+        tps, confs, pimg, ngt = [], [], [], []
+        for i, k in enumerate(keys):
+            sel = img == i
+            b, g = xyxy[sel], gt[k]
+            if len(b) and len(g):
+                tp = np.asarray(match(box_iou(torch.as_tensor(g), torch.as_tensor(b))), dtype=bool).reshape(len(b), -1)
+            else:
+                tp = np.zeros((len(b), SC.NIOU), dtype=bool)
+            tps.append(tp)
+            confs.append(q[sel])
+            pimg.append(np.full(len(b), i, dtype=np.int64))
+            ngt.append(len(g))
+        a = {"keys": np.asarray(keys), "tp": np.concatenate(tps, 0) if tps else np.zeros((0, SC.NIOU), dtype=bool),
+             "conf": np.concatenate(confs) if confs else np.zeros(0),
+             "pred_img": np.concatenate(pimg) if pimg else np.zeros(0, dtype=np.int64),
+             "n_gt": np.asarray(ngt, dtype=np.int64)}
+        if doc.get("n_boxes") is not None and int(a["n_gt"].sum()) != int(doc["n_boxes"]):
+            raise F.V3famRefused("%s seed %s: %s's labels hold %d boxes, the score counted %d"
+                                 % (name, s, exam, int(a["n_gt"].sum()), int(doc["n_boxes"])))
+        v = F.statistic_value(a, "agnostic")
+        rec = (doc.get("stage1") or {}).get("agnostic_map50_95")
+        if rec is None or not abs(v - float(rec)) <= STAGE1_RECOMPUTE_TOL:
+            raise F.V3famRefused("%s seed %s: the stage-1 boxes matched again give %.6f, its score records %s (more "
+                                 "than %g apart)" % (name, s, v, rec, STAGE1_RECOMPUTE_TOL))
+        runs.append(a)
+        vals.append(v)
+        recorded.append(float(rec))
+        diffs.append(abs(v - float(rec)))
+    return runs, vals, {"recorded": recorded, "max_abs_diff": max(diffs)}
+
+
+def copy_keys(family):
+    """The probe keys whose dose-1.0 copy is of copy family `family` and was kept (the family data summary's copy
+    plan, its dropped copies left out; V3F.5 D5b's per-family inflation)."""
+    from . import v3fam_data as VD
+    s = VD.read_summary()
+    if s is None:
+        raise F.V3famRefused("no complete family data summary: the probe's copy families are unknown")
+    cp = s.get("copies") or {}
+    dropped = set(cp.get("dropped") or [])
+    keys = sorted(k for k, _i, f in cp.get("plan") or [] if f == family and (VD.COPY_KEY % k) not in dropped)
+    if not keys:
+        raise F.V3famRefused("no kept dose-1.0 copy of family %s" % family)
+    return keys
+
+
 def sessions(exam):
     """One session per image in the arrays' key order (V3F.3.1's rule; the probe in its own root)."""
     rows = SYS.exam_rows(exam)
@@ -245,29 +439,77 @@ def dev_keep(trig):
     return [r["key"] for r in SYS.exam_rows("dev") if r["key"] not in set(h)]
 
 
+def d0s_removals():
+    """What D0-S's confirmed copies took out of the family's training sets (V3F.3.7 item 4), from the family data
+    summary: {rows, sha256, base_v2_rows}, or None when nothing was removed."""
+    from . import v3fam_data as VD
+    d = (VD.read_summary() or {}).get("d0s") or {}
+    keys = list(d.get("removal_keys") or [])
+    if not keys:
+        return None
+    return {"rows": len(keys), "sha256": d.get("removal_sha256"),
+            "base_v2_rows": len(d.get("d6_staging_removals") or [])}
+
+
+def declared(xname, yname, rm):
+    """The training-row difference D0-S's removals make between a comparison's sides, declared beside it (V3F.3.7
+    item 4), or None: the sides whose training set is the family's own lost the rows; the others were not retrained;
+    and, when base_v2 rows are among them, E3's crops (E3's classifier, D2's fits) keep their crops (Revision 31)."""
+    if not rm:
+        return None
+    sides = [n for n in (xname, yname) if n]
+    lost = [n for n in sides if n in TRAINED_SIDES_B or (n in TRAINED_SIDES_V2 and rm["base_v2_rows"])]
+    mine = [LABELS.get(n, n) for n in lost]
+    other = [LABELS.get(n, n) for n in sides if n not in lost]
+    crops = rm["base_v2_rows"] and any(n in E3_CROP_SIDES for n in sides)
+    if not mine and not crops:
+        return None
+    txt = "D0-S's confirmed copies: %d base B row(s), %d of them base_v2's (removal list %s)" % (
+        rm["rows"], rm["base_v2_rows"], str(rm["sha256"])[:16])
+    if mine:
+        txt += "; they left %s's training set (a base_v2-built side loses the base_v2 rows only)" % " and ".join(mine)
+        if other:
+            txt += "; %s was not retrained or held none of them" % " and ".join(other)
+    if crops:
+        txt += ("; the stage-2 classifiers here are fitted on exactly E3's crops, which include the crops of those %d "
+                "base_v2 row(s) (V3F.5 D2, D9; Revision 31)" % rm["base_v2_rows"])
+    return txt
+
+
 # ------------------------------------------------------------------ one comparison
-def compare(cid, exam, xname, yname, rule, statistic="species", selection=None, keep=None, seed_text=None):
+def compare(cid, exam, xname, yname, rule, statistic="species", selection=None, keep=None, seed_text=None,
+            species=None, subset=None):
     """One pre-declared comparison on committed family scores (module docstring); {"id", "status": decided |
-    not run, ...} with inc2.v3fam.comparison's record when decided."""
+    not run, ...} with inc2.v3fam.comparison's record when decided. statistic: species (the 12-class mean), probe
+    (D5b's seven species), subset (the mean over `species`), p7 (P7's ignore-region arrays), stage1 (stage1_runs).
+    keep: dev minus H (dev comparisons only); subset: the images a pre-declared subset comparison is computed on
+    (D5b's copy families)."""
     base = {"id": cid, "exam": exam, "x": xname, "y": yname, "x_label": LABELS.get(xname),
             "y_label": LABELS.get(yname), "se_rule": rule}
+    s1 = None
     try:
         if statistic == "p7":
             xr, xv = p7_runs(xname)
             yr, yv = p7_runs(yname)
-            stat, species = "agnostic", SC.SPECIES
+            stat, species_ = "agnostic", SC.SPECIES
+        elif statistic == "stage1":
+            xr, xv, xc = stage1_runs(xname, exam)
+            yr, yv, yc = stage1_runs(yname, exam)
+            stat, species_ = "agnostic", SC.SPECIES
+            s1 = {"x": xc, "y": yc}
         else:
             xs, ys = side(xname, exam), side(yname, exam)
             for nm, sd in ((xname, xs), (yname, ys)):
                 if sd["status"] != "ok":
                     return dict(base, status="not run", why="%s: %s" % (nm, sd.get("why")))
             xr, yr = xs["runs"], ys["runs"]
-            if statistic == "probe":
-                stat, species = "species", F.PROBE_SPECIES
-                xv = [F.statistic_value(a, "species", species) for a in xr]
-                yv = [F.statistic_value(a, "species", species) for a in yr]
+            stat = "species"
+            species_ = F.PROBE_SPECIES if statistic == "probe" else tuple(species) if statistic == "subset" \
+                else SC.SPECIES
+            if species_ != SC.SPECIES:
+                xv = [F.statistic_value(a, "species", species_) for a in xr]
+                yv = [F.statistic_value(a, "species", species_) for a in yr]
             else:
-                stat, species = "species", SC.SPECIES
                 xv, yv = xs["species"], ys["species"]
         ses = sessions(exam) if exam in ("dev", "ood22", "ood23", "probe") else None
         sel = None
@@ -279,14 +521,22 @@ def compare(cid, exam, xname, yname, rule, statistic="species", selection=None, 
                     return dict(base, status="not run", why="the selection correction needs E3-%s: %s"
                                 % (a, sd.get("why")))
                 sel["runs"][a], sel["values"][a] = sd["runs"], sd["species"]
-        rec = F.comparison(cid, xv, yv, xr, yr, statistic=stat, species=species, sessions=ses,
+        restrict = keep if exam == "dev" else None
+        if subset is not None:
+            restrict = list(subset) if restrict is None else [k for k in subset if k in set(restrict)]
+        rec = F.comparison(cid, xv, yv, xr, yr, statistic=stat, species=species_, sessions=ses,
                            se_rule={"one_system": "image"}.get(rule, rule), one_system=rule == "one_system",
-                           selection=sel, keep=keep if exam == "dev" else None, paired=cid in PAIRED,
-                           image_seed_text=seed_text)
+                           selection=sel, keep=restrict, paired=cid in PAIRED, image_seed_text=seed_text)
     except F.V3famRefused as e:
         return dict(base, status="not run", why=str(e)[:400])
     for k in ("x_values", "y_values"):
         rec[k] = [float(v) for v in rec[k]]
+    if rule == "one_system":
+        rec["x_minus_each_y"] = [rec["x_values"][0] - y for y in rec["y_values"]]
+    if s1 is not None:
+        rec["stage1_recompute"] = s1
+    if subset is not None:
+        rec["subset"] = {"n_images": rec["n_images"], "of": statistic}
     sel_rec = rec.get("selection")
     if sel_rec:
         rec["selection"] = {k: v for k, v in sel_rec.items() if k not in ("T", "chosen")}
@@ -303,42 +553,99 @@ def summary(rec):
 
 
 # ------------------------------------------------------------------ the verdict (L23L)
+def comparison_specs():
+    """Every pre-declared comparison of the family as (id, exam, X, Y, rule, statistic, species, seed text): the
+    primaries, Tier C (C_D3 is P4's record, SAME_COMPARISON), Tier S."""
+    out = [(cid, exam, x, y, rule, stat, None, None) for cid, exam, x, y, rule, stat, _t in COMPARISONS]
+    out += [("C_%s" % a, "dev", CHALLENGER_SIDES[a], "E3B", "image", "species", None, None) for a in F.CHALLENGERS
+            if "C_%s" % a not in SAME_COMPARISON]
+    out += [(cid, exam, x, y, rule, "species", None, BCLEAN_SEED_TEXT if cid == "S_bclean_over_ref" else None)
+            for cid, exam, x, y, rule in TIER_S]
+    out += [(cid, exam, x, y, rule, stat, sp, None) for cid, exam, x, y, rule, stat, sp in TIER_S_ARRAYS]
+    return out
+
+
+def run_spec(spec, keep):
+    cid, exam, x, y, rule, stat, sp, st = spec
+    subset = None
+    if stat.startswith("copy:"):
+        try:
+            subset = copy_keys(stat[len("copy:"):])
+        except F.V3famRefused as e:
+            return {"id": cid, "exam": exam, "x": x, "y": y, "x_label": LABELS.get(x), "y_label": LABELS.get(y),
+                    "se_rule": rule, "status": "not run", "why": str(e)[:400]}
+        stat = "probe"
+    return compare(cid, exam, x, y, rule, stat, keep=keep, seed_text=st, species=sp, subset=subset)
+
+
 def decide_family(keep=None):
-    """Every pre-declared comparison of the family on its committed scores; Holm, the gate, the read order."""
+    """Every pre-declared comparison of the family on its committed scores; Holm, the gate, the read order. On
+    D0-S's dev branch also every dev comparison's full-dev numbers and E3's recorded dev comparisons re-read on
+    dev minus H (reported only)."""
     trig = d0s_trigger()
     keep = dev_keep(trig) if keep is None else keep
+    rm = d0s_removals()
+    specs = comparison_specs()
     out = {}
-    for cid, exam, x, y, rule, stat, _tier in COMPARISONS:
-        out[cid] = compare(cid, exam, x, y, rule, stat, keep=keep)
-    for a in F.CHALLENGERS:
-        cid = "C_%s" % a
-        out[cid] = compare(cid, "dev", CHALLENGER_SIDES[a], "E3B", "one_system" if a == "D3" else "image",
-                           keep=keep)
-    for cid, exam, x, y, rule in TIER_S:
-        st = BCLEAN_SEED_TEXT if cid == "S_bclean_over_ref" else None
-        out[cid] = compare(cid, exam, x, y, rule, keep=keep, seed_text=st)
+    for spec in specs:
+        out[spec[0]] = run_spec(spec, keep)
+    for cid, src in SAME_COMPARISON.items():
+        out[cid] = dict(out[src], id=cid, same_as=src)
+    for cid, r in out.items():
+        note = declared(r.get("x"), r.get("y"), rm)
+        if note:
+            r["declared"] = note
     holm = F.holm_overlay({p: summary(out[p]) for p in F.PRIMARIES})
     gate = F.challenger_gate({a: summary(out["C_%s" % a]) for a in F.CHALLENGERS})
     ref_avail = tuple(a for a in F.REFERENCE_READS if arm_status("D8" if a == "D8M" else a) == "complete")
     bclean = bool(trig.get("bclean")) and arm_status("BCLEAN") == "complete"
     order = F.read_order(gate, bclean_triggered=bclean, reference_available=ref_avail)
-    full = None
+    full, e3 = None, None
     if keep is not None:
-        full = {cid: summary(compare(cid, exam, x, y, rule, stat)) for cid, exam, x, y, rule, stat, _t in
-                COMPARISONS if exam == "dev"}
+        full = {spec[0]: summary(run_spec(spec, None)) for spec in specs if spec[1] == "dev"}
+        for cid, src in SAME_COMPARISON.items():
+            full[cid] = dict(full[src], same_as=src)
+        e3 = {"dev_minus_h": {}, "full_dev": {}}
+        for cid, x, y, st in E3_REREADS:
+            e3["dev_minus_h"][cid] = _strip(compare(cid, "dev", x, y, "image", keep=keep, seed_text=st))
+            e3["full_dev"][cid] = summary(compare(cid, "dev", x, y, "image", seed_text=st))
     return {"comparisons": out, "holm": holm, "gate": gate, "order": order, "trigger": trig,
             "decided_on": "dev minus H" if keep is not None else "dev",
             "dev_minus_h": None if keep is None else {"n_images": len(keep),
                                                      "keys_sha256": C.sha256_text("\n".join(sorted(keep)))},
-            "full_dev_beside": full}
+            "full_dev_beside": full, "e3_reread": e3, "d0s_removals": rm}
 
 
-def dev_pass_count():
-    """Every committed family dev score (a dev pass of the family; V3F.3.5's read count)."""
-    base = F.root() / "arms"
-    if not base.is_dir():
-        return 0
-    return sum(1 for p in base.glob("*/*/dev*.json") if p.is_file())
+def dev_passes():
+    """Every dev pass of the family (V3F.3.5's printed count), by where it is recorded: {total, by_kind}.
+    family_scores: the committed family scores on dev (arms/**: E3RS with O5, D2, D3, D4, D6, D8, D9b, BCLEAN,
+    D1's dev readings); d2_gt: D2's ground-truth passes (d2/<KEY>/dev_gt.json, D2FT's dev_gt.s<k>.json); d9a: E3's
+    five fold classifiers on seed 0 of each E3 arm (twostage/e3_v1/sensitivity.json); reproductions: dev
+    identity's passes and injection's two (identity, injected); E3's two-stage reproductions are E3RS's dev
+    scores, counted once. builds_protocol: the pinned driver's own protocol dev scores of the family's build runs
+    (each base run's and each final's; D5b's are never read by the family)."""
+    by = {"family_scores": 0, "d2_gt": 0, "d9a": 0, "reproductions": 0, "builds_protocol": 0}
+    arms = F.root() / "arms"
+    if arms.is_dir():
+        for p in sorted(arms.rglob("dev*.json")):
+            d = F._read_json(p)
+            if isinstance(d, dict) and d.get("format") == F.FMT_SCORE and d.get("exam") == "dev":
+                by["family_scores"] += 1
+    d2 = F.root() / "d2"
+    if d2.is_dir():
+        by["d2_gt"] = sum(1 for p in d2.glob("*/dev_gt*.json") if isinstance(F._read_json(p), dict))
+    sens = F._read_json(TS.root() / "sensitivity.json")
+    if isinstance(sens, dict):
+        by["d9a"] = sum(len((a or {}).get("values") or []) for a in (sens.get("arms") or {}).values())
+    for name, per_pass in (("dev_identity.json", 1), ("injection.json", 2)):
+        d = F._read_json(F.equiv_dir() / name)
+        if isinstance(d, dict):
+            by["reproductions"] += per_pass * len(d.get("per") or {})
+    for exp in RC.V3FAM_EXPS.values():
+        runs = C.INC_DIR / exp / "runs"
+        if runs.is_dir():
+            by["builds_protocol"] += sum(1 for p in runs.glob("*/scores/dev.json") if p.is_file())
+    return {"total": sum(by.values()), "by_kind": by}
 
 
 def _strip(rec):
@@ -369,7 +676,8 @@ def ext_record():
 
 
 def _table():
-    """The family table: every side, every exam it holds, every seed (species, agnostic, stage-1 agnostic)."""
+    """The family table: every side, every exam it holds, every seed (species, agnostic, stage-1 agnostic; on ood23
+    a stage1-mode side's P7 readings: the target reading with and without the ignore regions, OtherPlant's)."""
     rows = []
     for name in sorted(SIDES):
         for exam in ("dev", "ood22", "ood23", "probe") + REPORTED_EXAMS:
@@ -377,36 +685,93 @@ def _table():
             if sd["status"] != "ok":
                 continue
             sp = [d.get("species_map50_95") for d in sd["docs"]]
-            rows.append({"side": name, "label": LABELS.get(name), "exam": exam, "seeds": [d.get("seed") for d in
-                                                                                          sd["docs"]],
-                         "species": sp, "species_mean": F._mean_sd([x for x in sp if x is not None])[0],
-                         "agnostic": [d.get("agnostic_map50_95") for d in sd["docs"]],
-                         "stage1_agnostic": [(d.get("stage1") or {}).get("agnostic_map50_95") for d in sd["docs"]]})
+            row = {"side": name, "label": LABELS.get(name), "exam": exam, "seeds": [d.get("seed") for d in sd["docs"]],
+                   "species": sp, "species_mean": F._mean_sd([x for x in sp if x is not None])[0],
+                   "agnostic": [d.get("agnostic_map50_95") for d in sd["docs"]],
+                   "stage1_agnostic": [(d.get("stage1") or {}).get("agnostic_map50_95") for d in sd["docs"]]}
+            if any(d.get("p7") for d in sd["docs"]):
+                row["p7"] = [d.get("p7") for d in sd["docs"]]
+            rows.append(row)
     return rows
+
+
+def report_row(v):
+    """A comparison as the family table shows it (V3F.3.5): D, and D_sel with the plain D, SE and the share of
+    resamples in which E3-B is chosen beside it (P2, P3, P5); 2 sd; both SEs; z; the interval; the outcome."""
+    out = dict(summary(v), id=v.get("id"), exam=v.get("exam"), x=v.get("x"), y=v.get("y"), x_label=v.get("x_label"),
+               y_label=v.get("y_label"), se_rule=v.get("se_rule"), statistic=v.get("statistic"),
+               decision=v.get("decision"), image=v.get("image"), session=v.get("session"), why=v.get("why"))
+    for k in ("x_values", "y_values", "plain", "paired_per_seed", "x_minus_each_y", "same_as", "declared",
+              "stage1_recompute", "subset", "restricted_to", "species"):
+        if v.get(k) is not None:
+            out[k] = v[k]
+    sel = v.get("selection")
+    if sel:
+        out["selection"] = {k: sel.get(k) for k in ("diff_sel", "se_sel", "bias", "n_valid", "share_chosen")}
+    return out
 
 
 def _md(rep):
     def f(x):
         return "-" if x is None else ("%.4f" % x if isinstance(x, float) else str(x))
-    lines = ["# V3F family report (%s)" % rep["generated_utc"], "",
-             "Decided on: %s. Dev passes of the family: %d." % (rep["decided_on"], rep["dev_passes"]), "",
-             "| id | exam | X | Y | D | 2 sd | SE image | SE session | z | 90 %% interval | outcome | confirmed / "
-             "opens |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
-    for cid, r in rep["comparisons"].items():
+
+    def head():
+        return ["| id | exam | X | Y | D | D_sel | 2 sd | SE image | SE session | SE_sel | z | 90 % interval | outcome "
+                "| confirmed / opens |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+
+    def row(cid, r, extra=""):
         if r.get("status") != "decided":
-            lines.append("| %s | %s | %s | %s | not run: %s |  |  |  |  |  |  |  |" % (
-                cid, r.get("exam"), r.get("x"), r.get("y"), str(r.get("why"))[:80]))
-            continue
+            return "| %s | %s | %s | %s | not run: %s |  |  |  |  |  |  |  |  | %s |" % (
+                cid, r.get("exam"), r.get("x"), r.get("y"), str(r.get("why"))[:80], extra)
         d = r["decision"]
+        plain = r.get("plain")
+        sel = r.get("selection") or {}
+        return "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | [%s, %s] | %s%s | %s |" % (
+            cid, r["exam"], r["x"], r["y"], f(plain["diff"] if plain else d["diff"]), f(d["diff"] if plain else None),
+            f(d["two_sd"]), f((r.get("image") or {}).get("se")), f((r.get("session") or {}).get("se")),
+            f(sel.get("se_sel")), f(d["z"]), f(d["interval_90"][0]), f(d["interval_90"][1]), d["outcome"],
+            (" (%s)" % ", ".join(d["flags"])) if d["flags"] else "", extra)
+    dp = rep["dev_passes"]
+    lines = ["# V3F family report (%s)" % rep["generated_utc"], "",
+             "Decided on: %s. Dev passes of the family: %d (%s)." % (
+                 rep["decided_on"], dp, ", ".join("%s %d" % kv for kv in sorted((rep.get("dev_passes_by_kind")
+                                                                                 or {}).items()))), ""] + head()
+    for cid, r in rep["comparisons"].items():
         extra = ""
         if cid in rep["holm"]:
             extra = "family-confirmed" if rep["holm"][cid]["family_confirmed"] else "not confirmed"
         if cid.startswith("C_"):
-            extra = "opens a read" if (rep["gate"]["arms"].get(cid[2:]) or {}).get("opens_read") else "no read"
-        lines.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s | [%s, %s] | %s%s | %s |" % (
-            cid, r["exam"], r["x"], r["y"], f(d["diff"]), f(d["two_sd"]), f((r.get("image") or {}).get("se")),
-            f((r.get("session") or {}).get("se")), f(d["z"]), f(d["interval_90"][0]), f(d["interval_90"][1]),
-            d["outcome"], (" (%s)" % ", ".join(d["flags"])) if d["flags"] else "", extra))
+            g = rep["gate"]["arms"].get(cid[2:]) or {}
+            extra = "opens a read" if g.get("opens_read") else "no read"
+            if g.get("opens_read") and cid[2:] in F.REFERENCE_READS:
+                extra += " (its read is the reference read)"
+        if r.get("same_as"):
+            extra += " (= %s)" % r["same_as"]
+        lines.append(row(cid, r, extra))
+    sel_lines = ["%s: E3-B chosen in %.1f %% of the image resamples; plain D %s, plain image SE %s; D_sel %s, SE_sel %s"
+                 % (cid, 100.0 * float((r.get("plain") or {}).get("share_B_chosen") or 0.0),
+                    f((r.get("plain") or {}).get("diff")), f((r.get("plain") or {}).get("se")),
+                    f(r["decision"]["diff"]), f((r.get("selection") or {}).get("se_sel")))
+                 for cid, r in rep["comparisons"].items() if r.get("status") == "decided" and r.get("plain")]
+    if sel_lines:
+        lines += ["", "Selection-corrected (V3F.3.3):"] + ["- %s" % x for x in sel_lines]
+    decl = ["%s: %s" % (cid, r["declared"]) for cid, r in rep["comparisons"].items() if r.get("declared")]
+    if decl:
+        lines += ["", "Declared beside (V3F.3.7 item 4):"] + ["- %s" % x for x in decl]
+    if rep.get("full_dev_beside"):
+        lines += ["", "Full dev beside (decided on dev minus H):", "",
+                  "| id | D | z | 90 % interval | outcome |", "|---|---|---|---|---|"]
+        for cid, r in rep["full_dev_beside"].items():
+            if r.get("status") == "decided":
+                lines.append("| %s | %s | %s | [%s, %s] | %s |" % (cid, f(r["diff"]), f(r["z"]),
+                                                                    f(r["interval_90"][0]), f(r["interval_90"][1]),
+                                                                    r["outcome"]))
+            else:
+                lines.append("| %s | not run: %s |  |  |  |" % (cid, str(r.get("why"))[:80]))
+    if rep.get("e3_reread"):
+        lines += ["", "E3's recorded dev comparisons re-read on dev minus H (reported only):", ""] + head()
+        for cid, r in rep["e3_reread"]["dev_minus_h"].items():
+            lines.append(row(cid, r, "reported only"))
     lines += ["", "Reads in order: %s." % (", ".join("%s (%s)" % (o["arm"], o["kind"]) for o in rep["order"])
                                          or "none"), "",
               "| side | exam | species (seeds) | mean | agnostic | stage-1 agnostic |", "|---|---|---|---|---|---|"]
@@ -417,50 +782,57 @@ def _md(rep):
     return "\n".join(lines) + "\n"
 
 
-def verdict():
+def verdict(cap_refused=None):
     """L23L (module docstring): the family's comparisons on its committed scores; the non-dev records first, the
-    platform's dev record (capacity/v3fam_v1.json) once and last."""
+    platform's dev record (capacity/v3fam_v1.json) once and last. cap_refused: the items the ticker recorded
+    'not run (family cap)' (--cap-refused), written under v3fam/v1/cap first."""
     F.check_frozen()
     vp = verdict_path()
     if vp.exists():
         raise F.V3famRefused("%s exists: the family's verdict is written once" % vp)
     t0 = time.time()
     with F.e_trees_unchanged() as before:
+        ticker = record_ticker_refusals(cap_refused)
         arms = {a: arm_status(a) for a in F.SCORE_ARMS}
         fam = decide_family()
         comps = {k: _strip(v) for k, v in fam["comparisons"].items()}
         holm = fam["holm"]
         dev_ids = [c[0] for c in COMPARISONS if c[1] == "dev"]
         ext_ids = [c[0] for c in COMPARISONS if c[1] != "dev"]
+        s_ids = [c[0] for c in TIER_S] + [c[0] for c in TIER_S_ARRAYS]
+        s_exam = dict([(c[0], c[1]) for c in TIER_S] + [(c[0], c[1]) for c in TIER_S_ARRAYS])
+        passes = dev_passes()
         common = {"family": F.NAME, "decided_by": F.DECIDED_BY, "code": dict(F.code_shas(),
                                                                           v3fam_verdict=C.sha256_file(__file__)),
                   "e_trees": {"files": len(before), "sha256": C.sha256_text(json.dumps(before, sort_keys=True))},
-                  "written_utc": F._utc()}
+                  "cap_refused": sorted(p.stem for p in F.cap_dir().glob("*.json")) if F.cap_dir().is_dir() else [],
+                  "cap_refused_by_ticker": ticker, "written_utc": F._utc()}
         ext = dict(common, format=FMT_EXTERNAL, status="decided",
                    primaries={p: comps[p] for p in ext_ids}, holm={p: holm[p] for p in ext_ids},
-                   tier_s={c[0]: comps[c[0]] for c in TIER_S if c[1] != "dev"},
+                   tier_s={c: comps[c] for c in s_ids if s_exam[c] != "dev"},
                    note="P6-P9 and the non-dev Tier S readings: never on the platform's evidence (V3F.3.5)")
         TS._write_json(cap_path(EXTERNAL), ext)
         TS._write_json(cap_path(EXT), dict(common, format=FMT_EXT, arms=ext_record(),
                                            note="ImageWeeds Ragweed AP50-95 (common ragweed, 2,010 boxes; other "
                                                 "ImageWeeds species scored only as OtherPlant) and agnostic; "
                                                 "ooddev_v1 agnostic; reported only"))
-        rep = dict(common, format=FMT_REPORT, decided_on=fam["decided_on"], dev_passes=dev_pass_count(),
-                   comparisons={k: dict(summary(v), exam=v.get("exam"), x=v.get("x"), y=v.get("y"),
-                                        decision=v.get("decision"), image=v.get("image"), session=v.get("session"),
-                                        why=v.get("why")) for k, v in comps.items()},
-                   holm=holm, gate=fam["gate"], order=fam["order"], arms=arms, table=_table(),
-                   generated_utc=F._utc())
+        rep = dict(common, format=FMT_REPORT, decided_on=fam["decided_on"], dev_passes=passes["total"],
+                   dev_passes_by_kind=passes["by_kind"],
+                   comparisons={k: report_row(v) for k, v in comps.items()},
+                   full_dev_beside=fam["full_dev_beside"], e3_reread=fam["e3_reread"],
+                   d0s_removals=fam["d0s_removals"], holm=holm, gate=fam["gate"], order=fam["order"], arms=arms,
+                   table=_table(), generated_utc=F._utc())
         TS._write_json(cap_path(REPORT + ".json"), rep)
         cap_path(REPORT + ".md").write_text(_md(rep))
         doc = dict(common, format=FMT_VERDICT, status="decided", exam="dev", decided_on=fam["decided_on"],
                    dev_minus_h=fam["dev_minus_h"], full_dev_beside=fam["full_dev_beside"],
+                   e3_reread=fam["e3_reread"], d0s_removals=fam["d0s_removals"],
                    primaries={p: comps[p] for p in dev_ids}, holm={p: holm[p] for p in dev_ids},
                    challengers=dict(fam["gate"], comparisons={a: comps["C_%s" % a] for a in F.CHALLENGERS}),
                    reads={"order": fam["order"], "cap": F.READ_CAP,
                           "bclean_triggered": any(o["kind"] == "bclean" for o in fam["order"])},
-                   tier_s={c[0]: comps[c[0]] for c in TIER_S if c[1] == "dev"},
-                   arms=arms, dev_passes=dev_pass_count(),
+                   tier_s={c: comps[c] for c in s_ids if s_exam[c] == "dev"},
+                   arms=arms, dev_passes=passes["total"], dev_passes_by_kind=passes["by_kind"],
                    sesoi=F.SESOI, rule="V3F.3.3: D > 2 pooled sd and D > SE; combined z; 90 % interval; outcome "
                                        "classes; Holm per exam; Tier C bar Phi^-1(1 - 0.05/14)",
                    note="dev only; the external primaries in capacity/%s; nothing switches" % EXTERNAL)
@@ -500,21 +872,35 @@ def family_job(name):
     return name.startswith("v3fam") or name in RC.V3FAM_EXPS.values()
 
 
-def spend_items(names=None):
+def spend_items(names=None, exclude_job=None):
     """The family's items as the cluster's records give them (inc2.v3fam.family_gpuh's input): every attempt of
-    every family job's provenance (one V100 per job: finished wall time, or its estimate while running), and
-    every family experiment's training runs (report.json's GPU-h once done, else exp.json's high estimate)."""
+    every family job's provenance (one V100 per job: finished wall time, or its estimate while running; every
+    attempt, so a retry adds to the first), every sealed-test read prepared by test-read whose score-test job has
+    not started (its read.json written, no attempt in its provenance yet: at its estimate, so a read prepared and
+    not yet submitted counts against the cap as a proposed item does), and every family experiment's training runs
+    (report.json's GPU-h once done, else exp.json's high estimate). exclude_job: the SLURM job id of the job asking,
+    whose own running attempt is left out (it adds its own estimate)."""
     out = []
     pdir = C.INC_DIR / "_campaign" / "provenance"
+    started = set()
     for p in sorted(pdir.glob("*.json")) if pdir.is_dir() else []:
         name = p.stem
         if not family_job(name) or (names is not None and not any(name.startswith(n) for n in names)):
             continue
         rec = F._read_json(p) or {}
         for i, att in enumerate(rec.get("attempts") or []):
+            started.add(name)
+            if exclude_job and str(att.get("job_id") or "") == str(exclude_job) and not att.get("finished_utc"):
+                continue
             h = _hours(att.get("started_utc"), att.get("finished_utc"))
             out.append({"item": "%s#%d" % (name, i), "state": "ended" if att.get("finished_utc") else "running",
                         "estimate": _estimate(name), "settled": h})
+    tdir = F.root() / "test"
+    for rj in sorted(tdir.glob("*/read.json")) if tdir.is_dir() else []:
+        name = "v3famtest_%s" % rj.parent.name.lower()
+        if name in started or (names is not None and not any(name.startswith(n) for n in names)):
+            continue
+        out.append({"item": "%s:prepared" % name, "state": "proposed", "estimate": READ_GPUH})
     if names is None:
         for exp in RC.V3FAM_EXPS.values():
             defn = F._read_json(C.INC_DIR / exp / "exp.json")
@@ -826,39 +1212,52 @@ def test_report(arm):
 
 
 def reanalyse_test(read_by, env=None):
-    """O4's re-analysis of stored test arrays (no inference; module docstring): capacity/v3fam_retest.json once."""
+    """O4's re-analysis of stored test arrays (no inference; module docstring): capacity/v3fam_retest.json once. It is
+    the last of the reads (V3F.3.6, decision 25): it refuses while a read of the verdict's order is neither prepared
+    nor recorded not run, so it never takes the cap's room from a read before it. Its own job's running attempt
+    is left out of the spend it checks (it adds its own estimate)."""
     who = F.read_by_value(read_by)
+    env = os.environ if env is None else env
     submitter = check_submitter(read_by, env)
-    read_verdict()
+    v = read_verdict()
     out = cap_path(RETEST)
     if out.exists():
         raise F.V3famRefused("%s exists: the re-analysis runs once" % out)
-    F.check_cap(spend_items(), "reanalyse_test", RETEST_GPUH)
-    stratum = F.dev_session_stratum(SYS.exam_rows("test"), SYS.exam_rows("dev"))
-    trig = d0s_trigger()
-    h = [str(k)[len("test/"):] for k in trig.get("h_test") or []]
-    minus = [r["key"] for r in SYS.exam_rows("test") if r["key"] not in set(h)] if h else None
-    rows = {}
-    for name, sub in (("A", "A"), ("M", "M"), ("B", "B"), ("reference", "reference")):
-        pairs = []
-        for s in F.SEEDS:
-            d = TS.root() / "test" / sub / ("s%d" % s)
-            jn = "test.identity.json" if sub == "reference" else "test.json"
-            doc = F._read_json(d / jn)
-            if not isinstance(doc, dict):
+    order = [o["arm"] for o in (v.get("reads") or {}).get("order") or []]
+    done = reads_done()
+    left = [a for a in order if a not in done]
+    if left:
+        raise F.V3famRefused("the re-analysis comes after the reads (V3F.3.6, decision 25): %s first (prepared with "
+                             "test-read, or recorded %s)" % (left, F.NOT_RUN_CAP))
+    t0 = time.time()
+    with F.e_trees_unchanged():
+        F.check_cap(spend_items(exclude_job=env.get("SLURM_JOB_ID")), "reanalyse_test", RETEST_GPUH)
+        stratum = F.dev_session_stratum(SYS.exam_rows("test"), SYS.exam_rows("dev"))
+        trig = d0s_trigger()
+        h = [str(k)[len("test/"):] for k in trig.get("h_test") or []]
+        minus = [r["key"] for r in SYS.exam_rows("test") if r["key"] not in set(h)] if h else None
+        rows = {}
+        for name, sub in (("A", "A"), ("M", "M"), ("B", "B"), ("reference", "reference")):
+            pairs = []
+            for s in F.SEEDS:
+                d = TS.root() / "test" / sub / ("s%d" % s)
+                jn = "test.identity.json" if sub == "reference" else "test.json"
+                doc = F._read_json(d / jn)
+                if not isinstance(doc, dict):
+                    continue
+                pairs.append(SC.load_npz(d / doc["images"]["name"]))
+            if len(pairs) != len(F.SEEDS):
+                rows[name] = {"status": "missing"}
                 continue
-            pairs.append(SC.load_npz(d / doc["images"]["name"]))
-        if len(pairs) != len(F.SEEDS):
-            rows[name] = {"status": "missing"}
-            continue
-        st = _arrays_mean(pairs, stratum)
-        rows[name] = {"status": "ok", "stratum": {"species": st, "mean": F._mean_sd(st)[0]}}
-        if minus is not None:
-            tm = _arrays_mean(pairs, minus)
-            rows[name]["test_minus_h"] = {"species": tm, "mean": F._mean_sd(tm)[0]}
-    rec = {"format": FMT_RETEST, "read_by": who, "incap_decided_by": submitter, "stratum_images": len(stratum),
-           "test_minus_h_images": None if minus is None else len(minus), "arms": rows,
-           "decided_by": F.DECIDED_BY, "written_utc": F._utc(),
-           "note": "re-analysis of E3's stored test arrays, no inference; descriptive (V3F.3.6)"}
-    F.write_once(out, rec)
+            st = _arrays_mean(pairs, stratum)
+            rows[name] = {"status": "ok", "stratum": {"species": st, "mean": F._mean_sd(st)[0]}}
+            if minus is not None:
+                tm = _arrays_mean(pairs, minus)
+                rows[name]["test_minus_h"] = {"species": tm, "mean": F._mean_sd(tm)[0]}
+        rec = {"format": FMT_RETEST, "read_by": who, "incap_decided_by": submitter, "stratum_images": len(stratum),
+               "test_minus_h_images": None if minus is None else len(minus), "arms": rows, "reads_before": order,
+               "decided_by": F.DECIDED_BY, "written_utc": F._utc(),
+               "note": "re-analysis of E3's stored test arrays, no inference; descriptive (V3F.3.6)"}
+        F.write_once(out, rec)
+    log("re-analysis written (%.0fs)" % (time.time() - t0))
     return rec

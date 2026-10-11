@@ -166,10 +166,11 @@ def image_sizes(rows):
 
 
 # ------------------------------------------------------------------ a family experiment's runs
-def run_source(exp, seed, testing_ok=False):
+def run_source(exp, seed, testing_ok=False, read_dev=True):
     """What seed `seed` of a family experiment scores (twostage._source's checks for any experiment): the base
     run's final.pt (a regular file hashing as its run.json says), its final run carrying the same weights, that
-    final run's recorded protocol dev score (production unless testing_ok), the research-only flag."""
+    final run's recorded protocol dev score (production unless testing_ok), the research-only flag. read_dev
+    False (D5b, Revision 30): the final run's scores/dev.json is never opened and no dev number is returned."""
     seed = int(seed)
     root_ = C.INC_DIR / exp
     defn = _read_json(root_ / "exp.json")
@@ -191,6 +192,14 @@ def run_source(exp, seed, testing_ok=False):
     fj = _read_json(root_ / "runs" / frid / "run.json")
     if not isinstance(fj, dict) or fj.get("status") != "done" or fj.get("weights_sha256") != wsha:
         raise F.V3famRefused("%s/%s is not done or does not carry %s's weights" % (exp, frid, rid))
+    ro = defn.get("research_only")
+    flag = ro.get("flag") if isinstance(ro, dict) else ro
+    out = {"exp": exp, "seed": seed, "run_id": rid, "final_run_id": frid, "weights": str(w.resolve()),
+           "weights_sha256": wsha, "base_run_json_sha256": _sha(root_ / "runs" / rid / "run.json"),
+           "final_run_json_sha256": _sha(root_ / "runs" / frid / "run.json"),
+           "research_only": True if flag is None else bool(flag), "definition": defn}
+    if not read_dev:
+        return out
     rp = root_ / "runs" / frid / "scores" / "dev.json"
     rec = _read_json(rp)
     if not isinstance(rec, dict) or rec.get("exam") != "dev":
@@ -199,15 +208,11 @@ def run_source(exp, seed, testing_ok=False):
         raise F.V3famRefused("%s is not a production score" % rp)
     if rec.get("weights_sha256") != wsha:
         raise F.V3famRefused("%s names weights %s, not the base run's" % (rp, str(rec.get("weights_sha256"))[:12]))
-    ro = defn.get("research_only")
-    flag = ro.get("flag") if isinstance(ro, dict) else ro
-    return {"exp": exp, "seed": seed, "run_id": rid, "final_run_id": frid, "weights": str(w.resolve()),
-            "weights_sha256": wsha, "base_run_json_sha256": _sha(root_ / "runs" / rid / "run.json"),
-            "final_run_json_sha256": _sha(root_ / "runs" / frid / "run.json"),
-            "recorded": {"file": "%s/%s/scores/dev.json" % (exp, frid), "sha256": _sha(rp),
+    out.update(recorded={"file": "%s/%s/scores/dev.json" % (exp, frid), "sha256": _sha(rp),
                          "species_map50_95": rec.get("species_map50_95"),
                          "agnostic_map50_95": rec.get("agnostic_map50_95"), "production": rec.get("production")},
-            "recorded_doc": rec, "research_only": True if flag is None else bool(flag), "definition": defn}
+               recorded_doc=rec)
+    return out
 
 
 def source_record(src):

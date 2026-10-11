@@ -7,7 +7,7 @@ family)", V3F.5 D2 and D9; kept byte for byte as docs/prereg/V3F_2026-10-11.md).
                                                                           D2RN50|D2BC1|D2BC2640|D2FT|D9
         (L23J: inc2.v3fam score --arm X)
     python -m weed_optimizer_framework.tools.inc2.v3fam_embed plan                            (the delegate, step 0c)
-    python -m weed_optimizer_framework.tools.inc2.v3fam_embed downloads [--commands FILE]     (the delegate, step 0c)
+    python -m weed_optimizer_framework.tools.inc2.v3fam_embed downloads --commands LOG       (the delegate, step 0c)
     python -m weed_optimizer_framework.tools.inc2.v3fam_embed status
         [--batch N --device D --no-lock-check-for-tests]   (test mode only, INC_SCORER_TESTING=1)
 
@@ -112,6 +112,7 @@ import io
 import json
 import math
 import os
+import re
 import statistics
 import sys
 import time
@@ -1564,10 +1565,17 @@ def score(arm, **kw):
 
 
 # ------------------------------------------------------------------ the downloads (V3F.5 D2, step 0c)
+DATE_CMD = "date -u +%Y-%m-%dT%H:%M:%SZ"
+UTC_LINE_RE = re.compile(r"^\s*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s*$", re.M)
+
+
 def download_plan():
-    """The delegate's download commands (login node, into the default cache): the files of DOWNLOAD_FILES at the
-    amendment's revisions (ResNet-50 a1: the revision the other cache holds), then `downloads`."""
-    lines = ["# V3F step 0c (login node): fetch at the pinned revisions into %s, then record them:" % hub_cache()]
+    """The delegate's download commands (login node, into the default cache), run with their output logged (V3F.5
+    D2: the commands and times go into downloads.json): the UTC time before and after each download, the files of
+    DOWNLOAD_FILES at the amendment's revisions (ResNet-50 a1: the revision the other cache holds), then
+    `downloads --commands` with that log."""
+    lines = ["# V3F step 0c (login node): run these with their output logged, e.g. bash -x plan.sh 2>&1 | tee "
+             "downloads.log; fetch at the pinned revisions into %s, then record them:" % hub_cache()]
     for bb, files in DOWNLOAD_FILES.items():
         e = BACKBONES[bb]
         if e["loader"] == "open_clip":
@@ -1576,19 +1584,41 @@ def download_plan():
                   "write that sha into refs/main" % (e["revision"], e["revision"])
         else:
             rev = e["revision"] or "<the revision /ocean/projects/cis240145p/byler/hf_cache/hub holds>"
+        lines.append("echo '%s start'; %s" % (bb, DATE_CMD))
         lines.append("HF_HUB_OFFLINE=0 huggingface-cli download %s %s --revision %s" % (e["repo"], " ".join(files), rev))
-    lines.append("python -m weed_optimizer_framework.tools.inc2.v3fam_embed downloads --commands <this log>")
+        lines.append("echo '%s end'; %s" % (bb, DATE_CMD))
+    lines.append("python -m weed_optimizer_framework.tools.inc2.v3fam_embed downloads --commands downloads.log")
     return "\n".join(lines)
+
+
+def command_log(commands):
+    """{file, sha256, text, times: [first, last], n_times} of the delegate's download log (V3F.5 D2: the commands
+    and times), refused when it is missing, empty or records no UTC time line (DATE_CMD's output)."""
+    if not commands:
+        raise Refused("downloads needs --commands <the download log> (V3F.5 D2: the commands and times are logged in "
+                      "downloads.json, which is written once)")
+    p = Path(commands)
+    if not p.is_file() or not p.read_text().strip():
+        raise Refused("the download log %s is missing or empty" % p)
+    text = p.read_text()
+    times = UTC_LINE_RE.findall(text)
+    if not times:
+        raise Refused("the download log %s records no UTC time (download_plan's '%s' lines): the times are part of "
+                      "the record" % (p, DATE_CMD))
+    return {"file": p.name, "sha256": C.sha256_file(p), "text": text, "times": [times[0], times[-1]],
+            "n_times": len(times)}
 
 
 def record_downloads(commands=None):
     """v3fam/v1/downloads.json, written once (the delegate, step 0c): for every backbone of the registry, the
     default cache's revision (the amendment's where it pins one; else refs/main, or the one snapshot), every
     file of that snapshot with its sha256 and size, the weight file its loader opens, and its status: ok, or
-    missing / mismatch with why (that backbone is then not run, with no substitute)."""
+    missing / mismatch with why (that backbone is then not run, with no substitute); and the delegate's command
+    log with its first and last UTC time (command_log: required, so the record is never written without it)."""
     out = downloads_path()
     if out.exists():
         raise Refused("%s exists: written once" % out)
+    cmd_log = command_log(commands)
     bbs = {}
     for bb, e in sorted(BACKBONES.items()):
         rd = repo_dir(e["repo"])
@@ -1624,9 +1654,7 @@ def record_downloads(commands=None):
         bbs[bb] = r
     doc = {"format": FMT_DOWNLOADS, "cache": str(hub_cache()), "backbones": bbs, "decided_by": F.DECIDED_BY,
            "code": code_shas(), "created_utc": TS._utc()}
-    if commands:
-        text = Path(commands).read_text()
-        doc["commands"] = {"file": Path(commands).name, "sha256": C.sha256_file(commands), "text": text}
+    doc["commands"] = cmd_log
     F.write_once(out, doc)
     log("downloads: %s" % {k: v["status"] for k, v in bbs.items()})
     return doc
@@ -1638,7 +1666,8 @@ def main(argv=None):
                                              "classifier's fit-sample sensitivity); dev only.")
     ap.add_argument("command", choices=("score", "plan", "downloads", "status"))
     ap.add_argument("--arm", default=None)
-    ap.add_argument("--commands", default=None, help="downloads: the delegate's command log, kept in the record")
+    ap.add_argument("--commands", default=None, help="downloads (required): the delegate's command log with its "
+                                                     "UTC times, kept in the record")
     ap.add_argument("--batch", type=int, default=None, help="protocol %d; another only with %s=1" % (S.BATCH,
                                                                                                     S.TEST_ENV))
     ap.add_argument("--device", default=None)

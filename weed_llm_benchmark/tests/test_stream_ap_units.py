@@ -3220,19 +3220,23 @@ def t_v3fam():
             "on TRAIN, in V3F.7's order once its gate opens, record only, within the family cap of 260 GPU-h")
     dom = LS.load_domain("weed")
     fam = dom["v3fam"]
-    check("the domain's v3fam block: the amendment's commit and sha256, the order of V3F.7, D0BCLEAN first among the "
-          "builds, D5b's three builds blocked, the cap 260 GPU-h and the 30 GiB storage margin",
+    from weed_optimizer_framework.tools.inc2 import v3fam as F
+    rev = pathlib.Path(__file__).resolve().parents[2] / fam["revision_file"]
+    check("the domain's v3fam block: the amendment's commit and sha256, Revisions 29-31's file and sha256 (the file's "
+          "own, v3fam.REVISION_SHA256), the order of V3F.7, D0BCLEAN first among the builds, no build blocked (D5b "
+          "builds with dev as its only final, Revision 30), the cap 260 GPU-h and the 30 GiB storage margin",
           fam["amendment_commit"] == "55cc2d97cd2147d01644c1e193098b73aeba0a06"
           and fam["amendment_sha256"] == "5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f"
+          and fam["revision_sha256"] == F.REVISION_SHA256 == hashlib.sha256(rev.read_bytes()).hexdigest()
+          and fam["revision_file"] == F.REVISION_FILE
           and fam["pre_build_scores"] == ["E3RS", "D2LAION", "D2CLIP", "D2DINOL", "D2DINOB", "D2SIGLIP", "D2RN50",
                                           "D2BC1", "D2BC2640", "D2FT", "D3", "D9"]
           and fam["builds"] == ["D0BCLEAN", "D8M", "D8S", "D4F", "D4N", "D4R15", "D1A1", "D1B1", "D1A12", "D5B0",
                                 "D5B25", "D5B100"]
           and fam["post_build_scores"] == ["BCLEAN", "D8", "D4F", "D4N", "D4R15", "D1", "D5B", "D6"]
-          and sorted(fam["blocked_builds"]) == ["D5B0", "D5B100", "D5B25"] and fam["cap_gpu_hours"] == 260.0
+          and fam["blocked_builds"] == {} and fam["cap_gpu_hours"] == 260.0
           and fam["storage_margin_gib"] == 30.0 and fam["max_failures"] == 2, fam.get("builds"))
     from weed_optimizer_framework.tools.inc2 import recipes as RC
-    from weed_optimizer_framework.tools.inc2 import v3fam as F
     check("the domain's arm lists are the family's (inc2.v3fam.SCORE_ARMS, inc2.recipes.V3FAM_EXPS)",
           sorted(fam["pre_build_scores"] + fam["post_build_scores"]) == sorted(F.SCORE_ARMS)
           and fam["build_exps"] == RC.V3FAM_EXPS and sorted(fam["budget_builds"]) == sorted(RC.V3FAM_BUDGET_ARMS)
@@ -3241,6 +3245,7 @@ def t_v3fam():
     prices = {}
     for lid, prm, info in (("L23H", {"pkg": "inc2"}, {}), ("L23L", {"pkg": "inc2"}, {}),
                            ("L23K", {"pkg": "inc2", "verb": "smoke"}, {}), ("L23K", PARAMS["L23K"], {}),
+                           ("L23K", dict(PARAMS["L23K"], seeds="1,2"), {}),
                            ("L23J", {"pkg": "inc2", "arm": "E3RS"}, {}), ("L23J", {"pkg": "inc2", "arm": "D2FT"}, {}),
                            ("L23J", {"pkg": "inc2", "arm": "D9"}, {}),
                            ("L23I", PARAMS["L23I"], {"images": 15432}),
@@ -3248,12 +3253,15 @@ def t_v3fam():
                            ("L23I", dict(PARAMS["L23I"], exp="v3_d1_a12_m640", arm="D1A12"), {"images": 3088})):
         est, det = LS.price(lid, LS.policy_params(lid, prm), dom, info)
         ok, bad = LS.check_params(lid, dict(LS.policy_params(lid, prm), est_gpu_hours=est))
-        prices["%s %s" % (lid, prm.get("arm") or prm.get("verb") or "")] = (est, ok)
-    want = {"L23H ": 2.0, "L23L ": 0.5, "L23K smoke": 0.5, "L23K train": 72.0, "L23J E3RS": 4.3, "L23J D2FT": 2.75,
+        prices["%s %s%s" % (lid, prm.get("arm") or prm.get("verb") or "",
+                            "" if prm.get("seeds") in (None, "0,1,2") or lid != "L23K" else " " + prm["seeds"])] = (est, ok)
+    want = {"L23H ": 2.0, "L23L ": 0.5, "L23K smoke": 0.5, "L23K train": 72.0, "L23K train 1,2": 48.0,
+            "L23J E3RS": 4.3, "L23J D2FT": 2.75,
             "L23J D9": 4.4, "L23I D4F": round(3 * 15432 * 78 * 14.2 / 3.6e6 + 0.3 + 4.0, 3),
             "L23I D8S": round(3 * 3048 * 100 * 8.3 / 3.6e6 + 0.3 + 4.0, 3),
             "L23I D1A12": round(3 * 3088 * 100 * 14.2 / 3.6e6 + 0.3 + 4.0, 3)}
-    check("prices (V3F.6.3): L23H 2.0, L23L 0.5, L23K smoke 0.5 and train 72, L23J per arm (E3RS 4.3, FT 2.75, D9 "
+    check("prices (V3F.6.3): L23H 2.0, L23L 0.5, L23K smoke 0.5 and train 24 per seed (72; a retry of two seeds 48), "
+          "L23J per arm (E3RS 4.3, FT 2.75, D9 "
           "4.4), L23I seeds x image-epochs x the measured rate (m640 14.2 ms, s640 8.3) + finals + the build job; each "
           "inside its policy row", all(abs(prices[k][0] - v) < 1e-6 and prices[k][1] for k, v in want.items()),
           prices)
@@ -3275,7 +3283,11 @@ def t_v3fam():
                                                      "--role", "baseline"]),
                            ("L23K", {"pkg": "inc2", "verb": "smoke"}, ["run_inc2_detr.sh", MODT + "inc2.v3fam_detr",
                                                                        "smoke"]),
-                           ("L23K", PARAMS["L23K"], [MODT + "inc2.v3fam_detr", "train", "--seeds", "0,1,2"])):
+                           ("L23K", PARAMS["L23K"], [MODT + "inc2.v3fam_detr", "train", "--seeds", "0,1,2"]),
+                           ("L23K", dict(PARAMS["L23K"], seeds="2"), [MODT + "inc2.v3fam_detr", "train", "--seeds",
+                                                                     "2"]),
+                           ("L23L", {"pkg": "inc2", "cap_refused": "build:D4F,score:D2CLIP"},
+                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "build:D4F,score:D2CLIP"])):
         pp = LS.policy_params(lid, prm)
         argv = LS.render(lid, pp)
         act = LS.row(lid)["policy_action"]
@@ -3304,7 +3316,14 @@ def t_v3fam():
             ("build", ["inc2.baseline", "build", "--exp", "v3_d4_n_m640", "--v3fam", "D4N", "--seeds", "0",
                        "--role", "baseline"], False, None),
             ("detr", ["inc2.v3fam_detr", "train"], False, None),
-            ("detr", ["inc2.v3fam_detr", "train", "--seeds", "0"], False, None),
+            ("detr", ["inc2.v3fam_detr", "train", "--seeds", "0"], True, "inc_detr_v3fam_s0"),
+            ("detr", ["inc2.v3fam_detr", "train", "--seeds", "1,2"], True, "inc_detr_v3fam_s1"),
+            ("detr", ["inc2.v3fam_detr", "train", "--seeds", "2,1"], False, None),
+            ("detr", ["inc2.v3fam_detr", "train", "--seeds", "3"], False, None),
+            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "build:D4F,score:D2CLIP,detr:train"], True,
+             "inc_build_v3fam_v1"),
+            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "score:d1"], False, None),
+            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "verdict"], False, None),
             ("detr", ["inc2.v3fam_detr", "score"], False, None),
             ("detr", ["inc2.twostage", "verdict"], False, None)):
         try:
@@ -3338,6 +3357,10 @@ def t_v3fam():
         wg = _v3fam_world("v3fam_gate_%s" % tag.replace(" ", "_"), data=False, **kw)
         wg.tick(3)
         res[tag] = [e.get("lever") for e in _fam_pro(wg)]
+    wrv = _v3fam_world("v3fam_gate_revision", data=False)
+    (wrv.dir / "docs" / "prereg" / "V3F_rev29-31_2026-10-11.md").unlink()
+    wrv.tick(3)
+    res["the deployed tree without Revisions 29-31's file"] = [e.get("lever") for e in _fam_pro(wrv)]
     wz = _v3fam_world("v3fam_gate_zoo", data=False)
     (wz.inc / "capacity" / "zoo_v1.json").unlink()
     wz.zoo_record("partial")
@@ -3371,13 +3394,16 @@ def t_v3fam():
     pro = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(w)]
     maint = [(l, a) for l, a in pro if l != "L23K"]
     want_maint = ([("L23H", "build")] + [("L23J", a) for a in fam["pre_build_scores"]]
-                  + [("L23I", a) for a in ("D8M", "D8S", "D4F", "D4N", "D4R15", "D1A1", "D1B1", "D1A12")]
-                  + [("L23J", a) for a in ("D8", "D4F", "D4N", "D4R15", "D1", "D6")] + [("L23L", "verdict")])
+                  + [("L23I", a) for a in ("D8M", "D8S", "D4F", "D4N", "D4R15", "D1A1", "D1B1", "D1A12", "D5B0",
+                                           "D5B25", "D5B100")]
+                  + [("L23J", a) for a in ("D8", "D4F", "D4N", "D4R15", "D1", "D5B", "D6")] + [("L23L", "verdict")])
     ex = [e for e in w.events("executed") if e.get("lever") in S.V3FAM_LEVERS]
     check("then, in V3F.7's order, one MAINT item at a time: L23J for E3RS, D2's nine, D3, D9; L23I for D8M, D8S, D4F, "
-          "D4N, D4R15, D1A1, D1B1, D1A12 (D0BCLEAN not triggered, D5b blocked); L23J for D8, D4F, D4N, D4R15, D1, D6 "
-          "once their runs are done (BCLEAN not needed, D5B not run); then L23L once; every item once, every one "
-          "executed within the envelope", done and maint == want_maint
+          "D4N, D4R15, D1A1, D1B1, D1A12, D5B0, D5B25, D5B100 (D0BCLEAN not triggered; D5b's builds no longer "
+          "blocked, Revision 30); L23J for D8, D4F, D4N, D4R15, D1, D5B, D6 once their runs are done (BCLEAN not "
+          "needed); then L23L once (no --cap-refused: nothing refused); every item once, every one executed within "
+          "the envelope", done and maint == want_maint
+          and "--cap-refused" not in (_fam_pro(w, "L23L")[0].get("argv") or [])
           and len(ex) == len(pro) and all(e.get("basis") == "envelope" for e in ex), (done, maint))
     check("  and on TRAIN L23K's smoke after L23H, then its three seeds in one item (three jobs inc_detr_v3fam_s0..s2)",
           [(l, a) for l, a in pro if l == "L23K"] == [("L23K", "smoke"), ("L23K", "0,1,2")]
@@ -3394,12 +3420,11 @@ def t_v3fam():
     cards = [c for c in w.state().get("cards") or [] if c.get("lever") in S.V3FAM_LEVERS]
     vc = [c for c in cards if c["title"].startswith("V3F's verdict is decided")]
     check("  one verdict card with each read's exact commands in the verdict's order (test-read with --read-by, "
-          "INCAP_DECIDED_BY, test-report, the re-analysis), and D5b's block card",
+          "INCAP_DECIDED_BY, test-report, the re-analysis); no D5b block card",
           len(vc) == 1 and "test-read --arm D6 --read-by owner|delegate" in vc[0]["detail"]
           and "test-report --arm D8M" in vc[0]["detail"] and "INCAP_DECIDED_BY" in vc[0]["detail"]
           and "reanalyse-test" in vc[0]["detail"]
-          and len([c for c in cards if "D5b's builds wait for a Revision" in c["title"]]) == 1,
-          [c["title"] for c in cards])
+          and not [c for c in cards if "D5b's builds wait" in c["title"]], [c["title"] for c in cards])
     check("  nothing of the family is proposed again", [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(w)] == pro)
     # BCLEAN, when D0-S triggered it: its build first, and its scores first after the builds
     wb = _v3fam_world("v3fam_bclean", bclean=True)
@@ -3434,6 +3459,15 @@ def t_v3fam():
     _fam_run(wf, ticks=6, until=lambda: any(_fam_arg(e) == "D2CLIP" for e in _fam_pro(wf, "L23J")))
     stf = wf.state()
     fc = [c["title"] for c in stf.get("cards") or [] if "D2LAION" in c["title"]]
+    rec2 = stf["v3fam"]["items"]["score:D2LAION"]
+    fcard = [c for c in stf.get("cards") or [] if c["title"] == "V3F's scores of arm D2LAION failed (L23J)"]
+    check("  the retry keeps the first attempt's GPU-h (0.5 h from sacct) in prior_gpuh, never overwritten, and the "
+          "second's settled beside it (1.0 GPU-h for the two); the card's rerun is an sbatch job with "
+          "INCAP_DECIDED_BY, never a foreground run", once.get("prior_gpuh") == 0.5 and once.get("spend") == "open"
+          and rec2.get("prior_gpuh") == 0.5 and rec2.get("settled") == 0.5 and len(rec2.get("attempts") or []) == 1
+          and fcard and "sbatch -p GPU-shared --job-name=inc_build_v3fam_score_d2laion run_inc2_build.sh inc2.v3fam "
+                        "score --arm D2LAION" in fcard[0]["detail"] and "INCAP_DECIDED_BY" in fcard[0]["detail"],
+          (once, rec2, [c["detail"][-200:] for c in fcard]))
     check("a failed L23J (D2LAION, sacct FAILED): one card, proposed once more under a new id; after its second "
           "failure recorded failed (a card), its id declined, no lane failure, no pause, and D2CLIP follows",
           once.get("state") == "running" and len(set(ids1)) == 2
@@ -3512,6 +3546,133 @@ def t_v3fam():
           and all(str(v).startswith("not run") for k, v in ((wc.state().get("stage") or {}).get("v3fam") or {})
                   .get("score", {}).items() if k.startswith("D2")) if (wc.state().get("stage") or {}).get("v3fam")
           else True)
+    _v3fam_more()
+
+
+def _v3fam_more():
+    """V3F's ticker fixes of the implementation review (2026-10-11): retries counted against the cap, L23K's
+    walltime, a retry of the seeds not yet trained, an ended build charged, the cap refusals in the verdict's argv,
+    the storage projection."""
+    # every attempt counts against the cap: the family's spend after a retry (S.StreamRun's own methods)
+    fam = LS.load_domain("weed")["v3fam"]
+
+    class Fam(object):
+        _v3fam = S.StreamRun._v3fam
+        _v3fam_item = S.StreamRun._v3fam_item
+        _v3fam_key = staticmethod(S.StreamRun._v3fam_key)
+        _v3fam_fold = staticmethod(S.StreamRun._v3fam_fold)
+        _v3fam_started = S.StreamRun._v3fam_started
+        _v3fam_settle = S.StreamRun._v3fam_settle
+        _v3fam_spend = S.StreamRun._v3fam_spend
+
+        _v3fam_cap_ok = S.StreamRun._v3fam_cap_ok
+        ev = None
+
+        def __init__(self):
+            self.st, self.dom, self.utc = {}, {"v3fam": fam}, "2026-10-12T00:00:00Z"
+
+        def _v3fam_report(self, exp, payload):
+            return None
+
+        def _ledger(self, *a, **k):
+            pass
+
+        def _card(self, *a, **k):
+            pass
+    f = Fam()
+    it = {"lever": "L23J", "proposal": {"id": "p1", "params": {"arm": "D2LAION"}, "est_gpu_hours": 1.0}}
+    f._v3fam_started(it)
+    f._v3fam_settle(it, [{"elapsed_s": 18000.0, "gpu_count": 1}])
+    f._v3fam_item("L23J", {"arm": "D2LAION"})["state"] = "failed_once"
+    it2 = {"lever": "L23J", "proposal": {"id": "p2", "params": {"arm": "D2LAION"}, "est_gpu_hours": 1.0}}
+    f._v3fam_started(it2)
+    mid = f._v3fam_spend({}, {})
+    f._v3fam_started(it2)                       # the same run taken back after a restart: not a new attempt
+    again = f._v3fam_spend({}, {})
+    f._v3fam_settle(it2, [{"elapsed_s": 3600.0, "gpu_count": 1}])
+    end = f._v3fam_spend({}, {})
+    it3 = {"lever": "L23J", "proposal": {"id": "p3", "params": {"arm": "D2CLIP"}, "est_gpu_hours": 1.0}}
+    f._v3fam_started(it3)
+    refused = not f._v3fam_cap_ok("L23J", {"arm": "D2CLIP"}, 300.0)
+    rec3 = f._v3fam_item("L23J", {"arm": "D2CLIP"})
+    capped = f._v3fam_spend({}, {}) if refused and rec3.get("state") == S.V3FAM_NOT_RUN_CAP else None
+    check("the cap counts every attempt: D2LAION's first job (5 GPU-h from sacct) failed and its retry runs at its "
+          "estimate: 6.0; the same run taken back after a restart is not a new attempt (6.0); the retry settled at 1 "
+          "GPU-h: 6.0, never the retry's 1.0 alone; an item refused at the cap after an attempt keeps that attempt's "
+          "estimate (7.0)", abs(mid - 6.0) < 1e-9 and abs(again - 6.0) < 1e-9 and abs(end - 6.0) < 1e-9
+          and capped is not None and abs(capped - 7.0) < 1e-9, (mid, again, end, capped))
+    # an L23K seed killed at its walltime: D6 fails at once, never retried; D6's scores not run, the verdict proposed
+    wt = _v3fam_world("v3fam_timeout")
+    _fam_run(wt, ticks=90, until=lambda: any(j["name"] == "inc_detr_v3fam_s1" for j in wt.squeue),
+             skip=("inc_detr_v3fam_s0", "inc_detr_v3fam_s1", "inc_detr_v3fam_s2"))
+    for k, stt in ((0, "COMPLETED"), (1, "TIMEOUT"), (2, "COMPLETED")):
+        wt.job_done("inc_detr_v3fam_s%d" % k, state=stt, elapsed=129600.0 if stt == "TIMEOUT" else 80000.0)
+    wt.v3fam_detr(trained=(0, 2))
+    _fam_run(wt, ticks=120, until=lambda: wt.state().get("v3fam", {}).get("items", {}).get("verdict"))
+    pt = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wt)]
+    trec = wt.state()["v3fam"]["items"]["detr:train"]
+    tcards = [c for c in wt.state().get("cards") or [] if c.get("lever") == "L23K" and "failed" in c["title"]]
+    check("an L23K seed ending TIMEOUT (its 36 h walltime): train recorded failed at once (never proposed again), "
+          "its three jobs' GPU-h settled (%.1f), one card citing V3F.7; D6's scores not run; the verdict proposed"
+          % float(trec.get("settled") or 0), trec.get("state") == "failed" and trec.get("fails") == 1
+          and "walltime" in str(trec.get("why")) and abs(float(trec.get("settled") or 0) - (129600 + 160000) / 3600.0)
+          < 1e-4 and [a for l, a in pt if l == "L23K"].count("0,1,2") == 1 and ("L23J", "D6") not in pt
+          and ("L23L", "verdict") in pt and len(tcards) == 1 and "V3F.7" in tcards[0]["detail"], (trec, pt, tcards))
+    # a train item failing otherwise: proposed once more naming only the seeds not yet trained
+    wr = _v3fam_world("v3fam_detr_retry")
+    _fam_run(wr, ticks=90, until=lambda: any(j["name"] == "inc_detr_v3fam_s1" for j in wr.squeue),
+             skip=("inc_detr_v3fam_s0", "inc_detr_v3fam_s1", "inc_detr_v3fam_s2"))
+    for k, stt in ((0, "COMPLETED"), (1, "FAILED"), (2, "COMPLETED")):
+        wr.job_done("inc_detr_v3fam_s%d" % k, state=stt)
+    wr.v3fam_detr(trained=(0, 2))
+    _fam_run(wr, ticks=10, until=lambda: any(j["name"] == "inc_detr_v3fam_s1" for j in wr.squeue),
+             skip=("inc_detr_v3fam_s0", "inc_detr_v3fam_s1", "inc_detr_v3fam_s2"))
+    kt = [(e.get("lever"), _fam_arg(e), e.get("est_gpu_hours")) for e in _fam_pro(wr, "L23K")]
+    queued = sorted(j["name"] for j in wr.squeue if j["name"].startswith("inc_detr_v3fam_s"))
+    rcard = [c for c in wr.state().get("cards") or [] if c.get("lever") == "L23K" and "failed" in c["title"]]
+    check("an L23K train failing otherwise (seed 1 FAILED, seeds 0 and 2 trained): proposed once more with --seeds 1 "
+          "only (24 GPU-h), one job inc_detr_v3fam_s1; the card's rerun is the sbatch of seed 1 alone",
+          [a for _l, a, _e in kt] == ["smoke", "0,1,2", "1"] and kt[-1][2] == 24.0 and queued == ["inc_detr_v3fam_s1"]
+          and bool(rcard) and "inc2.v3fam_detr train --seed 1" in rcard[-1]["detail"]
+          and "train --seed 0" not in rcard[-1]["detail"] and "train --seed 2" not in rcard[-1]["detail"],
+          (kt, queued, [c["detail"][-300:] for c in rcard]))
+    # a family build that ended without its experiment: charged its build job's sacct, never 0
+    wbld = _v3fam_world("v3fam_build_ended")
+    _fam_run(wbld, ticks=90, until=lambda: any(j["name"] == "inc_build_v3_d8_m640_tc" for j in wbld.squeue),
+             skip=("inc_build_v3_d8_m640_tc",))
+    wbld.job_done("inc_build_v3_d8_m640_tc", state="FAILED", elapsed=7200.0,
+                  refusal="[inc2.baseline] ERROR: refused")
+    _fam_run(wbld, ticks=S.BUILD_LOST_SNAPSHOTS + 3,
+             until=lambda: (wbld.state().get("v3fam", {}).get("items", {}).get("build:D8M") or {}).get("fails"),
+             skip=("inc_build_v3_d8_m640_tc",))
+    brec = wbld.state()["v3fam"]["items"].get("build:D8M") or {}
+    check("an L23I build that ended without its experiment (sacct FAILED after 2 h): its build job's GPU-h settled "
+          "from sacct (2.0) against the cap, never 0", brec.get("fails") == 1 and abs(float(
+              brec.get("settled") if brec.get("settled") is not None else brec.get("prior_gpuh") or -1) - 2.0) < 1e-9,
+          brec)
+    # the ticker's cap refusals reach the cluster: the verdict's argv names them
+    wv = _v3fam_world("v3fam_cap_argv")
+    wv.tick(1)
+    st0 = json.loads((S.StreamPaths(str(wv.lab), "weed").state(NAME)).read_text())
+    st0.setdefault("v3fam", {"items": {}})["items"]["build:D4F"] = {"state": S.V3FAM_NOT_RUN_CAP, "spend": None,
+                                                                    "estimate": 18.5, "lever": "L23I"}
+    S.StreamPaths(str(wv.lab), "weed").state(NAME).write_text(json.dumps(st0))
+    _fam_run(wv, ticks=120, until=lambda: bool(_fam_pro(wv, "L23L")))
+    lv = _fam_pro(wv, "L23L")
+    argv = (lv[0].get("argv") or []) if lv else []
+    check("an item the ticker recorded 'not run (family cap)' (build:D4F) is named in L23L's argv (--cap-refused "
+          "build:D4F), so the verdict writes it under v3fam/v1/cap and the family table gives that reason",
+          argv[-2:] == ["--cap-refused", "build:D4F"], argv)
+    # the storage projection: one card naming the shortfall before the family stalls midway
+    wq = _v3fam_world("v3fam_storage_projection", data=False)
+    wq.quota_rec = {"ok": True, "used_gb": 6590.0, "quota_gb": 6840.0, "free_gb": 250.0}
+    wq.tick(3)
+    pc = [c for c in wq.state().get("cards") or [] if "more on /ocean" in c["title"]]
+    wq.tick(3)
+    pc2 = [c for c in wq.state().get("cards") or [] if "more on /ocean" in c["title"]]
+    check("/ocean at 6.59 of 6.84 TiB (12.6 GB above the floor and margin) against the family's items not yet done: "
+          "one card naming the shortfall (raised once while it does not grow)", len(pc) == 1 == len(pc2)
+          and "frees at least" in pc[0]["detail"], [c["title"] for c in pc2])
 
 
 def _zoo_world(tag, e2=True, attr=True):
