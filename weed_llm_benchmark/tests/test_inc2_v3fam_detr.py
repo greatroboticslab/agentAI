@@ -253,6 +253,16 @@ def u_staging():
     WORLD["stage_rows"] = rows
     e0 = refused(D.stage, rows=rows, backend=FakeBackend())
     dev = WORLD["rows"]["dev"][0]
+    hold = D.holdout_index()
+    test_row = WORLD["rows"]["test"][0]
+    moved_dev = dict(dev, key="renamed_dev", image=str(W.TMP / "src" / "elsewhere.jpg"))
+    dev_key = dict(rows[0], key=dev["key"])
+    check("the holdout index (dev, test, ImageWeeds, ood22, ood23; the probe when it exists) finds a dev row, a test "
+          "row, a renamed copy of a dev image (by its sha256), a base image under a dev key (by key), and no base row",
+          D.holdout_hits(rows + [dev, test_row, moved_dev, dev_key], hold) == [dev["key"], test_row["key"],
+                                                                              "renamed_dev", dev["key"]]
+          and D.holdout_hits(rows, hold) == [] and set(hold["counts"]) == {"dev", "test", "imageweeds", "ood22",
+                                                                            "ood23", "probe"}, hold["counts"])
     e1 = refused(D.stage, exif="symlink", rows=rows + [dev], backend=FakeBackend())
     e2 = refused(D.stage, exif="symlink", rows=rows, backend=FakeBackend(transposes=False))
     left = [p.name for p in D.d6_dir().iterdir()] if D.d6_dir().exists() else []
