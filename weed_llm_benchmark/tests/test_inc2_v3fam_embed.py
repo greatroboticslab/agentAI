@@ -800,9 +800,9 @@ def w_reference():
     tc = TS.classifier_dir() / "train_crops.csv"
     raw = tc.read_bytes()
     tc.write_bytes(raw + b"\n")
-    e3x = refused(EM.training_crops, images=False)
+    e3x = raised(EM.training_crops, images=False)
     tc.write_bytes(raw)
-    check("a train_crops.csv that does not hash as E3's pin records is refused", e3x is not None
+    check("a train_crops.csv that does not hash as E3's pin records is refused", isinstance(e3x, F.V3famRefused)
           and "does not hash" in str(e3x), e3x)
 
 
@@ -911,9 +911,10 @@ def w_d2_more():
     bad["backbones"]["SIGLIP"].update(status="missing", why="the download failed")
     with patched(EM, "read_downloads", lambda: bad):
         e2 = refused(_d2, "D2SIGLIP")
-    sr = json.loads(EM.score_record_path("D2SIGLIP").read_text())
+    sr = safe(lambda: json.loads(EM.score_record_path("D2SIGLIP").read_text()))
+    sr = sr if isinstance(sr, dict) else {}
     check("a backbone not downloaded: D2SIGLIP recorded 'not run (download)' and refused; no pass taken",
-          e2 is not None and sr["status"] == "not run" and sr["reason"] == EM.NOT_RUN_DOWNLOAD
+          e2 is not None and sr.get("status") == "not run" and sr.get("reason") == EM.NOT_RUN_DOWNLOAD
           and not (F.root() / "arms" / "D2SIGLIP").exists(), (e2, sr))
     check("nothing written under twostage/e3_v1", tree(TS.root()) == before)
     stray = TS.root() / "stray.json"
@@ -966,9 +967,10 @@ def w_d9():
     after = tree(TS.root())
     new = sorted(set(after) - set(before))
     changed = sorted(k for k in before if before[k] != after.get(k))
-    sens = json.loads((TS.root() / "sensitivity.json").read_text())
+    sens = safe(lambda: json.loads((TS.root() / "sensitivity.json").read_text()))
     check("D9a: E3's own sensitivity.json, the only file written under twostage/e3_v1 (%.0fs)" % (time.time() - t0),
-          new == ["sensitivity.json"] and not changed and sens["format"] == TS.FMT_SENSITIVITY
+          new == ["sensitivity.json"] and not changed and isinstance(sens, dict)
+          and sens.get("format") == TS.FMT_SENSITIVITY
           and rec["d9a"]["status"] == "written" and F.e_trees() == e3_trees, (new, changed))
     doc = json.loads((EM.d9_dir() / "record.json").read_text())
     passes = doc["d9b"]["passes"]
