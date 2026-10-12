@@ -244,13 +244,17 @@ def _run(argv, timeout=120, stdin=None, env=None):
     return p.returncode, p.stdout or "", p.stderr or ""
 
 
-_SIZE_RE = re.compile(r"(?<![\w.])([0-9]+(?:\.[0-9]+)?)\s*([KMGTP]i?B?|B)\b")
-_UNITS = {"": 1.0 / 1e9, "B": 1.0 / 1e9, "K": 1e-6, "M": 1e-3, "G": 1.0, "T": 1e3, "P": 1e6}
+_SIZE_RE = re.compile(r"(?<![\w.])([0-9]+(?:\.[0-9]+)?)\s*([KMGTP][iI]?B?|B)\b")
+_POWER = {"": 0, "B": 0, "K": 1, "M": 2, "G": 3, "T": 4, "P": 5}
 
 
 def _gb(num, unit):
-    u = (unit or "").upper().rstrip("B").rstrip("I") or ""
-    return float(num) * _UNITS.get(u, 1.0 / 1e9)
+    """A size in GB (10^9 bytes): binary units (KiB, MiB, GiB, TiB, PiB) are powers of 1024, decimal ones (K, M,
+    G, T, P, with or without a B) powers of 1000; B or no unit is bytes. Deviation 1 (2026-10-12): every binary
+    unit used to count as decimal, 2.4 % low per GiB and 10 % low per TiB (parse_quota is the only caller)."""
+    u = (unit or "").strip()
+    base = 1024.0 if len(u) >= 2 and u[1] in "iI" else 1000.0
+    return float(num) * base ** _POWER.get(u[:1].upper(), 0) / 1e9
 
 
 def parse_projects(text):
@@ -278,10 +282,36 @@ def parse_projects(text):
     return out
 
 
+_QUOTA_HEAD_RE = re.compile(r"\s*the quota for\b", re.I)
+_QUOTA_SIZE_RE = re.compile(r"\s*storage\s+(quota|used)\s*:\s*(.*)\Z", re.I)
+
+
 def parse_quota(text, needle="/ocean"):
-    """(used_gb, quota_gb) from the first line naming `needle` with at least
-    two sizes (the quota tool's layout is to verify on the cluster)."""
-    for line in (text or "").splitlines():
+    """(used_gb, quota_gb) of the filesystem `needle` names, in GB (10^9 bytes; _gb), or (None, None) when the
+    quota tool's output does not give both. Two layouts:
+
+    * Bridges-2's `my_quotas` (read on the login node 2026-10-12; deviation 1): one block per directory, a header
+      "The quota for Project directory /ocean/projects/cis240145p" followed by "Storage quota: 6.84TiB" and
+      "Storage used: 6.56TiB" (and inode lines), up to the next header. The first block whose header names
+      `needle` is read; a block without both sizes gives (None, None).
+    * A table: the first line naming `needle` that holds two sizes after it, the used size first
+      ("/ocean  cis240145p  6.44T  7.00T")."""
+    lines = (text or "").splitlines()
+    for i, line in enumerate(lines):
+        if needle not in line or not _QUOTA_HEAD_RE.match(line):
+            continue
+        got = {}
+        for ln in lines[i + 1:]:
+            if _QUOTA_HEAD_RE.match(ln):
+                break
+            m = _QUOTA_SIZE_RE.match(ln)
+            sizes = _SIZE_RE.findall(m.group(2)) if m else []
+            if sizes and m.group(1).lower() not in got:
+                got[m.group(1).lower()] = _gb(*sizes[0])
+        if "used" in got and "quota" in got:
+            return got["used"], got["quota"]
+        return None, None
+    for line in lines:
         if needle not in line:
             continue
         sizes = _SIZE_RE.findall(line.split(needle, 1)[1])

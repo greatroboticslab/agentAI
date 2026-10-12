@@ -284,6 +284,11 @@ Project: CIS240145P
 QUOTA = """Filesystem  Project      Used      Quota
 /ocean      cis240145p   6.44T     7.00T
 """
+# Bridges-2's my_quotas as it printed on the login node on 2026-10-12 (deviation 1): one block per directory
+MY_QUOTAS_2026_10_12 = ("The quota for Home directory /jet/home/byler\nStorage quota: 25.00GiB\n Storage used: 7.40GiB\n"
+                        "  Inode quota: 0\n  Inodes used: 29,887\n\nThe quota for Project directory "
+                        "/ocean/projects/cis240145p\nStorage quota: 6.84TiB\n Storage used: 6.56TiB\n"
+                        "  Inode quota: 42,490,000\n  Inodes used: 18,651,082")
 
 
 def t_remote():
@@ -293,6 +298,38 @@ def t_remote():
           and r[0]["end_date"] == "2026-12-31" and "GPU" in r[0]["resource"], r)
     u, q = SR.parse_quota(QUOTA)
     check("the quota line: used and quota in GB (6.44T of 7.00T)", abs(u - 6440) < 1 and abs(q - 7000) < 1, (u, q))
+    u, q = SR.parse_quota(MY_QUOTAS_2026_10_12)
+    tib = 1024 ** 4 / 1e9
+    check("Bridges-2's my_quotas blocks (deviation 1): the /ocean block's 'Storage used' and 'Storage quota', TiB as "
+          "powers of 1024 (6.56 TiB = 7212.8 GB of 6.84 TiB = 7520.7 GB), not the home block's GiB",
+          abs(u - 6.56 * tib) < 1e-6 and abs(q - 6.84 * tib) < 1e-6 and abs((q - u) - 307.863) < 0.01, (u, q))
+    check("  the home block when it is the one named (7.40 GiB of 25.00 GiB)",
+          SR.parse_quota(MY_QUOTAS_2026_10_12, needle="/jet/home") == (7.40 * 1024 ** 3 / 1e9, 25.0 * 1024 ** 3 / 1e9),
+          SR.parse_quota(MY_QUOTAS_2026_10_12, needle="/jet/home"))
+    swapped = MY_QUOTAS_2026_10_12.replace("Storage quota: 6.84TiB\n Storage used: 6.56TiB",
+                                           " Storage used: 6.56TiB\nStorage quota: 6.84TiB")
+    no_used = MY_QUOTAS_2026_10_12.replace(" Storage used: 6.56TiB\n", "")
+    check("  read by label, not by order; a block without its used size gives (None, None), never the next block's",
+          SR.parse_quota(swapped) == (u, q) and SR.parse_quota(no_used) == (None, None)
+          and SR.parse_quota(MY_QUOTAS_2026_10_12, needle="/nowhere") == (None, None), SR.parse_quota(no_used))
+    check("  units: binary (KiB, MiB, GiB, TiB) are powers of 1024, decimal (K, KB, M, G, T) powers of 1000, B bytes",
+          [SR._gb("1", x) for x in ("KiB", "MiB", "GiB", "TiB", "K", "KB", "M", "G", "GB", "T", "B", "")]
+          == [1.024e-06, 1024 ** 2 / 1e9, 1024 ** 3 / 1e9, 1024 ** 4 / 1e9, 1e-06, 1e-06, 0.001, 1.0, 1.0, 1000.0,
+              1e-09, 1e-09], [SR._gb("1", x) for x in ("KiB", "MiB", "GiB", "TiB", "K", "KB", "M", "G", "GB", "T")])
+    qf = pathlib.Path(tempfile.mkdtemp(prefix="quota_", dir=str(W.TMP))) / "my_quotas.txt"
+    qf.write_text(MY_QUOTAS_2026_10_12 + "\n")
+    old = os.environ.get("INCAP_QUOTA")
+    os.environ["INCAP_QUOTA"] = "cat %s" % qf
+    try:
+        rec = SR.quota()
+    finally:
+        if old is None:
+            os.environ.pop("INCAP_QUOTA", None)
+        else:
+            os.environ["INCAP_QUOTA"] = old
+    check("  quota(): the ticker's /quota record from that output has free_gb = quota - used (307.9 GB)",
+          rec.get("ok") is True and abs(rec["quota_gb"] - 6.84 * tib) < 1e-6
+          and abs(rec["free_gb"] - (6.84 - 6.56) * tib) < 1e-6, rec)
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="chain_", dir=str(W.TMP)))
     p = tmp / "ledger.jsonl"
     raw = b""
@@ -3373,6 +3410,23 @@ def t_v3fam():
     sc = [c for c in wq.state().get("cards") or [] if "waits for storage" in c["title"]]
     check("  storage under 30 GiB above the 3 % floor for the item's bytes: no L23H, one card naming the shortfall",
           not _fam_pro(wq) and len(sc) == 1 and "floor" in sc[0]["detail"], [c["title"] for c in sc])
+    # deviation 1 (2026-10-12): the launch's /quota record was null on both numbers (the parser could not read
+    # my_quotas' blocks), which held every family item; the same output parsed now opens the gate
+    wu = _v3fam_world("v3fam_gate_quota_unknown", data=False)
+    wu.quota_rec = {"ok": True, "quota_gb": None, "free_gb": None}
+    wu.tick(3)
+    uc = [c for c in wu.state().get("cards") or [] if "waits for storage" in c["title"]]
+    check("  the launch's /quota record (quota_gb and free_gb null): no family lever, a card 'the quota is unknown'",
+          not _fam_pro(wu) and len(uc) == 1 and "the quota is unknown" in uc[0]["detail"], [c["title"] for c in uc])
+    wm = _v3fam_world("v3fam_gate_my_quotas", data=False)
+    u, q = SR.parse_quota(MY_QUOTAS_2026_10_12)
+    wm.quota_rec = {"ok": True, "used_gb": u, "quota_gb": q, "free_gb": q - u}
+    wm.tick(3)
+    mc = [c["title"] for c in wm.state().get("cards") or [] if "storage" in c["title"] or "/ocean" in c["title"]]
+    check("  /ocean as my_quotas printed it on 2026-10-12 (307.9 GB free: 50.0 GB above the 3 % floor of 225.6 GB and "
+          "the 30 GiB margin): L23H proposed first, no storage card",
+          [e.get("lever") for e in _fam_pro(wm)][:1] == ["L23H"] and not mc,
+          ([e.get("lever") for e in _fam_pro(wm)], mc))
     # all clear: the order of V3F.7, each item once, within the envelope
     w = _v3fam_world("v3fam", data=False)
     w.tick(2)
