@@ -116,12 +116,20 @@
 # stops when an outer module differs from the git-tracked nested copy
 # (INC_BUILD_ALLOW_DRIFT=1 runs the outer copies anyway, recorded).
 #
-# INC_BUILD_REPO and INC_BUILD_CONDA_SH replace the cluster paths below (tests
-# only).
+# D6's arm (inc2.v3fam score --arm D6 and score-test --arm D6) runs rfdetr: it
+# runs in D6's environment (deviation 2, 2026-10-12), a virtual environment over
+# the bench env that adds only the pins of tools/inc2/v3fam_detr_env.txt
+# (supervision 0.27.0.post2, defusedxml 0.7.1), first on PATH, after the import
+# check `inc2.v3fam_detr check-env`; every other verb and arm runs in the bench
+# env as before.
+#
+# INC_BUILD_REPO, INC_BUILD_CONDA_SH and INC_DETR_ENV replace the cluster paths
+# below (tests only).
 set -uo pipefail
 
 REPO="${INC_BUILD_REPO:-/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark}"
 CONDA_SH="${INC_BUILD_CONDA_SH:-/jet/home/byler/miniconda3/etc/profile.d/conda.sh}"
+D6_ENV="${INC_DETR_ENV:-/ocean/projects/cis240145p/byler/harry/envs/v3fam_d6}"
 export REPO
 cd "$REPO" || exit 1
 export PYTHONPATH="$REPO${PYTHONPATH:+:$PYTHONPATH}"
@@ -317,7 +325,7 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/twostage.py tools/inc/audit.py
          tools/inc2/v3fam.py tools/inc2/v3fam_data.py tools/inc2/v3fam_sweep.py tools/inc2/v3fam_embed.py
          tools/inc2/v3fam_wbf.py tools/inc2/v3fam_detr.py tools/inc2/v3fam_systems.py tools/inc2/v3fam_trained.py
-         tools/inc2/v3fam_verdict.py
+         tools/inc2/v3fam_verdict.py tools/inc2/v3fam_detr_env.txt
          tools/inc_autopilot/stream_thresholds.json)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 
@@ -443,6 +451,19 @@ if [ "$MOD" = v3fam ] || [ "$MOD" = v3fam_data ] || [ "$MOD" = v3fam_sweep ]; th
     # V3F: the backbones from the Hugging Face cache (no internet on compute nodes; another snapshot refuses);
     # Ultralytics installs and fetches nothing; ensemble_boxes for D3, timm for ResNet-50, cv2 for D0-S's SIFT
     export HF_HUB_OFFLINE=1 YOLO_OFFLINE=true YOLO_AUTOINSTALL=false
+    if [ "$MOD" = v3fam ] && [ "$ARM" = D6 ]; then
+        # D6's score and score-test run rfdetr: D6's environment (deviation 2, 2026-10-12), first on PATH
+        if [ ! -x "$D6_ENV/bin/python" ] || [ ! -f "$D6_ENV/pyvenv.cfg" ]; then
+            echo "FATAL: D6's environment $D6_ENV is missing (tools/inc2/v3fam_detr_env.txt says how it is made)" >&2
+            prov update status=env_failed "refusal=D6's environment $D6_ENV is missing" finish
+            exit 1
+        fi
+        export VIRTUAL_ENV="$D6_ENV" PATH="$D6_ENV/bin:$PATH"
+        echo "python: $(command -v python)  (D6's environment over the bench env)"
+        prov update "python_env=$D6_ENV"
+        python -u -m weed_optimizer_framework.tools.inc2.v3fam_detr check-env \
+            || { prov update status=env_failed finish; exit 1; }
+    fi
     python -u -c "import torch, ultralytics, sklearn, open_clip, transformers, timm, ensemble_boxes, cv2; print('torch', torch.__version__, 'ultralytics', ultralytics.__version__, 'sklearn', sklearn.__version__, 'open_clip', open_clip.__version__, 'transformers', transformers.__version__, 'timm', timm.__version__, 'cv2', cv2.__version__)" \
         || { prov update status=env_failed finish; exit 1; }
 fi

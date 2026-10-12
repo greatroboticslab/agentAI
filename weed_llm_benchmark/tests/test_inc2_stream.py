@@ -1667,6 +1667,112 @@ def test_lock_pin(base, guard):
 
 # ----------------------------------------------------------- job script
 SCRIPT = PKG_ROOT / "run_inc2_build.sh"
+DETR_SCRIPT = PKG_ROOT / "run_inc2_detr.sh"
+D6_STUB = ("import os, sys\na = sys.argv[1:]\n"
+           "print('[stub v3fam_detr] ' + ' '.join(a) + ' VIRTUAL_ENV=' + os.environ.get('VIRTUAL_ENV', '') + "
+           "' D6_SHIM=' + os.environ.get('D6_SHIM', ''), flush=True)\n"
+           "if a[:1] == ['check-env'] and os.environ.get('STUB_D6_ENV_BAD'):\n"
+           "    print('[inc2.v3fam_detr] ERROR: not D6s environment: supervision is 0.6.0', file=sys.stderr)\n"
+           "    sys.exit(2)\n"
+           "if 'refuse' in ' '.join(a):\n"
+           "    print('[inc2.v3fam_detr] ERROR: refused for the test', file=sys.stderr)\n    sys.exit(2)\n")
+
+
+def make_d6_env(name):
+    """A stand-in for D6's environment (deviation 2): bin/python runs this interpreter with D6_SHIM=1, and a
+    pyvenv.cfg beside it."""
+    d = TMP / name
+    (d / "bin").mkdir(parents=True, exist_ok=True)
+    (d / "bin" / "python").write_text("#!/bin/bash\nexport D6_SHIM=1\nexec %s \"$@\"\n" % sys.executable)
+    (d / "bin" / "python").chmod(0o755)
+    (d / "pyvenv.cfg").write_text("home = /bench/bin\ninclude-system-site-packages = true\n")
+    return d
+
+
+def write_d6_stub(roots):
+    """The same stub inc2.v3fam_detr in each package copy (outer and nested: no drift)."""
+    for root in roots:
+        (root / "tools" / "inc2" / "v3fam_detr.py").write_text(D6_STUB)
+
+
+def test_detr_script():
+    """run_inc2_detr.sh (V3F D6, L23K) with deviations 2 and 3 (2026-10-12): D6's environment first on PATH after
+    check-env, env_failed without it, and the job's provenance records INCAP_DECIDED_BY when sbatch passes it."""
+    print("run_inc2_detr.sh")
+    import re
+    text = DETR_SCRIPT.read_text()
+    check("bash -n accepts it", subprocess.run(["bash", "-n", str(DETR_SCRIPT)]).returncode == 0)
+    listed = sorted(set(re.findall(r"tools/[A-Za-z0-9_/]+\.(?:py|json|txt)", text)))
+    check("the drift check hashes D6's environment pins (tools/inc2/v3fam_detr_env.txt) beside the module",
+          "tools/inc2/v3fam_detr_env.txt" in listed and "tools/inc2/v3fam_detr.py" in listed, listed)
+    check("no import of rfdetr.__version__ (rfdetr 1.6.5.post0 has none): the import check is check-env",
+          "rfdetr.__version__" not in text and "v3fam_detr check-env" in text)
+    repo, inc, shims = TMP / "sd_repo", TMP / "sd_inc", TMP / "sd_shims"
+    shims.mkdir(parents=True, exist_ok=True)
+    (shims / "python").write_text("#!/bin/bash\nexec %s \"$@\"\n" % sys.executable)
+    (shims / "squeue").write_text("#!/bin/bash\nexit 0\n")
+    if not shutil.which("sha256sum"):
+        (shims / "sha256sum").write_text("#!/bin/bash\nexec %s -c 'import hashlib,sys; p=sys.argv[1]; "
+                                         "print(hashlib.sha256(open(p,\"rb\").read()).hexdigest(), p)' \"$@\"\n"
+                                         % sys.executable)
+    for p in shims.iterdir():
+        p.chmod(0o755)
+    conda = TMP / "sd_conda.sh"
+    conda.write_text("conda() { return 0; }\n")
+    roots = (repo / "weed_optimizer_framework", repo / "weed_llm_benchmark" / "weed_optimizer_framework")
+    for root in roots:
+        for d in ("", "tools", "tools/inc", "tools/inc2"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+            (root / d / "__init__.py").write_text("")
+        for m in listed:
+            (root / m).parent.mkdir(parents=True, exist_ok=True)
+            (root / m).write_text("# stub %s\n" % m)
+    write_d6_stub(roots)
+    d6env = make_d6_env("sd_d6env")
+
+    def run(args, extra=None):
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("INCAP_", "INC_", "SLURM_"))
+               and k != "VIRTUAL_ENV"}
+        env.update({"PATH": "%s:%s" % (shims, os.environ.get("PATH", "")), "INC_BUILD_REPO": str(repo),
+                    "INC_BUILD_CONDA_SH": str(conda), "INC_DIR": str(inc), "SLURM_JOB_ID": "902",
+                    "TMPDIR": str(TMP), "INC_DETR_ENV": str(d6env)})
+        env.update(extra or {})
+        return subprocess.run(["bash", str(DETR_SCRIPT)] + args, capture_output=True, text=True, env=env, timeout=120)
+
+    def prov(name):
+        p = inc / "_campaign" / "provenance" / ("%s.json" % name)
+        att = (json.loads(p.read_text()).get("attempts") or [{}]) if p.exists() else [{}]
+        return att[-1]
+
+    who = {"INCAP_DECIDED_BY": "assistant:claude-delegate", "INCAP_TRIGGER": "DR0",
+           "INCAP_REQUESTED_UTC": "2026-10-12T08:00:00Z"}
+    p = run(["inc2.v3fam_detr", "smoke"], extra=who)
+    a = prov("v3fam_detr_smoke")
+    check("smoke: check-env, then the module, both in D6's environment; done, python_env recorded, and the "
+          "provenance's decided_by, trigger and requested_utc are what the job was given (deviation 3)",
+          p.returncode == 0 and "[stub v3fam_detr] check-env VIRTUAL_ENV=%s D6_SHIM=1" % d6env in p.stdout
+          and "[stub v3fam_detr] smoke VIRTUAL_ENV=%s D6_SHIM=1" % d6env in p.stdout and a.get("status") == "done"
+          and a.get("python_env") == str(d6env) and a.get("decided_by") == "assistant:claude-delegate"
+          and a.get("trigger") == ["DR0"] and a.get("requested_utc") == "2026-10-12T08:00:00Z",
+          (p.returncode, p.stdout[-600:], p.stderr[-400:], a))
+    p = run(["inc2.v3fam_detr", "train", "--seed", "1"])
+    a = prov("v3fam_detr_s1")
+    check("train --seed 1: provenance v3fam_detr_s1, run in D6's environment; without INCAP_* given, decided_by "
+          "null", p.returncode == 0 and "[stub v3fam_detr] train --seed 1 VIRTUAL_ENV=%s" % d6env in p.stdout
+          and a.get("status") == "done" and a.get("decided_by") is None, (p.returncode, p.stdout[-400:], a))
+    p = run(["inc2.v3fam_detr", "train", "--seed", "2"], extra={"INC_DETR_ENV": str(TMP / "sd_no_env")})
+    a = prov("v3fam_detr_s2")
+    check("  without D6's environment: env_failed, the refusal names it, the module never runs",
+          p.returncode == 1 and a.get("status") == "env_failed" and "missing" in str(a.get("refusal"))
+          and "[stub v3fam_detr]" not in p.stdout, (p.returncode, a.get("status"), a.get("refusal")))
+    p = run(["inc2.v3fam_detr", "train", "--seed", "0"], extra={"STUB_D6_ENV_BAD": "1"})
+    a = prov("v3fam_detr_s0")
+    check("  when check-env refuses: env_failed, the module never runs",
+          p.returncode == 1 and a.get("status") == "env_failed" and "[stub v3fam_detr] check-env" in p.stdout
+          and "[stub v3fam_detr] train" not in p.stdout, (p.returncode, a.get("status"), p.stdout[-300:]))
+    p = run(["inc2.v3fam_detr", "smoke", "--refuse"])
+    check("  usage errors stay usage errors (exit 2), nothing run", p.returncode == 2 and "[stub" not in p.stdout,
+          (p.returncode, p.stderr[-200:]))
 
 
 def test_build_script():
@@ -1684,7 +1790,7 @@ def test_build_script():
               "tools/inc2/pilot4.py", "tools/inc/driver.py", "tools/inc/gate.py", "tools/inc/scorer.py"):
         check("the drift check hashes %s" % m, m in text)
     import re
-    listed = set(re.findall(r"tools/[A-Za-z0-9_/]+\.(?:py|json)", text))
+    listed = set(re.findall(r"tools/[A-Za-z0-9_/]+\.(?:py|json|txt)", text))
     # what the builders import (inc2.splits' copy scan loads funnel.embed / leak / estimate lazily; funnel.embed
     # loads semisup_labeler lazily), computed from the real modules, not restated
     code = ("import importlib, sys\n"
@@ -1734,6 +1840,7 @@ def test_build_script():
     stub_mod = ("import json, os, sys\na = sys.argv[1:]\nprint('[stub %(m)s] ' + ' '.join(a), flush=True)\n"
                 "print('INC_JOB_SCRIPT=' + os.environ.get('INC_JOB_SCRIPT', ''), flush=True)\n"
                 "print('HF_HUB_OFFLINE=' + os.environ.get('HF_HUB_OFFLINE', ''), flush=True)\n"
+                "print('VIRTUAL_ENV=' + os.environ.get('VIRTUAL_ENV', ''), flush=True)\n"
                 "if 'refuse' in ' '.join(a):\n    print('[inc2.%(m)s] ERROR: refused for the test', file=sys.stderr)\n"
                 "    sys.exit(1)\n"
                 "if '%(m)s' == 'stream' and a[0] == 'build':\n    print('[inc2.stream] built experiment wsv_s001')\n")
@@ -1755,7 +1862,8 @@ def test_build_script():
                 p.write_text("# stub %s\n" % m)
 
     def run(args, extra=None):
-        env = {k: v for k, v in os.environ.items() if not k.startswith(("INCAP_", "INC_", "SLURM_"))}
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("INCAP_", "INC_", "SLURM_"))
+               and k != "VIRTUAL_ENV"}
         env.update({"PATH": "%s:%s" % (shims, os.environ.get("PATH", "")), "INC_BUILD_REPO": str(repo),
                     "INC_BUILD_CONDA_SH": str(conda), "INC_DIR": str(inc), "SLURM_JOB_ID": "901",
                     "TMPDIR": str(TMP)})
@@ -1891,6 +1999,35 @@ def test_build_script():
         p = run(args, extra=with_fam)
         check("  inc2.%s: usage error (exit 2), nothing run" % " ".join(args).split(".", 1)[1],
               p.returncode == 2 and "usage:" in p.stderr and "[stub" not in p.stdout, (p.returncode, p.stderr[-200:]))
+    # deviation 2 (2026-10-12): D6's score and score-test run in D6's environment (a venv over the bench env with
+    # tools/inc2/v3fam_detr_env.txt's pins) after inc2.v3fam_detr check-env; every other arm and verb as before
+    d6env = make_d6_env("sh_d6env")
+    write_d6_stub([repo / "weed_optimizer_framework", repo / "weed_llm_benchmark" / "weed_optimizer_framework"])
+    with_d6 = dict(with_fam, INC_DETR_ENV=str(d6env))
+    for args, name in ((["inc2.v3fam", "score", "--arm", "D6"], "v3fam_score_d6"),
+                       (["inc2.v3fam", "score-test", "--arm", "D6"], "v3famtest_d6")):
+        p = run(args, extra=with_d6)
+        a = ((prov(name) or {}).get("attempts") or [{}])[-1]
+        check("inc2.v3fam %s (deviation 2): check-env, then the module, both in D6's environment (first on PATH, "
+              "VIRTUAL_ENV set), recorded as scored with python_env" % " ".join(args[1:]),
+              p.returncode == 0 and "[stub v3fam_detr] check-env VIRTUAL_ENV=%s D6_SHIM=1" % d6env in p.stdout
+              and "[stub v3fam] %s" % " ".join(args[1:]) in p.stdout and "VIRTUAL_ENV=%s" % d6env in p.stdout
+              and a.get("status") == "scored" and a.get("python_env") == str(d6env),
+              (p.returncode, p.stdout[-600:], p.stderr[-300:], a))
+    p = run(["inc2.v3fam", "score", "--arm", "E3RS"], extra=with_d6)
+    a = ((prov("v3fam_score_e3rs") or {}).get("attempts") or [{}])[-1]
+    check("  any other arm (E3RS) keeps the bench env: no check-env, VIRTUAL_ENV unset, no python_env",
+          p.returncode == 0 and "[stub v3fam_detr]" not in p.stdout and "\nVIRTUAL_ENV=\n" in p.stdout
+          and "python_env" not in a, (p.stdout[-400:], a))
+    p = run(["inc2.v3fam", "score", "--arm", "D6"], extra=dict(with_fam, INC_DETR_ENV=str(TMP / "sh_no_d6env")))
+    a = ((prov("v3fam_score_d6") or {}).get("attempts") or [{}])[-1]
+    check("  D6 without its environment: env_failed (the refusal names it) before the module runs",
+          p.returncode == 1 and a.get("status") == "env_failed" and "missing" in str(a.get("refusal"))
+          and "[stub v3fam]" not in p.stdout, (p.returncode, a))
+    p = run(["inc2.v3fam", "score-test", "--arm", "D6"], extra=dict(with_d6, STUB_D6_ENV_BAD="1"))
+    a = ((prov("v3famtest_d6") or {}).get("attempts") or [{}])[-1]
+    check("  D6 when check-env refuses (another supervision, say): env_failed before the module runs",
+          p.returncode == 1 and a.get("status") == "env_failed" and "[stub v3fam]" not in p.stdout, (p.returncode, a))
     p = run(["inc2.base3", "build", "--stream", "wsv"])
     a = ((prov("base3_v3") or {}).get("attempts") or [{}])[-1]
     check("inc2.base3 build (L23V, 2026-10-03): run under the provenance and lock base3_v3 with HF_HUB_OFFLINE=1, "
@@ -1946,6 +2083,7 @@ def main():
     test_crash_repair(base, guard)
     test_lock_pin(base, guard)
     test_build_script()
+    test_detr_script()
     print("\n%d failure(s)" % len(FAILURES))
     if not FAILURES:
         shutil.rmtree(TMP, ignore_errors=True)
