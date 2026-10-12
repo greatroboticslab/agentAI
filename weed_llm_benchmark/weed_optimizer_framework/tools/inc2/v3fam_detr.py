@@ -140,8 +140,12 @@ WALLTIME_H = 36.0
 WALLTIME_SHARE = 0.8                         # the seeds run only if the projection is <= 28.8 h
 OVERHEAD_H = 0.5
 NOT_RUN_WALLTIME = "not run (walltime)"
-# The read-only rehearsal's outcome (V3F.8 item 3): "symlink" or "transpose". None until it is recorded here.
-EXIF_STAGING = None
+# The read-only rehearsal's outcome (V3F.8 item 3): "symlink" or "transpose"; staging refuses while it is None.
+# Recorded 2026-10-12 (deviation 2; docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-12)"): rfdetr's reader in D6's
+# environment (supervision 0.27.0.post2) yields exif_transpose's pixels for base_v2's tagged images (MAD 0) but
+# scales the label boxes by the stored, unrotated width and height, so every image tagged 6 or 8 failed the check
+# (boxes about 1,000 px off): the tagged images are staged transposed.
+EXIF_STAGING = "transpose"
 EXIF_MODES = ("symlink", "transpose")
 ROTATED_TAGS = (3, 6, 8)
 TRANSPOSED_JPEG = {"format": "JPEG", "quality": 100, "subsampling": 0}

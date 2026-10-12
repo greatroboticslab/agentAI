@@ -12,7 +12,8 @@ UNITS (the synthetic world's splits, no scoring pass; V3FAM_ONLY=units):
 - the recipe (50 epochs, batch 2 x 8, lr 1e-4 / 1.5e-4, EMA 0.993 / 100,
   run_test false, checkpoint_interval 1000 > 50 epochs, 704 px), the walltime
   rule (0.8 x 36 h, epoch x 50 + 0.5 h), valid = round(0.02 x 6,811) = 136,
-  EXIF_STAGING unset until the rehearsal; the six E3-frozen sha256s;
+  EXIF_STAGING as the rehearsal recorded it (transpose; staging refuses while
+  it is unset); the six E3-frozen sha256s;
 - D6's environment (deviation 2, 2026-10-12): v3fam_detr_env.txt's hashed pins,
   env_problems on the environment as made (none), on the bench env itself
   (supervision 0.6.0 from outside, no defusedxml, no DetectionDataset), on
@@ -214,8 +215,9 @@ def u_constants():
           D.WALLTIME_H == 36.0 and abs(D.walltime_cap_h() - 28.8) < 1e-12 and D.projection_h(2030) <= 28.8
           and D.projection_h(2100) > 28.8 and D.valid_count(6811) == 136 and D.valid_count(22) == 1
           and D.THRESHOLD == 0.001 and D.NUM_SELECT == 300 and D.BACKGROUND_ID == 13 == C.NC)
-    check("EXIF_STAGING is unset until the read-only rehearsal records symlink or transpose",
-          D.EXIF_STAGING is None and D.EXIF_MODES == ("symlink", "transpose") and D.ROTATED_TAGS == (3, 6, 8))
+    check("EXIF_STAGING records the read-only rehearsal's outcome (V3F.8 item 3, 2026-10-12, deviation 2): transpose "
+          "(rfdetr's reader scaled the boxes of every image tagged 6 or 8 by the unrotated size)",
+          D.EXIF_STAGING == "transpose" and D.EXIF_MODES == ("symlink", "transpose") and D.ROTATED_TAGS == (3, 6, 8))
     check("the six E3-frozen sha256s of V3F.1", F.FROZEN_SHA256 == ST.FROZEN and {
         k: C.sha256_file(pathlib.Path(v).resolve()) for k, v in TS.CODE_FILES.items()} == ST.FROZEN)
 
@@ -371,7 +373,8 @@ def u_staging():
     import yaml
     rows = list(WORLD["rows"]["base_v2"]) + [tag6_row()]
     WORLD["stage_rows"] = rows
-    e0 = refused(D.stage, rows=rows, backend=FakeBackend())
+    with patched(D, "EXIF_STAGING", None):   # the module as it stood before the rehearsal recorded its outcome
+        e0 = refused(D.stage, rows=rows, backend=FakeBackend())
     e_d0s = refused(D.stage, exif="symlink", rows=rows, backend=FakeBackend())
     sweep_record()
     dev = WORLD["rows"]["dev"][0]
