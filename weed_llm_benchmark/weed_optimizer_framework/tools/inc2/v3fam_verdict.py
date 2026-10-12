@@ -110,6 +110,7 @@ RETEST_GPUH = 0.1
 BCLEAN_SEED_TEXT = "inc2/v3fam/bclean/species_se"     # BCLEAN's rule against b_v2_m640 (V3F.5 D0-S)
 DECIDED_BY_OWNER_PREFIX = "human:"
 DELEGATE_ACCOUNT = F.DECIDED_BY_ENV["delegate"]
+SUBMITTER_ENV = "INCAP_DECIDED_BY"           # the read's submitter, named in read.json's sbatch --export
 REF_TEST_DIR = "REF"
 
 # The sides (V3F.5): {name: (arms/<dir>, variant, one-system ens or None, the score arm whose record it is)}
@@ -982,7 +983,9 @@ def test_read(arm, read_by):
         raise
     srcs = read_sources(arm)
     logs = C.INC_DIR / "logs"
-    argv = ["sbatch", "--parsable", "--job-name=inc_build_v3famtest_%s" % arm.lower(),
+    # --export=INCAP_DECIDED_BY (deviation 3, 2026-10-12): Bridges-2's SBATCH_EXPORT=NONE gives a job none of the
+    # submitter's variables unless sbatch names them, and check_submitter refuses a read whose job lacks it
+    argv = ["sbatch", "--parsable", "--export=%s" % SUBMITTER_ENV, "--job-name=inc_build_v3famtest_%s" % arm.lower(),
             "--output=%s" % (logs / "%x_%j.out"), str(TS._build_script()), "inc2.v3fam", "score-test", "--arm", arm]
     env = DELEGATE_ACCOUNT if read_by == "delegate" else "the owner's account (%s...)" % DECIDED_BY_OWNER_PREFIX
     rec = {"format": FMT_READ, "arm": arm, "kind": pos["kind"], "position": pos["position"], "read_by": who,
@@ -999,7 +1002,7 @@ def test_read(arm, read_by):
 def check_submitter(read_by_key, env=None):
     """The read-path guard (decision 20): INCAP_DECIDED_BY must name the person read_by names (the owner's
     account, human:..., or the delegate's assistant:claude-delegate). Returns the value."""
-    got = (os.environ if env is None else env).get("INCAP_DECIDED_BY") or ""
+    got = (os.environ if env is None else env).get(SUBMITTER_ENV) or ""
     if read_by_key == "delegate":
         ok = got == DELEGATE_ACCOUNT
     elif read_by_key == "owner":
@@ -1008,7 +1011,9 @@ def check_submitter(read_by_key, env=None):
         ok = False
     if not ok:
         raise F.V3famRefused("INCAP_DECIDED_BY is %r, not the person read_by names (%s): a read submitted by anyone "
-                             "else is not a read under the amendment (V3F.3.6)" % (got, read_by_key))
+                             "else is not a read under the amendment (V3F.3.6)%s" % (
+                                 got, read_by_key, "" if got else "; on Bridges-2 sbatch passes it to the job only "
+                                 "when named (sbatch --export=INCAP_DECIDED_BY ..., as read.json's argv does)"))
     return got
 
 

@@ -379,6 +379,12 @@ def t_reads():
               and rj["position"] == 1 and rj["verdict_sha256"] == F._sha(VR.verdict_path())
               and rj["argv"][-4:] == ["inc2.v3fam", "score-test", "--arm", "D6"]
               and rj["incap_decided_by"] == "assistant:claude-delegate" and rec["sources"] == srcs["D6"], rj)
+        ex = [a for a in rj["argv"] if a.startswith("--export")]
+        check("  the argv names INCAP_DECIDED_BY, and only it, in sbatch's --export (deviation 3: Bridges-2's "
+              "SBATCH_EXPORT=NONE passes a job nothing it does not name; values never in the argv)",
+              ex == ["--export=INCAP_DECIDED_BY"] and rj["argv"].index(ex[0]) < rj["argv"].index(
+                  str(TS._build_script())) and not any("assistant:" in a or "human:" in a for a in rj["argv"]),
+              rj["argv"])
         e4 = refused(VR.test_read, "D6", "owner")
         check("  a second read of D6 refuses", e4 is not None, e4)
         rec2 = VR.test_read("D8M", "owner")
@@ -416,6 +422,9 @@ def t_submitter_and_score_test():
         e = refused(VR.check_submitter, key, {"INCAP_DECIDED_BY": env} if env is not None else {})
         check("read_by %s, INCAP_DECIDED_BY %r: %s" % (key, env, "accepted" if ok else "refused"),
               (e is None) == ok, e)
+    e = refused(VR.check_submitter, "delegate", {})
+    check("  a job without INCAP_DECIDED_BY: the refusal names sbatch --export=INCAP_DECIDED_BY (deviation 3)",
+          e is not None and "--export=INCAP_DECIDED_BY" in str(e), e)
     real = VR.read_sources
     VR.read_sources = lambda arm: {"mode": "identity", "seeds": [{"seed": 0}]}
     try:

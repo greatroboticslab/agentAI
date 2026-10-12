@@ -5113,8 +5113,10 @@ class StreamRun(object):
 
     def _v3fam_rerun(self, lever, params):
         """The command a person submits to rerun a family item by hand (an sbatch job, never a foreground run on the
-        login node), with INCAP_DECIDED_BY naming them; L23K's train one sbatch per seed not yet trained."""
-        sb = "INCAP_DECIDED_BY=<the person> sbatch -p GPU-shared"
+        login node), with INCAP_DECIDED_BY naming them and sbatch's --export naming that variable (Bridges-2's
+        SBATCH_EXPORT=NONE passes a job none of the submitter's variables sbatch does not name; deviation 3,
+        2026-10-12); L23K's train one sbatch per seed not yet trained."""
+        sb = "INCAP_DECIDED_BY=<the person> sbatch --export=INCAP_DECIDED_BY -p GPU-shared"
         if lever == "L23H":
             return "%s --job-name=inc_build_v3fam_data run_inc2_build.sh inc2.v3fam_data build" % sb
         if lever == "L23J":
@@ -5232,7 +5234,8 @@ class StreamRun(object):
                          "the amendment's and, under 'revisions', the stamp of %s)" % (fam.get("revision_file")
                                                                                        or "the Revisions"))
         if not fs.get("sweep"):
-            steps.append("D0-S (the delegate): INCAP_DECIDED_BY=assistant:claude-delegate sbatch -p GPU-shared "
+            steps.append("D0-S (the delegate): INCAP_DECIDED_BY=assistant:claude-delegate sbatch "
+                         "--export=INCAP_DECIDED_BY -p GPU-shared "
                          "--job-name=inc_build_v3fam_sweep run_inc2_build.sh inc2.v3fam_sweep run; then, per verified "
                          "pair, %s.v3fam_sweep verdict --pair <id> --copy yes|no --read-by owner|delegate" % mod)
         if not fs.get("exif"):
@@ -5281,12 +5284,14 @@ class StreamRun(object):
         order = (v.get("reads") or {}).get("order") or []
         for o in order:
             lines.append("Read %s (%s): %s.v3fam test-read --arm %s --read-by owner|delegate; the person named "
-                         "submits the printed sbatch argv with INCAP_DECIDED_BY naming them (the owner's account, or "
-                         "assistant:claude-delegate); then %s.v3fam test-report --arm %s" % (
-                             o.get("arm"), o.get("kind"), mod, o.get("arm"), mod, o.get("arm")))
-        lines.append("After the reads, the re-analysis (no inference): INCAP_DECIDED_BY=<the person> sbatch -p "
-                     "GPU-shared --job-name=inc_build_v3fam_retest run_inc2_build.sh inc2.v3fam reanalyse-test "
-                     "--read-by owner|delegate. Nothing switches; the headline stays E3-B (V3F.3.6).")
+                         "submits the printed sbatch argv (it names INCAP_DECIDED_BY in --export) with "
+                         "INCAP_DECIDED_BY naming them (the owner's account, or assistant:claude-delegate); then "
+                         "%s.v3fam test-report --arm %s" % (o.get("arm"), o.get("kind"), mod, o.get("arm"), mod,
+                                                           o.get("arm")))
+        lines.append("After the reads, the re-analysis (no inference): INCAP_DECIDED_BY=<the person> sbatch "
+                     "--export=INCAP_DECIDED_BY -p GPU-shared --job-name=inc_build_v3fam_retest run_inc2_build.sh "
+                     "inc2.v3fam reanalyse-test --read-by owner|delegate. Nothing switches; the headline stays E3-B "
+                     "(V3F.3.6).")
         f["verdict_card"] = self.utc
         self._card("research", "V3F's verdict is decided (%s)" % v.get("decided_on", "dev"), "\n".join(lines),
                    lever="L23L", trigger=["L23L"])

@@ -12,7 +12,13 @@ UNITS (the synthetic world's splits, no scoring pass; V3FAM_ONLY=units):
 - the recipe (50 epochs, batch 2 x 8, lr 1e-4 / 1.5e-4, EMA 0.993 / 100,
   run_test false, checkpoint_interval 1000 > 50 epochs, 704 px), the walltime
   rule (0.8 x 36 h, epoch x 50 + 0.5 h), valid = round(0.02 x 6,811) = 136,
-  EXIF_STAGING unset until the rehearsal; the six E3-frozen sha256s;
+  EXIF_STAGING as the rehearsal recorded it (transpose; staging refuses while
+  it is unset); the six E3-frozen sha256s;
+- D6's environment (deviation 2, 2026-10-12): v3fam_detr_env.txt's hashed pins,
+  env_problems on the environment as made (none), on the bench env itself
+  (supervision 0.6.0 from outside, no defusedxml, no DetectionDataset), on
+  another rfdetr and on a library that does not import; check-env refusing (exit
+  2 in the test's own interpreter);
 - the 0-12 class map round trip (data.yaml's names -> INC ids) and its
   refusals; the converter on planted predictions (background 13 dropped and
   counted, 14 / -1 / 2.5 / NaN / a score above 1 refused);
@@ -209,10 +215,111 @@ def u_constants():
           D.WALLTIME_H == 36.0 and abs(D.walltime_cap_h() - 28.8) < 1e-12 and D.projection_h(2030) <= 28.8
           and D.projection_h(2100) > 28.8 and D.valid_count(6811) == 136 and D.valid_count(22) == 1
           and D.THRESHOLD == 0.001 and D.NUM_SELECT == 300 and D.BACKGROUND_ID == 13 == C.NC)
-    check("EXIF_STAGING is unset until the read-only rehearsal records symlink or transpose",
-          D.EXIF_STAGING is None and D.EXIF_MODES == ("symlink", "transpose") and D.ROTATED_TAGS == (3, 6, 8))
+    check("EXIF_STAGING records the read-only rehearsal's outcome (V3F.8 item 3, 2026-10-12, deviation 2): transpose "
+          "(rfdetr's reader scaled the boxes of every image tagged 6 or 8 by the unrotated size)",
+          D.EXIF_STAGING == "transpose" and D.EXIF_MODES == ("symlink", "transpose") and D.ROTATED_TAGS == (3, 6, 8))
     check("the six E3-frozen sha256s of V3F.1", F.FROZEN_SHA256 == ST.FROZEN and {
         k: C.sha256_file(pathlib.Path(v).resolve()) for k, v in TS.CODE_FILES.items()} == ST.FROZEN)
+
+
+def u_env():
+    print("D6's environment (deviation 2, 2026-10-12): the pins, env_problems and check-env")
+    pins = D.env_pins()
+    check("v3fam_detr_env.txt pins supervision 0.27.0.post2 and defusedxml 0.7.1, each with its sha256",
+          pins == {"supervision": "0.27.0.post2", "defusedxml": "0.7.1"}
+          and D.ENV_FILE.read_text().count("--hash=sha256:") == 2, pins)
+    bad = W.TMP / "env_bad.txt"
+    bad.write_text("supervision==0.27.0.post2\n")
+    e = refused(D.env_pins, bad)
+    check("  a pin without its hash is refused (pip --require-hashes would refuse it too)", e is not None, e)
+    prefix = str(W.TMP / "venv")
+    good = {"supervision": "0.27.0.post2", "defusedxml": "0.7.1", "rfdetr": "1.6.5.post0"}
+
+    class _Sv(object):
+        __file__ = os.path.join(prefix, "lib", "python3.10", "site-packages", "supervision", "__init__.py")
+
+        class DetectionDataset(object):
+            @classmethod
+            def from_yolo(cls):
+                return None
+
+    class _SvOld(object):                    # the bench env's supervision 0.6.0: Dataset, no DetectionDataset
+        __file__ = "/bench/lib/python3.10/site-packages/supervision/__init__.py"
+
+    def world(vers=None, sv=_Sv, broken=()):
+        v = dict(good, **(vers or {}))
+
+        def version(name):
+            if v.get(name) is None:
+                raise LookupError(name)
+            return v[name]
+
+        def importer(mod):
+            if mod in broken:
+                raise ImportError("%s is not installed here" % mod)
+            return sv if mod == "supervision" else object()
+        return D.env_problems(version=version, importer=importer, prefix=prefix, pins=pins)
+    check("  the environment as made on the login node 2026-10-12: no problem", world() == [], world())
+    p_bench = world({"supervision": "0.6.0", "defusedxml": None}, sv=_SvOld)
+    check("  the bench env itself (supervision 0.6.0 from the bench env, no defusedxml): refused on the version, the "
+          "missing pin, the location and DetectionDataset", len(p_bench) == 4
+          and any("supervision is 0.6.0, not 0.27.0.post2" in x for x in p_bench)
+          and any("defusedxml is not installed" in x for x in p_bench)
+          and any("outside this environment" in x for x in p_bench)
+          and any("DetectionDataset" in x for x in p_bench), p_bench)
+    p_rf = world({"rfdetr": "1.11.2"})
+    p_imp = world(broken=("pytorch_lightning",))
+    check("  another rfdetr (1.11.2) and a library that does not import are refused",
+          p_rf == ["rfdetr is 1.11.2, not 1.6.5.post0"] and len(p_imp) == 1 and "pytorch_lightning" in p_imp[0],
+          (p_rf, p_imp))
+    with patched(D, "env_problems", lambda: ["supervision is 0.6.0, not 0.27.0.post2"]):
+        e = refused(D.check_env)
+    check("  check_env refuses with the problems and the file that says how the environment is made",
+          e is not None and "0.6.0" in str(e) and "v3fam_detr_env.txt" in str(e), e)
+    # the real RfdetrBackend.read_yolo against a stand-in supervision: one image at a time, BGR -> RGB
+    import types
+    seen = []
+
+    class _Det(object):
+        def __init__(self, i):
+            self.xyxy = np.array([[1.0, 2.0, 3.0 + i, 4.0]])
+            self.class_id = np.array([i])
+
+    class _Ds(object):
+        def __len__(self):
+            return 3
+
+        def __getitem__(self, i):
+            seen.append(i)
+            bgr = np.zeros((2, 3, 3), np.uint8)
+            bgr[..., 0] = 10 + i                 # blue channel in OpenCV's order
+            return "img_%d.jpg" % i, bgr, _Det(i)
+    fake_sv = types.SimpleNamespace(DetectionDataset=types.SimpleNamespace(from_yolo=lambda **k: _Ds()))
+    real_sv = sys.modules.get("supervision")
+    sys.modules["supervision"] = fake_sv
+    try:
+        it = D.RfdetrBackend().read_yolo(W.TMP / "nowhere", W.TMP / "data.yaml")
+        first = next(it)
+        after_first = list(seen)
+        rest = list(it)
+    finally:
+        if real_sv is None:
+            sys.modules.pop("supervision", None)
+        else:
+            sys.modules["supervision"] = real_sv
+    check("  read_yolo yields one image at a time (one read before the first item; 22 GB for the 606 tagged frames "
+          "as a list), RGB order, boxes and classes as read",
+          after_first == [0] and seen == [0, 1, 2] and len(rest) == 2 and first[0] == "img_0.jpg"
+          and first[1].shape == (2, 3, 3) and int(first[1][0, 0, 2]) == 10 and int(first[1][0, 0, 0]) == 0
+          and rest[1][2].tolist() == [[1.0, 2.0, 5.0, 4.0]] and rest[1][3].tolist() == [2], (after_first, seen))
+    env = dict(os.environ)
+    pkg = str(pathlib.Path(F.__file__).resolve().parents[3])
+    env["PYTHONPATH"] = pkg + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    pr = subprocess.run([sys.executable, "-m", "weed_optimizer_framework.tools.inc2.v3fam_detr", "check-env"],
+                        capture_output=True, text=True, timeout=300, env=env)
+    check("  `check-env` in this test's interpreter (not D6's environment): exit 2 with [inc2.v3fam_detr] ERROR",
+          pr.returncode == 2 and "[inc2.v3fam_detr] ERROR: not D6's environment" in pr.stderr,
+          (pr.returncode, pr.stderr[-300:]))
 
 
 def u_class_map_converter():
@@ -266,7 +373,8 @@ def u_staging():
     import yaml
     rows = list(WORLD["rows"]["base_v2"]) + [tag6_row()]
     WORLD["stage_rows"] = rows
-    e0 = refused(D.stage, rows=rows, backend=FakeBackend())
+    with patched(D, "EXIF_STAGING", None):   # the module as it stood before the rehearsal recorded its outcome
+        e0 = refused(D.stage, rows=rows, backend=FakeBackend())
     e_d0s = refused(D.stage, exif="symlink", rows=rows, backend=FakeBackend())
     sweep_record()
     dev = WORLD["rows"]["dev"][0]
@@ -493,7 +601,7 @@ def u_smoke_train():
           and len({D.final_record(s)["sha256"] for s in F.SEEDS}) == 3)
 
 
-UNITS = ("u_constants", "u_class_map_converter", "u_staging", "u_attempt", "u_smoke_train")
+UNITS = ("u_constants", "u_env", "u_class_map_converter", "u_staging", "u_attempt", "u_smoke_train")
 
 
 # ================================================================== WORLD

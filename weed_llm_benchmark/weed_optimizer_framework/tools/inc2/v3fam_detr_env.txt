@@ -1,0 +1,25 @@
+# V3F D6's environment (docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-12): V3F deviations 1-3", deviation 2).
+#
+# rfdetr 1.6.5.post0 reads YOLO folders through supervision.DetectionDataset.from_yolo and builds its predictions
+# with supervision.Detections(...).metadata. The bench env holds supervision 0.6.0 (groundingdino-py 0.4.0 pins
+# supervision==0.6.0 there), which has neither. D6's processes run in a virtual environment made from the bench
+# env's Python with the bench env's packages visible (--system-site-packages) and only the two wheels below
+# installed on top, so the bench env and every other job's environment stay as they are. Who uses it:
+# run_inc2_detr.sh (smoke, train), run_inc2_build.sh for "inc2.v3fam score --arm D6" and
+# "inc2.v3fam score-test --arm D6", and the read-only rehearsal (v3fam_detr rehearse-exif) on the login node.
+#
+# Made once on the login node (it has internet; the compute nodes do not):
+#   source /jet/home/byler/miniconda3/etc/profile.d/conda.sh && conda activate bench
+#   python -m venv --system-site-packages /ocean/projects/cis240145p/byler/harry/envs/v3fam_d6
+#   /ocean/projects/cis240145p/byler/harry/envs/v3fam_d6/bin/python -m pip install --isolated --no-deps \
+#       --require-hashes -r weed_optimizer_framework/tools/inc2/v3fam_detr_env.txt
+#   /ocean/projects/cis240145p/byler/harry/envs/v3fam_d6/bin/python -m weed_optimizer_framework.tools.inc2.v3fam_detr check-env
+#
+# Why these versions: supervision 0.27.0.post2 (2026-03-14) is the newest release pip installs beside
+# rfdetr 1.6.5.post0, both on rfdetr's release date (2026-05-01) and on the day it was installed on the cluster
+# (2026-05-11): rfdetr requires pyDeprecate>=0.3,<0.6, supervision 0.28.0 (2026-04-30) requires pydeprecate>=0.7,<0.8,
+# and 0.27.0.post2 requires pyDeprecate>=0.4.0,<0.6.0. Its other requirements are met by the bench env as it is
+# (pyDeprecate 0.5.0, numpy 2.2.6, scipy 1.15.3, matplotlib 3.10.8, pyyaml 6.0.3, pillow 12.0.0, requests 2.32.5,
+# tqdm 4.67.3, opencv-python 4.13.0.92), except defusedxml, which is added. The sha256 are PyPI's.
+supervision==0.27.0.post2 --hash=sha256:713a341a563774d6a4b017787baa94f8698a9ea1de57155093d70de3a5007941
+defusedxml==0.7.1 --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61

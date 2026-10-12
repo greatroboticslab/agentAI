@@ -7,6 +7,7 @@ as one family)", V3F.5 D6; decisions 12 and 27).
     python -m weed_optimizer_framework.tools.inc2.v3fam_detr score          (= inc2.v3fam score --arm D6, L23J)
     python -m weed_optimizer_framework.tools.inc2.v3fam_detr rehearse-exif --out DIR   (read-only, a person's)
     python -m weed_optimizer_framework.tools.inc2.v3fam_detr sources        (what D6's reference read scores)
+    python -m weed_optimizer_framework.tools.inc2.v3fam_detr check-env      (D6's environment: the import check)
         [--batch N --device D --no-lock-check-for-tests]   (test mode only, INC_SCORER_TESTING=1)
 
 Data (written once, v3fam/v1/d6/stage/ with stage.json). train/ holds all of
@@ -74,6 +75,13 @@ zoo's root, a subprocess) are reported. D6 has one reference read
 The RF-DETR calls are behind a backend (RfdetrBackend; tests pass a fake):
 train, save, load_state, states_equal, load_model, predict, read_yolo.
 
+Environment (deviation 2, 2026-10-12): rfdetr 1.6.5.post0 needs supervision's DetectionDataset and
+Detections.metadata, which the bench env's supervision 0.6.0 lacks (groundingdino-py pins it there). D6's
+processes run in a virtual environment over the bench env that adds only the pins of v3fam_detr_env.txt
+(supervision 0.27.0.post2, defusedxml 0.7.1); run_inc2_detr.sh, and run_inc2_build.sh for D6's score and
+score-test, put it first on PATH, and `check-env` (env_problems) refuses any other environment. rfdetr has no
+__version__: its version is read from its installed metadata.
+
 A refusal raises inc2.v3fam.V3famRefused; the CLI prints "[inc2.v3fam_detr]
 ERROR: ..." and exits 2. Any other error exits 1.
 """
@@ -115,6 +123,8 @@ PRETRAIN = "rf-detr-large-2026.pth"          # in REPO
 PRETRAIN_BYTES = 135954129
 PRETRAIN_MD5 = "5cb72153541cbcb9aa6efa26222acc75"   # rfdetr 1.6.5.post0's registry entry for this file
 RFDETR_VERSION = "1.6.5.post0"
+ENV_FILE = Path(__file__).resolve().with_name("v3fam_detr_env.txt")   # D6's environment pins (deviation 2)
+ENV_IMPORTS = ("torch", "rfdetr", "supervision", "pytorch_lightning")
 VALID_SHARE = 0.02
 VALID_SEED_TEXT = "inc2/v3fam/d6/valid/%s"
 NUM_CLASSES = C.NC                           # 13: the twelve species and OtherPlant
@@ -130,8 +140,12 @@ WALLTIME_H = 36.0
 WALLTIME_SHARE = 0.8                         # the seeds run only if the projection is <= 28.8 h
 OVERHEAD_H = 0.5
 NOT_RUN_WALLTIME = "not run (walltime)"
-# The read-only rehearsal's outcome (V3F.8 item 3): "symlink" or "transpose". None until it is recorded here.
-EXIF_STAGING = None
+# The read-only rehearsal's outcome (V3F.8 item 3): "symlink" or "transpose"; staging refuses while it is None.
+# Recorded 2026-10-12 (deviation 2; docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-12)"): rfdetr's reader in D6's
+# environment (supervision 0.27.0.post2) yields exif_transpose's pixels for base_v2's tagged images (MAD 0) but
+# scales the label boxes by the stored, unrotated width and height, so every image tagged 6 or 8 failed the check
+# (boxes about 1,000 px off): the tagged images are staged transposed.
+EXIF_STAGING = "transpose"
 EXIF_MODES = ("symlink", "transpose")
 ROTATED_TAGS = (3, 6, 8)
 TRANSPOSED_JPEG = {"format": "JPEG", "quality": 100, "subsampling": 0}
@@ -336,27 +350,92 @@ def d0s_staging_removals(base_keys):
                   "dropped_sha256": C.sha256_text("\n".join(drop)), "h": len(rec.get("H") or [])}
 
 
+# ------------------------------------------------------------------ the environment (deviation 2, 2026-10-12)
+def env_pins(path=None):
+    """{distribution: version} of v3fam_detr_env.txt's requirement lines (name==version --hash=...)."""
+    out = {}
+    for ln in Path(path or ENV_FILE).read_text(encoding="utf-8").splitlines():
+        ln = ln.split("#", 1)[0].strip()
+        if not ln:
+            continue
+        m = re.match(r"([A-Za-z0-9][A-Za-z0-9_.-]*)==([^\s;]+)(\s+--hash=sha256:[0-9a-f]{64})+\Z", ln)
+        if not m:
+            raise F.V3famRefused("%s: %r is not 'name==version --hash=sha256:...'" % (path or ENV_FILE, ln))
+        out[m.group(1).lower()] = m.group(2)
+    if "supervision" not in out:
+        raise F.V3famRefused("%s pins no supervision" % (path or ENV_FILE))
+    return out
+
+
+def env_problems(version=None, importer=None, prefix=None, pins=None):
+    """Why this interpreter is not D6's environment ([] when it is): rfdetr at RFDETR_VERSION and every pin of
+    v3fam_detr_env.txt installed as pinned, supervision imported from this environment's own site-packages (the
+    virtual environment over the bench env, not the bench env's 0.6.0) with DetectionDataset.from_yolo, and torch,
+    rfdetr, supervision and pytorch_lightning importable. version, importer and prefix are
+    importlib.metadata.version, importlib.import_module and sys.prefix (tests pass others)."""
+    import importlib
+    import importlib.metadata as md
+    version = version or md.version
+    importer = importer or importlib.import_module
+    prefix = os.path.realpath(prefix or sys.prefix)
+    out = []
+    for name, want in sorted(dict(pins if pins is not None else env_pins(), rfdetr=RFDETR_VERSION).items()):
+        try:
+            got = version(name)
+        except Exception:                    # noqa: BLE001 - not installed (PackageNotFoundError) is a problem
+            got = None
+        if got != want:
+            out.append("%s is %s, not %s" % (name, got or "not installed", want))
+    for mod in ENV_IMPORTS:
+        try:
+            m = importer(mod)
+        except Exception as e:               # noqa: BLE001 - any import failure is reported
+            out.append("%s does not import (%s: %s)" % (mod, type(e).__name__, str(e)[:200]))
+            continue
+        if mod == "supervision":
+            f = os.path.realpath(str(getattr(m, "__file__", "") or ""))
+            if not f.startswith(prefix + os.sep):
+                out.append("supervision is imported from %s, outside this environment (%s)" % (f, prefix))
+            if not callable(getattr(getattr(m, "DetectionDataset", None), "from_yolo", None)):
+                out.append("supervision has no DetectionDataset.from_yolo")
+    return out
+
+
+def check_env():
+    """`check-env`: the job scripts' import check and the login node's (deviation 2); refuses unless env_problems
+    is empty. Returns the versions it saw."""
+    bad = env_problems()
+    if bad:
+        raise F.V3famRefused("not D6's environment (%s; %s says how it is made): %s"
+                             % (sys.prefix, ENV_FILE.name, "; ".join(bad)))
+    vers = RfdetrBackend().versions()
+    log("D6's environment: %s" % json.dumps(vers, sort_keys=True))
+    return vers
+
+
 # ------------------------------------------------------------------ the backend (rfdetr 1.6.5.post0)
 class RfdetrBackend(object):
-    """The RF-DETR calls, imported only here (the bench env's rfdetr 1.6.5.post0, supervision, torch)."""
+    """The RF-DETR calls, imported only here (rfdetr 1.6.5.post0, supervision, torch: D6's environment)."""
     name = "rfdetr"
 
     def versions(self):
+        import importlib.metadata as md
         import pytorch_lightning
-        import rfdetr
         import supervision
         import torch
-        return {"rfdetr": rfdetr.__version__, "supervision": supervision.__version__, "torch": torch.__version__,
-                "pytorch_lightning": pytorch_lightning.__version__}
+        return {"rfdetr": md.version("rfdetr"), "supervision": supervision.__version__, "torch": torch.__version__,
+                "pytorch_lightning": pytorch_lightning.__version__, "defusedxml": md.version("defusedxml"),
+                "env": sys.prefix}
 
     def train(self, stage, out, seed, epochs, pretrain):
         """Train RFDETRLarge on the staging with RECIPE; returns {ema_state, inprocess_state (cpu tensors), args,
         epoch, max_epochs, interrupted, callbacks, seconds, model, class_names, seed_mechanism}."""
-        import rfdetr
+        import importlib.metadata as md
         import rfdetr.training as RT
         from rfdetr import RFDETRLarge
-        if rfdetr.__version__ != RFDETR_VERSION:
-            raise F.V3famRefused("rfdetr %s: D6 is pre-registered on %s" % (rfdetr.__version__, RFDETR_VERSION))
+        have = md.version("rfdetr")          # the package has no __version__ (deviation 2)
+        if have != RFDETR_VERSION:
+            raise F.V3famRefused("rfdetr %s: D6 is pre-registered on %s" % (have, RFDETR_VERSION))
         captured = {}
         orig = RT.build_trainer
 
@@ -442,18 +521,18 @@ class RfdetrBackend(object):
 
     def read_yolo(self, split_dir, data_yaml):
         """What rfdetr's YOLO reader yields: supervision.DetectionDataset.from_yolo (OpenCV) over split_dir's
-        images/ and labels/; [(image path, RGB array, xyxy, class ids)]."""
+        images/ and labels/; (image path, RGB array, xyxy, class ids) per image, one image at a time (deviation 2:
+        a list of the 606 tagged base_v2 frames at full resolution is about 22 GB; the single-process rehearsal
+        that built it was killed on the login node after 28 min at about 12 GB)."""
         import numpy as np
         import supervision as sv
         ds = sv.DetectionDataset.from_yolo(images_directory_path=str(Path(split_dir) / "images"),
                                            annotations_directory_path=str(Path(split_dir) / "labels"),
                                            data_yaml_path=str(data_yaml))
-        out = []
         for i in range(len(ds)):
             path, img, det = ds[i]
-            out.append((str(path), np.ascontiguousarray(np.asarray(img)[:, :, ::-1]),
-                        np.asarray(det.xyxy, dtype=np.float64).reshape(-1, 4), np.asarray(det.class_id)))
-        return out
+            yield (str(path), np.ascontiguousarray(np.asarray(img)[:, :, ::-1]),
+                   np.asarray(det.xyxy, dtype=np.float64).reshape(-1, 4), np.asarray(det.class_id))
 
 
 def default_backend(backend=None):
@@ -1151,7 +1230,7 @@ def score_d6(lock_check=True, batch=S.BATCH, device=None, reported=True, backend
 # ------------------------------------------------------------------ CLI
 def main(argv=None):
     ap = argparse.ArgumentParser(description="V3F D6: RF-DETR-L 12-class on base A (staging, smoke, train, score).")
-    ap.add_argument("command", choices=("smoke", "train", "score", "stage", "rehearse-exif", "sources"))
+    ap.add_argument("command", choices=("smoke", "train", "score", "stage", "rehearse-exif", "sources", "check-env"))
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--out", default=None, help="rehearse-exif: a directory outside INC_DIR")
     ap.add_argument("--batch", type=int, default=None, help="protocol %d; another only with %s=1" % (S.BATCH,
@@ -1182,6 +1261,8 @@ def main(argv=None):
             rehearse_exif(a.out)
         elif a.command == "sources":
             print(json.dumps(read_sources(), indent=1, sort_keys=True))
+        elif a.command == "check-env":
+            check_env()
         else:
             score_d6(lock_check=not a.no_lock_check_for_tests, batch=a.batch or S.BATCH, device=a.device)
     except (F.V3famRefused, TS.E3Refused, S.ScorerRefused, SC.SidecarError, SN.NativeRefused, V.VerifyError,

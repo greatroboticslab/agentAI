@@ -26,10 +26,16 @@
 # (SIGTERM: the training process removes the files its attempt wrote, then exits;
 # the provenance records "killed"), so D6 fails and is recorded, never shortened.
 #
-# What runs: the bench env (rfdetr 1.6.5.post0, supervision, PyTorch Lightning,
-# torch 2.5.1), offline (HF_HUB_OFFLINE=1; YOLO_OFFLINE=true and
-# YOLO_AUTOINSTALL=false for the family modules' Ultralytics imports), after an
-# import check of torch, rfdetr, supervision and pytorch_lightning. The pretrained
+# What runs: D6's environment (deviation 2, 2026-10-12), a virtual environment
+# over the bench env (rfdetr 1.6.5.post0, PyTorch Lightning, torch 2.5.1) that
+# adds only the pins of tools/inc2/v3fam_detr_env.txt (supervision 0.27.0.post2,
+# defusedxml 0.7.1: the bench env's supervision 0.6.0 has no DetectionDataset,
+# which rfdetr's YOLO reader calls), first on PATH after `conda activate bench`;
+# offline (HF_HUB_OFFLINE=1; YOLO_OFFLINE=true and YOLO_AUTOINSTALL=false for the
+# family modules' Ultralytics imports), after the import check
+# `inc2.v3fam_detr check-env` (the pinned versions, supervision from that
+# environment, torch, rfdetr, supervision and pytorch_lightning importable); a
+# missing environment or a failed check is recorded env_failed. The pretrained
 # file is REPO/rf-detr-large-2026.pth (inc2.v3fam_detr checks its size and MD5).
 # Nothing is advanced: D6 builds no inc experiment.
 #
@@ -41,11 +47,12 @@
 # an outer module differs from the git-tracked nested copy (INC_BUILD_ALLOW_DRIFT=1
 # runs the outer copies anyway, recorded).
 #
-# INC_BUILD_REPO and INC_BUILD_CONDA_SH replace the cluster paths below (tests only).
+# INC_BUILD_REPO, INC_BUILD_CONDA_SH and INC_DETR_ENV replace the cluster paths below (tests only).
 set -uo pipefail
 
 REPO="${INC_BUILD_REPO:-/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark}"
 CONDA_SH="${INC_BUILD_CONDA_SH:-/jet/home/byler/miniconda3/etc/profile.d/conda.sh}"
+D6_ENV="${INC_DETR_ENV:-/ocean/projects/cis240145p/byler/harry/envs/v3fam_d6}"
 export REPO
 
 usage() {
@@ -144,7 +151,7 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py tools/inc2/recipes.py tools/inc2/train.py
          tools/inc2/baseline.py tools/inc2/base3.py tools/inc2/base3_v2.json tools/inc2/scorer_sidecar.py
          tools/inc2/scorer_native.py tools/inc2/twostage.py tools/inc2/v3fam.py tools/inc2/v3fam_systems.py
-         tools/inc2/v3fam_detr.py)
+         tools/inc2/v3fam_detr.py tools/inc2/v3fam_detr_env.txt)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 
 prov() {
@@ -253,7 +260,17 @@ if [ "$drift" = 1 ]; then
 fi
 
 export HF_HUB_OFFLINE=1 YOLO_OFFLINE=true YOLO_AUTOINSTALL=false
-python -u -c "import torch, rfdetr, supervision, pytorch_lightning; print('torch', torch.__version__, 'rfdetr', rfdetr.__version__, 'supervision', supervision.__version__, 'pytorch_lightning', pytorch_lightning.__version__)" \
+# D6's environment (deviation 2, 2026-10-12): the bench env plus tools/inc2/v3fam_detr_env.txt's pins, first on PATH
+PHASE=env
+if [ ! -x "$D6_ENV/bin/python" ] || [ ! -f "$D6_ENV/pyvenv.cfg" ]; then
+    echo "FATAL: D6's environment $D6_ENV is missing (tools/inc2/v3fam_detr_env.txt says how it is made)" >&2
+    prov update status=env_failed "refusal=D6's environment $D6_ENV is missing" finish
+    exit 1
+fi
+export VIRTUAL_ENV="$D6_ENV" PATH="$D6_ENV/bin:$PATH"
+echo "python: $(command -v python)  (D6's environment over the bench env)"
+prov update "python_env=$D6_ENV"
+python -u -m weed_optimizer_framework.tools.inc2.v3fam_detr check-env \
     || { prov update status=env_failed finish; exit 1; }
 
 OUT_TMP="$(mktemp "${TMPDIR:-/tmp}/inc2_detr_${NAME}.XXXXXX")" || OUT_TMP=""
