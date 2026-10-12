@@ -22,7 +22,9 @@ prints exactly one "INCAP <json>" line (remote.emit).
     stream-submit KIND [--parent-exp P] [--child-exp E] [--trigger D1,..] [--approval-id ID]
                   [--decided-by A] [--dry-run] -- ARGS ...
         sbatch -p GPU-shared of a stream job script, ARGS checked against the
-        script's grammar: collect (run_inc_collect.sh fetch|intake|probe),
+        script's grammar (with --export naming the INCAP_* provenance variables
+        it passes: Bridges-2's SBATCH_EXPORT=NONE dropped them; deviation 3,
+        2026-10-12): collect (run_inc_collect.sh fetch|intake|probe),
         admit (run_inc2_stream.sh admit|bootstrap|knowntruth|backfill|scan-holds|eval-hits),
         build (run_inc2_build.sh <pkg>.stream init|build|milestone|fork|feasibility|bisect,
         <pkg>.splits build|lock, <pkg>.baseline build|rescore-native|rescore-agnostic|rescore-e2|
@@ -144,6 +146,17 @@ HOLDS = ("h6_scan", "funnel_F9", "licence")
 QOS_RE = re.compile(r"invalid qos|qos.*(not|invalid)|Invalid qos specification", re.I)
 PROJECTS_CMD = "projects"
 QUOTA_CMD = "my_quotas"
+# The submission's provenance as stream_submit passes it to a job (INCAP_<field> of --parent-exp, --child-exp,
+# --trigger, --approval-id, --decided-by, and INCAP_REQUESTED_UTC); run_inc2_build.sh and run_inc2_detr.sh record
+# them in the job's provenance. Deviation 3 (2026-10-12): Bridges-2 exports SBATCH_EXPORT=NONE to every login shell
+# (/etc/profile.d/slurm.sh), so sbatch gave a job none of the submitter's variables and every stream job's
+# provenance recorded them empty (decided_by, trigger and requested_utc of the 40 latest, D0-S's sweep among them).
+# sbatch_export names exactly these variables on the command line, which overrides SBATCH_EXPORT; the values stay in
+# the environment sbatch runs with, never in the argv. Measured on Bridges-2 (Slurm 22.05.11, two probe jobs,
+# 2026-10-12): a job submitted so holds the variables a NONE job holds (its SLURM_* and the login environment Slurm
+# loads on the node; 115, PATH identical) plus exactly the ones named, and no other variable of the submitter's.
+PROVENANCE_ENV = ("INCAP_PARENT_EXP", "INCAP_CHILD_EXP", "INCAP_TRIGGER", "INCAP_APPROVAL_ID", "INCAP_DECIDED_BY",
+                  "INCAP_REQUESTED_UTC")
 CHAIN_KEY = "prev_sha256"
 MAX_LEDGER_ROWS = 20000
 STREAM_MODULE_GLOBS = (("tools/inc2", "*.py"), ("tools/inc2", "*.json"), ("tools/collect", "*.py"),
@@ -1038,6 +1051,20 @@ def job_name(req, meta):
     return "inc_stream_%s_%s_%s" % (req["kind"], req["verb"].replace("-", ""), re.sub(r"[^A-Za-z0-9_.-]", "_", tag))
 
 
+def provenance_env(prov):
+    """{INCAP_<FIELD>: value} of a submission's provenance and INCAP_REQUESTED_UTC: what a stream job is given."""
+    out = {"INCAP_" + k.upper(): (",".join(v) if isinstance(v, list) else str(v)) for k, v in prov.items()}
+    out["INCAP_REQUESTED_UTC"] = M.utc_now()
+    return out
+
+
+def sbatch_export(prov):
+    """sbatch's --export naming the provenance variables of `prov` (deviation 3; PROVENANCE_ENV): their names only,
+    in PROVENANCE_ENV's order (a field outside it after them), INCAP_REQUESTED_UTC always among them."""
+    have = {"INCAP_" + k.upper() for k in prov} | {"INCAP_REQUESTED_UTC"}
+    return "--export=%s" % ",".join([k for k in PROVENANCE_ENV if k in have] + sorted(have - set(PROVENANCE_ENV)))
+
+
 def stream_submit(kind, args, meta=None, dry_run=False):
     rec = R.base_record("stream-submit")
     rec.update(kind=kind, dry_run=bool(dry_run))
@@ -1067,12 +1094,14 @@ def stream_submit(kind, args, meta=None, dry_run=False):
             argvs = []
             for n in names:
                 tail = req["script_args"] + (["--seed", n.rsplit("_s", 1)[1]] if req["verb"] == "train" else [])
-                argvs.append([sbatch, "--parsable", "--job-name=%s" % n, "-p", PARTITION, str(script)] + tail)
+                argvs.append([sbatch, "--parsable", "--job-name=%s" % n, "-p", PARTITION, sbatch_export(prov),
+                              str(script)] + tail)
             argv = argvs[0]
             rec.update(job_name=name, job_names=names, sbatch_argvs=argvs, partition=PARTITION)
         else:
             sbatch = os.environ.get("INCAP_SBATCH", "sbatch")
-            argv = [sbatch, "--parsable", "--job-name=%s" % name, "-p", PARTITION, str(script)] + req["script_args"]
+            argv = [sbatch, "--parsable", "--job-name=%s" % name, "-p", PARTITION, sbatch_export(prov),
+                    str(script)] + req["script_args"]
             rec.update(job_name=name, sbatch_argv=argv, partition=PARTITION)
         if req["kind"] == "build" and child and (R.inc_dir() / child / "exp.json").exists():
             raise R.Refused("experiment %s is already built; an experiment is built once" % child)
@@ -1092,9 +1121,7 @@ def stream_submit(kind, args, meta=None, dry_run=False):
         return _detr_submit(rec, prov)
     (R.inc_dir() / "logs").mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
-    for k, v in prov.items():
-        env["INCAP_" + k.upper()] = ",".join(v) if isinstance(v, list) else str(v)
-    env["INCAP_REQUESTED_UTC"] = M.utc_now()
+    env.update(provenance_env(prov))
     try:
         pr = subprocess.run(argv, capture_output=True, text=True, timeout=120, env=env)
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -1118,9 +1145,7 @@ def _detr_submit(rec, prov):
     half-submitted silently (an scancel that fails is reported in the failure)."""
     (R.inc_dir() / "logs").mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
-    for k, v in prov.items():
-        env["INCAP_" + k.upper()] = ",".join(v) if isinstance(v, list) else str(v)
-    env["INCAP_REQUESTED_UTC"] = M.utc_now()
+    env.update(provenance_env(prov))
     ids = []
 
     def undo(why, kind_):
@@ -1160,9 +1185,7 @@ def _zoo_submit(rec, argv, prov):
     unknown outcome ('uncertain': part of the chain may be queued); the last
     INCZOO line gives the five job ids."""
     env = dict(os.environ)
-    for k, v in prov.items():
-        env["INCAP_" + k.upper()] = ",".join(v) if isinstance(v, list) else str(v)
-    env["INCAP_REQUESTED_UTC"] = M.utc_now()
+    env.update(provenance_env(prov))
     try:
         pr = subprocess.run(argv, capture_output=True, text=True, timeout=ZOO_SUBMIT_TIMEOUT_S, env=env)
     except subprocess.TimeoutExpired as e:

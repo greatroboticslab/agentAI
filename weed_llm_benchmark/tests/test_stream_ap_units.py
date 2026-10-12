@@ -382,6 +382,36 @@ def t_remote():
     rec = SR.stream_submit("collect", ["fetch", "--source", "a", "--max-bytes", "100"], {"trigger": "D20"}, dry_run=True)
     check("a dry run: sbatch --parsable --job-name -p GPU-shared <script>", rec.get("ok") and rec["sbatch_argv"][3:5]
           == ["-p", "GPU-shared"] and rec["sbatch_argv"][2] == "--job-name=inc_stream_collect_fetch_a", rec)
+    # deviation 3 (2026-10-12): Bridges-2's login shells export SBATCH_EXPORT=NONE, so a job got none of the INCAP_*
+    # the platform set; sbatch's --export on the command line (which overrides SBATCH_EXPORT) names them
+    rec = SR.stream_submit("collect", ["fetch", "--source", "a", "--max-bytes", "100"],
+                           {"trigger": "D20", "decided_by": OWNER}, dry_run=True)
+    check("  --export names the provenance variables the job is given, names only, before the script (deviation 3)",
+          rec["sbatch_argv"][5] == "--export=INCAP_TRIGGER,INCAP_DECIDED_BY,INCAP_REQUESTED_UTC"
+          and rec["sbatch_argv"][6].endswith("run_inc_collect.sh") and OWNER not in " ".join(rec["sbatch_argv"]),
+          rec["sbatch_argv"])
+    old = os.environ.get("INCAP_DECIDED_BY")
+    os.environ["INCAP_DECIDED_BY"] = "human:stale@example.org"      # left in the submitter's environment
+    try:
+        rec = SR.stream_submit("collect", ["fetch", "--source", "b", "--max-bytes", "100"], {"trigger": "D20"})
+    finally:
+        if old is None:
+            os.environ.pop("INCAP_DECIDED_BY", None)
+        else:
+            os.environ["INCAP_DECIDED_BY"] = old
+    sub = w.submits[-1] if w.submits else {"argv": [], "env": {}}
+    ex = [a.split("=", 1)[1].split(",") for a in sub["argv"] if a.startswith("--export=")]
+    check("  a submission: --export names exactly its provenance (INCAP_TRIGGER, INCAP_REQUESTED_UTC), whose values "
+          "sbatch's environment holds; a stale INCAP_DECIDED_BY of the submitter's environment is not named",
+          rec.get("ok") and ex == [["INCAP_TRIGGER", "INCAP_REQUESTED_UTC"]] and sub["env"].get("INCAP_TRIGGER")
+          == "D20" and bool(sub["env"].get("INCAP_REQUESTED_UTC")) and "D20" not in " ".join(sub["argv"]),
+          (sub["argv"], sub["env"], rec.get("error")))
+    rec = SR.stream_submit("detr", ["inc2.v3fam_detr", "train", "--seeds", "0,1,2"],
+                           {"trigger": "DR0", "approval_id": "ab12cd"}, dry_run=True)
+    check("  L23K's three seed jobs: each argv names INCAP_TRIGGER, INCAP_APPROVAL_ID and INCAP_REQUESTED_UTC",
+          rec.get("ok") and len(rec.get("sbatch_argvs") or []) == 3 and all(
+              "--export=INCAP_TRIGGER,INCAP_APPROVAL_ID,INCAP_REQUESTED_UTC" in a for a in rec["sbatch_argvs"]),
+          rec.get("sbatch_argvs") or rec)
     w.qos = True
     rec = SR.stream_submit("collect", ["fetch", "--source", "a", "--max-bytes", "100"], {})
     check("an 'Invalid qos' refusal comes back as error_kind qos", rec.get("ok") is False and rec.get("error_kind") ==
@@ -3517,10 +3547,12 @@ def t_v3fam():
     fcard = [c for c in stf.get("cards") or [] if c["title"] == "V3F's scores of arm D2LAION failed (L23J)"]
     check("  the retry keeps the first attempt's GPU-h (0.5 h from sacct) in prior_gpuh, never overwritten, and the "
           "second's settled beside it (1.0 GPU-h for the two); the card's rerun is an sbatch job with "
-          "INCAP_DECIDED_BY, never a foreground run", once.get("prior_gpuh") == 0.5 and once.get("spend") == "open"
+          "INCAP_DECIDED_BY, named in sbatch's --export (deviation 3), never a foreground run",
+          once.get("prior_gpuh") == 0.5 and once.get("spend") == "open"
           and rec2.get("prior_gpuh") == 0.5 and rec2.get("settled") == 0.5 and len(rec2.get("attempts") or []) == 1
-          and fcard and "sbatch -p GPU-shared --job-name=inc_build_v3fam_score_d2laion run_inc2_build.sh inc2.v3fam "
-                        "score --arm D2LAION" in fcard[0]["detail"] and "INCAP_DECIDED_BY" in fcard[0]["detail"],
+          and fcard and "INCAP_DECIDED_BY=<the person> sbatch --export=INCAP_DECIDED_BY -p GPU-shared "
+                        "--job-name=inc_build_v3fam_score_d2laion run_inc2_build.sh inc2.v3fam score --arm D2LAION"
+          in fcard[0]["detail"],
           (once, rec2, [c["detail"][-200:] for c in fcard]))
     check("a failed L23J (D2LAION, sacct FAILED): one card, proposed once more under a new id; after its second "
           "failure recorded failed (a card), its id declined, no lane failure, no pause, and D2CLIP follows",
