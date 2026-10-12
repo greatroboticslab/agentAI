@@ -264,7 +264,7 @@ _POWER = {"": 0, "B": 0, "K": 1, "M": 2, "G": 3, "T": 4, "P": 5}
 def _gb(num, unit):
     """A size in GB (10^9 bytes): binary units (KiB, MiB, GiB, TiB, PiB) are powers of 1024, decimal ones (K, M,
     G, T, P, with or without a B) powers of 1000; B or no unit is bytes. Deviation 1 (2026-10-12): every binary
-    unit used to count as decimal, 2.4 % low per GiB and 10 % low per TiB (parse_quota is the only caller)."""
+    unit used to count as decimal, 6.9 % low for a GiB and 9.1 % low for a TiB (parse_quota is the only caller)."""
     u = (unit or "").strip()
     base = 1024.0 if len(u) >= 2 and u[1] in "iI" else 1000.0
     return float(num) * base ** _POWER.get(u[:1].upper(), 0) / 1e9
