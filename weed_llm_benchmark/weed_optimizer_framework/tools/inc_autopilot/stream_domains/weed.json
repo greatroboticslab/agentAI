@@ -509,7 +509,19 @@
   "status": "v3fam/v1/status.json",
   "data_record": "splits/v3fam/summary.json",
   "score_record": "capacity/v3fam_score_%s.json",
-  "verdict_record": "capacity/v3fam_v1.json",
+  "verdict_record": "capacity/v3fam_v1_cont.json",
+  "partial_verdict_record": "capacity/v3fam_v1.json",
+  "reopen": {
+   "marker": "deviation 4 (2026-10-20)",
+   "file": "docs/prereg/V3F_dev4_2026-10-20.md",
+   "sha256": "d1dd27297cfb770cffa01d0afaf56744f460a928038ef7e888182c1b85543b4b",
+   "items": [
+    "data",
+    "verdict"
+   ],
+   "before_utc": "2026-10-20T00:00:00Z",
+   "why": "Deviation 4 (2026-10-20): the family's data build (L23H) failed twice on 2026-10-12 on a defect (inc2.v3fam_data keyed its DINOv2 scans by manifest key, which 6,805 of base_v2's 6,811 keys repeat with two files, and funnel.embed refuses a repeated key), and the verdict of 2026-10-13 (job 49107774) was decided while eight arms had never started. The build is fixed (each file is scanned once, keyed by its sha256; no arm's rows change) and proposed again; the verdict of 2026-10-13 stays recorded as it is, and the family's continuation verdict (capacity/v3fam_v1_cont.json, the same rules and Holm sets) comes once every arm's record is complete or failed (V3F.7 step 11)."
+  },
   "seeds": [
    0,
    1,

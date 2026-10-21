@@ -1740,6 +1740,32 @@ def v3fam_terminal(state):
     return state in V3FAM_TERMINAL or str(state or "").startswith("not run")
 
 
+V3FAM_NOT_RUN_DATA = "not run (the family's data build failed)"
+V3FAM_DATA_ENDED = ("done", "not run (family cap)")     # the data build's states after which the verdict may come
+
+
+def v3fam_verdict_ready(fam, fs):
+    """(ready, pending) for L23L (V3F.7 step 11: 'once every arm's record is complete or failed'): the family's data
+    build done (or refused at the family cap), and every score arm, build and D6 job terminal by its own record or
+    its own run: done, failed after its own second failure, blocked, not needed, or not run for a reason of its own
+    (the family cap, the walltime, a download, a dependency of its own that ended without its effect). An item 'not
+    run (the family's data build failed)' never started: it is pending, not ended. The verdict of 2026-10-13 ran
+    with eight arms in that state (deviation 4, 2026-10-20)."""
+    pending = []
+    if fs.get("data") not in V3FAM_DATA_ENDED:
+        pending.append("data (%s)" % (fs.get("data") or "missing"))
+    score, build, det = fs.get("score") or {}, fs.get("build") or {}, fs.get("detr") or {}
+
+    def ended(st):
+        return v3fam_terminal(st) and st != V3FAM_NOT_RUN_DATA
+    for a in list(fam.get("pre_build_scores") or []) + list(fam.get("post_build_scores") or []):
+        if not ended(score.get(a)):
+            pending.append(a)
+    pending += ["build:%s" % a for a in fam.get("builds") or [] if not ended(build.get(a))]
+    pending += ["detr:%s" % k for k in ("smoke", "train") if not ended(det.get(k))]
+    return not pending, pending
+
+
 def _v3fam_due(state):
     """An item DR0 proposes: never proposed (missing) or failed once (proposed once more under a new id)."""
     return state in (None, "missing", "failed_once")
@@ -1806,8 +1832,8 @@ def _v3fam_deps(fs, deps):
 def v3fam_plan(fam, fs):
     """{lane: item} the family wants next and {item: why} of its waits, from /stage/v3fam (pure: DR0 and the
     family card read it). One MAINT item in V3F.7's order (L23H; L23J for the arms scored before the builds;
-    L23I per build; L23J per arm once its runs are done; L23L once everything is terminal) and, on TRAIN, L23K's
-    smoke after L23H and then its seeds."""
+    L23I per build; L23J per arm once its runs are done; L23L once every arm's record is complete or failed,
+    v3fam_verdict_ready) and, on TRAIN, L23K's smoke after L23H and then its seeds."""
     out, waits = {}, {}
     data = fs.get("data")
     score, build = fs.get("score") or {}, fs.get("build") or {}
@@ -1846,15 +1872,14 @@ def v3fam_plan(fam, fs):
                         out["MAINT"] = it
                         break
             if "MAINT" not in out:
-                arms = list(fam.get("pre_build_scores") or []) + list(fam.get("post_build_scores") or [])
-                pending = [a for a in arms if not v3fam_terminal(score.get(a))]
-                pending += ["build:%s" % a for a in fam.get("builds") or [] if not v3fam_terminal(build.get(a))]
-                pending += ["detr:%s" % k for k in ("smoke", "train") if not v3fam_terminal((fs.get("detr") or {})
-                                                                                          .get(k))]
-                if not pending and _v3fam_due(fs.get("verdict")):
+                ready, pending = v3fam_verdict_ready(fam, fs)
+                if ready and _v3fam_due(fs.get("verdict")):
                     out["MAINT"] = {"lever": "L23L", "item": "verdict"}
                 elif pending:
-                    waits["verdict"] = "waits for %s" % ", ".join(pending[:6])
+                    waits["verdict"] = "waits for %s%s" % (", ".join(pending[:6]), (
+                        "; the family's data build failed: its arms never started, and the verdict waits until "
+                        "every arm's record is complete or failed (V3F.7 step 11; deviation 4)"
+                        if fs.get("data") == "failed" else ""))
     det = fs.get("detr") or {}
     if data == "done":
         if _v3fam_due(det.get("smoke")):

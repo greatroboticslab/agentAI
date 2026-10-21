@@ -789,6 +789,9 @@ def stream_summary(sid, dev_exps=()):
     for arm in V3FAM_SCORE_ARMS:
         put("capacity/v3fam_score_%s.json" % arm.lower(), inc / "capacity" / ("v3fam_score_%s.json" % arm.lower()))
     put("capacity/v3fam_v1.json", inc / "capacity" / "v3fam_v1.json")
+    # deviation 4 (2026-10-20): the continuation verdict over every arm (dev only), the record the domain's
+    # v3fam.verdict_record names once the verdict of 2026-10-13 is in place
+    put("capacity/v3fam_v1_cont.json", inc / "capacity" / "v3fam_v1_cont.json")
     try:
         arts[V3FAM_STATUS] = _dev(v3fam_status(inc))
     except Exception as e:                      # a status that cannot be read is reported, never fatal
