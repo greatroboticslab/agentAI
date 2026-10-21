@@ -808,7 +808,8 @@ class World(object):
         """The family's gate in place: E3's verdict decided (the zoo is complete after ready_r0), the deployed
         tree's copies of the amendment and its Revisions 29-31 (their sha256s, at the lab tree's parent), the time
         stamp record (naming the Revisions' stamp), D0-S's record
-        complete (bclean: its test branch triggered), the EXIF frame pre-flight passed."""
+        complete (bclean: its test branch triggered), the EXIF frame pre-flight passed. Deviation 4's file is
+        deployed only by v3fam_deploy_dev4."""
         if e3_verdict:
             self.e3_records(arms=(), verdict=True, rescore=False, qualifying=("M", "A", "B"), chosen="B")
         dst = self.dir / "docs" / "prereg" / "V3F_2026-10-11.md"
@@ -857,16 +858,29 @@ class World(object):
         for k in trained:
             self._w("v3fam/v1/d6/s%d/train.json" % k, {"format": "inc2-v3fam-d6-train/1", "seed": k, "status": "done"})
 
-    def v3fam_verdict(self, order=(("D6", "reference"), ("D8M", "reference"))):
-        """inc2.v3fam verdict's platform record (capacity/v3fam_v1.json, dev only)."""
+    def v3fam_deploy_dev4(self):
+        """Deviation 4's file (docs/prereg/V3F_dev4_2026-10-20.md) in the deployed tree, as a deploy puts it."""
+        n = self.dom["v3fam"]["reopen"]["file"]
+        dst = self.dir / n
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(str(PKG_ROOT.parent / n), str(dst))
+
+    def v3fam_verdict(self, order=(("D6", "reference"), ("D8M", "reference")), record=None):
+        """inc2.v3fam verdict's platform record (dev only), at the domain's verdict record (the continuation's,
+        capacity/v3fam_v1_cont.json, since deviation 4) or `record`; a continuation names the verdict of 2026-10-13
+        when capacity/v3fam_v1.json is in place, as the verb does."""
+        record = record or self.dom["v3fam"].get("verdict_record") or "capacity/v3fam_v1.json"
         prim = {p: {"id": p, "status": "decided", "x": "E3B", "y": "Y", "x_label": "E3-B", "y_label": "Y",
                     "decision": {"diff": 0.004, "z": 1.2, "interval_90": [-0.001, 0.009], "outcome": "inconclusive",
                                  "flags": [], "qualifies": False}} for p in ("P1", "P2", "P3", "P4", "P5")}
-        self._w("capacity/v3fam_v1.json", {
-            "format": "inc2-v3fam-verdict/1", "status": "decided", "exam": "dev", "decided_on": "dev",
-            "primaries": prim, "holm": {p: {"family_confirmed": False} for p in prim},
-            "challengers": {"C": 14, "bar": 2.69011, "opening": []},
-            "reads": {"order": [{"arm": a, "kind": k} for a, k in order], "cap": 5}})
+        doc = {"format": "inc2-v3fam-verdict/1", "status": "decided", "exam": "dev", "decided_on": "dev",
+               "primaries": prim, "holm": {p: {"family_confirmed": False} for p in prim},
+               "challengers": {"C": 14, "bar": 2.69011, "opening": []},
+               "reads": {"order": [{"arm": a, "kind": k} for a, k in order], "cap": 5}}
+        if record != "capacity/v3fam_v1.json" and (self.inc / "capacity" / "v3fam_v1.json").exists():
+            doc["continues"] = {"verdict": "v3fam_v1.json", "sha256": "c" * 64,
+                                "deviation": "docs/prereg/V3F_dev4_2026-10-20.md", "reproduced": ["P1", "P4"]}
+        self._w(record, doc)
 
     def v3fam_cluster(self, skip=()):
         """The cluster's side of the family's jobs: each queued family job ends now and writes its record (L23H the

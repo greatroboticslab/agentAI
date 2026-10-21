@@ -4300,9 +4300,9 @@ class StreamRun(object):
         self._failed(ln, it, why, ended=ended)
         return True
 
-    @staticmethod
-    def _record_only_follow(it):
-        """(job name, record artifact) a record-only item is followed by."""
+    def _record_only_follow(self, it):
+        """(job name, record artifact) a record-only item is followed by (an instance method: L23L's record is the
+        domain's verdict record)."""
         from . import stream_remote as SR
         prm = it["proposal"].get("params") or {}
         if it["lever"] == "L23V":
@@ -4329,7 +4329,10 @@ class StreamRun(object):
         if it["lever"] == "L23K":
             return tuple(SR.V3FAM_DETR_JOB_NAMES[str(prm.get("verb"))]), SR.V3FAM_STATUS
         if it["lever"] == "L23L":
-            return SR.V3FAM_JOB_NAME, "capacity/v3fam_v1.json"
+            # the domain's verdict record: capacity/v3fam_v1_cont.json once the verdict of 2026-10-13 is in place
+            # (deviation 4); the job's name is the same
+            return SR.V3FAM_JOB_NAME, (((self.dom or {}).get("v3fam") or {}).get("verdict_record")
+                                       or "capacity/v3fam_v1.json")
         return SR.NATIVE_JOB_NAME % prm.get("exp"), "%s/native_rescore.json" % prm.get("exp")
 
     def _follow_record_only(self, ln, it, queued, names, arts):
@@ -4814,6 +4817,62 @@ class StreamRun(object):
                 return False
         return True
 
+    def _v3fam_deployed(self, f, sha):
+        """True when the deployed tree (the lab's, as _v3fam_amendment reads it) holds file f with this sha256."""
+        if not f or not sha:
+            return False
+        try:
+            return hashlib.sha256((self.paths.lab_inc.parents[3] / f).read_bytes()).hexdigest() == sha
+        except OSError:
+            return False
+
+    def _v3fam_reopen(self):
+        """A recorded deviation's reopening (deviation 4, 2026-10-20: the data build, after its defect is fixed, and
+        the verdict, whose record of 2026-10-13 was decided while seven arms had never started and stays as it is): each
+        item the domain's v3fam.reopen names is proposed again once the deployed tree holds the deviation's file
+        with its sha256, once per marker, and only an item whose last attempt started before the deviation
+        (v3fam.reopen.before_utc): an item run after it is never reopened by it. Such an item recorded failed or
+        done has its spend so far moved into prior_gpuh (every attempt stays counted against the family cap), its
+        earlier proposal ids added to failed_ids (a new proposal takes a new id: the executor runs an id once), its
+        record kept under reopen_history, and its state set to missing; the verdict's card mark goes with it (the
+        continuation's verdict raises its own card). An item running or never proposed is left as it is. Returns
+        the keys reopened now."""
+        fam = (self.dom or {}).get("v3fam") or {}
+        ro = fam.get("reopen") or {}
+        marker = ro.get("marker")
+        if not marker or not ro.get("items") or not self._v3fam_deployed(ro.get("file"), ro.get("sha256")):
+            return []
+        f = self._v3fam()
+        out = []
+        for key in ro["items"]:
+            rec = f["items"].get(key)
+            if not isinstance(rec, dict) or rec.get("reopened") == marker or rec.get("state") not in ("failed", "done"):
+                continue
+            if not ro.get("before_utc") or not rec.get("started_utc") or str(rec["started_utc"]) >= ro["before_utc"]:
+                continue
+            before = {k: v for k, v in rec.items() if k != "reopen_history"}
+            ids = [a.get("proposal") for a in rec.get("attempts") or []] + [rec.get("proposal")]
+            self._v3fam_fold(rec)
+            hist = list(rec.get("reopen_history") or []) + [dict(before, marker=marker, reopened_utc=self.utc)]
+            if key == "verdict" and f.get("verdict_card"):
+                hist[-1]["verdict_card"] = f.pop("verdict_card")
+            rec.update(state="missing", fails=0, proposal=None, reopened=marker, reopened_utc=self.utc,
+                       reopen_history=hist)
+            rec.pop("why", None)
+            failed = self._failed_ids()
+            self.st["failed_ids"] = (failed + [i for i in ids if i and i not in failed])[-FAILED_IDS_KEEP:]
+            out.append(key)
+        if out:
+            self._ledger("v3fam_reopened", record_only=True, v3fam_items=out, marker=marker, reasons=[
+                "V3F: %s reopened under %s (%s): proposed again under new ids, earlier spend kept in prior_gpuh"
+                % (", ".join(out), marker, ro.get("file"))])
+            self._card("research", "V3F: %s proposed again (%s)" % (", ".join(out), marker),
+                       "%s, recorded in %s. The verdict of 2026-10-13 stays recorded as it is; the family's "
+                       "continuation verdict comes once every arm's record is complete or failed (V3F.7 step 11). "
+                       "Earlier attempts stay counted against the family cap." % (ro.get("why") or marker,
+                                                                                   ro.get("file")), lever="L23L")
+        return out
+
     def _v3fam_stage(self, exp_status, payload=None):
         """/stage/v3fam (V3F.6.4), what DR0's family block and the cards read: the gate's inputs (the amendment
         deployed, the time stamp, D0-S's record and trigger, the EXIF pre-flight), every item's state (done from
@@ -4826,6 +4885,7 @@ class StreamRun(object):
         fam = (self.dom or {}).get("v3fam") or {}
         if not fam:
             return None
+        self._v3fam_reopen()
         items = self._v3fam()["items"]
         status = self._artifact(fam.get("status") or SR.V3FAM_STATUS) or {}
 
@@ -4877,8 +4937,9 @@ class StreamRun(object):
         out["detr"] = {"smoke": smoke, "train": train}
         if out["data"] == "failed":
             # the data build ended without its summary after its second failure: nothing that trains on the family's
-            # manifests (the builds) or stages after it (D6) can run; recorded so, terminal, so the verdict still comes
-            why = "not run (the family's data build failed)"
+            # manifests (the builds) or stages after it (D6) can run; recorded so for the family table, but these
+            # items never started, so the verdict does not take them as ended (DS.v3fam_verdict_ready; deviation 4)
+            why = DS.V3FAM_NOT_RUN_DATA
             for arm in b:
                 if b[arm] in ("missing", "failed_once"):
                     b[arm] = why
@@ -4956,10 +5017,15 @@ class StreamRun(object):
             return {"pkg": pkg}, None
         if lever == "L23L":
             # the items this ticker recorded 'not run (family cap)': the verdict writes them under v3fam/v1/cap so
-            # the family table gives that reason (V3F.3.4, V3F.3.5)
-            refused = sorted(k for k, v in self._v3fam()["items"].items() if v.get("state") == V3FAM_NOT_RUN_CAP
-                             and k != "verdict")
-            return dict({"pkg": pkg}, **({"cap_refused": ",".join(refused)} if refused else {})), None
+            # the family table gives that reason (V3F.3.4, V3F.3.5); and those it recorded failed after their own
+            # second failure (a score, build or D6 job; never the data build, whose failure ends nothing): the verb
+            # counts the arms they end as ended, as DS.v3fam_verdict_ready does, although such a job may have failed
+            # before it wrote a provenance attempt (deviation 4)
+            items = self._v3fam()["items"]
+            refused = sorted(k for k, v in items.items() if v.get("state") == V3FAM_NOT_RUN_CAP and k != "verdict")
+            failed = sorted(k for k, v in items.items() if v.get("state") == "failed" and k not in ("verdict", "data"))
+            return dict({"pkg": pkg}, **({"cap_refused": ",".join(refused)} if refused else {}),
+                        **({"ticker_failed": ",".join(failed)} if failed else {})), None
         if lever == "L23J":
             arms = list(fam.get("pre_build_scores") or []) + list(fam.get("post_build_scores") or [])
             if pr.get("arm") not in arms:
@@ -5102,6 +5168,14 @@ class StreamRun(object):
             body = ("%s. A seed killed at its walltime fails D6 (V3F.7; L23K's falsifier): recorded failed, never "
                     "retried; D6's scoring and its reference read are not spent, P5 and D6's Tier C arm are 'not "
                     "run' and keep their places (V3F.3.4). The family's other items go on." % _short(why, 400))
+        elif last and lever == "L23H":
+            body = ("%s. The family's data build failed twice: the arms it builds (and D6, which stages after it) "
+                    "never start, so the verdict waits until every arm's record is complete or failed (V3F.7 step "
+                    "11; deviation 4, which records why this wait departs from V3F.3.4/V3F.3.5's 'a job that failed "
+                    "twice'). The family's other items go on. A person finds the cause, fixes it as a recorded "
+                    "deviation and names the build in the domain's v3fam.reopen under a new marker (its before_utc "
+                    "after this failure); the platform then proposes it again. To rerun by hand: %s"
+                    % (_short(why, 400), self._v3fam_rerun(lever, params)))
         else:
             body = "%s. Record only: %s; the family's other items go on. A person may rerun it from the login node: %s" \
                 % (_short(why, 400), "after its second failure it is recorded failed and keeps its place in the "
@@ -5125,6 +5199,7 @@ class StreamRun(object):
                 sb, arm.lower(), arm)
         if lever == "L23L":
             cr = (" --cap-refused %s" % params["cap_refused"]) if params.get("cap_refused") else ""
+            cr += (" --ticker-failed %s" % params["ticker_failed"]) if params.get("ticker_failed") else ""
             return "%s --job-name=inc_build_v3fam_v1 run_inc2_build.sh inc2.v3fam verdict%s" % (sb, cr)
         if lever == "L23I":
             return ("%s --job-name=inc_build_%s run_inc2_build.sh inc2.baseline build --exp %s --v3fam %s --seeds "
@@ -5293,7 +5368,12 @@ class StreamRun(object):
                      "inc2.v3fam reanalyse-test --read-by owner|delegate. Nothing switches; the headline stays E3-B "
                      "(V3F.3.6).")
         f["verdict_card"] = self.utc
-        self._card("research", "V3F's verdict is decided (%s)" % v.get("decided_on", "dev"), "\n".join(lines),
+        if v.get("continues"):
+            lines.insert(0, "The family's continuation verdict over every arm (deviation 4); the verdict of 2026-10-13 "
+                            "(%s) stays recorded as it is, and every comparison it decided is reproduced here."
+                         % ((v.get("continues") or {}).get("verdict") or "capacity/v3fam_v1.json"))
+        self._card("research", "V3F's %sverdict is decided (%s)" % ("continuation " if v.get("continues") else "",
+                                                                     v.get("decided_on", "dev")), "\n".join(lines),
                    lever="L23L", trigger=["L23L"])
 
     def _measure_exps(self):

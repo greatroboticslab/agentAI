@@ -1696,6 +1696,17 @@ def stage_deploy():
     fixtures = {"tests/fixtures/collect", "tests/fixtures/inc_replay", "tests/fixtures/funnel"}
     check("the fixture directories the stream, collector and replay tests read are shipped",
           all(shipped(f) for f in fixtures), [f for f in fixtures if not shipped(f)])
+    # the files the ticker hashes in the deployed tree before it acts (the V3F amendment, its Revisions and a
+    # recorded deviation's reopening, each by its sha256: stream.py _v3fam_amendment, _v3fam_deployed) are git-root
+    # files the deploy ships; one left out would leave its gate shut on the lab for good (deviation 4's file, found
+    # missing from ROOT_PATHS on 2026-10-21)
+    from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LSM
+    roots = [ln.split(": ", 1)[1] for ln in dry.stdout.splitlines() if ln.startswith("git root: ")]
+    fam = LSM.load_domain("weed").get("v3fam") or {}
+    named = [f for f in (fam.get("amendment_file"), fam.get("revision_file"), (fam.get("reopen") or {}).get("file"))
+             if f]
+    check("every file the weed domain's v3fam block names by sha256 (%s) is a git-root path the deploy ships"
+          % ", ".join(named), len(named) == 3 and all(f in roots for f in named), (named, roots))
 
 
 def main_stages():

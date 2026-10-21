@@ -15,6 +15,11 @@ pinned is how the verdict reads the committed scores and how the reads are guard
   BCLEAN first when D0-S triggered it); a side whose arm was not run is "not run" with its reason and keeps its
   place; D0-S's dev branch decides on dev minus H; the platform's record dev only (the evidence scrub leaves it
   whole) and written once and last, the external records beside;
+- deviation 4 (2026-10-20): the verdict refuses while the family's data build has no summary or an arm never
+  started; after a verdict decided with arms never started (the one of 2026-10-13, by sha256), the reads wait for
+  its continuation, which is refused until every arm's record is complete or failed, then written once by the same
+  computation under its own names, the earlier records unchanged, every comparison they decided reproduced (a
+  doctored one refuses), the reads following it;
 - the reads: refused before the verdict, for an arm out of the order or out of turn, for a read_by other than the
   owner's or the delegate's exact name, a second time, and at the family cap (recorded "not run (family cap)",
   never retried); read.json written once with the argv; score-test refused unless INCAP_DECIDED_BY names the
@@ -193,6 +198,33 @@ def reset():
         shutil.rmtree(str(d), ignore_errors=True)
 
 
+def family_ready():
+    """What the verdict's guard reads (deviation 4): the family's data summary (written when absent) and, for every
+    score arm with no record, an attempt of its score job (its provenance: started and ended at once, so no GPU-h
+    is added) -- an arm that started and failed. Returns the files written, which the caller removes."""
+    from weed_optimizer_framework.tools.inc2 import v3fam_data as VD
+    made = []
+    sp = VD._summary_path()
+    if not sp.exists():
+        TS._write_json(sp, {"format": VD.FORMAT, "status": "complete", "arms": {}})
+        made.append(sp)
+    pdir = C.INC_DIR / "_campaign" / "provenance"
+    pdir.mkdir(parents=True, exist_ok=True)
+    for a in F.SCORE_ARMS:
+        p = pdir / ("v3fam_score_%s.json" % a.lower())
+        if VR.arm_status(a) == "missing" and not p.exists():
+            p.write_text(json.dumps({"attempts": [{"job_id": "1", "started_utc": "2026-10-12T00:00:00Z",
+                                                   "finished_utc": "2026-10-12T00:00:00Z", "status": "build_failed"}]}))
+            made.append(p)
+    return made
+
+
+def unmake(paths):
+    for p in paths:
+        if pathlib.Path(p).exists():
+            pathlib.Path(p).unlink()
+
+
 # ------------------------------------------------------------------ tests
 def t_verdict():
     print("the verdict on committed family scores")
@@ -208,11 +240,20 @@ def t_verdict():
         real = F.comparison
         F.comparison = functools.partial(real, resamples=RESAMPLES)
         try:
+            e_early = refused(VR.verdict)
+            made = family_ready()
             doc = VR.verdict()
         finally:
             F.comparison = real
     finally:
         F.RESAMPLES = old
+    check("the verdict refuses while the family's data build has no summary and arms never started (D5B and D9: no "
+          "record, no attempt; BCLEAN not needed without D0-S's trigger; deviation 4), writing nothing; with the "
+          "summary and an attempt of each it is decided",
+          e_early is not None and "every arm's record is complete or failed" in str(e_early)
+          and "never started: D9, D5B" in str(e_early) and "BCLEAN" not in str(e_early) and "summary" in str(e_early)
+          and doc["status"] == "decided", e_early)
+    unmake(made)
     p = doc["primaries"]
     check("capacity/v3fam_v1.json decided, dev only: P1-P5, Holm on dev, the Tier C gate (C = 14, bar 2.690110), "
           "the read order, Tier S on dev", doc["status"] == "decided" and sorted(p) == ["P1", "P2", "P3", "P4", "P5"]
@@ -302,10 +343,12 @@ def t_not_run_and_dev_minus_h():
     import functools
     real = F.comparison
     F.comparison = functools.partial(real, resamples=RESAMPLES)
+    made = family_ready()
     try:
         doc = VR.verdict()
     finally:
         F.comparison = real
+        unmake(made)
     p = doc["primaries"]
     check("P1 (its control D2LAION not run: download) and P5 (D6 missing) are 'not run' with the reason; Holm keeps "
           "m = 5; the gate counts C = 14; D6 reads nothing (not scored); BCLEAN's read first (D0-S triggered it), "
@@ -344,6 +387,115 @@ def t_not_run_and_dev_minus_h():
           and e3["dev_minus_h"]["E3_B_over_A"]["image"]["seed_text"] == "inc2/e3/attribution_se"
           and e3["full_dev"]["E3_M_over_ref"]["status"] == "decided"
           and "E3_B_over_ref" not in doc["primaries"], sorted(e3.get("dev_minus_h") or {}))
+
+
+def t_continuation():
+    """Deviation 4 (2026-10-20): the verdict of 2026-10-13 was decided while eight arms had never started; it stays
+    as it is, and the family's verdict over every arm is its continuation, by the same computation, once every arm's
+    record is complete or failed."""
+    print("deviation 4: the continuation verdict after a verdict decided with arms never started")
+    import functools
+    reset()
+    build_manifests()
+    late = ("D4F", "D4N", "D4R15", "D6", "D8S", "D8M")
+    build_scores(skip=late + ("D5B",))
+    for a in ("D4F", "D4N", "D4R15", "D6", "D8"):
+        if SYS.score_record_path(a).exists():
+            SYS.score_record_path(a).unlink()
+    real_cmp, real_ready, real_sha = F.comparison, VR.verdict_ready, VR.PARTIAL_VERDICT_SHA256
+    F.comparison = functools.partial(real_cmp, resamples=RESAMPLES)
+    made = []
+    try:
+        # the job of 2026-10-13 ran without the guard (the code of that day): its records as it wrote them
+        VR.verdict_ready = lambda *a, **k: (True, "")
+        v1 = VR.verdict()
+        VR.verdict_ready = real_ready
+        v1_bytes = VR.verdict_path().read_bytes()
+        ext_bytes = (C.INC_DIR / "capacity" / VR.EXTERNAL).read_bytes()
+        VR.PARTIAL_VERDICT_SHA256 = F._sha(VR.verdict_path())
+        e_read = refused(VR.read_verdict)
+        e_tr = refused(VR.test_read, "D6", "delegate")
+        check("the reads follow the continuation: while only the verdict of 2026-10-13 exists (P2, P3 and P5 'not "
+              "run'), read_verdict and test-read refuse, naming deviation 4",
+              v1["primaries"]["P2"]["status"] == "not run" and v1["primaries"]["P1"]["status"] == "decided"
+              and e_read is not None and "deviation 4" in str(e_read) and e_tr is not None
+              and VR.family_verdict_path().name == VR.CONTINUATION["verdict"], (e_read, e_tr))
+        e_wait = refused(VR.verdict)
+        check("the continuation waits until every arm's record is complete or failed: refused while D4F, D4N, D4R15, "
+              "D5B, D6 and D8 never started, writing nothing",
+              e_wait is not None and "never started" in str(e_wait) and all(a in str(e_wait) for a in
+                                                                              ("D4F", "D4N", "D4R15", "D5B", "D6", "D8"))
+              and not (C.INC_DIR / "capacity" / VR.CONTINUATION["verdict"]).exists(), e_wait)
+        for name in late:
+            for sd in F.SEEDS:
+                put(name, "dev", sd, SHIFT[name], arm=VR.SIDES[name][3])
+        for a in ("D4F", "D4N", "D4R15", "D6", "D8"):
+            TS._write_json(SYS.score_record_path(a), {"format": SYS.FMT_SCORE_RECORD, "arm": a, "status": "complete",
+                                                     "exam": "dev", "dev": []})
+        made = family_ready()                                # D5B started and failed; D9 likewise
+        cont = VR.verdict()
+        cp = C.INC_DIR / "capacity" / VR.CONTINUATION["verdict"]
+        p = cont["primaries"]
+        rep_ok = all((C.INC_DIR / "capacity" / n).exists() for n in (
+            VR.CONTINUATION["external"], VR.CONTINUATION["ext"], VR.CONTINUATION["report"] + ".json",
+            VR.CONTINUATION["report"] + ".md"))
+        check("the continuation: capacity/v3fam_v1_cont.json (and its external, ext and report files) written once; "
+              "the records of 2026-10-13 unchanged byte for byte; P2, P3 and P5 decided now; Holm over the same five "
+              "dev primaries",
+              cp.exists() and rep_ok and VR.verdict_path().read_bytes() == v1_bytes
+              and (C.INC_DIR / "capacity" / VR.EXTERNAL).read_bytes() == ext_bytes
+              and all(p[k]["status"] == "decided" for k in ("P1", "P2", "P3", "P4", "P5"))
+              and sorted(cont["holm"]) == ["P1", "P2", "P3", "P4", "P5"]
+              and all(cont["holm"][k]["m"] == 5 for k in cont["holm"]), sorted(p))
+        c = cont["continues"]
+        want = sorted(k for k, v in dict(v1["primaries"], **v1["tier_s"]).items() if v.get("status") == "decided") \
+            + sorted("C_%s" % a for a, v in v1["challengers"]["comparisons"].items() if v.get("status") == "decided")
+        check("  it names the verdict of 2026-10-13 by sha256 and deviation 4, and reproduces every comparison that "
+              "verdict decided (P1, P4, the D2 challengers, Tier S) with the same D, z, interval and outcome",
+              c["verdict"] == "v3fam_v1.json" and c["sha256"] == VR.PARTIAL_VERDICT_SHA256
+              and c["deviation"] == "docs/prereg/V3F_dev4_2026-10-20.md" and sorted(c["reproduced"]) == sorted(want)
+              and "P1" in c["reproduced"] and "C_D2LAION" in c["reproduced"]
+              and p["P1"]["decision"] == v1["primaries"]["P1"]["decision"]
+              and p["P4"]["decision"] == v1["primaries"]["P4"]["decision"], (sorted(c["reproduced"]), want))
+        check("  the same rules: Tier C counts C = 14 and its bar, the read order D6 then D8-m (scored now), the "
+              "platform's record dev only and on the allow-list",
+              cont["challengers"]["C"] == 14 and [o["arm"] for o in cont["reads"]["order"]][:2] == ["D6", "D8M"]
+              and R.dev_only(cont)[0] == cont and EV.allowed("capacity/%s" % VR.CONTINUATION["verdict"])
+              and not EV.allowed("capacity/%s" % VR.CONTINUATION["external"])
+              and not EV.allowed("capacity/%s.json" % VR.CONTINUATION["report"]), cont["reads"])
+        e_twice = refused(VR.verdict)
+        check("  the continuation is written once: a second run refuses", e_twice is not None
+              and "written once" in str(e_twice), e_twice)
+        real_src = VR.read_sources
+        VR.read_sources = lambda arm: {"mode": "inject_rows", "seeds": []}
+        try:
+            rec = VR.test_read("D6", "delegate")
+        finally:
+            VR.read_sources = real_src
+        check("  the reads follow it: D6's read prepared against v3fam_v1_cont.json and its sha256",
+              rec["verdict"] == VR.CONTINUATION["verdict"] and rec["verdict_sha256"] == F._sha(cp), rec["verdict"])
+        shutil.rmtree(str(VR.test_dir("D6")), ignore_errors=True)
+        # a verdict of 2026-10-13 the continuation does not reproduce: refused before anything is written
+        for n in (VR.CONTINUATION["verdict"], VR.CONTINUATION["external"], VR.CONTINUATION["ext"],
+                  VR.CONTINUATION["report"] + ".json", VR.CONTINUATION["report"] + ".md"):
+            (C.INC_DIR / "capacity" / n).unlink()
+        doctored = json.loads(v1_bytes)
+        doctored["primaries"]["P1"]["decision"]["z"] += 0.01
+        VR.verdict_path().write_text(json.dumps(doctored))
+        VR.PARTIAL_VERDICT_SHA256 = F._sha(VR.verdict_path())
+        e_rep = refused(VR.verdict)
+        check("  a verdict of 2026-10-13 whose P1 z the continuation does not give (0.01 off): refused, naming it, "
+              "nothing written", e_rep is not None and "does not reproduce" in str(e_rep) and "P1" in str(e_rep)
+              and not any((C.INC_DIR / "capacity" / n).exists() for n in (VR.CONTINUATION["verdict"],
+                                                                         VR.CONTINUATION["external"])), e_rep)
+        VR.verdict_path().write_bytes(v1_bytes)
+        VR.PARTIAL_VERDICT_SHA256 = "0" * 64
+        e_other = refused(VR.verdict)
+        check("  any other verdict in place (not the one of 2026-10-13): written once, refused",
+              e_other is not None and "written once" in str(e_other), e_other)
+    finally:
+        F.comparison, VR.verdict_ready, VR.PARTIAL_VERDICT_SHA256 = real_cmp, real_ready, real_sha
+        unmake(made)
 
 
 def write_verdict(order=(("D6", "reference"), ("D8M", "reference"), ("D4N", "challenger"))):
@@ -694,7 +846,8 @@ def t_spend():
 
 
 def main():
-    for fn in (t_verdict, t_not_run_and_dev_minus_h, t_reads, t_submitter_and_score_test, t_report_and_retest,
+    for fn in (t_verdict, t_not_run_and_dev_minus_h, t_continuation, t_reads, t_submitter_and_score_test,
+               t_report_and_retest,
                t_arrays_and_cap_argv, t_spend):
         try:
             fn()

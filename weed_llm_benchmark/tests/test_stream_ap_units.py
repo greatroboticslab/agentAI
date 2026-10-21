@@ -3261,8 +3261,11 @@ def _fam_pro(w, lever=None):
 
 
 def _fam_arg(e):
-    """What a family proposal names: L23J/L23I's --arm or --v3fam, L23K's verb."""
+    """What a family proposal names: L23J/L23I's --arm or --v3fam, L23K's verb, L23L's 'verdict' (its argv may end in
+    --cap-refused or --ticker-failed and their items)."""
     a = e.get("argv") or []
+    if e.get("lever") == "L23L":
+        return "verdict" if "verdict" in a else None
     for flag in ("--arm", "--v3fam"):
         if flag in a:
             return a[a.index(flag) + 1]
@@ -3354,7 +3357,13 @@ def t_v3fam():
                            ("L23K", dict(PARAMS["L23K"], seeds="2"), [MODT + "inc2.v3fam_detr", "train", "--seeds",
                                                                      "2"]),
                            ("L23L", {"pkg": "inc2", "cap_refused": "build:D4F,score:D2CLIP"},
-                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "build:D4F,score:D2CLIP"])):
+                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "build:D4F,score:D2CLIP"]),
+                           # deviation 4: the items the ticker recorded failed twice (never the data build)
+                           ("L23L", {"pkg": "inc2", "ticker_failed": "build:D4N,detr:smoke"},
+                            [MODT + "inc2.v3fam", "verdict", "--ticker-failed", "build:D4N,detr:smoke"]),
+                           ("L23L", {"pkg": "inc2", "cap_refused": "score:D9", "ticker_failed": "build:D4N"},
+                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "score:D9", "--ticker-failed",
+                             "build:D4N"])):
         pp = LS.policy_params(lid, prm)
         argv = LS.render(lid, pp)
         act = LS.row(lid)["policy_action"]
@@ -3391,6 +3400,10 @@ def t_v3fam():
              "inc_build_v3fam_v1"),
             ("build", ["inc2.v3fam", "verdict", "--cap-refused", "score:d1"], False, None),
             ("build", ["inc2.v3fam", "verdict", "--cap-refused", "verdict"], False, None),
+            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "score:D9", "--ticker-failed",
+                       "build:D4N,detr:smoke,score:D1"], True, "inc_build_v3fam_v1"),
+            ("build", ["inc2.v3fam", "verdict", "--ticker-failed", "data"], False, None),
+            ("build", ["inc2.v3fam", "verdict", "--ticker-failed", "build:D4N,verdict"], False, None),
             ("detr", ["inc2.v3fam_detr", "score"], False, None),
             ("detr", ["inc2.twostage", "verdict"], False, None)):
         try:
@@ -3576,18 +3589,27 @@ def t_v3fam():
     seq = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wv) if e.get("lever") in ("L23J", "L23L")]
     check("the verdict waits for every item: while D6's seeds run, every other arm scored, no L23L; once they end, "
           "L23J D6 and then L23L", not early and seq[-2:] == [("L23J", "D6"), ("L23L", "verdict")], (early, seq[-3:]))
-    # the data build failing twice: the builds and D6 not run, the verdict still proposed once the scores end
+    # the data build failing twice: the builds and D6 never start, so the verdict waits (deviation 4: on 2026-10-13
+    # the verdict was proposed here and decided with eight arms never started)
     wd = _v3fam_world("v3fam_data_failed", data=False)
     for _ in range(2):
         _fam_run(wd, ticks=4, until=lambda: any(j["name"] == "inc_build_v3fam_data" for j in wd.squeue),
                  skip=("inc_build_v3fam_data",))
         wd.job_done("inc_build_v3fam_data", state="FAILED", refusal="[inc2.v3fam_data] ERROR: refused")
-    _fam_run(wd, ticks=40, until=lambda: wd.state().get("v3fam", {}).get("items", {}).get("verdict"))
+    _fam_run(wd, ticks=40, until=lambda: any(_fam_arg(e) == "D9" for e in _fam_pro(wd, "L23J")))
+    _fam_run(wd, ticks=12)
     pd_ = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wd)]
+    dcard = [c for c in wd.state().get("cards") or [] if c["title"].endswith("recorded failed")
+             and c.get("lever") == "L23H"]
     check("L23H failing twice: recorded failed, no build and no L23K proposed (not run: the data build failed), the "
-          "scores before the builds still run, and the verdict is proposed",
+          "scores before the builds still run, and the verdict is NOT proposed: the arms the build makes never "
+          "started (V3F.7 step 11; deviation 4); its card says the verdict waits and names the reopening",
           wd.state()["v3fam"]["items"]["data"]["state"] == "failed" and not [x for x in pd_ if x[0] in ("L23I", "L23K")]
-          and ("L23J", "D9") in pd_ and ("L23L", "verdict") in pd_, pd_)
+          and ("L23J", "D9") in pd_ and ("L23L", "verdict") not in pd_
+          and "verdict" not in wd.state()["v3fam"]["items"] and len(dcard) == 1
+          and "the verdict waits" in dcard[0]["detail"] and "v3fam.reopen" in dcard[0]["detail"],
+          (pd_, [c["title"] for c in dcard]))
+    _v3fam_dev4(wd)
     # an unknown outcome: followed by its job name and its record
     wu = _v3fam_world("v3fam_unc")
     wu.lose_reply = "score"
@@ -3633,6 +3655,67 @@ def t_v3fam():
                   .get("score", {}).items() if k.startswith("D2")) if (wc.state().get("stage") or {}).get("v3fam")
           else True)
     _v3fam_more()
+
+
+def _v3fam_dev4(wd):
+    """Deviation 4 (2026-10-20) end to end on the world of a data build that failed twice: the verdict of 2026-10-13
+    put in place as the ticker had it (the item done, capacity/v3fam_v1.json written), then the deviation's file
+    deployed: the data build and the verdict are proposed again under new ids, the family runs to its end, and the
+    continuation verdict (capacity/v3fam_v1_cont.json) comes once every arm's record is complete or failed."""
+    paths = S.StreamPaths(str(wd.lab), "weed")
+    st0 = json.loads(paths.state(NAME).read_text())
+    old_ids = [e.get("proposal_id") for e in _fam_pro(wd, "L23H")]
+    st0["v3fam"]["items"]["verdict"] = {"state": "done", "lever": "L23L", "proposal": "d6a9917c5aa1d222848525288c2e138c",
+                                        "estimate": 0.5, "spend": "settled", "settled": 0.66,
+                                        "started_utc": "2026-10-13T12:04:58Z"}
+    st0["v3fam"]["verdict_card"] = "2026-10-13T13:14:58Z"
+    paths.state(NAME).write_text(json.dumps(st0))
+    wd.v3fam_verdict(order=(), record="capacity/v3fam_v1.json")       # the verdict of 2026-10-13, as written then
+    v1 = (wd.inc / "capacity" / "v3fam_v1.json").read_bytes()
+    spent0 = sum(float(v.get("prior_gpuh") or 0) + float(v.get("settled") or 0)
+                 for v in st0["v3fam"]["items"].values())
+    _fam_run(wd, ticks=4)
+    held = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wd)]
+    st1 = wd.state()
+    check("deviation 4 not yet deployed: nothing reopened (the data build failed, the verdict done; nothing proposed "
+          "again)", st1["v3fam"]["items"]["data"]["state"] == "failed"
+          and st1["v3fam"]["items"]["verdict"]["state"] == "done"
+          and [e.get("proposal_id") for e in _fam_pro(wd, "L23H")] == old_ids, held[-3:])
+    wd.v3fam_deploy_dev4()
+    _fam_run(wd, ticks=6, until=lambda: len(_fam_pro(wd, "L23H")) > len(old_ids))
+    st2 = wd.state()
+    new_h = [e.get("proposal_id") for e in _fam_pro(wd, "L23H")][len(old_ids):]
+    rcards = [c for c in st2.get("cards") or [] if c["title"].startswith("V3F: data, verdict proposed again")]
+    d2 = st2["v3fam"]["items"]["data"]
+    check("deviation 4 deployed: the data build and the verdict reopened once (one card), L23H proposed again under a "
+          "new id; the earlier attempts kept in prior_gpuh and reopen_history",
+          len(new_h) == 1 and new_h[0] not in old_ids and len(rcards) == 1
+          and d2.get("reopened") == "deviation 4 (2026-10-20)" and d2["reopen_history"][0]["state"] == "failed"
+          and st2["v3fam"]["items"]["verdict"].get("reopen_history", [{}])[0].get("state") == "done"
+          and float(d2.get("prior_gpuh") or 0) > 0, (new_h, old_ids, [c["title"] for c in rcards]))
+    done = _fam_run(wd, ticks=120, until=lambda: wd.state().get("v3fam", {}).get("items", {}).get("verdict", {})
+                    .get("state") == "done" and (wd.inc / "capacity" / "v3fam_v1_cont.json").exists())
+    pro = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wd)]
+    after = pro[pro.index(("L23H", "build"), len(old_ids)):] if ("L23H", "build") in pro else []
+    l23l = [e for e in _fam_pro(wd, "L23L")]
+    seq = [x for x in after if x[0] in ("L23I", "L23J", "L23L")]
+    check("then the family goes on in V3F.7's order: the builds, their scores, D6's jobs, and L23L last, once, under "
+          "a new id, after every arm's record is complete or failed; the continuation written, the record of "
+          "2026-10-13 unchanged", done and len(l23l) == 1 and l23l[0].get("proposal_id")
+          != "d6a9917c5aa1d222848525288c2e138c" and seq[-1] == ("L23L", "verdict")
+          and ("L23I", "D4F") in seq and ("L23J", "D6") in seq and ("L23K", "smoke") in after
+          and (wd.inc / "capacity" / "v3fam_v1.json").read_bytes() == v1, (done, seq[-4:]))
+    wd.tick(3)
+    vc = [c for c in wd.state().get("cards") or [] if "verdict is decided" in c["title"]]
+    its = wd.state()["v3fam"]["items"]
+    kept = float(its["data"].get("prior_gpuh") or 0) + float(its["verdict"].get("prior_gpuh") or 0)
+    before = float(st0["v3fam"]["items"]["data"].get("prior_gpuh") or 0) + float(
+        st0["v3fam"]["items"]["data"].get("settled") or 0) + 0.66
+    check("  one card for the continuation verdict (naming the verdict of 2026-10-13); the attempts before the "
+          "deviation stay counted (data and verdict prior_gpuh %.4f = their spend before it, %.4f); nothing "
+          "proposed after it" % (kept, before), len(vc) == 1 and vc[0]["title"].startswith("V3F's continuation verdict")
+          and "2026-10-13" in vc[0]["detail"] and abs(kept - before) < 1e-9 and spent0 > 0
+          and [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wd)] == pro, ([c["title"] for c in vc], kept, before))
 
 
 def _v3fam_more():
@@ -3698,9 +3781,12 @@ def _v3fam_more():
     pt = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wt)]
     trec = wt.state()["v3fam"]["items"]["detr:train"]
     tcards = [c for c in wt.state().get("cards") or [] if c.get("lever") == "L23K" and "failed" in c["title"]]
+    lt = [e.get("argv") or [] for e in _fam_pro(wt, "L23L")]
     check("an L23K seed ending TIMEOUT (its 36 h walltime): train recorded failed at once (never proposed again), "
-          "its three jobs' GPU-h settled (%.1f), one card citing V3F.7; D6's scores not run; the verdict proposed"
+          "its three jobs' GPU-h settled (%.1f), one card citing V3F.7; D6's scores not run; the verdict proposed, "
+          "its argv naming the failed item (--ticker-failed detr:train, deviation 4)"
           % float(trec.get("settled") or 0), trec.get("state") == "failed" and trec.get("fails") == 1
+          and len(lt) == 1 and lt[0][-2:] == ["--ticker-failed", "detr:train"]
           and "walltime" in str(trec.get("why")) and abs(float(trec.get("settled") or 0) - (129600 + 160000) / 3600.0)
           < 1e-4 and [a for l, a in pt if l == "L23K"].count("0,1,2") == 1 and ("L23J", "D6") not in pt
           and ("L23L", "verdict") in pt and len(tcards) == 1 and "V3F.7" in tcards[0]["detail"], (trec, pt, tcards))

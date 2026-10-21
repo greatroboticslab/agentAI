@@ -118,6 +118,25 @@ splits/v3fam manifest; inc2.train's v3fam_problems checks the summary's
 sha256 and that cold_budget names one of BUDGET_ARMS; recipes' v3fam set takes
 "n_images" from summary["arms"][ARM]["images"].
 
+Deviation 4 (2026-10-20; docs/prereg/V3F_dev4_2026-10-20.md). The DINOv2
+scans run once per distinct file and are keyed by the file's sha256: a
+manifest key is not unique among the files scanned (6,805 of base_v2's 6,811
+keys name base v3's re-written PNG in base B and the original file in
+base_v2), and funnel.embed refuses a repeated key, which failed both builds
+of 2026-10-12. Every hit names the file it is of (file_sha256) and counts for
+its key whichever of the key's files it is of, so no arm's rule changes. A
+build started over a failed build's partial outputs (splits/v3fam/d5b's
+copies, v3fam/v1/leak/ood_desc.npz) writes beside them: the copies are
+content-addressed and written once (a copy made again is the same file), the
+season index's cache is reused only when its identity is this build's (else
+funnel.leak refuses rather than overwrite it); every file present at the
+start is listed in summary.json's "preexisting", must still hold its bytes at
+the end (else the build refuses before the summary), and none is removed;
+a cut-off attempt's transient files (funnel.embed's resume parts
+<name>.partNNNNN.npz beside a scan's descriptor file, which the resumed scan
+reuses and then removes, and temp files) are listed apart and need not
+remain.
+
 A refusal raises DataRefused (a V3famRefused); the CLI prints
 "[inc2.v3fam_data] ERROR: ..." and exits 2.
 """
@@ -666,7 +685,9 @@ def file_entries(arm_rows, store):
 
 
 def dhash_check(entries, exams):
-    """Each file against each exam's hashes: {key: [{"exam", "exam_key", "exam_sha256", "bits"}]}."""
+    """Each file against each exam's hashes: {key: [{"exam", "exam_key", "exam_sha256", "bits", "how",
+    "file_sha256"}]}. A key can name two files (a base_v2 key's base B file is base v3's re-written PNG, its base_v2
+    file the original), so each hit names the file it is of (deviation 4)."""
     hits = collections.defaultdict(list)
     if not entries:
         return hits
@@ -674,21 +695,25 @@ def dhash_check(entries, exams):
     for exam, ex in sorted(exams.items()):
         for (a, e), d in sorted(near_hits(H, ok, ex["H"], ex["ok"]).items()):
             hits[entries[a]["key"]].append({"exam": exam, "exam_key": ex["keys"][e], "exam_sha256": ex["sha256"][e],
-                                            "bits": d, "how": "dhash"})
+                                            "bits": d, "how": "dhash", "file_sha256": entries[a].get("sha256")})
     return hits
 
 
 def embed_check(entries, scanner, desc_path=None, procs=1):
-    """The calibrated DINOv2 detector on files: {key: [{"exam", "exam_key", "cos", "bits", "how"}]}; a file it
-    cannot describe refuses (fail closed)."""
+    """The calibrated DINOv2 detector on files: {key: [{"exam", "exam_key", "cos", "bits", "how"}]}, keyed by the
+    entries' "key" (the scanner's row key, which must be unique: funnel.embed refuses a repeated one); an entry's
+    "row_key" (the manifest key, when the scan is keyed otherwise) rides along for the refusal's message and is
+    ignored by inc2.guard.EmbedScanner. A file it cannot describe refuses (fail closed)."""
     hits = collections.defaultdict(list)
     if not entries:
         return hits
-    rows = [{"key": e["key"], "image": e["image"], "sha256": e["sha256"]} for e in entries]
+    rows = [dict({"key": e["key"], "image": e["image"], "sha256": e["sha256"]},
+                 **({"row_key": e["row_key"]} if e.get("row_key") is not None else {})) for e in entries]
     copies, unscannable = scanner.scan(rows, desc_path=desc_path, procs=procs)
     if unscannable:
+        named = {r["key"]: r.get("row_key") or r["key"] for r in rows}
         raise DataRefused("%d file(s) the DINOv2 detector cannot describe (e.g. %s): fail closed"
-                          % (len(unscannable), sorted(unscannable)[:3]))
+                          % (len(unscannable), sorted(named.get(k, k) for k in unscannable)[:3]))
     for k, es in copies.items():
         for e in es:
             hits[k].append({"exam": e.get("eval_split") or e.get("split"), "exam_key": e.get("eval_key"),
@@ -1033,24 +1058,81 @@ def _budget(n):
 
 
 def _file_hits(files, dh, emb_by_sha, scanned):
-    """{key: hits} of files: their dHash hits, plus the DINOv2 hits of their file when it was scanned."""
+    """{key: hits} of files: each file's own dHash hits (dh's hits that name its sha256) plus the DINOv2 hits of its
+    file when it was scanned, every file of a key added to that key's hits (a key can name two files: a base_v2
+    key's base B file is base v3's re-written PNG, its base_v2 file the original; deviation 4). A hit drops or keeps
+    its key whichever of the key's files it is of (V3F.3.7 item 3)."""
     out = {}
     for f in files:
-        hs = list(dh.get(f["key"], []))
+        hs = [h for h in dh.get(f["key"], []) if h.get("file_sha256", f["sha256"]) == f["sha256"]]
         if f["sha256"] in scanned:
-            hs += list(emb_by_sha.get(f["sha256"], []))
+            hs += [dict(h, file_sha256=f["sha256"]) for h in emb_by_sha.get(f["sha256"], [])]
         if hs:
-            out[f["key"]] = hs
+            out.setdefault(f["key"], []).extend(hs)
     return out
 
 
 def _scan_unique(files, scanner, desc_path, procs):
-    """The DINOv2 detector once per distinct file (by sha256): ({sha256: hits}, the scanned sha256s)."""
+    """The DINOv2 detector once per distinct file (by sha256): ({sha256: hits}, the scanned sha256s). The scanner's
+    rows are keyed by the file's sha256, unique by construction, and each file's hits are its own: the manifest key
+    is not unique among the files (6,805 of base_v2's 6,811 keys name base v3's re-written PNG in base B and the
+    original file in base_v2, 3,108 of them in the first scan, which made funnel.embed refuse 'duplicate keys' in
+    both data builds of 2026-10-12; deviation 4)."""
     uniq = {}
     for f in files:
         uniq.setdefault(f["sha256"], f)
-    got = embed_check(list(uniq.values()), scanner, desc_path=desc_path, procs=procs)
-    return {sha: got.get(f["key"], []) for sha, f in uniq.items()}, set(uniq)
+    got = embed_check([{"key": sha, "row_key": f["key"], "image": f["image"], "sha256": sha}
+                       for sha, f in uniq.items()], scanner, desc_path=desc_path, procs=procs)
+    return {sha: list(got.get(sha, [])) for sha in uniq}, set(uniq)
+
+
+# A build's own transient files, which a build cut off (a node lost, scancel, a requeue, ENOSPC) leaves behind and the
+# next attempt reuses or replaces: funnel.embed's resume parts beside a scan's descriptor file
+# (<name>.partNNNNN.npz, reused and then removed by the scan that resumes them) and the temp files of an atomic write
+# (<name>.tmp, .<name>.<pid>.<ns>.tmp). They are listed, never required to remain (deviation 4).
+TRANSIENT_RE = re.compile(r"(?:\.part\d{5}\.npz|\.tmp)\Z")
+
+
+def _preexisting():
+    """{path: {"bytes", "sha256"[, "transient"]}} of every file already under splits/v3fam/ and v3fam/v1/leak/ when a
+    build starts: a failed build's partial outputs (the copies under splits/v3fam/d5b/, written content-addressed and
+    once; leak/ood_desc.npz, the season index's cache, reused only when its identity is the one this build would
+    make, else funnel.leak refuses rather than overwrite it), and its transient files (TRANSIENT_RE: a cut-off
+    scan's resume parts, which this build's scan reuses and removes, and temp files), marked so. The build writes
+    beside them and deletes none of the outputs (deviation 4)."""
+    out = {}
+    for d in (out_dir(), F.root() / "leak"):
+        if d.is_dir():
+            for p in sorted(d.rglob("*")):
+                if p.is_file():
+                    out[str(p)] = dict({"bytes": p.stat().st_size, "sha256": C.sha256_file(p)},
+                                       **({"transient": True} if TRANSIENT_RE.search(p.name) else {}))
+    return out
+
+
+def _preexisting_record(pre, copy_rows):
+    """What became of the files present when the build started: each output must still hold its bytes (a changed or
+    missing one refuses before the summary is written); the copy files the build made again (the same bytes, so the
+    same content-addressed path) and the rest, listed, none removed. The transient files (a cut-off scan's resume
+    parts, temp files) are listed apart with whether they remain: the scan that resumes from its parts removes them
+    when it completes, so they are not required to remain."""
+    outs = {p: e for p, e in pre.items() if not e.get("transient")}
+    changed = sorted(p for p, e in outs.items() if not Path(p).is_file() or C.sha256_file(p) != e["sha256"])
+    if changed:
+        raise DataRefused("%d file(s) present before the build changed or went missing during it (e.g. %s): a "
+                          "build writes beside earlier outputs and never over them" % (len(changed), changed[:3]))
+    used = {str(r[k]) for r in copy_rows.values() for k in ("image", "label")}
+    listing = [[p, outs[p]["bytes"], outs[p]["sha256"]] for p in sorted(outs)]
+    return {"files": len(outs), "unchanged": True,
+            "copy_files_made_again": sum(1 for p in outs if p in used),
+            "not_used": sorted(p for p in outs if p not in used),
+            "listing_sha256": hashlib.sha256(json.dumps(listing).encode("utf-8")).hexdigest(),
+            "transient": [[p, pre[p]["bytes"], pre[p]["sha256"], Path(p).is_file()]
+                          for p in sorted(pre) if pre[p].get("transient")],
+            "note": "files under splits/v3fam/ and v3fam/v1/leak/ before this build (a failed build's partial "
+                    "outputs): kept as they were; copies made again are the same files; transient: [path, bytes, "
+                    "sha256, still present] of a cut-off scan's resume parts and temp files, reused or replaced by "
+                    "this build (deviation 4)"}
 
 
 def build(inputs=None, procs=5, embedder=None, testing=False, catch=True):
@@ -1066,6 +1148,7 @@ def _build(inputs=None, procs=5, embedder=None, testing=False, catch=True):
         raise DataRefused("%s exists: the family's manifests are built once" % _summary_path())
     F.check_frozen()
     ts = SW.require_timestamp()
+    earlier = _preexisting()                 # before anything is written (load_inputs may write ood_desc.npz)
     if inputs is None:
         if testing:
             raise DataRefused("a testing build is given its inputs")
@@ -1222,6 +1305,7 @@ def _build(inputs=None, procs=5, embedder=None, testing=False, catch=True):
                                             "per_family": crec["per_family"]},
         "recorded_only": {"D8_train_core": _record_only(tc_files, ev, emb_ev, scanned_ev),
                           "D6_base_v2": _record_only(v2_files, ev, emb_ev, scanned_ev)},
+        "preexisting": _preexisting_record(earlier, copy_rows),
         "arms": arms, "seconds": round(time.time() - t0, 1), "built_utc": F._utc()}
     summary = json.loads(json.dumps(summary, default=str))
     F.write_once(_summary_path(), summary)

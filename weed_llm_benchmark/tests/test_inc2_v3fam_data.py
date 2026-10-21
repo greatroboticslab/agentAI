@@ -446,17 +446,19 @@ def exam_of(exam):
 
 
 class FakeScanner(object):
-    """The DINOv2 detector's interface (scan); flags the files whose image path or key a rule names."""
+    """The DINOv2 detector's interface (scan); flags the files whose image path or manifest key a rule names. The
+    build keys a scan's rows by the file's sha256 and passes the manifest key as row_key (deviation 4): the rule
+    and `seen` read the manifest key, the result is keyed as the rows are."""
 
     def __init__(self, rule):
         self.rule = rule
         self.seen = []
 
     def scan(self, rows, desc_path=None, procs=1):
-        self.seen.extend(r["key"] for r in rows)
+        self.seen.extend(r.get("row_key") or r["key"] for r in rows)
         out = {}
         for r in rows:
-            e = self.rule(r)
+            e = self.rule(dict(r, key=r.get("row_key") or r["key"]))
             if e:
                 out[r["key"]] = [e]
         return out, set()

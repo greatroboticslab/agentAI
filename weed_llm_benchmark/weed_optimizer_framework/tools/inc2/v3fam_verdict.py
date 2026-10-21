@@ -71,6 +71,23 @@ reads E3's stored test arrays: O4's stratum for E3-A, E3-M, E3-B and the
 reference, and test minus H when D0-S found test copies
 (capacity/v3fam_retest.json); it runs inside e_trees_unchanged.
 
+Deviation 4 (2026-10-20; docs/prereg/V3F_dev4_2026-10-20.md). The verdict
+refuses unless every arm's record is complete or failed (verdict_ready: the
+family's data summary complete, and no arm that never started: no score or
+cap record, no attempt in the provenance of its score job, its builds or
+D6's jobs, and no failure of one of those the ticker recorded after its
+second failure, --ticker-failed, written once under v3fam/v1/failed). The
+verdict of 2026-10-13 (capacity/v3fam_v1.json, sha256
+PARTIAL_VERDICT_SHA256) was decided while seven arms had never started (D1,
+D4F, D4N, D4R15, D5B, D6, D8; BCLEAN, also recorded missing, was not needed:
+D0-S did not trigger it) and stays as it is; when that file is the one in
+place, the verb writes the family's continuation verdict (CONTINUATION:
+capacity/v3fam_v1_cont.json, its external, ext and report files) by the
+same computation, once, after checking that it reproduces every comparison
+the 2026-10-13 records decided (to 1e-9, the same outcome; a primary
+family-confirmed then stays so), and the reads follow the continuation
+(family_verdict_path): before it, every read refuses.
+
 A refusal raises inc2.v3fam.V3famRefused (V3famCapRefused at the family cap).
 """
 from __future__ import annotations
@@ -218,6 +235,28 @@ FAMILY_ESTIMATES = {"v3fam_data": 2.0, "v3fam_sweep": 1.5, "v3fam_v1": 0.5, "v3f
                     "v3fam_detr_s": 24.0, "v3fam_retest": RETEST_GPUH, "v3famtest_": READ_GPUH}
 SCORE_ESTIMATE_GPUH = 1.5                    # a family score job without a price of its own here
 PERSON_JOBS = ("v3fam_sweep", "v3famtest_", "v3fam_retest")
+# Deviation 4 (2026-10-20, docs/prereg/V3F_dev4_2026-10-20.md). The verdict of 2026-10-13 (job 49107774,
+# capacity/v3fam_v1.json with this sha256) was decided while seven arms had never started (D1, D4F, D4N, D4R15, D5B,
+# D6, D8; its table also lists BCLEAN missing, which D0-S had not triggered, so it was not needed): the family's data
+# build had failed twice on a defect (funnel.embed's 'duplicate keys'), and the ticker took its dependants as ended.
+# That record stays as it is. The family's verdict over every arm is its continuation, decided by the same code (the
+# same comparisons, Holm sets, Tier C gate and read order) once every arm's record is complete or failed (V3F.7 step
+# 11), written once under its own names; it must reproduce every comparison the record of 2026-10-13 decided, or it
+# refuses. The sealed-test reads follow the continuation.
+PARTIAL_VERDICT_SHA256 = "304bad59f15487bfd3965d2f1e9384658daac58c5971494118ecaad4fcfaa7d9"
+PARTIAL_EXTERNAL_SHA256 = "81cd1811d9cbd1870d4b6ecae922320ae9ca7e446e2a9a809afff7db3e3a60f5"   # its external record
+CONTINUATION = {"verdict": "v3fam_v1_cont.json", "external": "v3fam_v1_cont_external.json",
+                "ext": "v3fam_ext_v1_cont.json", "report": "v3fam_v1_cont_report"}
+DEVIATION_4 = "docs/prereg/V3F_dev4_2026-10-20.md"
+REPRO_FIELDS = ("diff", "z", "interval_90", "outcome", "qualifies")     # a decision the continuation reproduces
+CONT_REPRO_TOL = 1e-9
+# The items the ticker recorded failed after their own second failure (stream state), passed in the verdict's argv
+# (--ticker-failed) so the verb counts the arms they end as ended, as the ticker does (diagnose_stream.
+# v3fam_verdict_ready): a job can fail before it writes a provenance attempt (cancelled while pending, NODE_FAIL at
+# launch, an environment that does not activate). Never the data build (its failure does not end the arms it builds,
+# deviation 4) nor the verdict.
+FAILED_ITEM_RE = re.compile(r"(score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))\Z")
+SCORED_AFTER_ALL = "E3RS"                    # every other score arm is scored after E3RS (the domain's score_after)
 
 
 def log(msg):
@@ -230,6 +269,19 @@ def cap_path(name):
 
 def verdict_path():
     return cap_path(VERDICT)
+
+
+def is_partial(path=None):
+    """True when capacity/v3fam_v1.json is the verdict of 2026-10-13, decided while seven arms had never started
+    (deviation 4)."""
+    vp = path or verdict_path()
+    return vp.is_file() and F._sha(vp) == PARTIAL_VERDICT_SHA256
+
+
+def family_verdict_path():
+    """The family's verdict the sealed-test reads follow: capacity/v3fam_v1.json, or its continuation when that
+    file is the verdict of 2026-10-13 (deviation 4), written or not."""
+    return cap_path(CONTINUATION["verdict"]) if is_partial() else verdict_path()
 
 
 def test_dir(arm):
@@ -249,6 +301,9 @@ def cap_file(item):
 
 def cap_refused(item):
     return cap_file(item).exists()
+
+
+cap_refused_item = cap_refused                # the same check where a parameter shadows the name
 
 
 def record_ticker_refusals(items):
@@ -273,15 +328,71 @@ def record_ticker_refusals(items):
     return out
 
 
+def failed_dir():
+    return F.root() / "failed"
+
+
+def failed_file(item):
+    return failed_dir() / ("%s.json" % re.sub(r"[^A-Za-z0-9_.-]", "_", str(item)))
+
+
+def ending_items(arm):
+    """The family items whose failure ends the arm (its record stays missing): its own score job, what it scores (a
+    build, D6's jobs) and E3RS, which every other arm is scored after."""
+    return ("score:%s" % arm,) + tuple(SCORE_DEPS.get(arm, ())) + (
+        ("score:%s" % SCORED_AFTER_ALL,) if arm != SCORED_AFTER_ALL else ())
+
+
+def _failed_items(items):
+    """The --ticker-failed items, checked: a family item other than the data build and the verdict."""
+    out = []
+    for it in items or []:
+        it = str(it).strip()
+        if not it:
+            continue
+        if not FAILED_ITEM_RE.match(it):
+            raise F.V3famRefused("--ticker-failed names %r, not a score, build or D6 item (score:<ARM>, build:<ARM>, "
+                                 "detr:smoke|train); the data build's failure never ends the arms it builds "
+                                 "(deviation 4)" % it)
+        out.append(it)
+    return out
+
+
+def record_ticker_failures(items):
+    """The items the ticker recorded failed after their own second failure (stream state), passed in the verdict's
+    argv (--ticker-failed), each written once under v3fam/v1/failed/ (one already there is kept), so arm_status
+    reports the arms they end as failed from the cluster's records (V3F.3.4, V3F.3.5: 'a job that failed twice').
+    Returns the names."""
+    out = []
+    for it in _failed_items(items):
+        p = failed_file(it)
+        if not p.exists():
+            F.write_once(p, {"format": "inc2-v3fam-failed/1", "item": it, "status": "failed",
+                             "reason": "a job that failed twice (V3F.3.4, V3F.3.5)",
+                             "source": "the ticker's record (stream state): failed after its own second failure, "
+                                       "passed in the verdict's argv (deviation 4)", "written_utc": F._utc()})
+        out.append(it)
+    return out
+
+
+def failure_recorded(item):
+    return failed_file(item).exists()
+
+
 def arm_status(arm):
-    """complete | not run (<why>) | failed | missing, from the arm's score record and the family cap's records
-    (the arm's own score item, or an item it depends on: a build it scores, D6's RF-DETR jobs, the data build)."""
+    """complete | not run (<why>) | failed | missing, from the arm's score record, the family cap's records (the
+    arm's own score item, or an item it depends on: a build it scores, D6's RF-DETR jobs, the data build) and the
+    ticker's failure records (ending_items: an arm with no score record whose score job, build, D6 job or E3RS
+    failed twice is 'failed (<item> failed twice)')."""
     deps = SCORE_DEPS.get(arm, ())
     if cap_refused("score_%s" % arm) or cap_refused(arm) or any(cap_refused(d) for d in deps) \
             or (deps and cap_refused("data")):
         return F.NOT_RUN_CAP
     r = score_record(arm)
     if r is None:
+        ended = [i for i in ending_items(arm) if failure_recorded(i)]
+        if ended:
+            return "failed (%s failed twice)" % ", ".join(ended)
         return "missing"
     st = r.get("status")
     if st == "complete":
@@ -783,17 +894,152 @@ def _md(rep):
     return "\n".join(lines) + "\n"
 
 
-def verdict(cap_refused=None):
+def _attempted(name):
+    """True when the provenance of the family job `name` holds at least one attempt (the cluster's own record that
+    the job ran)."""
+    rec = F._read_json(C.INC_DIR / "_campaign" / "provenance" / ("%s.json" % name))
+    return isinstance(rec, dict) and bool(rec.get("attempts"))
+
+
+def arm_started(arm):
+    """True when the arm, or what it scores, ran at least once: an attempt in the provenance of its score job
+    (v3fam_score_<arm>), of a build it scores (the build's experiment name) or of D6's jobs (v3fam_detr_smoke,
+    v3fam_detr_s<k>)."""
+    names = ["v3fam_score_%s" % arm.lower()]
+    for d in SCORE_DEPS.get(arm, ()):
+        if d.startswith("build:"):
+            names.append(RC.V3FAM_EXPS[d[len("build:"):]])
+        elif d == "detr:smoke":
+            names.append("v3fam_detr_smoke")
+        elif d == "detr:train":
+            names += ["v3fam_detr_s%d" % s for s in F.SEEDS]
+    return any(_attempted(n) for n in names)
+
+
+def verdict_ready(trig=None, cap_refused=(), failed=()):
+    """V3F.7 step 11, 'L23L verdict, once every arm's record is complete or failed', on the cluster's records:
+    (ready, why). The family's data build complete (splits/v3fam/summary.json: every arm of steps 8-10 trains on
+    or after its manifests), and no arm that never started: an arm with no record (score record or family-cap
+    record) and no attempt of its own or of what it scores never ran, so it is neither complete nor failed. BCLEAN
+    without D0-S's trigger is not needed. The verdict of 2026-10-13 was decided with seven arms of that kind
+    (deviation 4; BCLEAN, untriggered, was not needed); this guard refuses it. The ticker proposes L23L only once
+    every item is terminal (diagnose_stream.v3fam_verdict_ready); an arm that started and failed, or was refused, is
+    decided 'not run' with its reason (V3F.3.5). An item the ticker refused at the family cap (cap_refused, the
+    verdict's --cap-refused, or a cap record already written) is a recorded 'not run (family cap)', the data
+    build's too.
+    An item the ticker recorded failed after its own second failure (failed, the verdict's --ticker-failed, or a
+    failure record already written) ends the arms it ends (ending_items), as the ticker counts them: a job can fail
+    before its provenance attempt is written. The data build's failure ends nothing: its summary is needed."""
+    from . import v3fam_data as VD
+    trig = d0s_trigger() if trig is None else trig
+    refused = {str(x).strip() for x in cap_refused or () if str(x).strip()}
+    gone = set(_failed_items(failed))
+    why = []
+    if VD.read_summary() is None and "data" not in refused and not cap_refused_item("data"):
+        why.append("the family's data build has no complete %s" % VD._summary_path())
+    never = []
+    for a in F.SCORE_ARMS:
+        st = arm_status(a)
+        if st != "missing":
+            continue
+        if a == "BCLEAN" and not trig.get("bclean"):
+            continue
+        if refused & ({"score:%s" % a, "data"} | set(SCORE_DEPS.get(a, ()))):
+            continue
+        if gone & set(ending_items(a)):
+            continue
+        if not arm_started(a):
+            never.append(a)
+    if never:
+        why.append("never started: %s" % ", ".join(never))
+    return (not why), "; ".join(why)
+
+
+def _reproduces(old, new):
+    """[(id, field, old, new)] where a comparison the old record decided is not reproduced by the new one."""
+    bad = []
+    for cid, o in sorted((old or {}).items()):
+        if not isinstance(o, dict) or o.get("status") != "decided":
+            continue
+        n = (new or {}).get(cid) or {}
+        if n.get("status") != "decided":
+            bad.append((cid, "status", "decided", n.get("status")))
+            continue
+        od, nd = o.get("decision") or {}, n.get("decision") or {}
+        for k in REPRO_FIELDS:
+            a, b = od.get(k), nd.get(k)
+            if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool):
+                if abs(float(a) - float(b)) > CONT_REPRO_TOL:
+                    bad.append((cid, k, a, b))
+            elif isinstance(a, list) and isinstance(b, list) and len(a) == len(b) and all(
+                    isinstance(x, (int, float)) and isinstance(y, (int, float)) for x, y in zip(a, b)):
+                if any(abs(float(x) - float(y)) > CONT_REPRO_TOL for x, y in zip(a, b)):
+                    bad.append((cid, k, a, b))
+            elif a != b:
+                bad.append((cid, k, a, b))
+    return bad
+
+
+def continuation_check(doc, ext):
+    """What the continuation carries of the verdict of 2026-10-13: its name and sha256, and that every comparison it
+    decided (dev: P1-P5, Tier C, Tier S; external: P6-P9 and Tier S off dev) is reproduced to 1e-9 with the same
+    outcome, and every primary it family-confirmed stays confirmed (Holm's step-down over the same sets can only
+    keep it). Refuses otherwise."""
+    old = F._read_json(verdict_path()) or {}
+    olde = F._read_json(cap_path(EXTERNAL)) if cap_path(EXTERNAL).is_file() else None
+    oc = dict(old.get("primaries") or {}, **(old.get("tier_s") or {}))
+    oc.update({"C_%s" % a: v for a, v in ((old.get("challengers") or {}).get("comparisons") or {}).items()})
+    nc = dict(doc.get("primaries") or {}, **(doc.get("tier_s") or {}))
+    nc.update({"C_%s" % a: v for a, v in ((doc.get("challengers") or {}).get("comparisons") or {}).items()})
+    bad = _reproduces(oc, nc)
+    if isinstance(olde, dict):
+        bad += _reproduces(dict(olde.get("primaries") or {}, **(olde.get("tier_s") or {})),
+                           dict(ext.get("primaries") or {}, **(ext.get("tier_s") or {})))
+    lost = sorted(p for p, h in (old.get("holm") or {}).items() if (h or {}).get("family_confirmed")
+                  and not ((doc.get("holm") or {}).get(p) or {}).get("family_confirmed"))
+    if bad or lost:
+        raise F.V3famRefused("the continuation does not reproduce the verdict of 2026-10-13 (%s): %s%s" % (
+            VERDICT, ["%s %s: %r -> %r" % x for x in bad[:4]], "; no longer family-confirmed: %s" % lost if lost
+            else ""))
+    decided = sorted(k for k, v in oc.items() if isinstance(v, dict) and v.get("status") == "decided")
+    return {"verdict": VERDICT, "sha256": PARTIAL_VERDICT_SHA256, "external": EXTERNAL,
+            "external_sha256": F._sha(cap_path(EXTERNAL)) if cap_path(EXTERNAL).is_file() else None,
+            "external_as_read_on_2026_10_18": (F._sha(cap_path(EXTERNAL)) == PARTIAL_EXTERNAL_SHA256)
+            if cap_path(EXTERNAL).is_file() else False,
+            "deviation": DEVIATION_4, "reproduced": decided, "tolerance": CONT_REPRO_TOL,
+            "family_confirmed_kept": sorted(p for p, h in (old.get("holm") or {}).items()
+                                            if (h or {}).get("family_confirmed")),
+            "note": "the verdict of 2026-10-13 stays as it is; this record is the family's verdict over every arm, by "
+                    "the same rules (deviation 4)"}
+
+
+def verdict(cap_refused=None, ticker_failed=None):
     """L23L (module docstring): the family's comparisons on its committed scores; the non-dev records first, the
     platform's dev record (capacity/v3fam_v1.json) once and last. cap_refused: the items the ticker recorded
-    'not run (family cap)' (--cap-refused), written under v3fam/v1/cap first."""
+    'not run (family cap)' (--cap-refused), written under v3fam/v1/cap first; ticker_failed: the items it recorded
+    failed after their own second failure (--ticker-failed), written under v3fam/v1/failed first. Refused unless
+    every arm's record is complete or failed (verdict_ready). When capacity/v3fam_v1.json is the verdict of
+    2026-10-13 (deviation 4), the same computation writes the continuation's records (CONTINUATION) instead, once,
+    after checking that it reproduces every comparison that verdict decided."""
     F.check_frozen()
     vp = verdict_path()
+    cont = False
     if vp.exists():
-        raise F.V3famRefused("%s exists: the family's verdict is written once" % vp)
+        if not is_partial(vp):
+            raise F.V3famRefused("%s exists: the family's verdict is written once" % vp)
+        cont = True
+        cp = cap_path(CONTINUATION["verdict"])
+        if cp.exists():
+            raise F.V3famRefused("%s exists: the family's continuation verdict is written once (deviation 4)" % cp)
+    names = dict(CONTINUATION) if cont else {"verdict": VERDICT, "external": EXTERNAL, "ext": EXT, "report": REPORT}
+    ok, why = verdict_ready(cap_refused=cap_refused, failed=ticker_failed)
+    if not ok:
+        raise F.V3famRefused("the verdict waits until every arm's record is complete or failed (V3F.7 step 11; "
+                             "deviation 4): %s" % why)
     t0 = time.time()
     with F.e_trees_unchanged() as before:
         ticker = record_ticker_refusals(cap_refused)
+        ticker_f = record_ticker_failures(ticker_failed)
         arms = {a: arm_status(a) for a in F.SCORE_ARMS}
         fam = decide_family()
         comps = {k: _strip(v) for k, v in fam["comparisons"].items()}
@@ -807,13 +1053,20 @@ def verdict(cap_refused=None):
                                                                           v3fam_verdict=C.sha256_file(__file__)),
                   "e_trees": {"files": len(before), "sha256": C.sha256_text(json.dumps(before, sort_keys=True))},
                   "cap_refused": sorted(p.stem for p in F.cap_dir().glob("*.json")) if F.cap_dir().is_dir() else [],
-                  "cap_refused_by_ticker": ticker, "written_utc": F._utc()}
+                  "cap_refused_by_ticker": ticker, "failed_by_ticker": ticker_f, "written_utc": F._utc()}
         ext = dict(common, format=FMT_EXTERNAL, status="decided",
                    primaries={p: comps[p] for p in ext_ids}, holm={p: holm[p] for p in ext_ids},
                    tier_s={c: comps[c] for c in s_ids if s_exam[c] != "dev"},
                    note="P6-P9 and the non-dev Tier S readings: never on the platform's evidence (V3F.3.5)")
-        TS._write_json(cap_path(EXTERNAL), ext)
-        TS._write_json(cap_path(EXT), dict(common, format=FMT_EXT, arms=ext_record(),
+        dev_doc = {"primaries": {p: comps[p] for p in dev_ids}, "holm": {p: holm[p] for p in dev_ids},
+                   "tier_s": {c: comps[c] for c in s_ids if s_exam[c] == "dev"},
+                   "challengers": {"comparisons": {a: comps["C_%s" % a] for a in F.CHALLENGERS}}}
+        continues = continuation_check(dev_doc, ext) if cont else None   # before anything is written
+        if continues:
+            common["continues"] = continues
+            ext["continues"] = continues
+        TS._write_json(cap_path(names["external"]), ext)
+        TS._write_json(cap_path(names["ext"]), dict(common, format=FMT_EXT, arms=ext_record(),
                                            note="ImageWeeds Ragweed AP50-95 (common ragweed, 2,010 boxes; other "
                                                 "ImageWeeds species scored only as OtherPlant) and agnostic; "
                                                 "ooddev_v1 agnostic; reported only"))
@@ -823,8 +1076,8 @@ def verdict(cap_refused=None):
                    full_dev_beside=fam["full_dev_beside"], e3_reread=fam["e3_reread"],
                    d0s_removals=fam["d0s_removals"], holm=holm, gate=fam["gate"], order=fam["order"], arms=arms,
                    table=_table(), generated_utc=F._utc())
-        TS._write_json(cap_path(REPORT + ".json"), rep)
-        cap_path(REPORT + ".md").write_text(_md(rep))
+        TS._write_json(cap_path(names["report"] + ".json"), rep)
+        cap_path(names["report"] + ".md").write_text(_md(rep))
         doc = dict(common, format=FMT_VERDICT, status="decided", exam="dev", decided_on=fam["decided_on"],
                    dev_minus_h=fam["dev_minus_h"], full_dev_beside=fam["full_dev_beside"],
                    e3_reread=fam["e3_reread"], d0s_removals=fam["d0s_removals"],
@@ -836,19 +1089,26 @@ def verdict(cap_refused=None):
                    arms=arms, dev_passes=passes["total"], dev_passes_by_kind=passes["by_kind"],
                    sesoi=F.SESOI, rule="V3F.3.3: D > 2 pooled sd and D > SE; combined z; 90 % interval; outcome "
                                        "classes; Holm per exam; Tier C bar Phi^-1(1 - 0.05/14)",
-                   note="dev only; the external primaries in capacity/%s; nothing switches" % EXTERNAL)
-        F.write_once(vp, doc)
-    log("verdict: %s; reads %s (%.0fs)" % (", ".join("%s %s" % (p, (doc["primaries"].get(p) or {}).get(
-        "decision", {}).get("outcome", doc["primaries"].get(p, {}).get("status"))) for p in dev_ids),
+                   note="dev only; the external primaries in capacity/%s; nothing switches" % names["external"])
+        F.write_once(cap_path(names["verdict"]), doc)
+    log("%s: %s; reads %s (%.0fs)" % ("continuation verdict (deviation 4)" if cont else "verdict", ", ".join(
+        "%s %s" % (p, (doc["primaries"].get(p) or {}).get("decision", {}).get(
+            "outcome", doc["primaries"].get(p, {}).get("status"))) for p in dev_ids),
         [o["arm"] for o in fam["order"]], time.time() - t0))
     return doc
 
 
 def read_verdict():
-    d = F._read_json(verdict_path())
+    """The family's verdict the reads follow (family_verdict_path): decided, or refused. While capacity/v3fam_v1.json
+    is the verdict of 2026-10-13, decided while seven arms had never started, every read waits for its continuation
+    (deviation 4)."""
+    vp = family_verdict_path()
+    d = F._read_json(vp)
     if not isinstance(d, dict) or d.get("format") != FMT_VERDICT or d.get("status") != "decided":
-        raise F.V3famRefused("the family's verdict (%s) is not decided: no sealed-test read before it (V3F.3.6)"
-                             % verdict_path())
+        extra = (" (capacity/%s is the verdict of 2026-10-13, decided while seven arms had never started: the reads "
+                 "follow its continuation, deviation 4)" % VERDICT) if is_partial() else ""
+        raise F.V3famRefused("the family's verdict (%s) is not decided: no sealed-test read before it (V3F.3.6)%s"
+                             % (vp, extra))
     return d
 
 
@@ -989,8 +1249,8 @@ def test_read(arm, read_by):
             "--output=%s" % (logs / "%x_%j.out"), str(TS._build_script()), "inc2.v3fam", "score-test", "--arm", arm]
     env = DELEGATE_ACCOUNT if read_by == "delegate" else "the owner's account (%s...)" % DECIDED_BY_OWNER_PREFIX
     rec = {"format": FMT_READ, "arm": arm, "kind": pos["kind"], "position": pos["position"], "read_by": who,
-           "read_by_key": read_by, "incap_decided_by": env, "verdict": verdict_path().name,
-           "verdict_sha256": F._sha(verdict_path()), "sources": srcs, "argv": argv, "cap": before,
+           "read_by_key": read_by, "incap_decided_by": env, "verdict": family_verdict_path().name,
+           "verdict_sha256": F._sha(family_verdict_path()), "sources": srcs, "argv": argv, "cap": before,
            "decided_by": F.DECIDED_BY, "written_utc": F._utc(),
            "note": "submitted by the person named in read_by with INCAP_DECIDED_BY naming them; the scores stay off "
                    "the platform's evidence (V3F.3.6)"}
@@ -1134,7 +1394,7 @@ def score_test(arm, embedder=None, workers=None, lock_check=True, batch=S.BATCH,
         raise F.V3famRefused("%s has no prepared read (test-read --arm %s --read-by ... first)" % (arm, arm))
     submitter = check_submitter(rr.get("read_by_key"), env)
     read_verdict()
-    if F._sha(verdict_path()) != rr.get("verdict_sha256"):
+    if F._sha(family_verdict_path()) != rr.get("verdict_sha256"):
         raise F.V3famRefused("the verdict changed since the read was prepared")
     now = json.loads(json.dumps(read_sources(arm), default=str))
     if now != rr.get("sources"):
