@@ -13,6 +13,12 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-20 — Lab server back after the outage; the dashboard now reconnects to MongoDB on its own
+
+- **What happened.** After the reboot the dashboard came up a minute before mongod, cached the failed probe and showed none of the 10 projects (JSON fallback). The database was intact: 10 domains, 113 slugs, 1,056 audit events; the last `domain.delete` dates from 2026-09-07. A dashboard restart restored the list.
+- **Fix.** `db.py` retries a failed connection after 15 s and closes the failed client (CHANGELOG, 2026-10-20). Test: `tests/test_db_reconnect.py`.
+- **Also seen.** `weed-sync` failed while the cluster's hostnames did not resolve (2026-10-19 to 10-21 02:20 UTC), then pulled the registry and re-mirrored 113 slugs to Mongo at 02:51 UTC.
+
 
 
 ## 2026-10-12 — V3F unblocked: the quota reading, D6's environment and the jobs' provenance fixed (three recorded deviations); D6 stages its rotated images transposed

@@ -11040,3 +11040,10 @@ Every result sat near test 0.85, against the 0.90 goal.
   - `docs/CONTINUOUS_LOOP.md` and `docs/prereg/V3F_dev1-3_2026-10-12.md`: the deviations, with the family numbers that existed. `docs/prereg/V3F_rev29-31_2026-10-11.md.ots`: the upgraded (complete) proof.
 - **Verified.** Lab: 156 test files, 138 pass and the same 18 environment failures as the deployed base, check by check; the final code's D6, stream-unit and job-script files as on the base; replay gate pass (56 of 58, R2 and R4b skipped). Cluster: the storage gate on a live `my_quotas`, two export probe jobs, the D6 environment's import check, a one-epoch V100 check of D6's training path, and the read-only rehearsal (transpose).
 - **Deploy.** One commit containing these and 55cc2d9: `deploy/deploy_funnel.sh` (no `--allow-*` flag), dashboard restart, `executor.run_replay_tests`; then, on the login node, `check-env` in D6's environment from the deployed tree.
+
+## 2026-10-20 — The dashboard reconnects to MongoDB after a failed first probe
+
+- **Why.** After the lab server's reboot on 2026-10-20 the dashboard started at 21:17:08 CDT and mongod at 21:18:08. `db.py` probed Mongo once per process and cached the failure, so every page ran on the JSON fallback: `/api/domains` listed 0 of the 10 projects and `/api/db_status` reported `available: false` until the dashboard was restarted by hand (22:04 CDT restart: 10 domains, 113 slugs). No data was lost: the database was intact, and no write request reached the dashboard in that window.
+- **Change.** `tools/db.py`: a failed connection is retried on the next call once `AGENTAI_MONGO_RETRY_S` seconds (default 15) have passed since the failure; a live handle is reused as before. The client a failed attempt creates is closed, so retries do not accumulate pymongo monitor threads.
+- **Verified.** `tests/test_db_reconnect.py` (10 checks, pymongo replaced by a fake): fails on the previous `db.py` (`KeyError: 'failed_at'`), passes on this one; `tests/test_domain_config.py` passes.
+- **Deploy.** `deploy/deploy_funnel.sh` (db.py is a lab-only path), which restarts the dashboard.
