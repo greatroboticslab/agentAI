@@ -52,6 +52,7 @@ from __future__ import annotations
 import os
 import re
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -120,9 +121,15 @@ DEFAULT_DOMAIN = os.environ.get("AGENTAI_DEFAULT_DOMAIN", "weed")
 # localhost. Still bounded so a dead Mongo never hangs a request.
 _CONNECT_TIMEOUT_MS = int(os.environ.get("AGENTAI_MONGO_TIMEOUT_MS", "1500"))
 
+# A failed connection is retried after this many seconds rather than cached for
+# the life of the process. After the 2026-10-20 reboot the dashboard started
+# 60 s before mongod; the cached failure kept every page on the JSON fallback
+# (no domains listed) until a manual restart.
+_RETRY_AFTER_S = float(os.environ.get("AGENTAI_MONGO_RETRY_S", "15"))
+
 
 # --------------------------------------------------------------------------- #
-# Connection (lazy singleton, thread-safe, probe cached)
+# Connection (lazy singleton, thread-safe; a failed probe is retried)
 # --------------------------------------------------------------------------- #
 
 _lock = threading.Lock()
@@ -132,6 +139,7 @@ _state: dict = {
     "db": None,          # Database handle or None
     "url": None,         # resolved connection string
     "error": None,       # last connection error string (for diagnostics)
+    "failed_at": None,   # time.monotonic() of the last failed attempt
 }
 
 
@@ -165,10 +173,16 @@ def _db_name_from_url(url: str) -> str:
 
 def _connect() -> None:
     """Attempt a connection once. Idempotent; subsequent calls are no-ops
-    unless reset() is called. Sets _state['db'] to a live handle or None."""
+    unless reset() is called or _get_db() re-arms a failure older than
+    _RETRY_AFTER_S. Sets _state['db'] to a live handle or None."""
     if _state["tried"]:
         return
     _state["tried"] = True
+    _try_connect()
+    _state["failed_at"] = None if _state["db"] is not None else time.monotonic()
+
+
+def _try_connect() -> None:
     url = _resolve_url()
     _state["url"] = url
     if not url:
@@ -179,6 +193,7 @@ def _connect() -> None:
     except Exception as e:
         _state["error"] = f"pymongo not installed: {e}"
         return
+    client = None
     try:
         client = MongoClient(url, serverSelectionTimeoutMS=_CONNECT_TIMEOUT_MS)
         # Force a round-trip so we know it's actually reachable now.
@@ -187,6 +202,11 @@ def _connect() -> None:
         _state["db"] = client[_db_name_from_url(url)]
         _state["error"] = None
     except Exception as e:
+        if client is not None:          # retries must not pile up monitor threads
+            try:
+                client.close()
+            except Exception:
+                pass
         _state["client"] = None
         _state["db"] = None
         _state["error"] = f"connect/ping failed: {e}"
@@ -202,7 +222,7 @@ def reset() -> None:
             except Exception:
                 pass
         _state.update({"tried": False, "client": None, "db": None,
-                       "url": None, "error": None})
+                       "url": None, "error": None, "failed_at": None})
 
 
 def _get_db():
@@ -210,6 +230,9 @@ def _get_db():
     if _state["db"] is not None:
         return _state["db"]
     with _lock:
+        if (_state["db"] is None and _state["failed_at"] is not None
+                and time.monotonic() - _state["failed_at"] >= _RETRY_AFTER_S):
+            _state["tried"] = False
         _connect()
     return _state["db"]
 
