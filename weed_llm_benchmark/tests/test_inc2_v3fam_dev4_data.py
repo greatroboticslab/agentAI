@@ -20,7 +20,11 @@ JPG.
 - a failed build's partial outputs: the probe's copies already under splits/v3fam/d5b (as job 49061040 left 476 of
   them), an unrelated file there and v3fam/v1/leak/ood_desc.npz are kept byte for byte; the copies made again are
   the same files; summary.json lists them (preexisting: files, copies made again, the ones not used); a file
-  present at the start that changed refuses before the summary.
+  present at the start that changed refuses before the summary;
+- a build cut off inside a DINOv2 scan (node lost, scancel, a requeue, ENOSPC) leaves funnel.embed's resume parts
+  (<name>.partNNNNN.npz) and temp files in v3fam/v1/leak/: the next attempt's scan (the real funnel.embed.
+  embed_images) resumes from the parts and removes them, and the build does not refuse over them (they are listed
+  apart as transient, with whether they remain); an output beside them still may not change.
 
 Run:  python3 tests/test_inc2_v3fam_dev4_data.py
 """
@@ -33,6 +37,7 @@ import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import test_inc2_v3fam_data as T  # noqa: E402  (sets INC_DIR / REPO first, through test_inc2_train)
+import test_inc2_v3fam_sweep as SWT  # noqa: E402
 
 from PIL import Image  # noqa: E402
 
@@ -231,12 +236,88 @@ def w_changed():
           (rec_ok, e, e2))
 
 
+class _Killed(BaseException):
+    """A job killed in the middle of a scan (not an Exception: funnel's batch retry does not catch it)."""
+
+
+class _KilledAfter(SWT.StubEmbedder):
+    """The stand-in embedder, killed at its n-th call (one call per chunk of one row here)."""
+
+    def __init__(self, n):
+        self.left = n
+
+    def __call__(self, pils):
+        self.left -= 1
+        if self.left < 0:
+            raise _Killed()
+        return SWT.StubEmbedder.__call__(self, pils)
+
+
+def w_resume_parts():
+    print("a build cut off inside a DINOv2 scan: the next attempt resumes from funnel.embed's parts and does not "
+          "refuse over them")
+    d = T.TMP / "pre_parts"
+    imgs = d / "imgs"
+    imgs.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for i in range(4):
+        p = imgs / ("im%d.png" % i)
+        Image.new("RGB", (32, 24), (40 * i, 90, 200 - 30 * i)).save(p)
+        sha = W.sha(p)
+        rows.append({"key": sha, "image": str(p), "sha256": sha})
+    leak = d / "v3fam_root" / "leak"
+    out = leak / "eval_scan_desc.npz"
+    cache = leak / "ood_desc.npz"
+    leak.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(b"the season index's descriptors")
+    real_out, real_root = D.out_dir, F.root
+    D.out_dir = lambda: d / "splits_v3fam"
+    F.root = lambda: d / "v3fam_root"
+    try:
+        killed = False
+        try:                                      # attempt 1: killed after two of the scan's four chunks
+            E.embed_images(rows, out, _KilledAfter(2), chunk=1, procs=1)
+        except _Killed:
+            killed = True
+        parts = sorted(p.name for p in leak.glob("eval_scan_desc.part*.npz"))
+        stale = leak / "eval_scan_desc.part00002.npz.tmp"    # a part write cut off by the kill
+        stale.write_bytes(b"half a part")
+        pre = D._preexisting()
+        got = E.embed_images(rows, out, SWT.EMB, chunk=1, procs=1)      # attempt 2: resumes, then removes the parts
+        left = sorted(p.name for p in leak.iterdir())
+        err, rec = None, None
+        try:
+            rec = D._preexisting_record(pre, {})
+        except D.DataRefused as e:
+            err = e
+        cache.write_bytes(b"other descriptors")
+        err2 = None
+        try:
+            D._preexisting_record(pre, {})
+        except D.DataRefused as e:
+            err2 = e
+    finally:
+        D.out_dir, F.root = real_out, real_root
+    check("attempt 1 is killed inside the scan and leaves two resume parts; attempt 2 completes from them and "
+          "removes them (and replaces the cut-off temp file)", killed and parts == ["eval_scan_desc.part00000.npz",
+                                                                                  "eval_scan_desc.part00001.npz"]
+          and len(got["keys"]) == 4 and left == ["eval_scan_desc.npz", "ood_desc.npz"], (killed, parts, left))
+    tr = {pathlib.Path(x[0]).name: x[3] for x in (rec or {}).get("transient") or []}
+    check("the build does not refuse over them: the outputs present at the start (ood_desc.npz) unchanged, the parts "
+          "and the temp file listed apart as transient and gone",
+          err is None and rec["files"] == 1 and rec["not_used"] == [str(cache)]
+          and tr == {"eval_scan_desc.part00000.npz": False, "eval_scan_desc.part00001.npz": False,
+                     "eval_scan_desc.part00002.npz.tmp": False}, (str(err), rec))
+    check("  an output beside them that changed still refuses", err2 is not None and "never over them" in str(err2),
+          err2)
+
+
 def main():
     t0 = time.time()
     try:
         T.WORLD["world"] = W.build_world()
         T.WORLD["fixture"] = rewritten_fixture()
-        for fn in (w_rewritten, w_changed):
+        for fn in (w_rewritten, w_changed, w_resume_parts):
             try:
                 fn()
             except Exception as e:               # noqa: BLE001

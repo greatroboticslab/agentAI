@@ -1750,7 +1750,7 @@ def v3fam_verdict_ready(fam, fs):
     its own run: done, failed after its own second failure, blocked, not needed, or not run for a reason of its own
     (the family cap, the walltime, a download, a dependency of its own that ended without its effect). An item 'not
     run (the family's data build failed)' never started: it is pending, not ended. The verdict of 2026-10-13 ran
-    with eight arms in that state (deviation 4, 2026-10-20)."""
+    with seven arms in that state (deviation 4, 2026-10-20)."""
     pending = []
     if fs.get("data") not in V3FAM_DATA_ENDED:
         pending.append("data (%s)" % (fs.get("data") or "missing"))

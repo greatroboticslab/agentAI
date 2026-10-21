@@ -33,8 +33,8 @@ prints exactly one "INCAP <json>" line (remote.emit).
         <pkg>.v3fam score --arm X|verdict, <pkg>.baseline build --exp E --v3fam ARM
         --seeds 0,1,2 --role baseline; a person's score-test, reanalyse-test and the
         D0-S sweep are refused; verdict takes --cap-refused ITEM,... the ticker refused at
-        the family cap); detr (run_inc2_detr.sh <pkg>.v3fam_detr smoke | train
-        --seeds S: D6's RF-DETR jobs, L23K; train submits one job per seed named,
+        the family cap and --ticker-failed ITEM,... it recorded failed twice); detr
+        (run_inc2_detr.sh <pkg>.v3fam_detr smoke | train --seeds S: D6's RF-DETR jobs, L23K; train submits one job per seed named,
         inc_detr_v3fam_s<k> (0,1,2 first; a retry names only the seeds not yet
         trained), and returns their ids; refused while any is queued);
         zoo (run_inc2_zoo.sh submit: the model-zoo
@@ -126,6 +126,10 @@ V3FAM_DETR_SEEDS_RE = re.compile(r"(0,1,2|0,1|0,2|1,2|0|1|2)\Z")
 # L23L's --cap-refused: the family items (stream.py _v3fam_key) the ticker recorded "not run (family cap)"
 V3FAM_CAP_ITEMS_RE = re.compile(r"(data|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))"
                                 r"(,(data|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))){0,39}\Z")
+# L23L's --ticker-failed (deviation 4, 2026-10-20): the score, build and D6 items the ticker recorded failed after
+# their own second failure (never the data build or the verdict)
+V3FAM_FAILED_ITEMS_RE = re.compile(r"(score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))"
+                                   r"(,(score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))){0,39}\Z")
 V3FAM_DETR_JOB_NAMES = {"smoke": ("inc_detr_v3fam_smoke",),
                         "train": ("inc_detr_v3fam_s0", "inc_detr_v3fam_s1", "inc_detr_v3fam_s2")}
 V3FAM_SCORE_ARMS = ("E3RS", "D2LAION", "D2CLIP", "D2DINOL", "D2DINOB", "D2SIGLIP", "D2RN50", "D2BC1", "D2BC2640",
@@ -921,7 +925,8 @@ BUILD_FLAGS = {
     ("twostage", "verdict"): {},
     ("v3fam_data", "build"): {},
     ("v3fam", "score"): {"--arm": ("arm", _ENUM(*V3FAM_SCORE_ARMS))},
-    ("v3fam", "verdict"): {"--cap-refused": ("cap_refused", V3FAM_CAP_ITEMS_RE)},
+    ("v3fam", "verdict"): {"--cap-refused": ("cap_refused", V3FAM_CAP_ITEMS_RE),
+                           "--ticker-failed": ("ticker_failed", V3FAM_FAILED_ITEMS_RE)},
     ("baseline", "rescore-agnostic"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
     ("base3", "build"): {"--stream": ("stream", _NAME)},
     ("pilot4", "build"): {"--exp": ("exp", _NAME), "--from": ("from_exp", _NAME), "--recipes": ("recipes", _RECIPES)},

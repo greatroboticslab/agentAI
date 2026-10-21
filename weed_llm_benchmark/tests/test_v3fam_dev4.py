@@ -17,7 +17,14 @@ ticker run), so tests/test_v3fam_dev4_mutants.py can run this file against each 
   a running item;
 - the verb's guard (inc2.v3fam_verdict.verdict_ready, verdict): refused without the family's data summary and while
   an arm never started (no record, no attempt of its score job, its builds or D6's jobs), writing nothing; BCLEAN
-  excused only without D0-S's trigger; an item refused at the family cap excused;
+  excused only without D0-S's trigger; an item refused at the family cap excused; an item the ticker recorded
+  failed after its own second failure (--ticker-failed) ends the arms it ends, also when its job failed before
+  writing a provenance attempt, and is written once under v3fam/v1/failed; the data build's failure is refused there;
+- the two guards agree: a build that failed twice before its provenance attempt (cancelled while pending, NODE_FAIL
+  at launch) and its score arm derived 'not run': the ticker proposes L23L with --ticker-failed naming the build,
+  and the verb is then ready; every dependency the domain's score_after names is one the verb's ending_items counts;
+- L23L's record-only follow (a submission whose outcome is unknown) names the domain's verdict record without
+  raising (it read self.dom inside a static method: NameError on every tick);
 - the read path: with the verdict of 2026-10-13 in place (its sha256) the family's verdict is the continuation;
   read_verdict refuses until it is decided;
 - the continuation's reproduction check: equal decisions pass; a D 1e-6 off, another outcome, or a primary no longer
@@ -127,6 +134,7 @@ class Fam(object):
     _v3fam_fold = staticmethod(S.StreamRun._v3fam_fold)
     _v3fam_reopen = S.StreamRun._v3fam_reopen
     _v3fam_deployed = S.StreamRun._v3fam_deployed
+    _v3fam_params = S.StreamRun._v3fam_params
     _failed_ids = S.StreamRun._failed_ids
 
     def __init__(self, root, reopen, st):
@@ -269,6 +277,32 @@ def t_verb_guard():
     ok5, why5 = VR.verdict_ready()
     check("an item refused at the family cap (a build D1 scores, or D1's own score) excuses it; then an attempt of "
           "one of D1's builds: ready", ok3 and ok4 and ok5 and why5 == "", (why3, why5))
+    (C.INC_DIR / "_campaign" / "provenance" / "v3_d1_a12_m640.json").unlink()
+    got = {tag: VR.verdict_ready(failed=f) for tag, f in (
+        ("a build D1 scores failed twice (no attempt recorded)", ["build:D1B1"]),
+        ("D1's own score job failed twice", ["score:D1"]),
+        ("E3RS, which every arm is scored after, failed twice", ["score:E3RS"]),
+        ("another arm's build failed twice", ["build:D4F"]))}
+    check("an item the ticker recorded failed after its own second failure ends the arms it ends, its job attempted "
+          "or not: %s" % "; ".join(got), got["a build D1 scores failed twice (no attempt recorded)"][0]
+          and got["D1's own score job failed twice"][0] and got["E3RS, which every arm is scored after, failed twice"][0]
+          and got["another arm's build failed twice"] == (False, "never started: D1"), got)
+    bad = {tag: refused(VR.verdict_ready, failed=f) for tag, f in (("the data build", ["data"]),
+                                                                   ("the verdict", ["verdict"]),
+                                                                   ("not a family item", ["build:d1b1;rm"]))}
+    check("  --ticker-failed never names the data build (its failure ends nothing: the summary is needed) or the "
+          "verdict", all(e is not None and "--ticker-failed" in str(e) for e in bad.values()),
+          {k: str(v)[:100] for k, v in bad.items()})
+    names = VR.record_ticker_failures(["build:D1B1"])
+    rec = json.loads(VR.failed_file("build:D1B1").read_text())
+    st, (ok_r, why_r) = VR.arm_status("D1"), VR.verdict_ready()
+    VR.record_ticker_failures(["build:D1B1"])
+    check("  written once under v3fam/v1/failed (a second call keeps it); the arm is then reported failed with its "
+          "reason, and the verb is ready without the argv", names == ["build:D1B1"] and rec["status"] == "failed"
+          and rec["item"] == "build:D1B1" and st == "failed (build:D1B1 failed twice)" and ok_r
+          and json.loads(VR.failed_file("build:D1B1").read_text()) == rec, (st, why_r, rec))
+    shutil.rmtree(str(VR.failed_dir()))
+    provenance("v3_d1_a12_m640")
     sw = F.root() / "sweep" / "record.json"
     sw.parent.mkdir(parents=True, exist_ok=True)
     sw.write_text(json.dumps({"format": "inc2-v3fam-sweep-record/1", "status": "complete", "H": ["test/t1"],
@@ -287,6 +321,69 @@ def t_verb_guard():
     check("a data build refused at the family cap (in the argv, or its record written) stands for the summary",
           ok8 and ok9, why8)
     clean()
+
+
+def t_guards_agree():
+    print("the ticker's and the verb's guards agree on a job that failed twice before its provenance attempt")
+    clean()
+    first = ("E3RS", "D2LAION", "D2CLIP", "D2DINOL", "D2DINOB", "D2SIGLIP", "D2RN50", "D2BC1", "D2BC2640", "D2FT",
+             "D3", "D9")
+    records(first)
+    TS._write_json(VD._summary_path(), {"format": VD.FORMAT, "status": "complete", "arms": {}})
+    for n in ("v3fam_score_d4n", "v3fam_score_d4r15", "v3fam_score_d1", "v3fam_score_d5b", "v3fam_score_d6",
+              "v3fam_score_d8"):
+        provenance(n)
+    # the ticker: build:D4F recorded failed after its second failure (both attempts ended before 'prov start'), so
+    # its score arm is derived 'not run (a dependency ended without its effect)'; every other item done
+    fs = stage(build={"D4F": "failed"}, score={"D4F": "not run (a dependency ended without its effect)"})
+    t_ready, t_pending = DS.v3fam_verdict_ready(FAM, fs)
+    root = VT.TMP / "agree"
+    items = {"build:D4F": {"state": "failed", "fails": 2, "lever": "L23I"},
+             "build:D4N": {"state": "done", "lever": "L23I"}, "data": {"state": "done", "lever": "L23H"},
+             "score:D9": {"state": "not run (family cap)", "lever": "L23J"}}
+    f = Fam(root, None, {"v3fam": {"items": items}})
+    params, _child = f._v3fam_params("L23L", {}, "inc2", {})
+    argv_failed = [x for x in (params.get("ticker_failed") or "").split(",") if x]
+    v_before = VR.verdict_ready(cap_refused=[x for x in (params.get("cap_refused") or "").split(",") if x])
+    v_ready, v_why = VR.verdict_ready(cap_refused=[x for x in (params.get("cap_refused") or "").split(",") if x],
+                                      failed=argv_failed)
+    check("the ticker proposes L23L with --ticker-failed naming the failed build (never the data build), and the verb "
+          "given it is ready (without it: 'never started: D4F', the disagreement that would fail L23L twice)",
+          t_ready and not t_pending and params.get("ticker_failed") == "build:D4F"
+          and params.get("cap_refused") == "score:D9" and v_before == (False, "never started: D4F") and v_ready,
+          (t_pending, params, v_before, v_why))
+    f2 = Fam(root, None, {"v3fam": {"items": dict(items, data={"state": "failed", "lever": "L23H"})}})
+    p2, _c = f2._v3fam_params("L23L", {}, "inc2", {})
+    check("  a failed data build is never passed as a failure", p2.get("ticker_failed") == "build:D4F", p2)
+    gaps = {}
+    for arm, deps in (FAM.get("score_after") or {}).items():
+        want = {"score:%s" % d if not (d.startswith("build:") or d.startswith("detr:")) else d
+                for d in deps if d != "exif"}
+        miss = want - set(VR.ending_items(arm))
+        if miss:
+            gaps[arm] = sorted(miss)
+    check("every dependency the domain's score_after names (but the EXIF pre-flight, which only waits) is one whose "
+          "failure the verb counts for that arm (ending_items)", not gaps and set(FAM["score_after"]) <= set(
+              F.SCORE_ARMS), gaps)
+    clean()
+
+
+def t_record_only_follow():
+    print("L23L's record-only follow (a submission whose outcome is unknown)")
+    root = VT.TMP / "follow"
+    f = Fam(root, None, {"v3fam": {"items": {}}})
+    f._record_only_follow = S.StreamRun._record_only_follow.__get__(f)
+    got, err = {}, None
+    try:
+        for lv, prm in (("L23L", {}), ("L23H", {}), ("L23J", {"arm": "D4F"})):
+            got[lv] = f._record_only_follow({"lever": lv, "proposal": {"params": prm}})
+    except Exception as e:                       # noqa: BLE001  (NameError: self in a static method)
+        err = e
+    check("L23L follows the domain's verdict record (the continuation), L23H and L23J theirs, without raising",
+          err is None and got.get("L23L") == ("inc_build_v3fam_v1", "capacity/v3fam_v1_cont.json")
+          and got.get("L23H") == ("inc_build_v3fam_data", "splits/v3fam/summary.json")
+          and got.get("L23J") == ("inc_build_v3fam_score_d4f", "capacity/v3fam_score_d4f.json"),
+          (got, "%s: %s" % (type(err).__name__, err) if err else None))
 
 
 def t_read_path():
@@ -369,7 +466,8 @@ def t_reproduction():
 
 def main():
     try:
-        for fn in (t_platform_guard, t_reopen, t_verb_guard, t_read_path, t_reproduction):
+        for fn in (t_platform_guard, t_reopen, t_verb_guard, t_guards_agree, t_record_only_follow, t_read_path,
+                   t_reproduction):
             try:
                 fn()
             except Exception as e:               # noqa: BLE001

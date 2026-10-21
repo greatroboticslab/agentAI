@@ -131,7 +131,11 @@ content-addressed and written once (a copy made again is the same file), the
 season index's cache is reused only when its identity is this build's (else
 funnel.leak refuses rather than overwrite it); every file present at the
 start is listed in summary.json's "preexisting", must still hold its bytes at
-the end (else the build refuses before the summary), and none is removed.
+the end (else the build refuses before the summary), and none is removed;
+a cut-off attempt's transient files (funnel.embed's resume parts
+<name>.partNNNNN.npz beside a scan's descriptor file, which the resumed scan
+reuses and then removes, and temp files) are listed apart and need not
+remain.
 
 A refusal raises DataRefused (a V3famRefused); the CLI prints
 "[inc2.v3fam_data] ERROR: ..." and exits 2.
@@ -1082,37 +1086,53 @@ def _scan_unique(files, scanner, desc_path, procs):
     return {sha: list(got.get(sha, [])) for sha in uniq}, set(uniq)
 
 
+# A build's own transient files, which a build cut off (a node lost, scancel, a requeue, ENOSPC) leaves behind and the
+# next attempt reuses or replaces: funnel.embed's resume parts beside a scan's descriptor file
+# (<name>.partNNNNN.npz, reused and then removed by the scan that resumes them) and the temp files of an atomic write
+# (<name>.tmp, .<name>.<pid>.<ns>.tmp). They are listed, never required to remain (deviation 4).
+TRANSIENT_RE = re.compile(r"(?:\.part\d{5}\.npz|\.tmp)\Z")
+
+
 def _preexisting():
-    """{path: {"bytes", "sha256"}} of every file already under splits/v3fam/ and v3fam/v1/leak/ when a build starts:
-    a failed build's partial outputs (the copies under splits/v3fam/d5b/, written content-addressed and once;
-    leak/ood_desc.npz, the season index's cache, reused only when its identity is the one this build would make,
-    else funnel.leak refuses rather than overwrite it). The build writes beside them and deletes nothing
-    (deviation 4)."""
+    """{path: {"bytes", "sha256"[, "transient"]}} of every file already under splits/v3fam/ and v3fam/v1/leak/ when a
+    build starts: a failed build's partial outputs (the copies under splits/v3fam/d5b/, written content-addressed and
+    once; leak/ood_desc.npz, the season index's cache, reused only when its identity is the one this build would
+    make, else funnel.leak refuses rather than overwrite it), and its transient files (TRANSIENT_RE: a cut-off
+    scan's resume parts, which this build's scan reuses and removes, and temp files), marked so. The build writes
+    beside them and deletes none of the outputs (deviation 4)."""
     out = {}
     for d in (out_dir(), F.root() / "leak"):
         if d.is_dir():
             for p in sorted(d.rglob("*")):
                 if p.is_file():
-                    out[str(p)] = {"bytes": p.stat().st_size, "sha256": C.sha256_file(p)}
+                    out[str(p)] = dict({"bytes": p.stat().st_size, "sha256": C.sha256_file(p)},
+                                       **({"transient": True} if TRANSIENT_RE.search(p.name) else {}))
     return out
 
 
 def _preexisting_record(pre, copy_rows):
-    """What became of the files present when the build started: each must still hold its bytes (a changed one
-    refuses before the summary is written); the copy files the build made again (the same bytes, so the same
-    content-addressed path) and the rest, listed, none removed."""
-    changed = sorted(p for p, e in pre.items() if not Path(p).is_file() or C.sha256_file(p) != e["sha256"])
+    """What became of the files present when the build started: each output must still hold its bytes (a changed or
+    missing one refuses before the summary is written); the copy files the build made again (the same bytes, so the
+    same content-addressed path) and the rest, listed, none removed. The transient files (a cut-off scan's resume
+    parts, temp files) are listed apart with whether they remain: the scan that resumes from its parts removes them
+    when it completes, so they are not required to remain."""
+    outs = {p: e for p, e in pre.items() if not e.get("transient")}
+    changed = sorted(p for p, e in outs.items() if not Path(p).is_file() or C.sha256_file(p) != e["sha256"])
     if changed:
         raise DataRefused("%d file(s) present before the build changed or went missing during it (e.g. %s): a "
                           "build writes beside earlier outputs and never over them" % (len(changed), changed[:3]))
     used = {str(r[k]) for r in copy_rows.values() for k in ("image", "label")}
-    listing = [[p, pre[p]["bytes"], pre[p]["sha256"]] for p in sorted(pre)]
-    return {"files": len(pre), "unchanged": True,
-            "copy_files_made_again": sum(1 for p in pre if p in used),
-            "not_used": sorted(p for p in pre if p not in used),
+    listing = [[p, outs[p]["bytes"], outs[p]["sha256"]] for p in sorted(outs)]
+    return {"files": len(outs), "unchanged": True,
+            "copy_files_made_again": sum(1 for p in outs if p in used),
+            "not_used": sorted(p for p in outs if p not in used),
             "listing_sha256": hashlib.sha256(json.dumps(listing).encode("utf-8")).hexdigest(),
+            "transient": [[p, pre[p]["bytes"], pre[p]["sha256"], Path(p).is_file()]
+                          for p in sorted(pre) if pre[p].get("transient")],
             "note": "files under splits/v3fam/ and v3fam/v1/leak/ before this build (a failed build's partial "
-                    "outputs): kept as they were; copies made again are the same files (deviation 4)"}
+                    "outputs): kept as they were; copies made again are the same files; transient: [path, bytes, "
+                    "sha256, still present] of a cut-off scan's resume parts and temp files, reused or replaced by "
+                    "this build (deviation 4)"}
 
 
 def build(inputs=None, procs=5, embedder=None, testing=False, catch=True):

@@ -32,6 +32,12 @@ reproduction check inside the verb.
   DM20  stream               the reopening without the deviation's file deployed
   DM21  stream               the earlier attempts' spend dropped from the family cap
   DM22  v3fam_verdict        the continuation written without its reproduction check (tests/test_inc2_v3fam_verdict.py)
+  DM23  v3fam_verdict        an item the ticker recorded failed twice does not end the arms it ends
+  DM24  stream               the ticker no longer passes its failed items to the verdict (--ticker-failed)
+  DM25  v3fam_verdict        E3RS's failure does not end the arms scored after it
+  DM26  v3fam_verdict        --ticker-failed accepts the data build's failure
+  DM27  stream               L23L's record-only follow reads self.dom inside a static method (NameError)
+  DM28  v3fam_data           a cut-off scan's resume parts are required to remain (tests/test_inc2_v3fam_dev4_data.py)
 
 Run:  python3 tests/test_v3fam_dev4_mutants.py [DM1 DM5 ...]
 """
@@ -51,6 +57,8 @@ VR = "weed_optimizer_framework/tools/inc2/v3fam_verdict.py"
 ST = "weed_optimizer_framework/tools/inc_autopilot/stream.py"
 FAST = "tests/test_v3fam_dev4.py"
 FULL = "tests/test_inc2_v3fam_verdict.py"
+VD = "weed_optimizer_framework/tools/inc2/v3fam_data.py"
+DATA = "tests/test_inc2_v3fam_dev4_data.py"
 MUTANTS = {
     "DM1": (DS, '    if fs.get("data") not in V3FAM_DATA_ENDED:\n', '    if False:\n', FAST),
     "DM2": (DS, '        return v3fam_terminal(st) and st != V3FAM_NOT_RUN_DATA\n',
@@ -70,7 +78,8 @@ MUTANTS = {
     "DM9": (VR, '        if not arm_started(a):\n            never.append(a)\n',
             '        if False:\n            never.append(a)\n', FAST),
     "DM10": (VR, '        if a == "BCLEAN" and not trig.get("bclean"):\n', '        if a == "BCLEAN":\n', FAST),
-    "DM11": (VR, '    ok, why = verdict_ready(cap_refused=cap_refused)\n', '    ok, why = True, ""\n', FAST),
+    "DM11": (VR, '    ok, why = verdict_ready(cap_refused=cap_refused, failed=ticker_failed)\n', '    ok, why = True, ""\n',
+             FAST),
     "DM12": (VR, '    return cap_path(CONTINUATION["verdict"]) if is_partial() else verdict_path()\n',
              '    return verdict_path()\n', FAST),
     "DM13": (VR, '                if abs(float(a) - float(b)) > CONT_REPRO_TOL:\n',
@@ -93,6 +102,15 @@ MUTANTS = {
     "DM22": (VR, '        continues = continuation_check(dev_doc, ext) if cont else None   # before anything is written\n',
              '        continues = dict(verdict=VERDICT, sha256=PARTIAL_VERDICT_SHA256, deviation=DEVIATION_4, '
              'reproduced=[]) if cont else None\n', FULL),
+    "DM23": (VR, '        if gone & set(ending_items(a)):\n            continue\n',
+             '        if False:\n            continue\n', FAST),
+    "DM24": (ST, '            failed = sorted(k for k, v in items.items() if v.get("state") == "failed" and k not in '
+                 '("verdict", "data"))\n', '            failed = []\n', FAST),
+    "DM25": (VR, '        ("score:%s" % SCORED_AFTER_ALL,) if arm != SCORED_AFTER_ALL else ())\n', '        ())\n', FAST),
+    "DM26": (VR, 'FAILED_ITEM_RE = re.compile(r"(score:', 'FAILED_ITEM_RE = re.compile(r"(data|score:', FAST),
+    "DM27": (ST, '    def _record_only_follow(self, it):\n',
+             '    @staticmethod\n    def _record_only_follow(it):\n', FAST),
+    "DM28": (VD, '    outs = {p: e for p, e in pre.items() if not e.get("transient")}\n', '    outs = dict(pre)\n', DATA),
 }
 
 

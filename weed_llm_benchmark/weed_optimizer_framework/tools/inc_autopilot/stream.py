@@ -4300,9 +4300,9 @@ class StreamRun(object):
         self._failed(ln, it, why, ended=ended)
         return True
 
-    @staticmethod
-    def _record_only_follow(it):
-        """(job name, record artifact) a record-only item is followed by."""
+    def _record_only_follow(self, it):
+        """(job name, record artifact) a record-only item is followed by (an instance method: L23L's record is the
+        domain's verdict record)."""
         from . import stream_remote as SR
         prm = it["proposal"].get("params") or {}
         if it["lever"] == "L23V":
@@ -4828,7 +4828,7 @@ class StreamRun(object):
 
     def _v3fam_reopen(self):
         """A recorded deviation's reopening (deviation 4, 2026-10-20: the data build, after its defect is fixed, and
-        the verdict, whose record of 2026-10-13 was decided with eight arms never started and stays as it is): each
+        the verdict, whose record of 2026-10-13 was decided while seven arms had never started and stays as it is): each
         item the domain's v3fam.reopen names is proposed again once the deployed tree holds the deviation's file
         with its sha256, once per marker, and only an item whose last attempt started before the deviation
         (v3fam.reopen.before_utc): an item run after it is never reopened by it. Such an item recorded failed or
@@ -5017,10 +5017,15 @@ class StreamRun(object):
             return {"pkg": pkg}, None
         if lever == "L23L":
             # the items this ticker recorded 'not run (family cap)': the verdict writes them under v3fam/v1/cap so
-            # the family table gives that reason (V3F.3.4, V3F.3.5)
-            refused = sorted(k for k, v in self._v3fam()["items"].items() if v.get("state") == V3FAM_NOT_RUN_CAP
-                             and k != "verdict")
-            return dict({"pkg": pkg}, **({"cap_refused": ",".join(refused)} if refused else {})), None
+            # the family table gives that reason (V3F.3.4, V3F.3.5); and those it recorded failed after their own
+            # second failure (a score, build or D6 job; never the data build, whose failure ends nothing): the verb
+            # counts the arms they end as ended, as DS.v3fam_verdict_ready does, although such a job may have failed
+            # before it wrote a provenance attempt (deviation 4)
+            items = self._v3fam()["items"]
+            refused = sorted(k for k, v in items.items() if v.get("state") == V3FAM_NOT_RUN_CAP and k != "verdict")
+            failed = sorted(k for k, v in items.items() if v.get("state") == "failed" and k not in ("verdict", "data"))
+            return dict({"pkg": pkg}, **({"cap_refused": ",".join(refused)} if refused else {}),
+                        **({"ticker_failed": ",".join(failed)} if failed else {})), None
         if lever == "L23J":
             arms = list(fam.get("pre_build_scores") or []) + list(fam.get("post_build_scores") or [])
             if pr.get("arm") not in arms:
@@ -5166,8 +5171,10 @@ class StreamRun(object):
         elif last and lever == "L23H":
             body = ("%s. The family's data build failed twice: the arms it builds (and D6, which stages after it) "
                     "never start, so the verdict waits until every arm's record is complete or failed (V3F.7 step "
-                    "11; deviation 4). A person finds the cause, fixes it as a recorded deviation and names the "
-                    "build in the domain's v3fam.reopen; the platform then proposes it again. To rerun by hand: %s"
+                    "11; deviation 4, which records why this wait departs from V3F.3.4/V3F.3.5's 'a job that failed "
+                    "twice'). The family's other items go on. A person finds the cause, fixes it as a recorded "
+                    "deviation and names the build in the domain's v3fam.reopen under a new marker (its before_utc "
+                    "after this failure); the platform then proposes it again. To rerun by hand: %s"
                     % (_short(why, 400), self._v3fam_rerun(lever, params)))
         else:
             body = "%s. Record only: %s; the family's other items go on. A person may rerun it from the login node: %s" \
@@ -5192,6 +5199,7 @@ class StreamRun(object):
                 sb, arm.lower(), arm)
         if lever == "L23L":
             cr = (" --cap-refused %s" % params["cap_refused"]) if params.get("cap_refused") else ""
+            cr += (" --ticker-failed %s" % params["ticker_failed"]) if params.get("ticker_failed") else ""
             return "%s --job-name=inc_build_v3fam_v1 run_inc2_build.sh inc2.v3fam verdict%s" % (sb, cr)
         if lever == "L23I":
             return ("%s --job-name=inc_build_%s run_inc2_build.sh inc2.baseline build --exp %s --v3fam %s --seeds "

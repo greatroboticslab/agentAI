@@ -3261,8 +3261,11 @@ def _fam_pro(w, lever=None):
 
 
 def _fam_arg(e):
-    """What a family proposal names: L23J/L23I's --arm or --v3fam, L23K's verb."""
+    """What a family proposal names: L23J/L23I's --arm or --v3fam, L23K's verb, L23L's 'verdict' (its argv may end in
+    --cap-refused or --ticker-failed and their items)."""
     a = e.get("argv") or []
+    if e.get("lever") == "L23L":
+        return "verdict" if "verdict" in a else None
     for flag in ("--arm", "--v3fam"):
         if flag in a:
             return a[a.index(flag) + 1]
@@ -3354,7 +3357,13 @@ def t_v3fam():
                            ("L23K", dict(PARAMS["L23K"], seeds="2"), [MODT + "inc2.v3fam_detr", "train", "--seeds",
                                                                      "2"]),
                            ("L23L", {"pkg": "inc2", "cap_refused": "build:D4F,score:D2CLIP"},
-                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "build:D4F,score:D2CLIP"])):
+                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "build:D4F,score:D2CLIP"]),
+                           # deviation 4: the items the ticker recorded failed twice (never the data build)
+                           ("L23L", {"pkg": "inc2", "ticker_failed": "build:D4N,detr:smoke"},
+                            [MODT + "inc2.v3fam", "verdict", "--ticker-failed", "build:D4N,detr:smoke"]),
+                           ("L23L", {"pkg": "inc2", "cap_refused": "score:D9", "ticker_failed": "build:D4N"},
+                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "score:D9", "--ticker-failed",
+                             "build:D4N"])):
         pp = LS.policy_params(lid, prm)
         argv = LS.render(lid, pp)
         act = LS.row(lid)["policy_action"]
@@ -3391,6 +3400,10 @@ def t_v3fam():
              "inc_build_v3fam_v1"),
             ("build", ["inc2.v3fam", "verdict", "--cap-refused", "score:d1"], False, None),
             ("build", ["inc2.v3fam", "verdict", "--cap-refused", "verdict"], False, None),
+            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "score:D9", "--ticker-failed",
+                       "build:D4N,detr:smoke,score:D1"], True, "inc_build_v3fam_v1"),
+            ("build", ["inc2.v3fam", "verdict", "--ticker-failed", "data"], False, None),
+            ("build", ["inc2.v3fam", "verdict", "--ticker-failed", "build:D4N,verdict"], False, None),
             ("detr", ["inc2.v3fam_detr", "score"], False, None),
             ("detr", ["inc2.twostage", "verdict"], False, None)):
         try:
@@ -3768,9 +3781,12 @@ def _v3fam_more():
     pt = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wt)]
     trec = wt.state()["v3fam"]["items"]["detr:train"]
     tcards = [c for c in wt.state().get("cards") or [] if c.get("lever") == "L23K" and "failed" in c["title"]]
+    lt = [e.get("argv") or [] for e in _fam_pro(wt, "L23L")]
     check("an L23K seed ending TIMEOUT (its 36 h walltime): train recorded failed at once (never proposed again), "
-          "its three jobs' GPU-h settled (%.1f), one card citing V3F.7; D6's scores not run; the verdict proposed"
+          "its three jobs' GPU-h settled (%.1f), one card citing V3F.7; D6's scores not run; the verdict proposed, "
+          "its argv naming the failed item (--ticker-failed detr:train, deviation 4)"
           % float(trec.get("settled") or 0), trec.get("state") == "failed" and trec.get("fails") == 1
+          and len(lt) == 1 and lt[0][-2:] == ["--ticker-failed", "detr:train"]
           and "walltime" in str(trec.get("why")) and abs(float(trec.get("settled") or 0) - (129600 + 160000) / 3600.0)
           < 1e-4 and [a for l, a in pt if l == "L23K"].count("0,1,2") == 1 and ("L23J", "D6") not in pt
           and ("L23L", "verdict") in pt and len(tcards) == 1 and "V3F.7" in tcards[0]["detail"], (trec, pt, tcards))

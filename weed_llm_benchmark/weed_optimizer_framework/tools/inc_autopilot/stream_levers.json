@@ -764,13 +764,20 @@
       "--cap-refused",
       "{cap_refused}"
      ]
+    },
+    {
+     "if": "ticker_failed",
+     "tokens": [
+      "--ticker-failed",
+      "{ticker_failed}"
+     ]
     }
    ],
    "control": "Every comparison's two sides through the one family path (decision 17).",
    "success": "capacity/v3fam_v1.json decided (dev only), written once and last; once the verdict of 2026-10-13 is in place, capacity/v3fam_v1_cont.json, its continuation over every arm by the same rules (deviation 4).",
    "falsifier": "V3F.3.3's rule, V3F.3.4's Holm overlay and Tier C bar Phi^-1(1 - 0.05/14); nothing switches.",
    "estimator": "v3fam_verdict",
-   "note": "Record only (V3F.7 step 11): proposed once every arm's record is complete or failed: the family's data build done, and no score arm, build or D6 job pending or 'not run (the family's data build failed)', which never started (deviation 4, diagnose_stream.v3fam_verdict_ready; the verb refuses too); --cap-refused names the items the ticker recorded 'not run (family cap)', which the verdict writes under v3fam/v1/cap first; the sealed-test reads are a person's (inc2.v3fam test-read)."
+   "note": "Record only (V3F.7 step 11): proposed once every arm's record is complete or failed: the family's data build done, and no score arm, build or D6 job pending or 'not run (the family's data build failed)', which never started (deviation 4, diagnose_stream.v3fam_verdict_ready; the verb refuses too); --cap-refused names the items the ticker recorded 'not run (family cap)', which the verdict writes under v3fam/v1/cap first; --ticker-failed the score, build and D6 items it recorded failed after their own second failure (never the data build), which the verdict writes under v3fam/v1/failed and counts as ending the arms they end, as the ticker does; the sealed-test reads are a person's (inc2.v3fam test-read)."
   },
   "LV": {
    "name": "verdict",

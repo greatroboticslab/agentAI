@@ -2790,7 +2790,7 @@
       "description": "Lever L23K (R3, envelope-eligible, TRAIN lane; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): run_inc2_detr.sh inc2.v3fam_detr smoke stages base_v2 (no test folder, no holdout image) and trains one epoch, recording the 50-epoch projection; once it is within 0.8 x 36 h, train --seed 0, 1 and 2 are submitted together (run_test false, checkpoint_interval 1000, the final EMA weights exported once). Record only: nothing switches."
     },
     "inc_verdict_v3fam": {
-      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.v3fam verdict [--cap-refused {cap_refused}]",
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.v3fam verdict [--cap-refused {cap_refused}] [--ticker-failed {ticker_failed}]",
       "param_bounds": {
         "pkg": {
           "type": "enum",
@@ -2802,6 +2802,10 @@
         "cap_refused": {
           "type": "str",
           "pattern": "^(data|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))(,(data|score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))){0,39}$"
+        },
+        "ticker_failed": {
+          "type": "str",
+          "pattern": "^(score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))(,(score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))){0,39}$"
         },
         "est_gpu_hours": {
           "type": "float",

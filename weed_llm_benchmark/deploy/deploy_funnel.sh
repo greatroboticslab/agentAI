@@ -110,10 +110,12 @@ while IFS= read -r t; do PKG_PATHS+=("$t"); done < <(ls tests/test_funnel_*.py t
 ROOT_PATHS=(docs/FUNNEL_AUDIT.md docs/FUNNEL_AUDIT_RUNNER.md docs/FUNNEL_REPRODUCE.md RESEARCH_LOG.md
             docs/poster/figures_data.json
             docs/CONTINUOUS_LOOP.md docs/INCREMENTAL_PROTOCOL.md docs/INCREMENTAL_PROTOCOL_RUNNER.md docs/INC_AUTOPILOT.md
-            docs/prereg/V3F_2026-10-11.md docs/prereg/V3F_rev29-31_2026-10-11.md)
+            docs/prereg/V3F_2026-10-11.md docs/prereg/V3F_rev29-31_2026-10-11.md docs/prereg/V3F_dev4_2026-10-20.md)
 # V3F (2026-10-11): the ticker proposes the family's levers only once the deployed tree holds the amendment's byte
 # copy (docs/prereg/V3F_2026-10-11.md) and its Revisions 29-31's (docs/prereg/V3F_rev29-31_2026-10-11.md), each by
-# its sha256; the deploy record names whether HEAD descends from the amendment's commit
+# its sha256; it reopens the items a recorded deviation names only once the deployed tree holds that deviation's
+# file by its sha256 (the domain's v3fam.reopen: docs/prereg/V3F_dev4_2026-10-20.md, deviation 4); the deploy record
+# names whether HEAD descends from the amendment's commit
 V3F_COMMIT=55cc2d97cd2147d01644c1e193098b73aeba0a06
 # The replay set envelope autonomy needs a pass for (executor.REPLAY_SCRIPTS: inc, funnel and stream,
 # with both mutation harnesses) plus the stream's end-to-end pipeline: all must pass locally before any
