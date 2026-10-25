@@ -119,13 +119,13 @@ ROOT_PATHS=(docs/FUNNEL_AUDIT.md docs/FUNNEL_AUDIT_RUNNER.md docs/FUNNEL_REPRODU
             docs/poster/figures_data.json
             docs/CONTINUOUS_LOOP.md docs/INCREMENTAL_PROTOCOL.md docs/INCREMENTAL_PROTOCOL_RUNNER.md docs/INC_AUTOPILOT.md
             docs/prereg/V3F_2026-10-11.md docs/prereg/V3F_rev29-31_2026-10-11.md docs/prereg/V3F_dev4_2026-10-20.md
-            docs/prereg/V3F_dev5_2026-10-24.md)
+            docs/prereg/V3F_dev5_2026-10-24.md docs/prereg/V3F_dev6_2026-10-25.md)
 # V3F (2026-10-11): the ticker proposes the family's levers only once the deployed tree holds the amendment's byte
 # copy (docs/prereg/V3F_2026-10-11.md) and its Revisions 29-31's (docs/prereg/V3F_rev29-31_2026-10-11.md), each by
 # its sha256; it reopens the items a recorded deviation names only once the deployed tree holds that deviation's
 # file by its sha256 (the domain's v3fam.reopen: docs/prereg/V3F_dev4_2026-10-20.md, deviation 4;
-# docs/prereg/V3F_dev5_2026-10-24.md, deviation 5); the deploy record names whether HEAD descends from the amendment's
-# commit
+# docs/prereg/V3F_dev5_2026-10-24.md, deviation 5; docs/prereg/V3F_dev6_2026-10-25.md, deviation 6); the deploy record
+# names whether HEAD descends from the amendment's commit
 V3F_COMMIT=55cc2d97cd2147d01644c1e193098b73aeba0a06
 # V3F_CODE (deviation 5, 2026-10-24): every reproduction record of the family (the cluster's v3fam/v1/equivalence)
 # pins the sha256 of the code that took it (inc2.v3fam.code_shas: inc2/v3fam.py and the six E3-frozen files), and

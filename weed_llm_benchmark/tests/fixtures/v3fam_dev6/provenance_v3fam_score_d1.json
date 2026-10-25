@@ -1,0 +1,1015 @@
+{
+ "attempts": [
+  {
+   "approval_id": "ap-1792621834-75278550",
+   "argv": [
+    "inc2.v3fam",
+    "score",
+    "--arm",
+    "D1"
+   ],
+   "build_rc": 1,
+   "built_exp": "",
+   "command": "score",
+   "decided_by": "round-scheduler:inc-autopilot",
+   "drift": [],
+   "finished_utc": "2026-10-21T22:50:02Z",
+   "host": "v018.ib.bridges2.psc.edu",
+   "job_id": "49569308",
+   "job_script": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_llm_benchmark/run_inc2_job.sh",
+   "module": "inc2.v3fam",
+   "modules": {
+    "tools/cwd12_species.py": {
+     "nested": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+     "outer": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e"
+    },
+    "tools/funnel/__init__.py": {
+     "nested": "354d3fd23c77a74ebc6b7f58b91dda611d2ba9cd3639abcac591160bff02e8de",
+     "outer": "354d3fd23c77a74ebc6b7f58b91dda611d2ba9cd3639abcac591160bff02e8de"
+    },
+    "tools/funnel/domain.py": {
+     "nested": "b8667767d9741e23d6a181051847ac7e63cda30a77884344fd6c48427fb1e7cd",
+     "outer": "b8667767d9741e23d6a181051847ac7e63cda30a77884344fd6c48427fb1e7cd"
+    },
+    "tools/funnel/domains/weed.json": {
+     "nested": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f",
+     "outer": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f"
+    },
+    "tools/funnel/embed.py": {
+     "nested": "a0c129b6d7fb711c784de83d354685a7fbbba5be8b92e647dc29969bde5cdfd7",
+     "outer": "a0c129b6d7fb711c784de83d354685a7fbbba5be8b92e647dc29969bde5cdfd7"
+    },
+    "tools/funnel/estimate.py": {
+     "nested": "103db7a7f7a0e75f65ed2ce4b2f94ea7855d1e344834adf610c81612bc6af155",
+     "outer": "103db7a7f7a0e75f65ed2ce4b2f94ea7855d1e344834adf610c81612bc6af155"
+    },
+    "tools/funnel/leak.py": {
+     "nested": "e4742bb55b82a0a83992e77feccc83abd5f081987cc2e3c30e72152c06fcce98",
+     "outer": "e4742bb55b82a0a83992e77feccc83abd5f081987cc2e3c30e72152c06fcce98"
+    },
+    "tools/funnel/ledger.py": {
+     "nested": "18880306aaa8162eee768399e4cb1b177f3db93d146d0ecb7d510783fe4266c5",
+     "outer": "18880306aaa8162eee768399e4cb1b177f3db93d146d0ecb7d510783fe4266c5"
+    },
+    "tools/inc/__init__.py": {
+     "nested": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+     "outer": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74"
+    },
+    "tools/inc/audit.py": {
+     "nested": "83870aa9897c5caaa759d5912686ad3b019b895b349d8891fe74c6072f7375e3",
+     "outer": "83870aa9897c5caaa759d5912686ad3b019b895b349d8891fe74c6072f7375e3"
+    },
+    "tools/inc/common.py": {
+     "nested": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+     "outer": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d"
+    },
+    "tools/inc/driver.py": {
+     "nested": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c",
+     "outer": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c"
+    },
+    "tools/inc/gate.py": {
+     "nested": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546",
+     "outer": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546"
+    },
+    "tools/inc/pilot.py": {
+     "nested": "fb4c7236db438e0a3d89ae4b9acd471c4548076cba3ba48eef78b5bbb49963d3",
+     "outer": "fb4c7236db438e0a3d89ae4b9acd471c4548076cba3ba48eef78b5bbb49963d3"
+    },
+    "tools/inc/report.py": {
+     "nested": "e3c5c827302cc8c8858d720652f6d1e68c0c13abb15663bd34256aabf9471f59",
+     "outer": "e3c5c827302cc8c8858d720652f6d1e68c0c13abb15663bd34256aabf9471f59"
+    },
+    "tools/inc/scorer.py": {
+     "nested": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+     "outer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4"
+    },
+    "tools/inc/select.py": {
+     "nested": "cba11d5b26969bf1e6b367785e847c0159b575a0c35b76741a632e38bdb9406e",
+     "outer": "cba11d5b26969bf1e6b367785e847c0159b575a0c35b76741a632e38bdb9406e"
+    },
+    "tools/inc/splits.py": {
+     "nested": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567",
+     "outer": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+    },
+    "tools/inc/train.py": {
+     "nested": "f58d898575ccdd0dbc00fad310a8cb8d9e577318ae793829f97247a0f91f24ce",
+     "outer": "f58d898575ccdd0dbc00fad310a8cb8d9e577318ae793829f97247a0f91f24ce"
+    },
+    "tools/inc/verify.py": {
+     "nested": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10",
+     "outer": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+    },
+    "tools/inc2/__init__.py": {
+     "nested": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+     "outer": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tools/inc2/base3.py": {
+     "nested": "36afa6371f344c4f481ff51925c816c1541d4280f2855419d122be714b243433",
+     "outer": "36afa6371f344c4f481ff51925c816c1541d4280f2855419d122be714b243433"
+    },
+    "tools/inc2/base3_v2.json": {
+     "nested": "17b1fc3be310c33704aa4115d5bf0a878e70b3bdb4678ab981ad099426a004fd",
+     "outer": "17b1fc3be310c33704aa4115d5bf0a878e70b3bdb4678ab981ad099426a004fd"
+    },
+    "tools/inc2/baseline.py": {
+     "nested": "8ba19f8508ff2bcc81108b2fe70b3bb6d0e53858f4ac32356d3916fa96f3c1bf",
+     "outer": "8ba19f8508ff2bcc81108b2fe70b3bb6d0e53858f4ac32356d3916fa96f3c1bf"
+    },
+    "tools/inc2/common.py": {
+     "nested": "fc0c4f06220d7fd40bef456d7ee00144847db23489d841bf26e36f4797b97f11",
+     "outer": "fc0c4f06220d7fd40bef456d7ee00144847db23489d841bf26e36f4797b97f11"
+    },
+    "tools/inc2/embed_calibration.py": {
+     "nested": "71ef8eea63e57a867443f8178acf802aa6d71442414ac1fb454de3a3edc3c8e2",
+     "outer": "71ef8eea63e57a867443f8178acf802aa6d71442414ac1fb454de3a3edc3c8e2"
+    },
+    "tools/inc2/eval_hits.py": {
+     "nested": "912e46998994559aca360d423d617d31df4477d46e557e0ee02ab4a0d19d4039",
+     "outer": "912e46998994559aca360d423d617d31df4477d46e557e0ee02ab4a0d19d4039"
+    },
+    "tools/inc2/gate3.py": {
+     "nested": "96bb73566bfb45a56f57bd659040651929b0113692b4f60d7ea34a6944862713",
+     "outer": "96bb73566bfb45a56f57bd659040651929b0113692b4f60d7ea34a6944862713"
+    },
+    "tools/inc2/guard.py": {
+     "nested": "98df1d1465220b094b54f21eb83e71f8d3b6c73c303b5c0b2c84f80404d08e63",
+     "outer": "98df1d1465220b094b54f21eb83e71f8d3b6c73c303b5c0b2c84f80404d08e63"
+    },
+    "tools/inc2/mask.py": {
+     "nested": "7b2ef8434a96460763687063cc7fd44c096371d2108f63822abb366a1a11ea82",
+     "outer": "7b2ef8434a96460763687063cc7fd44c096371d2108f63822abb366a1a11ea82"
+    },
+    "tools/inc2/pilot4.py": {
+     "nested": "6c5626befcd0c06356a74f6aa1e56637d979829bbc2a20a1a9c387d4dcb7a83f",
+     "outer": "6c5626befcd0c06356a74f6aa1e56637d979829bbc2a20a1a9c387d4dcb7a83f"
+    },
+    "tools/inc2/recipes.py": {
+     "nested": "1cebd6dfa42852be776b131dd8b4ae0b4920b2653d083af10ea90707210b4d53",
+     "outer": "1cebd6dfa42852be776b131dd8b4ae0b4920b2653d083af10ea90707210b4d53"
+    },
+    "tools/inc2/scorer_agnostic.py": {
+     "nested": "3b465d41de0c77ae6832374b1416c5bf77d371e53e504b241d7e7b670dadd66f",
+     "outer": "3b465d41de0c77ae6832374b1416c5bf77d371e53e504b241d7e7b670dadd66f"
+    },
+    "tools/inc2/scorer_native.py": {
+     "nested": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+     "outer": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d"
+    },
+    "tools/inc2/scorer_sidecar.py": {
+     "nested": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+     "outer": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52"
+    },
+    "tools/inc2/splits.py": {
+     "nested": "ecd24b2ddad295993bd1afeafd7e4e144917810180f5e8fd992133ae122ff9fd",
+     "outer": "ecd24b2ddad295993bd1afeafd7e4e144917810180f5e8fd992133ae122ff9fd"
+    },
+    "tools/inc2/step1_stream.py": {
+     "nested": "d0844f9ebe8294252ee4a782c91aa405ff51b09d8fee9e73346013ac35d43086",
+     "outer": "d0844f9ebe8294252ee4a782c91aa405ff51b09d8fee9e73346013ac35d43086"
+    },
+    "tools/inc2/stream.py": {
+     "nested": "fc9681527964a49c36b0d567735558d51b88704b9a535e51b6f8f04a985c1f82",
+     "outer": "fc9681527964a49c36b0d567735558d51b88704b9a535e51b6f8f04a985c1f82"
+    },
+    "tools/inc2/stream_report.py": {
+     "nested": "cfc230e03dbd262d8376be06a2ee4609430e969d1ba25792a4a1e53739547a69",
+     "outer": "cfc230e03dbd262d8376be06a2ee4609430e969d1ba25792a4a1e53739547a69"
+    },
+    "tools/inc2/train.py": {
+     "nested": "c737b0e64c172661c45e5318b5ed46e2d2905fd66785d708ba2f6925cd85932d",
+     "outer": "c737b0e64c172661c45e5318b5ed46e2d2905fd66785d708ba2f6925cd85932d"
+    },
+    "tools/inc2/twostage.py": {
+     "nested": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+     "outer": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc"
+    },
+    "tools/inc2/v3fam.py": {
+     "nested": "c5e923dcad8f576cdb9761a0433d5c85241def4a87a0a0081063aa57a50e5e78",
+     "outer": "c5e923dcad8f576cdb9761a0433d5c85241def4a87a0a0081063aa57a50e5e78"
+    },
+    "tools/inc2/v3fam_data.py": {
+     "nested": "d7e62d895e4c36427097db3ecaad4fd45e8e3fad2cec5eecd500d0cd6997460e",
+     "outer": "d7e62d895e4c36427097db3ecaad4fd45e8e3fad2cec5eecd500d0cd6997460e"
+    },
+    "tools/inc2/v3fam_detr.py": {
+     "nested": "4af4073f0b11f36d53f05586060ca285d00cf8473208ec629c252b43e3c5767e",
+     "outer": "4af4073f0b11f36d53f05586060ca285d00cf8473208ec629c252b43e3c5767e"
+    },
+    "tools/inc2/v3fam_detr_env.txt": {
+     "nested": "d05b539cbc7989de576c09ef517d4b1d3b77be7c819b5ffd8aa6a0ca0d53bf35",
+     "outer": "d05b539cbc7989de576c09ef517d4b1d3b77be7c819b5ffd8aa6a0ca0d53bf35"
+    },
+    "tools/inc2/v3fam_embed.py": {
+     "nested": "6caf3e87d4d2bca7430c0323a81f26ca75d9836db670fee5d178317d158c10dc",
+     "outer": "6caf3e87d4d2bca7430c0323a81f26ca75d9836db670fee5d178317d158c10dc"
+    },
+    "tools/inc2/v3fam_sweep.py": {
+     "nested": "78d9ba50a40209ce5c096fd53199730b8959dac1c61a2962bd961dfaa5157b03",
+     "outer": "78d9ba50a40209ce5c096fd53199730b8959dac1c61a2962bd961dfaa5157b03"
+    },
+    "tools/inc2/v3fam_systems.py": {
+     "nested": "208de283954472abcd81ed5df66fcba420b9986cb6ee81c144416bc758cc4f56",
+     "outer": "208de283954472abcd81ed5df66fcba420b9986cb6ee81c144416bc758cc4f56"
+    },
+    "tools/inc2/v3fam_trained.py": {
+     "nested": "1cb47c838b17060cec8a8f3f162eaad51dd5a7e78e7cc0d50705b3760a4ae6be",
+     "outer": "1cb47c838b17060cec8a8f3f162eaad51dd5a7e78e7cc0d50705b3760a4ae6be"
+    },
+    "tools/inc2/v3fam_verdict.py": {
+     "nested": "b77e97a57fce2ca7cbc66778d7d34fc1e62ef9fd0ab3a1d3dffa3a01b6c30816",
+     "outer": "b77e97a57fce2ca7cbc66778d7d34fc1e62ef9fd0ab3a1d3dffa3a01b6c30816"
+    },
+    "tools/inc2/v3fam_wbf.py": {
+     "nested": "099ae63f63a1b8156e64ef338cefb2b5fee98bb88e5926af5c24c52f9d60e11c",
+     "outer": "099ae63f63a1b8156e64ef338cefb2b5fee98bb88e5926af5c24c52f9d60e11c"
+    },
+    "tools/inc_autopilot/stream_thresholds.json": {
+     "nested": "66bd3096b8f5b2df7f3b02ea1a25064358cee46af0357c906248270f0f20965c",
+     "outer": "66bd3096b8f5b2df7f3b02ea1a25064358cee46af0357c906248270f0f20965c"
+    },
+    "tools/mega_trainer.py": {
+     "nested": "98920bcb14b9c4c92ad9baeded7eb041771b680671b920ce7a3d03537b0e7ce8",
+     "outer": "98920bcb14b9c4c92ad9baeded7eb041771b680671b920ce7a3d03537b0e7ce8"
+    },
+    "tools/near_dup.py": {
+     "nested": "b0d99ef71ef916f184a9f25974b0493d6bd769e0ca36584d6eae18060340d449",
+     "outer": "b0d99ef71ef916f184a9f25974b0493d6bd769e0ca36584d6eae18060340d449"
+    },
+    "tools/semisup_labeler.py": {
+     "nested": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+     "outer": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c"
+    }
+   },
+   "parent_exp": null,
+   "refusal": "  File \"/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam_trained.py\", line 416, in score_d1\n    eqs = F.require_equivalence(dev_names)\n  File \"/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam.py\", line 1289, in require_equivalence\n    raise V3famRefused(\"the code changed since %s ran (%s): it is moved aside and rerun, as a deviation\"\nweed_optimizer_framework.tools.inc2.v3fam.V3famRefused: the code changed since dev_identity.json ran (v3fam): it is moved aside and rerun, as a deviation",
+   "requested_utc": "2026-10-21T22:30:48Z",
+   "started_utc": "2026-10-21T22:43:13Z",
+   "status": "build_failed",
+   "trigger": [
+    "DR0"
+   ],
+   "updated_utc": "2026-10-21T22:50:02Z"
+  },
+  {
+   "approval_id": "ap-1792623634-77279638",
+   "argv": [
+    "inc2.v3fam",
+    "score",
+    "--arm",
+    "D1"
+   ],
+   "build_rc": 1,
+   "built_exp": "",
+   "command": "score",
+   "decided_by": "round-scheduler:inc-autopilot",
+   "drift": [],
+   "finished_utc": "2026-10-21T23:07:59Z",
+   "host": "v008.ib.bridges2.psc.edu",
+   "job_id": "49569831",
+   "job_script": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_llm_benchmark/run_inc2_job.sh",
+   "module": "inc2.v3fam",
+   "modules": {
+    "tools/cwd12_species.py": {
+     "nested": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+     "outer": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e"
+    },
+    "tools/funnel/__init__.py": {
+     "nested": "354d3fd23c77a74ebc6b7f58b91dda611d2ba9cd3639abcac591160bff02e8de",
+     "outer": "354d3fd23c77a74ebc6b7f58b91dda611d2ba9cd3639abcac591160bff02e8de"
+    },
+    "tools/funnel/domain.py": {
+     "nested": "b8667767d9741e23d6a181051847ac7e63cda30a77884344fd6c48427fb1e7cd",
+     "outer": "b8667767d9741e23d6a181051847ac7e63cda30a77884344fd6c48427fb1e7cd"
+    },
+    "tools/funnel/domains/weed.json": {
+     "nested": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f",
+     "outer": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f"
+    },
+    "tools/funnel/embed.py": {
+     "nested": "a0c129b6d7fb711c784de83d354685a7fbbba5be8b92e647dc29969bde5cdfd7",
+     "outer": "a0c129b6d7fb711c784de83d354685a7fbbba5be8b92e647dc29969bde5cdfd7"
+    },
+    "tools/funnel/estimate.py": {
+     "nested": "103db7a7f7a0e75f65ed2ce4b2f94ea7855d1e344834adf610c81612bc6af155",
+     "outer": "103db7a7f7a0e75f65ed2ce4b2f94ea7855d1e344834adf610c81612bc6af155"
+    },
+    "tools/funnel/leak.py": {
+     "nested": "e4742bb55b82a0a83992e77feccc83abd5f081987cc2e3c30e72152c06fcce98",
+     "outer": "e4742bb55b82a0a83992e77feccc83abd5f081987cc2e3c30e72152c06fcce98"
+    },
+    "tools/funnel/ledger.py": {
+     "nested": "18880306aaa8162eee768399e4cb1b177f3db93d146d0ecb7d510783fe4266c5",
+     "outer": "18880306aaa8162eee768399e4cb1b177f3db93d146d0ecb7d510783fe4266c5"
+    },
+    "tools/inc/__init__.py": {
+     "nested": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+     "outer": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74"
+    },
+    "tools/inc/audit.py": {
+     "nested": "83870aa9897c5caaa759d5912686ad3b019b895b349d8891fe74c6072f7375e3",
+     "outer": "83870aa9897c5caaa759d5912686ad3b019b895b349d8891fe74c6072f7375e3"
+    },
+    "tools/inc/common.py": {
+     "nested": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+     "outer": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d"
+    },
+    "tools/inc/driver.py": {
+     "nested": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c",
+     "outer": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c"
+    },
+    "tools/inc/gate.py": {
+     "nested": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546",
+     "outer": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546"
+    },
+    "tools/inc/pilot.py": {
+     "nested": "fb4c7236db438e0a3d89ae4b9acd471c4548076cba3ba48eef78b5bbb49963d3",
+     "outer": "fb4c7236db438e0a3d89ae4b9acd471c4548076cba3ba48eef78b5bbb49963d3"
+    },
+    "tools/inc/report.py": {
+     "nested": "e3c5c827302cc8c8858d720652f6d1e68c0c13abb15663bd34256aabf9471f59",
+     "outer": "e3c5c827302cc8c8858d720652f6d1e68c0c13abb15663bd34256aabf9471f59"
+    },
+    "tools/inc/scorer.py": {
+     "nested": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+     "outer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4"
+    },
+    "tools/inc/select.py": {
+     "nested": "cba11d5b26969bf1e6b367785e847c0159b575a0c35b76741a632e38bdb9406e",
+     "outer": "cba11d5b26969bf1e6b367785e847c0159b575a0c35b76741a632e38bdb9406e"
+    },
+    "tools/inc/splits.py": {
+     "nested": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567",
+     "outer": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+    },
+    "tools/inc/train.py": {
+     "nested": "f58d898575ccdd0dbc00fad310a8cb8d9e577318ae793829f97247a0f91f24ce",
+     "outer": "f58d898575ccdd0dbc00fad310a8cb8d9e577318ae793829f97247a0f91f24ce"
+    },
+    "tools/inc/verify.py": {
+     "nested": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10",
+     "outer": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+    },
+    "tools/inc2/__init__.py": {
+     "nested": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+     "outer": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tools/inc2/base3.py": {
+     "nested": "36afa6371f344c4f481ff51925c816c1541d4280f2855419d122be714b243433",
+     "outer": "36afa6371f344c4f481ff51925c816c1541d4280f2855419d122be714b243433"
+    },
+    "tools/inc2/base3_v2.json": {
+     "nested": "17b1fc3be310c33704aa4115d5bf0a878e70b3bdb4678ab981ad099426a004fd",
+     "outer": "17b1fc3be310c33704aa4115d5bf0a878e70b3bdb4678ab981ad099426a004fd"
+    },
+    "tools/inc2/baseline.py": {
+     "nested": "8ba19f8508ff2bcc81108b2fe70b3bb6d0e53858f4ac32356d3916fa96f3c1bf",
+     "outer": "8ba19f8508ff2bcc81108b2fe70b3bb6d0e53858f4ac32356d3916fa96f3c1bf"
+    },
+    "tools/inc2/common.py": {
+     "nested": "fc0c4f06220d7fd40bef456d7ee00144847db23489d841bf26e36f4797b97f11",
+     "outer": "fc0c4f06220d7fd40bef456d7ee00144847db23489d841bf26e36f4797b97f11"
+    },
+    "tools/inc2/embed_calibration.py": {
+     "nested": "71ef8eea63e57a867443f8178acf802aa6d71442414ac1fb454de3a3edc3c8e2",
+     "outer": "71ef8eea63e57a867443f8178acf802aa6d71442414ac1fb454de3a3edc3c8e2"
+    },
+    "tools/inc2/eval_hits.py": {
+     "nested": "912e46998994559aca360d423d617d31df4477d46e557e0ee02ab4a0d19d4039",
+     "outer": "912e46998994559aca360d423d617d31df4477d46e557e0ee02ab4a0d19d4039"
+    },
+    "tools/inc2/gate3.py": {
+     "nested": "96bb73566bfb45a56f57bd659040651929b0113692b4f60d7ea34a6944862713",
+     "outer": "96bb73566bfb45a56f57bd659040651929b0113692b4f60d7ea34a6944862713"
+    },
+    "tools/inc2/guard.py": {
+     "nested": "98df1d1465220b094b54f21eb83e71f8d3b6c73c303b5c0b2c84f80404d08e63",
+     "outer": "98df1d1465220b094b54f21eb83e71f8d3b6c73c303b5c0b2c84f80404d08e63"
+    },
+    "tools/inc2/mask.py": {
+     "nested": "7b2ef8434a96460763687063cc7fd44c096371d2108f63822abb366a1a11ea82",
+     "outer": "7b2ef8434a96460763687063cc7fd44c096371d2108f63822abb366a1a11ea82"
+    },
+    "tools/inc2/pilot4.py": {
+     "nested": "6c5626befcd0c06356a74f6aa1e56637d979829bbc2a20a1a9c387d4dcb7a83f",
+     "outer": "6c5626befcd0c06356a74f6aa1e56637d979829bbc2a20a1a9c387d4dcb7a83f"
+    },
+    "tools/inc2/recipes.py": {
+     "nested": "1cebd6dfa42852be776b131dd8b4ae0b4920b2653d083af10ea90707210b4d53",
+     "outer": "1cebd6dfa42852be776b131dd8b4ae0b4920b2653d083af10ea90707210b4d53"
+    },
+    "tools/inc2/scorer_agnostic.py": {
+     "nested": "3b465d41de0c77ae6832374b1416c5bf77d371e53e504b241d7e7b670dadd66f",
+     "outer": "3b465d41de0c77ae6832374b1416c5bf77d371e53e504b241d7e7b670dadd66f"
+    },
+    "tools/inc2/scorer_native.py": {
+     "nested": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+     "outer": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d"
+    },
+    "tools/inc2/scorer_sidecar.py": {
+     "nested": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+     "outer": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52"
+    },
+    "tools/inc2/splits.py": {
+     "nested": "ecd24b2ddad295993bd1afeafd7e4e144917810180f5e8fd992133ae122ff9fd",
+     "outer": "ecd24b2ddad295993bd1afeafd7e4e144917810180f5e8fd992133ae122ff9fd"
+    },
+    "tools/inc2/step1_stream.py": {
+     "nested": "d0844f9ebe8294252ee4a782c91aa405ff51b09d8fee9e73346013ac35d43086",
+     "outer": "d0844f9ebe8294252ee4a782c91aa405ff51b09d8fee9e73346013ac35d43086"
+    },
+    "tools/inc2/stream.py": {
+     "nested": "fc9681527964a49c36b0d567735558d51b88704b9a535e51b6f8f04a985c1f82",
+     "outer": "fc9681527964a49c36b0d567735558d51b88704b9a535e51b6f8f04a985c1f82"
+    },
+    "tools/inc2/stream_report.py": {
+     "nested": "cfc230e03dbd262d8376be06a2ee4609430e969d1ba25792a4a1e53739547a69",
+     "outer": "cfc230e03dbd262d8376be06a2ee4609430e969d1ba25792a4a1e53739547a69"
+    },
+    "tools/inc2/train.py": {
+     "nested": "c737b0e64c172661c45e5318b5ed46e2d2905fd66785d708ba2f6925cd85932d",
+     "outer": "c737b0e64c172661c45e5318b5ed46e2d2905fd66785d708ba2f6925cd85932d"
+    },
+    "tools/inc2/twostage.py": {
+     "nested": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+     "outer": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc"
+    },
+    "tools/inc2/v3fam.py": {
+     "nested": "c5e923dcad8f576cdb9761a0433d5c85241def4a87a0a0081063aa57a50e5e78",
+     "outer": "c5e923dcad8f576cdb9761a0433d5c85241def4a87a0a0081063aa57a50e5e78"
+    },
+    "tools/inc2/v3fam_data.py": {
+     "nested": "d7e62d895e4c36427097db3ecaad4fd45e8e3fad2cec5eecd500d0cd6997460e",
+     "outer": "d7e62d895e4c36427097db3ecaad4fd45e8e3fad2cec5eecd500d0cd6997460e"
+    },
+    "tools/inc2/v3fam_detr.py": {
+     "nested": "4af4073f0b11f36d53f05586060ca285d00cf8473208ec629c252b43e3c5767e",
+     "outer": "4af4073f0b11f36d53f05586060ca285d00cf8473208ec629c252b43e3c5767e"
+    },
+    "tools/inc2/v3fam_detr_env.txt": {
+     "nested": "d05b539cbc7989de576c09ef517d4b1d3b77be7c819b5ffd8aa6a0ca0d53bf35",
+     "outer": "d05b539cbc7989de576c09ef517d4b1d3b77be7c819b5ffd8aa6a0ca0d53bf35"
+    },
+    "tools/inc2/v3fam_embed.py": {
+     "nested": "6caf3e87d4d2bca7430c0323a81f26ca75d9836db670fee5d178317d158c10dc",
+     "outer": "6caf3e87d4d2bca7430c0323a81f26ca75d9836db670fee5d178317d158c10dc"
+    },
+    "tools/inc2/v3fam_sweep.py": {
+     "nested": "78d9ba50a40209ce5c096fd53199730b8959dac1c61a2962bd961dfaa5157b03",
+     "outer": "78d9ba50a40209ce5c096fd53199730b8959dac1c61a2962bd961dfaa5157b03"
+    },
+    "tools/inc2/v3fam_systems.py": {
+     "nested": "208de283954472abcd81ed5df66fcba420b9986cb6ee81c144416bc758cc4f56",
+     "outer": "208de283954472abcd81ed5df66fcba420b9986cb6ee81c144416bc758cc4f56"
+    },
+    "tools/inc2/v3fam_trained.py": {
+     "nested": "1cb47c838b17060cec8a8f3f162eaad51dd5a7e78e7cc0d50705b3760a4ae6be",
+     "outer": "1cb47c838b17060cec8a8f3f162eaad51dd5a7e78e7cc0d50705b3760a4ae6be"
+    },
+    "tools/inc2/v3fam_verdict.py": {
+     "nested": "b77e97a57fce2ca7cbc66778d7d34fc1e62ef9fd0ab3a1d3dffa3a01b6c30816",
+     "outer": "b77e97a57fce2ca7cbc66778d7d34fc1e62ef9fd0ab3a1d3dffa3a01b6c30816"
+    },
+    "tools/inc2/v3fam_wbf.py": {
+     "nested": "099ae63f63a1b8156e64ef338cefb2b5fee98bb88e5926af5c24c52f9d60e11c",
+     "outer": "099ae63f63a1b8156e64ef338cefb2b5fee98bb88e5926af5c24c52f9d60e11c"
+    },
+    "tools/inc_autopilot/stream_thresholds.json": {
+     "nested": "66bd3096b8f5b2df7f3b02ea1a25064358cee46af0357c906248270f0f20965c",
+     "outer": "66bd3096b8f5b2df7f3b02ea1a25064358cee46af0357c906248270f0f20965c"
+    },
+    "tools/mega_trainer.py": {
+     "nested": "98920bcb14b9c4c92ad9baeded7eb041771b680671b920ce7a3d03537b0e7ce8",
+     "outer": "98920bcb14b9c4c92ad9baeded7eb041771b680671b920ce7a3d03537b0e7ce8"
+    },
+    "tools/near_dup.py": {
+     "nested": "b0d99ef71ef916f184a9f25974b0493d6bd769e0ca36584d6eae18060340d449",
+     "outer": "b0d99ef71ef916f184a9f25974b0493d6bd769e0ca36584d6eae18060340d449"
+    },
+    "tools/semisup_labeler.py": {
+     "nested": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+     "outer": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c"
+    }
+   },
+   "parent_exp": null,
+   "refusal": "  File \"/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam_trained.py\", line 416, in score_d1\n    eqs = F.require_equivalence(dev_names)\n  File \"/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam.py\", line 1289, in require_equivalence\n    raise V3famRefused(\"the code changed since %s ran (%s): it is moved aside and rerun, as a deviation\"\nweed_optimizer_framework.tools.inc2.v3fam.V3famRefused: the code changed since dev_identity.json ran (v3fam): it is moved aside and rerun, as a deviation",
+   "requested_utc": "2026-10-21T23:00:58Z",
+   "started_utc": "2026-10-21T23:03:30Z",
+   "status": "build_failed",
+   "trigger": [
+    "DR0"
+   ],
+   "updated_utc": "2026-10-21T23:07:59Z"
+  },
+  {
+   "approval_id": "ap-1792941576-78544713",
+   "argv": [
+    "inc2.v3fam",
+    "score",
+    "--arm",
+    "D1"
+   ],
+   "build_rc": 1,
+   "built_exp": "",
+   "command": "score",
+   "decided_by": "round-scheduler:inc-autopilot",
+   "drift": [],
+   "finished_utc": "2026-10-25T16:12:11Z",
+   "host": "v005.ib.bridges2.psc.edu",
+   "job_id": "49820090",
+   "job_script": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_llm_benchmark/run_inc2_job.sh",
+   "module": "inc2.v3fam",
+   "modules": {
+    "tools/cwd12_species.py": {
+     "nested": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+     "outer": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e"
+    },
+    "tools/funnel/__init__.py": {
+     "nested": "354d3fd23c77a74ebc6b7f58b91dda611d2ba9cd3639abcac591160bff02e8de",
+     "outer": "354d3fd23c77a74ebc6b7f58b91dda611d2ba9cd3639abcac591160bff02e8de"
+    },
+    "tools/funnel/domain.py": {
+     "nested": "b8667767d9741e23d6a181051847ac7e63cda30a77884344fd6c48427fb1e7cd",
+     "outer": "b8667767d9741e23d6a181051847ac7e63cda30a77884344fd6c48427fb1e7cd"
+    },
+    "tools/funnel/domains/weed.json": {
+     "nested": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f",
+     "outer": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f"
+    },
+    "tools/funnel/embed.py": {
+     "nested": "a0c129b6d7fb711c784de83d354685a7fbbba5be8b92e647dc29969bde5cdfd7",
+     "outer": "a0c129b6d7fb711c784de83d354685a7fbbba5be8b92e647dc29969bde5cdfd7"
+    },
+    "tools/funnel/estimate.py": {
+     "nested": "103db7a7f7a0e75f65ed2ce4b2f94ea7855d1e344834adf610c81612bc6af155",
+     "outer": "103db7a7f7a0e75f65ed2ce4b2f94ea7855d1e344834adf610c81612bc6af155"
+    },
+    "tools/funnel/leak.py": {
+     "nested": "e4742bb55b82a0a83992e77feccc83abd5f081987cc2e3c30e72152c06fcce98",
+     "outer": "e4742bb55b82a0a83992e77feccc83abd5f081987cc2e3c30e72152c06fcce98"
+    },
+    "tools/funnel/ledger.py": {
+     "nested": "18880306aaa8162eee768399e4cb1b177f3db93d146d0ecb7d510783fe4266c5",
+     "outer": "18880306aaa8162eee768399e4cb1b177f3db93d146d0ecb7d510783fe4266c5"
+    },
+    "tools/inc/__init__.py": {
+     "nested": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+     "outer": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74"
+    },
+    "tools/inc/audit.py": {
+     "nested": "83870aa9897c5caaa759d5912686ad3b019b895b349d8891fe74c6072f7375e3",
+     "outer": "83870aa9897c5caaa759d5912686ad3b019b895b349d8891fe74c6072f7375e3"
+    },
+    "tools/inc/common.py": {
+     "nested": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+     "outer": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d"
+    },
+    "tools/inc/driver.py": {
+     "nested": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c",
+     "outer": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c"
+    },
+    "tools/inc/gate.py": {
+     "nested": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546",
+     "outer": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546"
+    },
+    "tools/inc/pilot.py": {
+     "nested": "fb4c7236db438e0a3d89ae4b9acd471c4548076cba3ba48eef78b5bbb49963d3",
+     "outer": "fb4c7236db438e0a3d89ae4b9acd471c4548076cba3ba48eef78b5bbb49963d3"
+    },
+    "tools/inc/report.py": {
+     "nested": "e3c5c827302cc8c8858d720652f6d1e68c0c13abb15663bd34256aabf9471f59",
+     "outer": "e3c5c827302cc8c8858d720652f6d1e68c0c13abb15663bd34256aabf9471f59"
+    },
+    "tools/inc/scorer.py": {
+     "nested": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+     "outer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4"
+    },
+    "tools/inc/select.py": {
+     "nested": "cba11d5b26969bf1e6b367785e847c0159b575a0c35b76741a632e38bdb9406e",
+     "outer": "cba11d5b26969bf1e6b367785e847c0159b575a0c35b76741a632e38bdb9406e"
+    },
+    "tools/inc/splits.py": {
+     "nested": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567",
+     "outer": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+    },
+    "tools/inc/train.py": {
+     "nested": "f58d898575ccdd0dbc00fad310a8cb8d9e577318ae793829f97247a0f91f24ce",
+     "outer": "f58d898575ccdd0dbc00fad310a8cb8d9e577318ae793829f97247a0f91f24ce"
+    },
+    "tools/inc/verify.py": {
+     "nested": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10",
+     "outer": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+    },
+    "tools/inc2/__init__.py": {
+     "nested": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+     "outer": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tools/inc2/base3.py": {
+     "nested": "36afa6371f344c4f481ff51925c816c1541d4280f2855419d122be714b243433",
+     "outer": "36afa6371f344c4f481ff51925c816c1541d4280f2855419d122be714b243433"
+    },
+    "tools/inc2/base3_v2.json": {
+     "nested": "17b1fc3be310c33704aa4115d5bf0a878e70b3bdb4678ab981ad099426a004fd",
+     "outer": "17b1fc3be310c33704aa4115d5bf0a878e70b3bdb4678ab981ad099426a004fd"
+    },
+    "tools/inc2/baseline.py": {
+     "nested": "8ba19f8508ff2bcc81108b2fe70b3bb6d0e53858f4ac32356d3916fa96f3c1bf",
+     "outer": "8ba19f8508ff2bcc81108b2fe70b3bb6d0e53858f4ac32356d3916fa96f3c1bf"
+    },
+    "tools/inc2/common.py": {
+     "nested": "fc0c4f06220d7fd40bef456d7ee00144847db23489d841bf26e36f4797b97f11",
+     "outer": "fc0c4f06220d7fd40bef456d7ee00144847db23489d841bf26e36f4797b97f11"
+    },
+    "tools/inc2/embed_calibration.py": {
+     "nested": "71ef8eea63e57a867443f8178acf802aa6d71442414ac1fb454de3a3edc3c8e2",
+     "outer": "71ef8eea63e57a867443f8178acf802aa6d71442414ac1fb454de3a3edc3c8e2"
+    },
+    "tools/inc2/eval_hits.py": {
+     "nested": "912e46998994559aca360d423d617d31df4477d46e557e0ee02ab4a0d19d4039",
+     "outer": "912e46998994559aca360d423d617d31df4477d46e557e0ee02ab4a0d19d4039"
+    },
+    "tools/inc2/gate3.py": {
+     "nested": "96bb73566bfb45a56f57bd659040651929b0113692b4f60d7ea34a6944862713",
+     "outer": "96bb73566bfb45a56f57bd659040651929b0113692b4f60d7ea34a6944862713"
+    },
+    "tools/inc2/guard.py": {
+     "nested": "98df1d1465220b094b54f21eb83e71f8d3b6c73c303b5c0b2c84f80404d08e63",
+     "outer": "98df1d1465220b094b54f21eb83e71f8d3b6c73c303b5c0b2c84f80404d08e63"
+    },
+    "tools/inc2/mask.py": {
+     "nested": "7b2ef8434a96460763687063cc7fd44c096371d2108f63822abb366a1a11ea82",
+     "outer": "7b2ef8434a96460763687063cc7fd44c096371d2108f63822abb366a1a11ea82"
+    },
+    "tools/inc2/pilot4.py": {
+     "nested": "6c5626befcd0c06356a74f6aa1e56637d979829bbc2a20a1a9c387d4dcb7a83f",
+     "outer": "6c5626befcd0c06356a74f6aa1e56637d979829bbc2a20a1a9c387d4dcb7a83f"
+    },
+    "tools/inc2/recipes.py": {
+     "nested": "1cebd6dfa42852be776b131dd8b4ae0b4920b2653d083af10ea90707210b4d53",
+     "outer": "1cebd6dfa42852be776b131dd8b4ae0b4920b2653d083af10ea90707210b4d53"
+    },
+    "tools/inc2/scorer_agnostic.py": {
+     "nested": "3b465d41de0c77ae6832374b1416c5bf77d371e53e504b241d7e7b670dadd66f",
+     "outer": "3b465d41de0c77ae6832374b1416c5bf77d371e53e504b241d7e7b670dadd66f"
+    },
+    "tools/inc2/scorer_native.py": {
+     "nested": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+     "outer": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d"
+    },
+    "tools/inc2/scorer_sidecar.py": {
+     "nested": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+     "outer": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52"
+    },
+    "tools/inc2/splits.py": {
+     "nested": "ecd24b2ddad295993bd1afeafd7e4e144917810180f5e8fd992133ae122ff9fd",
+     "outer": "ecd24b2ddad295993bd1afeafd7e4e144917810180f5e8fd992133ae122ff9fd"
+    },
+    "tools/inc2/step1_stream.py": {
+     "nested": "d0844f9ebe8294252ee4a782c91aa405ff51b09d8fee9e73346013ac35d43086",
+     "outer": "d0844f9ebe8294252ee4a782c91aa405ff51b09d8fee9e73346013ac35d43086"
+    },
+    "tools/inc2/stream.py": {
+     "nested": "fc9681527964a49c36b0d567735558d51b88704b9a535e51b6f8f04a985c1f82",
+     "outer": "fc9681527964a49c36b0d567735558d51b88704b9a535e51b6f8f04a985c1f82"
+    },
+    "tools/inc2/stream_report.py": {
+     "nested": "cfc230e03dbd262d8376be06a2ee4609430e969d1ba25792a4a1e53739547a69",
+     "outer": "cfc230e03dbd262d8376be06a2ee4609430e969d1ba25792a4a1e53739547a69"
+    },
+    "tools/inc2/train.py": {
+     "nested": "c737b0e64c172661c45e5318b5ed46e2d2905fd66785d708ba2f6925cd85932d",
+     "outer": "c737b0e64c172661c45e5318b5ed46e2d2905fd66785d708ba2f6925cd85932d"
+    },
+    "tools/inc2/twostage.py": {
+     "nested": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+     "outer": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc"
+    },
+    "tools/inc2/v3fam.py": {
+     "nested": "3d776daed91d487d2817ba6959f9dd832d82c6e0be048b812916b63f22b239b7",
+     "outer": "3d776daed91d487d2817ba6959f9dd832d82c6e0be048b812916b63f22b239b7"
+    },
+    "tools/inc2/v3fam_data.py": {
+     "nested": "d7e62d895e4c36427097db3ecaad4fd45e8e3fad2cec5eecd500d0cd6997460e",
+     "outer": "d7e62d895e4c36427097db3ecaad4fd45e8e3fad2cec5eecd500d0cd6997460e"
+    },
+    "tools/inc2/v3fam_detr.py": {
+     "nested": "2a6e40eacb012c040f3b910e1e2c85e55676e9305119f6451e3cd775c2940b0f",
+     "outer": "2a6e40eacb012c040f3b910e1e2c85e55676e9305119f6451e3cd775c2940b0f"
+    },
+    "tools/inc2/v3fam_detr_env.txt": {
+     "nested": "d05b539cbc7989de576c09ef517d4b1d3b77be7c819b5ffd8aa6a0ca0d53bf35",
+     "outer": "d05b539cbc7989de576c09ef517d4b1d3b77be7c819b5ffd8aa6a0ca0d53bf35"
+    },
+    "tools/inc2/v3fam_embed.py": {
+     "nested": "6caf3e87d4d2bca7430c0323a81f26ca75d9836db670fee5d178317d158c10dc",
+     "outer": "6caf3e87d4d2bca7430c0323a81f26ca75d9836db670fee5d178317d158c10dc"
+    },
+    "tools/inc2/v3fam_supersede.py": {
+     "nested": "a5a880c67f9c1cb60a8e015a4e3bd5fca12841368123793bf389d6677a5407e7",
+     "outer": "a5a880c67f9c1cb60a8e015a4e3bd5fca12841368123793bf389d6677a5407e7"
+    },
+    "tools/inc2/v3fam_sweep.py": {
+     "nested": "78d9ba50a40209ce5c096fd53199730b8959dac1c61a2962bd961dfaa5157b03",
+     "outer": "78d9ba50a40209ce5c096fd53199730b8959dac1c61a2962bd961dfaa5157b03"
+    },
+    "tools/inc2/v3fam_systems.py": {
+     "nested": "56efc5182b3792261b09ee957e1b98d8228420d24bde473491bf102b58b169b7",
+     "outer": "56efc5182b3792261b09ee957e1b98d8228420d24bde473491bf102b58b169b7"
+    },
+    "tools/inc2/v3fam_trained.py": {
+     "nested": "b897414281acbfd5176c610292095e79f58a9b92735a7b226310cbfa8bd0d6ef",
+     "outer": "b897414281acbfd5176c610292095e79f58a9b92735a7b226310cbfa8bd0d6ef"
+    },
+    "tools/inc2/v3fam_verdict.py": {
+     "nested": "0f854499aa5f197848753d1fd85a3c2d3729ec90d02a664dc13b6c21d48b1971",
+     "outer": "0f854499aa5f197848753d1fd85a3c2d3729ec90d02a664dc13b6c21d48b1971"
+    },
+    "tools/inc2/v3fam_wbf.py": {
+     "nested": "099ae63f63a1b8156e64ef338cefb2b5fee98bb88e5926af5c24c52f9d60e11c",
+     "outer": "099ae63f63a1b8156e64ef338cefb2b5fee98bb88e5926af5c24c52f9d60e11c"
+    },
+    "tools/inc_autopilot/stream_thresholds.json": {
+     "nested": "66bd3096b8f5b2df7f3b02ea1a25064358cee46af0357c906248270f0f20965c",
+     "outer": "66bd3096b8f5b2df7f3b02ea1a25064358cee46af0357c906248270f0f20965c"
+    },
+    "tools/mega_trainer.py": {
+     "nested": "98920bcb14b9c4c92ad9baeded7eb041771b680671b920ce7a3d03537b0e7ce8",
+     "outer": "98920bcb14b9c4c92ad9baeded7eb041771b680671b920ce7a3d03537b0e7ce8"
+    },
+    "tools/near_dup.py": {
+     "nested": "b0d99ef71ef916f184a9f25974b0493d6bd769e0ca36584d6eae18060340d449",
+     "outer": "b0d99ef71ef916f184a9f25974b0493d6bd769e0ca36584d6eae18060340d449"
+    },
+    "tools/semisup_labeler.py": {
+     "nested": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+     "outer": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c"
+    }
+   },
+   "parent_exp": null,
+   "refusal": "  File \"/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam_trained.py\", line 438, in score_d1\n    ps = F._family_pass(src[\"weights\"], exam, cfg, \"D1\", **kw)\n  File \"/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam.py\", line 800, in _family_pass\n    raise V3famRefused(\"E3's path refuses: %s\" % e)\nweed_optimizer_framework.tools.inc2.v3fam.V3famRefused: E3's path refuses: ood23__20230804_HTRC_iPhone12_WY_2: ground-truth box 0 comes back through the geometry 0.109094 from its label (> 0.001): the map to the original image is wrong",
+   "requested_utc": "2026-10-25T15:19:56Z",
+   "started_utc": "2026-10-25T15:20:48Z",
+   "status": "build_failed",
+   "trigger": [
+    "DR0"
+   ],
+   "updated_utc": "2026-10-25T16:12:11Z"
+  },
+  {
+   "approval_id": "ap-1792945776-82740892",
+   "argv": [
+    "inc2.v3fam",
+    "score",
+    "--arm",
+    "D1"
+   ],
+   "build_rc": 1,
+   "built_exp": "",
+   "command": "score",
+   "decided_by": "round-scheduler:inc-autopilot",
+   "drift": [],
+   "finished_utc": "2026-10-25T16:37:51Z",
+   "host": "v004.ib.bridges2.psc.edu",
+   "job_id": "49821128",
+   "job_script": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_llm_benchmark/run_inc2_job.sh",
+   "module": "inc2.v3fam",
+   "modules": {
+    "tools/cwd12_species.py": {
+     "nested": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+     "outer": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e"
+    },
+    "tools/funnel/__init__.py": {
+     "nested": "354d3fd23c77a74ebc6b7f58b91dda611d2ba9cd3639abcac591160bff02e8de",
+     "outer": "354d3fd23c77a74ebc6b7f58b91dda611d2ba9cd3639abcac591160bff02e8de"
+    },
+    "tools/funnel/domain.py": {
+     "nested": "b8667767d9741e23d6a181051847ac7e63cda30a77884344fd6c48427fb1e7cd",
+     "outer": "b8667767d9741e23d6a181051847ac7e63cda30a77884344fd6c48427fb1e7cd"
+    },
+    "tools/funnel/domains/weed.json": {
+     "nested": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f",
+     "outer": "2f6318efa91b0f46889f83301a0774aa2d6203e748f6e925afd55d273d4b264f"
+    },
+    "tools/funnel/embed.py": {
+     "nested": "a0c129b6d7fb711c784de83d354685a7fbbba5be8b92e647dc29969bde5cdfd7",
+     "outer": "a0c129b6d7fb711c784de83d354685a7fbbba5be8b92e647dc29969bde5cdfd7"
+    },
+    "tools/funnel/estimate.py": {
+     "nested": "103db7a7f7a0e75f65ed2ce4b2f94ea7855d1e344834adf610c81612bc6af155",
+     "outer": "103db7a7f7a0e75f65ed2ce4b2f94ea7855d1e344834adf610c81612bc6af155"
+    },
+    "tools/funnel/leak.py": {
+     "nested": "e4742bb55b82a0a83992e77feccc83abd5f081987cc2e3c30e72152c06fcce98",
+     "outer": "e4742bb55b82a0a83992e77feccc83abd5f081987cc2e3c30e72152c06fcce98"
+    },
+    "tools/funnel/ledger.py": {
+     "nested": "18880306aaa8162eee768399e4cb1b177f3db93d146d0ecb7d510783fe4266c5",
+     "outer": "18880306aaa8162eee768399e4cb1b177f3db93d146d0ecb7d510783fe4266c5"
+    },
+    "tools/inc/__init__.py": {
+     "nested": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+     "outer": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74"
+    },
+    "tools/inc/audit.py": {
+     "nested": "83870aa9897c5caaa759d5912686ad3b019b895b349d8891fe74c6072f7375e3",
+     "outer": "83870aa9897c5caaa759d5912686ad3b019b895b349d8891fe74c6072f7375e3"
+    },
+    "tools/inc/common.py": {
+     "nested": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+     "outer": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d"
+    },
+    "tools/inc/driver.py": {
+     "nested": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c",
+     "outer": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c"
+    },
+    "tools/inc/gate.py": {
+     "nested": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546",
+     "outer": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546"
+    },
+    "tools/inc/pilot.py": {
+     "nested": "fb4c7236db438e0a3d89ae4b9acd471c4548076cba3ba48eef78b5bbb49963d3",
+     "outer": "fb4c7236db438e0a3d89ae4b9acd471c4548076cba3ba48eef78b5bbb49963d3"
+    },
+    "tools/inc/report.py": {
+     "nested": "e3c5c827302cc8c8858d720652f6d1e68c0c13abb15663bd34256aabf9471f59",
+     "outer": "e3c5c827302cc8c8858d720652f6d1e68c0c13abb15663bd34256aabf9471f59"
+    },
+    "tools/inc/scorer.py": {
+     "nested": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+     "outer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4"
+    },
+    "tools/inc/select.py": {
+     "nested": "cba11d5b26969bf1e6b367785e847c0159b575a0c35b76741a632e38bdb9406e",
+     "outer": "cba11d5b26969bf1e6b367785e847c0159b575a0c35b76741a632e38bdb9406e"
+    },
+    "tools/inc/splits.py": {
+     "nested": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567",
+     "outer": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+    },
+    "tools/inc/train.py": {
+     "nested": "f58d898575ccdd0dbc00fad310a8cb8d9e577318ae793829f97247a0f91f24ce",
+     "outer": "f58d898575ccdd0dbc00fad310a8cb8d9e577318ae793829f97247a0f91f24ce"
+    },
+    "tools/inc/verify.py": {
+     "nested": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10",
+     "outer": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+    },
+    "tools/inc2/__init__.py": {
+     "nested": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+     "outer": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tools/inc2/base3.py": {
+     "nested": "36afa6371f344c4f481ff51925c816c1541d4280f2855419d122be714b243433",
+     "outer": "36afa6371f344c4f481ff51925c816c1541d4280f2855419d122be714b243433"
+    },
+    "tools/inc2/base3_v2.json": {
+     "nested": "17b1fc3be310c33704aa4115d5bf0a878e70b3bdb4678ab981ad099426a004fd",
+     "outer": "17b1fc3be310c33704aa4115d5bf0a878e70b3bdb4678ab981ad099426a004fd"
+    },
+    "tools/inc2/baseline.py": {
+     "nested": "8ba19f8508ff2bcc81108b2fe70b3bb6d0e53858f4ac32356d3916fa96f3c1bf",
+     "outer": "8ba19f8508ff2bcc81108b2fe70b3bb6d0e53858f4ac32356d3916fa96f3c1bf"
+    },
+    "tools/inc2/common.py": {
+     "nested": "fc0c4f06220d7fd40bef456d7ee00144847db23489d841bf26e36f4797b97f11",
+     "outer": "fc0c4f06220d7fd40bef456d7ee00144847db23489d841bf26e36f4797b97f11"
+    },
+    "tools/inc2/embed_calibration.py": {
+     "nested": "71ef8eea63e57a867443f8178acf802aa6d71442414ac1fb454de3a3edc3c8e2",
+     "outer": "71ef8eea63e57a867443f8178acf802aa6d71442414ac1fb454de3a3edc3c8e2"
+    },
+    "tools/inc2/eval_hits.py": {
+     "nested": "912e46998994559aca360d423d617d31df4477d46e557e0ee02ab4a0d19d4039",
+     "outer": "912e46998994559aca360d423d617d31df4477d46e557e0ee02ab4a0d19d4039"
+    },
+    "tools/inc2/gate3.py": {
+     "nested": "96bb73566bfb45a56f57bd659040651929b0113692b4f60d7ea34a6944862713",
+     "outer": "96bb73566bfb45a56f57bd659040651929b0113692b4f60d7ea34a6944862713"
+    },
+    "tools/inc2/guard.py": {
+     "nested": "98df1d1465220b094b54f21eb83e71f8d3b6c73c303b5c0b2c84f80404d08e63",
+     "outer": "98df1d1465220b094b54f21eb83e71f8d3b6c73c303b5c0b2c84f80404d08e63"
+    },
+    "tools/inc2/mask.py": {
+     "nested": "7b2ef8434a96460763687063cc7fd44c096371d2108f63822abb366a1a11ea82",
+     "outer": "7b2ef8434a96460763687063cc7fd44c096371d2108f63822abb366a1a11ea82"
+    },
+    "tools/inc2/pilot4.py": {
+     "nested": "6c5626befcd0c06356a74f6aa1e56637d979829bbc2a20a1a9c387d4dcb7a83f",
+     "outer": "6c5626befcd0c06356a74f6aa1e56637d979829bbc2a20a1a9c387d4dcb7a83f"
+    },
+    "tools/inc2/recipes.py": {
+     "nested": "1cebd6dfa42852be776b131dd8b4ae0b4920b2653d083af10ea90707210b4d53",
+     "outer": "1cebd6dfa42852be776b131dd8b4ae0b4920b2653d083af10ea90707210b4d53"
+    },
+    "tools/inc2/scorer_agnostic.py": {
+     "nested": "3b465d41de0c77ae6832374b1416c5bf77d371e53e504b241d7e7b670dadd66f",
+     "outer": "3b465d41de0c77ae6832374b1416c5bf77d371e53e504b241d7e7b670dadd66f"
+    },
+    "tools/inc2/scorer_native.py": {
+     "nested": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+     "outer": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d"
+    },
+    "tools/inc2/scorer_sidecar.py": {
+     "nested": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+     "outer": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52"
+    },
+    "tools/inc2/splits.py": {
+     "nested": "ecd24b2ddad295993bd1afeafd7e4e144917810180f5e8fd992133ae122ff9fd",
+     "outer": "ecd24b2ddad295993bd1afeafd7e4e144917810180f5e8fd992133ae122ff9fd"
+    },
+    "tools/inc2/step1_stream.py": {
+     "nested": "d0844f9ebe8294252ee4a782c91aa405ff51b09d8fee9e73346013ac35d43086",
+     "outer": "d0844f9ebe8294252ee4a782c91aa405ff51b09d8fee9e73346013ac35d43086"
+    },
+    "tools/inc2/stream.py": {
+     "nested": "fc9681527964a49c36b0d567735558d51b88704b9a535e51b6f8f04a985c1f82",
+     "outer": "fc9681527964a49c36b0d567735558d51b88704b9a535e51b6f8f04a985c1f82"
+    },
+    "tools/inc2/stream_report.py": {
+     "nested": "cfc230e03dbd262d8376be06a2ee4609430e969d1ba25792a4a1e53739547a69",
+     "outer": "cfc230e03dbd262d8376be06a2ee4609430e969d1ba25792a4a1e53739547a69"
+    },
+    "tools/inc2/train.py": {
+     "nested": "c737b0e64c172661c45e5318b5ed46e2d2905fd66785d708ba2f6925cd85932d",
+     "outer": "c737b0e64c172661c45e5318b5ed46e2d2905fd66785d708ba2f6925cd85932d"
+    },
+    "tools/inc2/twostage.py": {
+     "nested": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+     "outer": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc"
+    },
+    "tools/inc2/v3fam.py": {
+     "nested": "3d776daed91d487d2817ba6959f9dd832d82c6e0be048b812916b63f22b239b7",
+     "outer": "3d776daed91d487d2817ba6959f9dd832d82c6e0be048b812916b63f22b239b7"
+    },
+    "tools/inc2/v3fam_data.py": {
+     "nested": "d7e62d895e4c36427097db3ecaad4fd45e8e3fad2cec5eecd500d0cd6997460e",
+     "outer": "d7e62d895e4c36427097db3ecaad4fd45e8e3fad2cec5eecd500d0cd6997460e"
+    },
+    "tools/inc2/v3fam_detr.py": {
+     "nested": "2a6e40eacb012c040f3b910e1e2c85e55676e9305119f6451e3cd775c2940b0f",
+     "outer": "2a6e40eacb012c040f3b910e1e2c85e55676e9305119f6451e3cd775c2940b0f"
+    },
+    "tools/inc2/v3fam_detr_env.txt": {
+     "nested": "d05b539cbc7989de576c09ef517d4b1d3b77be7c819b5ffd8aa6a0ca0d53bf35",
+     "outer": "d05b539cbc7989de576c09ef517d4b1d3b77be7c819b5ffd8aa6a0ca0d53bf35"
+    },
+    "tools/inc2/v3fam_embed.py": {
+     "nested": "6caf3e87d4d2bca7430c0323a81f26ca75d9836db670fee5d178317d158c10dc",
+     "outer": "6caf3e87d4d2bca7430c0323a81f26ca75d9836db670fee5d178317d158c10dc"
+    },
+    "tools/inc2/v3fam_supersede.py": {
+     "nested": "a5a880c67f9c1cb60a8e015a4e3bd5fca12841368123793bf389d6677a5407e7",
+     "outer": "a5a880c67f9c1cb60a8e015a4e3bd5fca12841368123793bf389d6677a5407e7"
+    },
+    "tools/inc2/v3fam_sweep.py": {
+     "nested": "78d9ba50a40209ce5c096fd53199730b8959dac1c61a2962bd961dfaa5157b03",
+     "outer": "78d9ba50a40209ce5c096fd53199730b8959dac1c61a2962bd961dfaa5157b03"
+    },
+    "tools/inc2/v3fam_systems.py": {
+     "nested": "56efc5182b3792261b09ee957e1b98d8228420d24bde473491bf102b58b169b7",
+     "outer": "56efc5182b3792261b09ee957e1b98d8228420d24bde473491bf102b58b169b7"
+    },
+    "tools/inc2/v3fam_trained.py": {
+     "nested": "b897414281acbfd5176c610292095e79f58a9b92735a7b226310cbfa8bd0d6ef",
+     "outer": "b897414281acbfd5176c610292095e79f58a9b92735a7b226310cbfa8bd0d6ef"
+    },
+    "tools/inc2/v3fam_verdict.py": {
+     "nested": "0f854499aa5f197848753d1fd85a3c2d3729ec90d02a664dc13b6c21d48b1971",
+     "outer": "0f854499aa5f197848753d1fd85a3c2d3729ec90d02a664dc13b6c21d48b1971"
+    },
+    "tools/inc2/v3fam_wbf.py": {
+     "nested": "099ae63f63a1b8156e64ef338cefb2b5fee98bb88e5926af5c24c52f9d60e11c",
+     "outer": "099ae63f63a1b8156e64ef338cefb2b5fee98bb88e5926af5c24c52f9d60e11c"
+    },
+    "tools/inc_autopilot/stream_thresholds.json": {
+     "nested": "66bd3096b8f5b2df7f3b02ea1a25064358cee46af0357c906248270f0f20965c",
+     "outer": "66bd3096b8f5b2df7f3b02ea1a25064358cee46af0357c906248270f0f20965c"
+    },
+    "tools/mega_trainer.py": {
+     "nested": "98920bcb14b9c4c92ad9baeded7eb041771b680671b920ce7a3d03537b0e7ce8",
+     "outer": "98920bcb14b9c4c92ad9baeded7eb041771b680671b920ce7a3d03537b0e7ce8"
+    },
+    "tools/near_dup.py": {
+     "nested": "b0d99ef71ef916f184a9f25974b0493d6bd769e0ca36584d6eae18060340d449",
+     "outer": "b0d99ef71ef916f184a9f25974b0493d6bd769e0ca36584d6eae18060340d449"
+    },
+    "tools/semisup_labeler.py": {
+     "nested": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+     "outer": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c"
+    }
+   },
+   "parent_exp": null,
+   "refusal": "  File \"/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam_trained.py\", line 438, in score_d1\n    ps = F._family_pass(src[\"weights\"], exam, cfg, \"D1\", **kw)\n  File \"/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam.py\", line 800, in _family_pass\n    raise V3famRefused(\"E3's path refuses: %s\" % e)\nweed_optimizer_framework.tools.inc2.v3fam.V3famRefused: E3's path refuses: ood23__20230804_HTRC_iPhone12_WY_2: ground-truth box 0 comes back through the geometry 0.109094 from its label (> 0.001): the map to the original image is wrong",
+   "requested_utc": "2026-10-25T16:31:01Z",
+   "started_utc": "2026-10-25T16:32:50Z",
+   "status": "build_failed",
+   "trigger": [
+    "DR0"
+   ],
+   "updated_utc": "2026-10-25T16:37:51Z"
+  }
+ ],
+ "exp": "v3fam_score_d1",
+ "format": "inc_autopilot.provenance/1",
+ "script": "run_inc2_build.sh"
+}

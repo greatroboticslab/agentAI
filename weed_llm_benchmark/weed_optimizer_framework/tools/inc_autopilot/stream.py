@@ -221,10 +221,16 @@ V3FAM_NOT_RUN_CAP = "not run (family cap)"
 # again; after V3FAM_PLATFORM_MAX such refusals of one item it stays held for a person, never looped. While the
 # snapshot reports a record taken by other code than the deployed one, no family score is proposed
 # (diagnose_stream.v3fam_plan).
+# Deviation 6 (2026-10-25; docs/prereg/V3F_dev6_2026-10-25.md): D1's passes on its two season exams run under the
+# loader fix and its pre-flight (inc2.v3fam_loader); a refusal of that check ("deviation 6's loader check refuses": the
+# exam's frames, the label cache's sizes, the letterbox, an identity record not taken under the fix) is about the
+# platform's loader and records, never D1's detectors, so it is held as the platform's too.
 V3FAM_PLATFORM_REFUSAL_RE = re.compile(
     r"the code changed since [^\n]{1,120}? ran|is missing or did not pass: no family score is taken without it"
     r"|no longer hash as V3F\.1 records|the E-series records changed while this family job ran"
-    r"|is never moved over another file|a superseded record could not be moved aside")
+    r"|is never moved over another file|a superseded record could not be moved aside"
+    r"|deviation 6's loader check refuses")
+V3FAM_LOADER_REFUSAL = "deviation 6's loader check refuses"
 V3FAM_PLATFORM_MAX = 3
 # the family jobs' provenance names (run_inc2_build.sh; L23J's v3fam_score_<arm>, L23I's its experiment)
 V3FAM_PROV = {"L23H": "v3fam_data", "L23L": "v3fam_v1"}
@@ -5409,6 +5415,12 @@ class StreamRun(object):
                   "byte (deviation 5 did, moving the verdict's CLI to inc2/v3fam_verdict.py), or move the records "
                   "aside byte for byte and retake them (inc2.v3fam equivalence --item ...) before any family score; "
                   "deploy_funnel.sh refuses a change to that code while records exist.")
+        if V3FAM_LOADER_REFUSAL in str(why or ""):
+            remedy = ("Deviation 6's loader check (inc2/v3fam_loader.py; its record v3fam/v1/exif/loader_shapes.json) "
+                      "found an exam image whose label-cache size, loader frame or letterbox is not as that record "
+                      "proves, a pass the fix did not see whole, or an identity record not taken under the fix. "
+                      "It is the platform's loader or records, not the arm's detectors; a person finds why, and a "
+                      "recorded deviation moves the records aside or changes the check.")
         if final:
             self._card("escalation", "%s: held after %d refusals" % (title, rec["platform_refusals"]),
                        "%s. Refused %d times by a precondition of the platform's own making although the snapshot "

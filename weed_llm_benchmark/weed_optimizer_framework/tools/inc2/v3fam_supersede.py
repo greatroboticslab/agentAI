@@ -1,5 +1,5 @@
 """V3F: the family records a recorded deviation supersedes, moved aside byte for byte (deviation 5, 2026-10-24;
-docs/prereg/V3F_dev5_2026-10-24.md).
+docs/prereg/V3F_dev5_2026-10-24.md; deviation 6, 2026-10-25, docs/prereg/V3F_dev6_2026-10-25.md).
 
     python -m weed_optimizer_framework.tools.inc2.v3fam_supersede status     (read-only)
     python -m weed_optimizer_framework.tools.inc2.v3fam_supersede apply      (the score jobs of v3fam_systems' and
@@ -33,6 +33,12 @@ changed since dev_identity.json ran'). Deviation 5 puts inc2/v3fam.py back to 3d
     epoch time x 50 + 0.5 h), so the smoke is taken again with the epoch timed from its start (v3fam_detr); it goes
     first in that smoke's own job (group "d6"), so no reader takes it as D6's walltime outcome.
 
+Why the record of deviation 6 goes: equivalence/identity_ood23.json was taken 2026-10-25T15:31:06Z by D1's score job
+49820090 with Ultralytics' label cache recording the stored (landscape) size of the 289 ood23 photos PIL reads as MPO
+tagged 6 or 8 (inc2.v3fam_loader); its family identity pass and its plain locked score were both taken so (it passed
+with difference 0), and identity mode never runs E3's geometry check, so it does not cover the path under the loader
+fix. It goes (group "scores"), and D1's job takes it again under the fix (inc2.v3fam_loader.identity).
+
 Each entry belongs to a group: "scores" (the score jobs move these: GROUP_SCORES) and "d6" (D6's smoke job moves its
 own record: GROUP_D6). The score jobs (MAINT) and D6's smoke (TRAIN) may run at the same time, so each moves only its
 own group; the verdict's job, which runs after every arm, moves both.
@@ -65,6 +71,13 @@ _WHY_SMOKE = ("written 2026-10-21T12:38:15Z by D6's smoke job 49542653: it recor
               "(2,405.6 s, including about 905 s of one-time dataset construction and sanity check before the epoch) "
               "as the epoch time and projected 33.9 h against the 28.8 h rule; V3F.5 D6's rule takes the epoch's own "
               "time, so the smoke is taken again with the epoch timed from its start (deviation 5)")
+DEVIATION_6 = "docs/prereg/V3F_dev6_2026-10-25.md"
+FOLDER_6 = "superseded_2026-10-25"
+_WHY_OOD23 = ("taken 2026-10-25T15:31:06Z by D1's score job 49820090 while Ultralytics 8.4.37's label cache recorded "
+              "the stored (landscape) size of the 289 ood23 photos PIL reads as MPO tagged 6 or 8 (exif_size swaps "
+              "width and height for JPEG only), so both of its scores letterboxed those photos at 0.8 or 0.9 of the "
+              "scale ratio_pad records; identity mode never runs E3's geometry check, which refused D1's first ood23 "
+              "pass (WY_2, 0.109094); D1's job takes it again under deviation 6's loader fix (inc2.v3fam_loader)")
 GROUP_SCORES = "scores"
 GROUP_D6 = "d6"
 GROUPS = (GROUP_SCORES, GROUP_D6)
@@ -86,6 +99,9 @@ ENTRIES = (
      DEVIATION_5, FOLDER_5, _WHY_FAILED),
     ("v3fam/v1/d6/smoke/smoke.json", "1d0691a852f1c4e3345e678e05cdade007b9d5c7de31b8fd52707f4ab597c2b8",
      DEVIATION_5, FOLDER_5, _WHY_SMOKE),
+    # deviation 6 (2026-10-25; sha256 as read from the cluster on 2026-10-25)
+    ("v3fam/v1/equivalence/identity_ood23.json", "3c29764783b8303b0659cfe75ee49b966dff4334394477fba24b2245045ad3ea",
+     DEVIATION_6, FOLDER_6, _WHY_OOD23),
 )
 D6_SMOKE = "v3fam/v1/d6/smoke/smoke.json"
 
@@ -245,7 +261,7 @@ def apply(inc, repo=None, job=None, log=None, groups=GROUPS):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="V3F: the records a recorded deviation supersedes, moved aside byte for "
-                                             "byte into a dated folder with a manifest (deviation 5).")
+                                             "byte into a dated folder with a manifest (deviations 5 and 6).")
     ap.add_argument("command", choices=("status", "apply"))
     ap.add_argument("--group", choices=GROUPS, action="append", default=None,
                     help="apply only this group's records (repeatable; default: every group)")

@@ -120,6 +120,19 @@ moved aside before the verdict runs and are never read. D6 with no score
 reports its own smoke's 'not run (walltime)' (V3F.5 D6, V3F.3.4) and BCLEAN
 'not needed' without D0-S's trigger, never 'missing'.
 
+Deviation 6 (2026-10-25; docs/prereg/V3F_dev6_2026-10-25.md). D1's score jobs
+49820090 and 49821128 (2026-10-25) were refused by E3's geometry check on
+ood23 (ood23__20230804_HTRC_iPhone12_WY_2, 0.109094): Ultralytics' label
+cache recorded the stored size of the 289 ood23 photos PIL reads as MPO
+tagged 6 or 8, a defect of the platform's loader, not of D1's detectors
+(inc2.v3fam_loader). The domain reopens score:D1 under deviation 6; under
+the second continuation D1 (DEV6_REOPENED_ARMS) needs a record written since
+DEV6_REOPEN_UTC (reopen_utc_of): a complete score, or a failure or family-cap
+refusal the ticker names whose item ran a job since then (its provenance).
+The attempts of 2026-10-25 do not count (they started before), a failure
+record of score:D1 written before then is not read, and the second
+continuation names deviation 6 among its deviations.
+
 A refusal raises inc2.v3fam.V3famRefused (V3famCapRefused at the family cap).
 """
 from __future__ import annotations
@@ -301,6 +314,16 @@ DEV5_REOPEN_UTC = "2026-10-24T00:00:00Z"
 # the ticker's failure records of 2026-10-22 for those arms (inc2.v3fam_supersede moves them aside): by sha256
 DEV5_SUPERSEDED_FAILED = {"score:%s" % rel.rsplit("score_", 1)[1][:-len(".json")]: sha
                           for rel, sha in SUP.superseded_sha256s("v3fam/v1/failed/").items()}
+# Deviation 6 (2026-10-25, docs/prereg/V3F_dev6_2026-10-25.md; module docstring). D1's score jobs of 2026-10-25
+# (49820090, 49821128) were refused by E3's geometry check on ood23 through a defect of the loader's label cache
+# (inc2.v3fam_loader), not of D1's detectors; the domain reopens score:D1 under deviation 6 (its reopen block's
+# before_utc, equal to DEV6_REOPEN_UTC). Under the second continuation D1's record must postdate that reopening: a
+# failure or cap refusal of an item ending D1 counts only with a job of it since, and score:D1's failure record only
+# when written since (the attempts of 2026-10-25 started at 15:20:48Z and 16:32:50Z and never end D1).
+DEVIATION_6 = SUP.DEVIATION_6
+DEV6_REOPENED_ARMS = ("D1",)
+DEV6_ITEMS = ("score:D1",)                   # the items deviation 6's block reopens
+DEV6_REOPEN_UTC = "2026-10-25T17:00:00Z"
 D6_SMOKE = ("d6", "smoke", "smoke.json")     # under v3fam/v1: D6's smoke record (inc2.v3fam_detr)
 REPRO_FIELDS = ("diff", "z", "interval_90", "outcome", "qualifies")     # a decision the continuation reproduces
 CONT_REPRO_TOL = 1e-9
@@ -451,15 +474,33 @@ def superseded_failure(item, path=None):
     return item in DEV5_SUPERSEDED_FAILED and p.is_file() and F._sha(p) == DEV5_SUPERSEDED_FAILED[item]
 
 
+def reopen_utc_of(arm):
+    """The reopening a reopened arm's record must postdate under the second continuation: deviation 6's for D1 (its
+    score jobs of 2026-10-25 refused by the loader's defect), deviation 5's for the other arms deviation 5 reopened,
+    None for any other arm."""
+    if arm in DEV6_REOPENED_ARMS:
+        return DEV6_REOPEN_UTC
+    if arm in DEV5_REOPENED_ARMS:
+        return DEV5_REOPEN_UTC
+    return None
+
+
+def item_reopen_utc(item):
+    """The reopening a failure record of item must postdate under the second continuation: deviation 6's for the items
+    its block reopens (score:D1), deviation 5's for every other."""
+    return DEV6_REOPEN_UTC if str(item) in DEV6_ITEMS else DEV5_REOPEN_UTC
+
+
 def failure_recorded(item):
     """True when the ticker's failure record of item is in place and counts: never one deviation 5 supersedes (by
-    sha256); while the second continuation is due, only one written since deviation 5's reopening."""
+    sha256); while the second continuation is due, only one written since the reopening of that item (deviation 6's
+    for score:D1, deviation 5's for every other: item_reopen_utc)."""
     p = failed_file(item)
     if not p.exists() or superseded_failure(item, p):
         return False
     if second_continuation_due():
         d = F._read_json(p)
-        return isinstance(d, dict) and str(d.get("written_utc") or "") >= DEV5_REOPEN_UTC
+        return isinstance(d, dict) and str(d.get("written_utc") or "") >= item_reopen_utc(item)
     return True
 
 
@@ -1122,7 +1163,9 @@ def verdict_ready(trig=None, cap_refused=(), failed=()):
     the reopening, DEV5_REOPEN_UTC, by its provenance): the score jobs of 2026-10-21, refused by the platform's own
     stale records, do not count as its start, their failure records (superseded by sha256, or written before the
     reopening) are not read, and the lists of 2026-10-22 passed again end nothing; an item named failed or refused
-    whose own record is complete (a score, the data summary) refuses the verb (contradicted)."""
+    whose own record is complete (a score, the data summary) refuses the verb (contradicted). Deviation 6: D1 needs
+    its record since deviation 6's reopening (DEV6_REOPEN_UTC, reopen_utc_of), so its score jobs of 2026-10-25,
+    refused through the loader's defect, never end it."""
     from . import v3fam_data as VD
     trig = d0s_trigger() if trig is None else trig
     refused = {str(x).strip() for x in cap_refused or () if str(x).strip()}
@@ -1134,7 +1177,7 @@ def verdict_ready(trig=None, cap_refused=(), failed=()):
         why.append("the ticker's lists name items the cluster's records contradict: %s" % ", ".join(bad))
     if VD.read_summary() is None and "data" not in refused and not cap_refused_item("data"):
         why.append("the family's data build has no complete %s" % VD._summary_path())
-    never, again, stale = [], [], []
+    never, again, stale, again6, stale6 = [], [], [], [], []
     for a in F.SCORE_ARMS:
         st = arm_status(a)
         if st != "missing":
@@ -1144,16 +1187,19 @@ def verdict_ready(trig=None, cap_refused=(), failed=()):
         cap_named = refused & ({"score:%s" % a, "data"} | set(SCORE_DEPS.get(a, ())))
         fail_named = gone & set(ending_items(a))
         named = cap_named | fail_named
-        if second and a in DEV5_REOPENED_ARMS:
+        if second and reopen_utc_of(a):
             # deviation 5: reopened after its score jobs of 2026-10-21 were refused by the platform's stale records
             # (D6: its smoke taken again); those attempts do not start it again, and a failure or cap refusal the
             # ticker names ends it only with a job of that item since the reopening (the lists of 2026-10-22 never
-            # end it again): it needs a record, or such a failure, since the reopening
-            if any(attempted_since(i, DEV5_REOPEN_UTC) for i in named):
+            # end it again): it needs a record, or such a failure, since the reopening. Deviation 6: D1 likewise since
+            # its own reopening (its score jobs of 2026-10-25, refused through the loader's defect, never end it)
+            ru = reopen_utc_of(a)
+            if any(attempted_since(i, ru) for i in named):
                 continue
+            six = a in DEV6_REOPENED_ARMS
             if named:
-                stale.append("%s (%s)" % (a, ", ".join(sorted(named))))
-            again.append(a)
+                (stale6 if six else stale).append("%s (%s)" % (a, ", ".join(sorted(named))))
+            (again6 if six else again).append(a)
             continue
         if named:
             continue
@@ -1166,6 +1212,11 @@ def verdict_ready(trig=None, cap_refused=(), failed=()):
     if stale:
         why.append("named failed or refused with no job of that item since the reopening (%s): %s" % (
             DEV5_REOPEN_UTC, "; ".join(stale)))
+    if again6:
+        why.append("not scored since deviation 6 reopened it (%s): %s" % (DEVIATION_6, ", ".join(again6)))
+    if stale6:
+        why.append("named failed or refused with no job of that item since deviation 6's reopening (%s): %s" % (
+            DEV6_REOPEN_UTC, "; ".join(stale6)))
     return (not why), "; ".join(why)
 
 
@@ -1252,7 +1303,7 @@ def continuation_check(doc, ext):
                 continuation_external=CONTINUATION["external"],
                 continuation_external_sha256=F._sha(cx) if cx.is_file() else None,
                 continuation_external_as_read_on_2026_10_24=(F._sha(cx) == CONT_EXTERNAL_SHA256) if cx.is_file()
-                else False, deviation=DEVIATION_5, deviations=[DEVIATION_4, DEVIATION_5],
+                else False, deviation=DEVIATION_5, deviations=[DEVIATION_4, DEVIATION_5, DEVIATION_6],
                 reproduced=sorted(set(by_rec["2026-10-13"]) | set(by_rec["2026-10-22"])), reproduced_by_record=by_rec,
                 note="the verdict of 2026-10-13 and its continuation of 2026-10-22 stay as they are; this record is "
                      "the family's verdict over every arm, by the same rules (deviation 5)")

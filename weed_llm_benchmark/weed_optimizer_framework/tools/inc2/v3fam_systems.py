@@ -123,8 +123,10 @@ def _sha(path):
 
 def supersede(groups=(SUP.GROUP_SCORES,)):
     """The records a recorded deviation supersedes (inc2.v3fam_supersede: deviation 5's identity_probe.json, taken
-    under the CLI-only change of inc2/v3fam.py it reverts, and the ticker's failure records of 2026-10-22; D6's
-    smoke record of 2026-10-21 is its own job's, group d6), moved aside byte for byte into their dated folders, each
+    under the CLI-only change of inc2/v3fam.py it reverts, and the ticker's failure records of 2026-10-22; deviation
+    6's identity_ood23.json, taken while the loader's label cache held the stored size of ood23's MPO photos tagged
+    6 or 8; D6's smoke record of 2026-10-21 is its own job's, group d6), moved aside byte for byte into their dated
+    folders, each
     named in the folder's manifest, before any family score or verdict reads them. Every family score job (group
     scores) and the verdict's job (every group) run it first; it is a no-op once done. A move that would overwrite a
     file refuses the job."""
