@@ -1,0 +1,310 @@
+{
+ "cap_refused": [],
+ "cap_refused_by_ticker": [],
+ "code": {
+  "scorer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+  "scorer_native": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+  "scorer_sidecar": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+  "semisup_labeler": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+  "twostage": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+  "v3fam": "c5e923dcad8f576cdb9761a0433d5c85241def4a87a0a0081063aa57a50e5e78",
+  "v3fam_verdict": "b77e97a57fce2ca7cbc66778d7d34fc1e62ef9fd0ab3a1d3dffa3a01b6c30816",
+  "verify": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+ },
+ "continues": {
+  "deviation": "docs/prereg/V3F_dev4_2026-10-20.md",
+  "external": "v3fam_v1_external.json",
+  "external_as_read_on_2026_10_18": true,
+  "external_sha256": "81cd1811d9cbd1870d4b6ecae922320ae9ca7e446e2a9a809afff7db3e3a60f5",
+  "family_confirmed_kept": [
+   "P1"
+  ],
+  "note": "the verdict of 2026-10-13 stays as it is; this record is the family's verdict over every arm, by the same rules (deviation 4)",
+  "reproduced": [
+   "C_D2BC1",
+   "C_D2BC2640",
+   "C_D2CLIP",
+   "C_D2DINOB",
+   "C_D2DINOL",
+   "C_D2FT",
+   "C_D2LAION",
+   "C_D2RN50",
+   "C_D2SIGLIP",
+   "C_D3",
+   "P1",
+   "P4",
+   "S_bc1_over_clip",
+   "S_bc2_over_bc2640",
+   "S_bc2_over_clip",
+   "S_d3_stage1_over_e3b",
+   "S_dinol_over_clip",
+   "S_ft_over_rn50",
+   "S_laion_over_clip"
+  ],
+  "sha256": "304bad59f15487bfd3965d2f1e9384658daac58c5971494118ecaad4fcfaa7d9",
+  "tolerance": 1e-09,
+  "verdict": "v3fam_v1.json"
+ },
+ "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-11): V3F, the v3 experiment family D0-D9 (pre-registered as one family); commit 55cc2d9; docs/prereg/V3F_2026-10-11.md sha256 5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f; Revisions 29-31: docs/prereg/V3F_rev29-31_2026-10-11.md sha256 36f4637898156ace639112f4605fbfe1192ecacad67b81ed47b1a6465bc0f814",
+ "e_trees": {
+  "files": 132,
+  "sha256": "9f0b3ef48bccc81ebc32db9d7a551bbe0803341ac0d99eabfb215e6ed528b690"
+ },
+ "failed_by_ticker": [
+  "score:D1",
+  "score:D4F",
+  "score:D4N",
+  "score:D4R15",
+  "score:D5B",
+  "score:D8"
+ ],
+ "family": "v1",
+ "format": "inc2-v3fam-external/1",
+ "holm": {
+  "P6": {
+   "bar": 1.6448536269514715,
+   "exam": "ood22",
+   "family_confirmed": false,
+   "m": 1,
+   "rank": 1,
+   "status": "not run",
+   "survives": false,
+   "z": null
+  },
+  "P7": {
+   "bar": 1.6448536269514715,
+   "exam": "ood23",
+   "family_confirmed": false,
+   "m": 1,
+   "rank": 1,
+   "status": "not run",
+   "survives": false,
+   "z": null
+  },
+  "P8": {
+   "bar": 1.9599639845400536,
+   "exam": "probe",
+   "family_confirmed": false,
+   "m": 2,
+   "rank": 1,
+   "status": "not run",
+   "survives": false,
+   "z": null
+  },
+  "P9": {
+   "bar": 1.6448536269514715,
+   "exam": "probe",
+   "family_confirmed": false,
+   "m": 2,
+   "rank": 2,
+   "status": "not run",
+   "survives": false,
+   "z": null
+  }
+ },
+ "note": "P6-P9 and the non-dev Tier S readings: never on the platform's evidence (V3F.3.5)",
+ "primaries": {
+  "P6": {
+   "exam": "ood22",
+   "id": "P6",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSB: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSB/s0/ood22.json",
+   "x": "TSB",
+   "x_label": "TS-B'",
+   "y": "D1A12",
+   "y_label": "A'12"
+  },
+  "P7": {
+   "exam": "ood23",
+   "id": "P7",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D1B1/s0/ood23.json",
+   "x": "D1B1",
+   "x_label": "B'1",
+   "y": "D1A1",
+   "y_label": "A'1"
+  },
+  "P8": {
+   "exam": "probe",
+   "id": "P8",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "D5B100: failed (score:D5B failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D5B100/s0/probe.json",
+   "x": "D5B100",
+   "x_label": "dose 1.0",
+   "y": "D5B0",
+   "y_label": "dose 0"
+  },
+  "P9": {
+   "exam": "probe",
+   "id": "P9",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "D5B25: failed (score:D5B failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D5B25/s0/probe.json",
+   "x": "D5B25",
+   "x_label": "dose 0.25",
+   "y": "D5B0",
+   "y_label": "dose 0"
+  }
+ },
+ "status": "decided",
+ "tier_s": {
+  "S_d5b_copy_crop90": {
+   "exam": "probe",
+   "id": "S_d5b_copy_crop90",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "D5B100: failed (score:D5B failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D5B100/s0/probe.json",
+   "x": "D5B100",
+   "x_label": "dose 1.0",
+   "y": "D5B0",
+   "y_label": "dose 0"
+  },
+  "S_d5b_copy_hflip": {
+   "exam": "probe",
+   "id": "S_d5b_copy_hflip",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "D5B100: failed (score:D5B failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D5B100/s0/probe.json",
+   "x": "D5B100",
+   "x_label": "dose 1.0",
+   "y": "D5B0",
+   "y_label": "dose 0"
+  },
+  "S_d5b_copy_jpeg75": {
+   "exam": "probe",
+   "id": "S_d5b_copy_jpeg75",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "D5B100: failed (score:D5B failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D5B100/s0/probe.json",
+   "x": "D5B100",
+   "x_label": "dose 1.0",
+   "y": "D5B0",
+   "y_label": "dose 0"
+  },
+  "S_d5b_copy_letterbox640": {
+   "exam": "probe",
+   "id": "S_d5b_copy_letterbox640",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "D5B100: failed (score:D5B failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D5B100/s0/probe.json",
+   "x": "D5B100",
+   "x_label": "dose 1.0",
+   "y": "D5B0",
+   "y_label": "dose 0"
+  },
+  "S_p8_12class": {
+   "exam": "probe",
+   "id": "S_p8_12class",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "D5B100: failed (score:D5B failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D5B100/s0/probe.json",
+   "x": "D5B100",
+   "x_label": "dose 1.0",
+   "y": "D5B0",
+   "y_label": "dose 0"
+  },
+  "S_p9_12class": {
+   "exam": "probe",
+   "id": "S_p9_12class",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "D5B25: failed (score:D5B failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D5B25/s0/probe.json",
+   "x": "D5B25",
+   "x_label": "dose 0.25",
+   "y": "D5B0",
+   "y_label": "dose 0"
+  },
+  "S_tsa_over_a12_ood22": {
+   "exam": "ood22",
+   "id": "S_tsa_over_a12_ood22",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSA: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSA/s0/ood22.json",
+   "x": "TSA",
+   "x_label": "TS-A'",
+   "y": "D1A12",
+   "y_label": "A'12"
+  },
+  "S_tsa_over_a12_ood22_8sp": {
+   "exam": "ood22",
+   "id": "S_tsa_over_a12_ood22_8sp",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSA: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSA/s0/ood22.json",
+   "x": "TSA",
+   "x_label": "TS-A'",
+   "y": "D1A12",
+   "y_label": "A'12"
+  },
+  "S_tsa_over_a12_ood23_3sp": {
+   "exam": "ood23",
+   "id": "S_tsa_over_a12_ood23_3sp",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSA: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSA/s0/ood23.json",
+   "x": "TSA",
+   "x_label": "TS-A'",
+   "y": "D1A12",
+   "y_label": "A'12"
+  },
+  "S_tsb_over_a12_ood22_8sp": {
+   "exam": "ood22",
+   "id": "S_tsb_over_a12_ood22_8sp",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSB: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSB/s0/ood22.json",
+   "x": "TSB",
+   "x_label": "TS-B'",
+   "y": "D1A12",
+   "y_label": "A'12"
+  },
+  "S_tsb_over_a12_ood23_3sp": {
+   "exam": "ood23",
+   "id": "S_tsb_over_a12_ood23_3sp",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSB: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSB/s0/ood23.json",
+   "x": "TSB",
+   "x_label": "TS-B'",
+   "y": "D1A12",
+   "y_label": "A'12"
+  },
+  "S_tsb_over_tsa_ood22": {
+   "exam": "ood22",
+   "id": "S_tsb_over_tsa_ood22",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSB: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSB/s0/ood22.json",
+   "x": "TSB",
+   "x_label": "TS-B'",
+   "y": "TSA",
+   "y_label": "TS-A'"
+  },
+  "S_tsb_over_tsa_ood22_8sp": {
+   "exam": "ood22",
+   "id": "S_tsb_over_tsa_ood22_8sp",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSB: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSB/s0/ood22.json",
+   "x": "TSB",
+   "x_label": "TS-B'",
+   "y": "TSA",
+   "y_label": "TS-A'"
+  },
+  "S_tsb_over_tsa_ood23_3sp": {
+   "exam": "ood23",
+   "id": "S_tsb_over_tsa_ood23_3sp",
+   "se_rule": "max",
+   "status": "not run",
+   "why": "TSB: failed (score:D1 failed twice): no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/TSB/s0/ood23.json",
+   "x": "TSB",
+   "x_label": "TS-B'",
+   "y": "TSA",
+   "y_label": "TS-A'"
+  }
+ },
+ "written_utc": "2026-10-22T01:13:43.250511Z"
+}

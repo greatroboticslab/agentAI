@@ -1,0 +1,147 @@
+{
+ "classifier": {
+  "json_sha256": "d6f5b32ca021f9e95bba9d37bf16f5f0d2df72c80a034c40023090b15833f7f5",
+  "npz_sha256": "4905e4a67c07597146fcea62785666e65cc5ce3a3e8e35b62282bfd5d1c5f42b"
+ },
+ "code": {
+  "scorer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+  "scorer_native": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+  "scorer_sidecar": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+  "semisup_labeler": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+  "twostage": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+  "v3fam": "3d776daed91d487d2817ba6959f9dd832d82c6e0be048b812916b63f22b239b7",
+  "verify": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+ },
+ "created_utc": "2026-10-12T13:52:00.822088Z",
+ "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-11): V3F, the v3 experiment family D0-D9 (pre-registered as one family); commit 55cc2d9; docs/prereg/V3F_2026-10-11.md sha256 5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f; Revisions 29-31: docs/prereg/V3F_rev29-31_2026-10-11.md sha256 36f4637898156ace639112f4605fbfe1192ecacad67b81ed47b1a6465bc0f814",
+ "deviation_band": 0.002,
+ "e3_arm": "B",
+ "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+ "exam": "dev",
+ "format": "inc2-v3fam-equivalence/1",
+ "item": "two_stage",
+ "nms": "locked",
+ "per": {
+  "0": {
+   "diff": {
+    "agnostic_map50_95": 0.0,
+    "map50_95": 0.0,
+    "max_abs_diff": 0.0,
+    "per_class": {
+     "Carpetweed": 0.0,
+     "CutleafGroundcherry": 0.0,
+     "Eclipta": 0.0,
+     "Goosegrass": 0.0,
+     "MorningGlory": 0.0,
+     "PalmerAmaranth": 0.0,
+     "PricklySida": 0.0,
+     "Purslane": 0.0,
+     "Ragweed": 0.0,
+     "Sicklepod": 0.0,
+     "SpottedSpurge": 0.0,
+     "Waterhemp": 0.0
+    },
+    "species_map50_95": 0.0
+   },
+   "recorded": {
+    "file": "twostage/e3_v1/arms/B/s0/dev.json",
+    "sha256": "7687da5cab7989e0941bc2c57d943a7aa2e26f035ef1a48e14af39dd74b4882c",
+    "species_map50_95": 0.8850048395242874
+   },
+   "stage1": {
+    "q_max_abs_diff": 0.0,
+    "q_tol": 0.0001,
+    "rows": 5708,
+    "top_cls_equal": true,
+    "xyxy_max_abs_diff_px": 0.0,
+    "xyxy_tol_px": 0.001
+   },
+   "status": "passed",
+   "weights_sha256": "d84aa23553c381cc6caa40cfe1c806a2876844dd53c9f78efa1ed800b0befc60"
+  },
+  "1": {
+   "diff": {
+    "agnostic_map50_95": 0.0,
+    "map50_95": 0.0,
+    "max_abs_diff": 0.0,
+    "per_class": {
+     "Carpetweed": 0.0,
+     "CutleafGroundcherry": 0.0,
+     "Eclipta": 0.0,
+     "Goosegrass": 0.0,
+     "MorningGlory": 0.0,
+     "PalmerAmaranth": 0.0,
+     "PricklySida": 0.0,
+     "Purslane": 0.0,
+     "Ragweed": 0.0,
+     "Sicklepod": 0.0,
+     "SpottedSpurge": 0.0,
+     "Waterhemp": 0.0
+    },
+    "species_map50_95": 0.0
+   },
+   "recorded": {
+    "file": "twostage/e3_v1/arms/B/s1/dev.json",
+    "sha256": "0dffeadb5940aee67b5ecdb60794733b8a02af3339b0e765e2a1c69847959ddf",
+    "species_map50_95": 0.8853225797753201
+   },
+   "stage1": {
+    "q_max_abs_diff": 0.0,
+    "q_tol": 0.0001,
+    "rows": 5740,
+    "top_cls_equal": true,
+    "xyxy_max_abs_diff_px": 0.0,
+    "xyxy_tol_px": 0.001
+   },
+   "status": "passed",
+   "weights_sha256": "048d7ce9e713583c4c9d934947b963bc9f2c928cd499ff71ab04baaf664e4bdc"
+  },
+  "2": {
+   "diff": {
+    "agnostic_map50_95": 0.0,
+    "map50_95": 0.0,
+    "max_abs_diff": 0.0,
+    "per_class": {
+     "Carpetweed": 0.0,
+     "CutleafGroundcherry": 0.0,
+     "Eclipta": 0.0,
+     "Goosegrass": 0.0,
+     "MorningGlory": 0.0,
+     "PalmerAmaranth": 0.0,
+     "PricklySida": 0.0,
+     "Purslane": 0.0,
+     "Ragweed": 0.0,
+     "Sicklepod": 0.0,
+     "SpottedSpurge": 0.0,
+     "Waterhemp": 0.0
+    },
+    "species_map50_95": 0.0
+   },
+   "recorded": {
+    "file": "twostage/e3_v1/arms/B/s2/dev.json",
+    "sha256": "0d9384b2c0336bc2fd8ef760cddbd55ef691e77f74fab078f9307ac7b833b490",
+    "species_map50_95": 0.8874253848145025
+   },
+   "stage1": {
+    "q_max_abs_diff": 0.0,
+    "q_tol": 0.0001,
+    "rows": 5815,
+    "top_cls_equal": true,
+    "xyxy_max_abs_diff_px": 0.0,
+    "xyxy_tol_px": 0.001
+   },
+   "status": "passed",
+   "weights_sha256": "3d5850adbb73e2588f011bdf9699c5855b0e84cdefa0782892bb3a5ae412a4db"
+  }
+ },
+ "status": "passed",
+ "testing": false,
+ "tolerance": 1e-06,
+ "versions": {
+  "numpy": "2.2.6",
+  "open_clip": "3.3.0",
+  "sklearn": "1.7.2",
+  "torch": "2.5.1+cu121",
+  "ultralytics": "8.4.37"
+ }
+}

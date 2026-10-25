@@ -3348,7 +3348,8 @@ def t_v3fam():
     # argv, the executor and the cluster's grammar
     for lid, prm, tail in (("L23H", {"pkg": "inc2"}, [MODT + "inc2.v3fam_data", "build"]),
                            ("L23J", {"pkg": "inc2", "arm": "D1"}, [MODT + "inc2.v3fam", "score", "--arm", "D1"]),
-                           ("L23L", {"pkg": "inc2"}, [MODT + "inc2.v3fam", "verdict"]),
+                           # deviation 5: the verdict's CLI is inc2.v3fam_verdict (inc2/v3fam.py keeps its bytes)
+                           ("L23L", {"pkg": "inc2"}, [MODT + "inc2.v3fam_verdict", "verdict"]),
                            ("L23I", PARAMS["L23I"], ["--exp", "v3_d4_f_m640", "--v3fam", "D4F", "--seeds", "0,1,2",
                                                      "--role", "baseline"]),
                            ("L23K", {"pkg": "inc2", "verb": "smoke"}, ["run_inc2_detr.sh", MODT + "inc2.v3fam_detr",
@@ -3357,12 +3358,12 @@ def t_v3fam():
                            ("L23K", dict(PARAMS["L23K"], seeds="2"), [MODT + "inc2.v3fam_detr", "train", "--seeds",
                                                                      "2"]),
                            ("L23L", {"pkg": "inc2", "cap_refused": "build:D4F,score:D2CLIP"},
-                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "build:D4F,score:D2CLIP"]),
+                            [MODT + "inc2.v3fam_verdict", "verdict", "--cap-refused", "build:D4F,score:D2CLIP"]),
                            # deviation 4: the items the ticker recorded failed twice (never the data build)
                            ("L23L", {"pkg": "inc2", "ticker_failed": "build:D4N,detr:smoke"},
-                            [MODT + "inc2.v3fam", "verdict", "--ticker-failed", "build:D4N,detr:smoke"]),
+                            [MODT + "inc2.v3fam_verdict", "verdict", "--ticker-failed", "build:D4N,detr:smoke"]),
                            ("L23L", {"pkg": "inc2", "cap_refused": "score:D9", "ticker_failed": "build:D4N"},
-                            [MODT + "inc2.v3fam", "verdict", "--cap-refused", "score:D9", "--ticker-failed",
+                            [MODT + "inc2.v3fam_verdict", "verdict", "--cap-refused", "score:D9", "--ticker-failed",
                              "build:D4N"])):
         pp = LS.policy_params(lid, prm)
         argv = LS.render(lid, pp)
@@ -3376,7 +3377,9 @@ def t_v3fam():
             ("build", ["inc2.v3fam_data", "build"], True, "inc_build_v3fam_data"),
             ("build", ["inc2.v3fam", "score", "--arm", "D2LAION"], True, "inc_build_v3fam_score_d2laion"),
             ("build", ["inc2.v3fam", "score", "--arm", "BCLEAN"], True, "inc_build_v3fam_score_bclean"),
-            ("build", ["inc2.v3fam", "verdict"], True, "inc_build_v3fam_v1"),
+            ("build", ["inc2.v3fam_verdict", "verdict"], True, "inc_build_v3fam_v1"),
+            # deviation 5: inc2/v3fam.py's verdict verb is a person's (its sha256 is pinned): never the platform's
+            ("build", ["inc2.v3fam", "verdict"], False, None),
             ("build", ["inc2.baseline", "build", "--exp", "v3_d4_n_m640", "--v3fam", "D4N", "--seeds", "0,1,2",
                        "--role", "baseline"], True, "inc_build_v3_d4_n_m640"),
             ("detr", ["inc2.v3fam_detr", "smoke"], True, "inc_detr_v3fam_smoke"),
@@ -3396,14 +3399,15 @@ def t_v3fam():
             ("detr", ["inc2.v3fam_detr", "train", "--seeds", "1,2"], True, "inc_detr_v3fam_s1"),
             ("detr", ["inc2.v3fam_detr", "train", "--seeds", "2,1"], False, None),
             ("detr", ["inc2.v3fam_detr", "train", "--seeds", "3"], False, None),
-            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "build:D4F,score:D2CLIP,detr:train"], True,
+            ("build", ["inc2.v3fam_verdict", "verdict", "--cap-refused", "build:D4F,score:D2CLIP,detr:train"], True,
              "inc_build_v3fam_v1"),
-            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "score:d1"], False, None),
-            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "verdict"], False, None),
-            ("build", ["inc2.v3fam", "verdict", "--cap-refused", "score:D9", "--ticker-failed",
+            ("build", ["inc2.v3fam_verdict", "verdict", "--cap-refused", "score:d1"], False, None),
+            ("build", ["inc2.v3fam_verdict", "verdict", "--cap-refused", "verdict"], False, None),
+            ("build", ["inc2.v3fam_verdict", "verdict", "--cap-refused", "score:D9", "--ticker-failed",
                        "build:D4N,detr:smoke,score:D1"], True, "inc_build_v3fam_v1"),
-            ("build", ["inc2.v3fam", "verdict", "--ticker-failed", "data"], False, None),
-            ("build", ["inc2.v3fam", "verdict", "--ticker-failed", "build:D4N,verdict"], False, None),
+            ("build", ["inc2.v3fam_verdict", "verdict", "--ticker-failed", "data"], False, None),
+            ("build", ["inc2.v3fam_verdict", "verdict", "--ticker-failed", "build:D4N,verdict"], False, None),
+            ("build", ["inc2.v3fam", "verdict", "--ticker-failed", "build:D4N"], False, None),
             ("detr", ["inc2.v3fam_detr", "score"], False, None),
             ("detr", ["inc2.twostage", "verdict"], False, None)):
         try:
@@ -3694,7 +3698,7 @@ def _v3fam_dev4(wd):
           and st2["v3fam"]["items"]["verdict"].get("reopen_history", [{}])[0].get("state") == "done"
           and float(d2.get("prior_gpuh") or 0) > 0, (new_h, old_ids, [c["title"] for c in rcards]))
     done = _fam_run(wd, ticks=120, until=lambda: wd.state().get("v3fam", {}).get("items", {}).get("verdict", {})
-                    .get("state") == "done" and (wd.inc / "capacity" / "v3fam_v1_cont.json").exists())
+                    .get("state") == "done" and (wd.inc / wd.dom["v3fam"]["verdict_record"]).exists())
     pro = [(e.get("lever"), _fam_arg(e)) for e in _fam_pro(wd)]
     after = pro[pro.index(("L23H", "build"), len(old_ids)):] if ("L23H", "build") in pro else []
     l23l = [e for e in _fam_pro(wd, "L23L")]

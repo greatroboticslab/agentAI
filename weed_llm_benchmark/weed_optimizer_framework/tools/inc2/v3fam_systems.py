@@ -74,6 +74,7 @@ from . import scorer_native as SN
 from . import scorer_sidecar as SC
 from . import twostage as TS
 from . import v3fam as F
+from . import v3fam_supersede as SUP
 
 # ------------------------------------------------------------------ constants (pre-registered)
 SYSTEM_ARMS = ("E3RS", "D3", "D6", "D8")    # the L23J arms this module scores (inc2.v3fam score --arm)
@@ -118,6 +119,18 @@ def _read_json(path):
 
 def _sha(path):
     return TS._sha(path)
+
+
+def supersede():
+    """The records a recorded deviation supersedes (inc2.v3fam_supersede: deviation 5's identity_probe.json, taken
+    under the CLI-only change of inc2/v3fam.py it reverts, and the ticker's failure records of 2026-10-22), moved
+    aside byte for byte into their dated folders, each named in the folder's manifest, before any family score or
+    verdict reads them. Every family score job and the verdict's job run it first; it is a no-op once done. A move
+    that would overwrite a file refuses the job."""
+    try:
+        return SUP.apply(C.INC_DIR, repo=C.REPO, log=log)
+    except SUP.SupersedeRefused as e:
+        raise F.V3famRefused(str(e))
 
 
 def rel(path):
@@ -704,6 +717,7 @@ def score_arm(arm, embedder=None, lock_check=True, batch=S.BATCH, device=None, w
     """inc2.v3fam score --arm X for this module's arms (E3RS, D3, D6, D8)."""
     if arm not in SYSTEM_ARMS:
         raise F.V3famRefused("--arm %r is not one of %s" % (arm, list(SYSTEM_ARMS)))
+    supersede()                              # deviation 5: the records it supersedes moved aside first
     kw = {"lock_check": lock_check, "batch": batch, "device": device}
     if arm == "E3RS":
         return score_e3rs(embedder=embedder, workers=workers, reported=reported, **kw)

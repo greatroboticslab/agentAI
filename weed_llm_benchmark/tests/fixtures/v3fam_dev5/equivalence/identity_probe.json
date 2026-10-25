@@ -1,0 +1,76 @@
+{
+ "arm": "D5B",
+ "code": {
+  "scorer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+  "scorer_native": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+  "scorer_sidecar": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+  "semisup_labeler": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+  "twostage": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+  "v3fam": "c5e923dcad8f576cdb9761a0433d5c85241def4a87a0a0081063aa57a50e5e78",
+  "verify": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+ },
+ "created_utc": "2026-10-21T23:45:45.800019Z",
+ "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-11): V3F, the v3 experiment family D0-D9 (pre-registered as one family); commit 55cc2d9; docs/prereg/V3F_2026-10-11.md sha256 5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f; Revisions 29-31: docs/prereg/V3F_rev29-31_2026-10-11.md sha256 36f4637898156ace639112f4605fbfe1192ecacad67b81ed47b1a6465bc0f814",
+ "deviation_band": 0.002,
+ "exam": "probe",
+ "format": "inc2-v3fam-equivalence/1",
+ "item": "identity",
+ "note": "the plain scores are recorded here only and never compared with anything",
+ "per": {
+  "0": {
+   "diff": {
+    "agnostic_map50_95": 0.0,
+    "map50_95": 0.0,
+    "max_abs_diff": 0.0,
+    "per_class": {
+     "Carpetweed": 0.0,
+     "CutleafGroundcherry": 0.0,
+     "Eclipta": 0.0,
+     "Goosegrass": 0.0,
+     "MorningGlory": 0.0,
+     "PalmerAmaranth": 0.0,
+     "PricklySida": 0.0,
+     "Purslane": 0.0,
+     "Ragweed": 0.0,
+     "SpottedSpurge": 0.0,
+     "Waterhemp": 0.0
+    },
+    "species_map50_95": 0.0
+   },
+   "plain": {
+    "agnostic_map50_95": 0.9677612481026217,
+    "map50_95": 0.9700097484869701,
+    "n_images": 476,
+    "per_class": {
+     "Carpetweed": 0.8730625869839296,
+     "CutleafGroundcherry": 0.9949999999999999,
+     "Eclipta": 0.9895877020038786,
+     "Goosegrass": 0.9655142857142858,
+     "MorningGlory": 0.9827157897884925,
+     "PalmerAmaranth": 0.9938928571428571,
+     "PricklySida": 0.9903214285714286,
+     "Purslane": 0.992,
+     "Ragweed": 0.9395040039339808,
+     "SpottedSpurge": 0.9667564711729091,
+     "Waterhemp": 0.9817521080449089
+    },
+    "production": true,
+    "scorer_sha256": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+    "species_map50_95": 0.9700097484869699
+   },
+   "status": "passed",
+   "weights_sha256": "1d9027f6ca41211369f7d48d045ce86bfe33fb7dfb497b68500d2230f0712708"
+  }
+ },
+ "reference": "b_v2_m640",
+ "status": "passed",
+ "testing": false,
+ "tolerance": 1e-06,
+ "versions": {
+  "numpy": "2.2.6",
+  "open_clip": "3.3.0",
+  "sklearn": "1.7.2",
+  "torch": "2.5.1+cu121",
+  "ultralytics": "8.4.37"
+ }
+}

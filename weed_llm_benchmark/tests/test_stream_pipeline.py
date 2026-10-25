@@ -1693,7 +1693,8 @@ def stage_deploy():
             todo.append("tests/%s.py" % (m.group(1) or m.group(2)))
     miss = sorted(t for t in closure if not shipped(t))
     check("every test module a shipped test imports is shipped too (%d test files)" % len(closure), not miss, miss)
-    fixtures = {"tests/fixtures/collect", "tests/fixtures/inc_replay", "tests/fixtures/funnel"}
+    fixtures = {"tests/fixtures/collect", "tests/fixtures/inc_replay", "tests/fixtures/funnel",
+                "tests/fixtures/v3fam_dev5"}
     check("the fixture directories the stream, collector and replay tests read are shipped",
           all(shipped(f) for f in fixtures), [f for f in fixtures if not shipped(f)])
     # the files the ticker hashes in the deployed tree before it acts (the V3F amendment, its Revisions and a
@@ -1703,10 +1704,18 @@ def stage_deploy():
     from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LSM
     roots = [ln.split(": ", 1)[1] for ln in dry.stdout.splitlines() if ln.startswith("git root: ")]
     fam = LSM.load_domain("weed").get("v3fam") or {}
-    named = [f for f in (fam.get("amendment_file"), fam.get("revision_file"), (fam.get("reopen") or {}).get("file"))
-             if f]
+    ro = fam.get("reopen") or []
+    named = [f for f in [fam.get("amendment_file"), fam.get("revision_file")] + [
+        b.get("file") for b in ([ro] if isinstance(ro, dict) else ro)] if f]
     check("every file the weed domain's v3fam block names by sha256 (%s) is a git-root path the deploy ships"
-          % ", ".join(named), len(named) == 3 and all(f in roots for f in named), (named, roots))
+          % ", ".join(named), len(named) == 4 and all(f in roots for f in named), (named, roots))
+    # deviation 5: the deploy-time checks (the code the reproduction records pin, every pinned file's sha256)
+    roots_sh = script.read_text().split("ROOT_PATHS=(", 1)[1].split(")", 1)[0].split()
+    ok5, lines5 = SRM.v3fam_deploy_check(LSM.load_domain("weed"), ROOT_PKG.parent, roots_sh)
+    check("the V3F deploy checks pass on this tree (deviation 5): its code is the domain's v3fam.equivalence_code and "
+          "every file the v3fam block pins is among the script's git-root paths with that sha256", ok5, lines5)
+    check("  and the dry run runs them (it prints both passes)", len([
+        ln for ln in dry.stdout.splitlines() if ln.startswith("v3fam check: pass:")]) == 2, dry.stdout[-400:])
 
 
 def main_stages():

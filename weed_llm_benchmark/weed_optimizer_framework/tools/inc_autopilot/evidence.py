@@ -196,8 +196,10 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # classifier's pin and INC_DIR/twostage/ (a reserved directory) are never on
 # the list; V3F's (2026-10-11, the v3 experiment family): capacity/v3fam_v1.json
 # (the family's verdict, dev only; and capacity/v3fam_v1_cont.json, its
-# continuation over every arm, deviation 4 of 2026-10-20; the continuation's
-# external, ext and report files are never on the list, as v1's are not),
+# continuation over every arm, deviation 4 of 2026-10-20, and
+# capacity/v3fam_v1_cont2.json, its second continuation, deviation 5 of
+# 2026-10-24; the continuations' external, ext and report files are never on
+# the list, as v1's are not),
 # capacity/v3fam_score_<arm>.json (each
 # arm's score record: dev file names, sha256s, status and counts),
 # splits/v3fam/summary.json (the family's manifests by sha256 and counts) and
@@ -230,8 +232,9 @@ ALLOWED = tuple(re.compile(p) for p in (
     r"\.json\Z",
     r"splits/v3/summary\.json\Z",
     # V3F (2026-10-11): the family's verdict and score records (dev only), its data summary, its derived status;
-    # deviation 4 (2026-10-20): the continuation verdict (dev only), never its external, ext or report files
-    r"capacity/v3fam_(?:v1|v1_cont|score_(?:%s))\.json\Z" % "|".join(
+    # deviation 4 (2026-10-20): the continuation verdict (dev only), never its external, ext or report files;
+    # deviation 5 (2026-10-24): the second continuation likewise
+    r"capacity/v3fam_(?:v1|v1_cont|v1_cont2|score_(?:%s))\.json\Z" % "|".join(
         ("e3rs", "d2laion", "d2clip", "d2dinol", "d2dinob", "d2siglip", "d2rn50", "d2bc1", "d2bc2640", "d2ft", "d3",
          "d9", "d1", "d4f", "d4n", "d4r15", "d5b", "d6", "d8", "bclean")),
     r"splits/v3fam/summary\.json\Z",

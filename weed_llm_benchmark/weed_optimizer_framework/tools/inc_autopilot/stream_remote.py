@@ -30,7 +30,8 @@ prints exactly one "INCAP <json>" line (remote.emit).
         <pkg>.splits build|lock, <pkg>.baseline build|rescore-native|rescore-agnostic|rescore-e2|
         rescore-e2-attr, <pkg>.twostage score-arm|verdict,
         <pkg>.base3 build, <pkg>.pilot4 build; V3F, 2026-10-11: <pkg>.v3fam_data build,
-        <pkg>.v3fam score --arm X|verdict, <pkg>.baseline build --exp E --v3fam ARM
+        <pkg>.v3fam score --arm X, <pkg>.v3fam_verdict verdict (deviation 5, 2026-10-24: the
+        verdict's CLI outside inc2/v3fam.py), <pkg>.baseline build --exp E --v3fam ARM
         --seeds 0,1,2 --role baseline; a person's score-test, reanalyse-test and the
         D0-S sweep are refused; verdict takes --cap-refused ITEM,... the ticker refused at
         the family cap and --ticker-failed ITEM,... it recorded failed twice); detr
@@ -89,8 +90,10 @@ BUILD_VERBS = {"stream": ("init", "build", "milestone", "fork", "feasibility", "
                "twostage": ("score-arm", "verdict"),
                # V3F (2026-10-11): the family's data (L23H), one arm's scores (L23J) and its verdict (L23L); its
                # builds are inc2.baseline build --v3fam (L23I); score-test, reanalyse-test and the sweep are a
-               # person's or the delegate's jobs, never the platform's
-               "v3fam_data": ("build",), "v3fam": ("score", "verdict")}
+               # person's or the delegate's jobs, never the platform's. The verdict runs from inc2.v3fam_verdict
+               # (deviation 5, 2026-10-24): inc2/v3fam.py, whose sha256 every reproduction record pins, keeps only
+               # the verbs it had when they were taken
+               "v3fam_data": ("build",), "v3fam": ("score",), "v3fam_verdict": ("verdict",)}
 # V3F (2026-10-11): D6's RF-DETR jobs (L23K, TRAIN lane) through run_inc2_detr.sh
 DETR_VERBS = {"v3fam_detr": ("smoke", "train")}
 RUN_VERBS = {"stream": ("commit", "compare", "choose-arm", "rollback", "quarantine", "release"),
@@ -115,7 +118,8 @@ E2_ATTR_JOB_NAME = "inc_build_e2_attr_v1"
 E3_SCORE_JOB_NAME = "inc_build_e3_score_%s"
 E3_JOB_NAME = "inc_build_e3_v1"
 # V3F (2026-10-11): inc2.v3fam_data build's job (L23H), inc2.v3fam score's per arm (L23J; the arm lower-cased, as
-# run_inc2_build.sh names its provenance v3fam_score_<arm>) and inc2.v3fam verdict's (L23L); D6's RF-DETR jobs
+# run_inc2_build.sh names its provenance v3fam_score_<arm>) and inc2.v3fam_verdict verdict's (L23L, provenance
+# v3fam_v1; deviation 5); D6's RF-DETR jobs
 # (L23K) as run_inc2_detr.sh is submitted: the smoke's and each seed's; a family build (L23I) is inc_build_<exp>
 V3FAM_DATA_JOB_NAME = "inc_build_v3fam_data"
 V3FAM_SCORE_JOB_NAME = "inc_build_v3fam_score_%s"
@@ -620,6 +624,14 @@ def refresh_summary(sid, pkg=STREAM_PKG):
 
 V3FAM_STATUS = "v3fam/v1/status.json"         # derived on the cluster each snapshot, never a file of the tree
 V3FAM_PERSON_JOBS = ("v3fam_sweep", "v3famtest_", "v3fam_retest")
+# Deviation 5 (2026-10-24): the code every reproduction record of the family pins (inc2.v3fam.code_shas: the six
+# E3-frozen files of twostage.CODE_FILES and inc2/v3fam.py), relative to weed_optimizer_framework/; restated here so
+# that the snapshot hashes the files without importing the family's modules (torch); a test checks it against both
+V3FAM_CODE_FILES = {"twostage": "tools/inc2/twostage.py", "scorer": "tools/inc/scorer.py",
+                    "scorer_sidecar": "tools/inc2/scorer_sidecar.py", "scorer_native": "tools/inc2/scorer_native.py",
+                    "verify": "tools/inc/verify.py", "semisup_labeler": "tools/semisup_labeler.py",
+                    "v3fam": "tools/inc2/v3fam.py"}
+V3FAM_EQUIV_DIR = "v3fam/v1/equivalence"
 
 
 def _v3fam_hours(att):
@@ -631,6 +643,159 @@ def _v3fam_hours(att):
     except (TypeError, ValueError):
         return None
     return max(0.0, (b - a).total_seconds() / 3600.0)
+
+
+def v3fam_code():
+    """({name: sha256} of the code the family's jobs run, {copy, nested_equal}): V3FAM_CODE_FILES in the outer copy
+    the INC jobs import (remote.package_copies), else in the running package; nested_equal says whether the
+    nested copy holds the same bytes (None when there is no other copy)."""
+    nested, outer = R.package_copies()
+    here = Path(__file__).resolve().parents[2]
+    base = outer if outer.is_dir() else here
+
+    def shas(root):
+        return {k: (R._sha256_file(root / rel) if (root / rel).is_file() else None)
+                for k, rel in sorted(V3FAM_CODE_FILES.items())}
+    code = shas(base)
+    other = nested if base != nested else None
+    eq = (shas(other) == code) if other is not None and other.is_dir() and other.resolve() != base.resolve() else None
+    return code, {"copy": "outer" if base == outer else "running", "nested_equal": eq}
+
+
+def v3fam_equivalence(inc):
+    """The family's reproduction records against the code its jobs run (deviation 5, 2026-10-24): each record of
+    v3fam/v1/equivalence (its name, status, sha256, whether its code map equals v3fam_code(), the keys that differ),
+    the names taken by other code (stale; inc2.v3fam.require_equivalence refuses every family score resting on
+    one), the records a recorded deviation supersedes by sha256 (inc2.v3fam_supersede: not stale, the next family
+    job moves them aside) and that module's status. Hashes and names only, no score."""
+    from ..inc2 import v3fam_supersede as SUP
+    code, where = v3fam_code()
+    d = inc / V3FAM_EQUIV_DIR
+    recs, stale, sup = [], [], []
+    for p in sorted(d.glob("*.json")) if d.is_dir() else []:
+        rec, info = _read_json(p)
+        sha = (info or {}).get("sha256") if isinstance(info, dict) else None
+        sha = sha or (R._sha256_file(p) if p.is_file() else None)
+        rc = (rec or {}).get("code") if isinstance(rec, dict) else None
+        rc = rc if isinstance(rc, dict) else {}
+        diff = sorted(k for k in set(code) | set(rc) if code.get(k) != rc.get(k))
+        rel = "%s/%s" % (V3FAM_EQUIV_DIR, p.name)
+        superseded = SUP.is_superseded(rel, sha)
+        recs.append({"name": p.name, "status": (rec or {}).get("status") if isinstance(rec, dict) else None,
+                     "sha256": sha, "code_match": not diff, "differs": diff, "superseded": superseded})
+        if superseded:
+            sup.append(p.name)
+        elif diff:
+            stale.append(p.name)
+    st = SUP.status(inc)
+    return {"code": code, "fingerprint": hashlib.sha256(json.dumps(code, sort_keys=True).encode()).hexdigest(),
+            "copy": where["copy"], "nested_equal": where["nested_equal"], "records": recs, "stale": stale,
+            "superseded": sup, "supersede": {k: st[k] for k in ("pending", "moved", "other", "absent")}}
+
+
+def v3fam_code_at(package):
+    """{name: sha256 or None} of V3FAM_CODE_FILES under a weed_optimizer_framework directory (the deploy's tree)."""
+    package = Path(package)
+    return {k: (R._sha256_file(package / rel) if (package / rel).is_file() else None)
+            for k, rel in sorted(V3FAM_CODE_FILES.items())}
+
+
+V3FAM_CODE_RE = re.compile(r"weed_optimizer_framework/(%s)$" % "|".join(
+    re.escape(v) for _k, v in sorted(V3FAM_CODE_FILES.items())))
+
+
+def v3fam_deploy_check(dom, git_root, root_paths, allow=None, package=None):
+    """(ok, [lines]): deviation 5's deploy-time checks on the tree a deploy ships (deploy/deploy_funnel.sh runs them
+    before anything is copied, and in --dry-run; tests/test_stream_pipeline.py runs them):
+      (a) the code every reproduction record of the family pins (V3FAM_CODE_FILES, inc2.v3fam.code_shas) hashes as
+          the domain's v3fam.equivalence_code, the code map the cluster's records were taken with; a changed file
+          is refused by name (on 2026-10-21 deviation 4's CLI-only change of inc2/v3fam.py left every record taken
+          by other code, and twelve score jobs of six arms were refused); allow, a recorded deviation's file among
+          the deploy's git-root paths, lets it pass with a notice (the deviation then says which records it moves
+          aside and retakes);
+      (b) every file the domain's v3fam block names by sha256 (the amendment, its Revisions, each reopen block's
+          deviation file) is among the git-root paths and hashes so in this tree; else the ticker would never
+          reopen what a deviation names, and nothing would say so."""
+    fam = (dom or {}).get("v3fam") or {}
+    git_root = Path(git_root)
+    package = Path(package) if package else Path(__file__).resolve().parents[2]
+    roots = set(root_paths or ())
+    lines, ok = [], True
+    pin = fam.get("equivalence_code")
+    now = v3fam_code_at(package)
+    if not isinstance(pin, dict) or set(pin) != set(V3FAM_CODE_FILES):
+        ok = False
+        lines.append("refused: the domain's v3fam.equivalence_code does not name the code the family's reproduction "
+                     "records pin (%s)" % ", ".join(sorted(V3FAM_CODE_FILES)))
+    else:
+        changed = sorted(k for k in V3FAM_CODE_FILES if now.get(k) != pin.get(k))
+        if not changed:
+            lines.append("pass: the code the reproduction records pin (inc2.v3fam.code_shas) is the domain's "
+                         "v3fam.equivalence_code (v3fam %s)" % str(now.get("v3fam"))[:12])
+        elif allow and allow in roots and (git_root / allow).is_file():
+            lines.append("NOTICE: %s change(s) the code the reproduction records pin (%s); allowed by the recorded "
+                         "deviation %s (sha256 %s): every record taken by other code is refused by "
+                         "inc2.v3fam.require_equivalence until that deviation moves it aside and retakes it" % (
+                             "this tree", ", ".join("%s %s -> %s" % (k, str(pin.get(k))[:12], str(now.get(k))[:12])
+                                                    for k in changed), allow,
+                             hashlib.sha256((git_root / allow).read_bytes()).hexdigest()[:12]))
+        else:
+            ok = False
+            lines.append("refused: this tree changes the code every reproduction record of the family pins (%s; "
+                         "inc2.v3fam.code_shas): each family score would be refused ('the code changed since ... "
+                         "ran'). Keep those files' bytes (put CLI or plumbing elsewhere, as deviation 5 did with "
+                         "inc2/v3fam_verdict.py), or record a deviation that moves the records aside and retakes "
+                         "them, ship it among the git-root paths and pass --allow-v3fam-code-change=<its file>%s" % (
+                             ", ".join("%s %s -> %s" % (k, str(pin.get(k))[:12], str(now.get(k))[:12])
+                                       for k in changed),
+                             "" if not allow else " (%s is not a git-root path this deploy ships)" % allow))
+    named = [(fam.get("amendment_file"), fam.get("amendment_sha256")),
+             (fam.get("revision_file"), fam.get("revision_sha256"))]
+    ro = fam.get("reopen") or []
+    named += [(b.get("file"), b.get("sha256")) for b in ([ro] if isinstance(ro, dict) else ro) if isinstance(b, dict)]
+    bad = []
+    for f, sha in named:
+        if not f:
+            continue
+        p = git_root / f
+        got = hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+        if f not in roots:
+            bad.append("%s is not a git-root path the deploy ships" % f)
+        elif got != sha:
+            bad.append("%s hashes %s, the domain pins %s" % (f, str(got)[:12], str(sha)[:12]))
+    if bad:
+        ok = False
+        lines.append("refused: a file the domain's v3fam block pins by sha256 would not be deployed as pinned (the "
+                     "ticker would never act on it, and nothing would say so): %s" % "; ".join(bad))
+    else:
+        lines.append("pass: every file the domain's v3fam block pins by sha256 (%d) is shipped with that sha256"
+                     % len([f for f, _s in named if f]))
+    return ok, lines
+
+
+def v3fam_records_guard(changed, n_records, allow=None, roots=()):
+    """(ok, message) for deploy_funnel.sh step 2, beside PINNED_RE: `changed`, the paths rsync would change on the
+    cluster; n_records, the reproduction records under the cluster's v3fam/v1/equivalence (an int, or anything else
+    when the listing failed: read as present). A change to a file the records pin (V3FAM_CODE_RE) while records
+    exist is refused unless `allow` names a recorded deviation among the git-root paths (roots)."""
+    hit = sorted({c for c in changed or () if V3FAM_CODE_RE.search(str(c))})
+    if not hit:
+        return True, "pass: no file the family's reproduction records pin changes on the cluster"
+    try:
+        n = int(n_records)
+    except (TypeError, ValueError):
+        n = None
+    if n == 0:
+        return True, "NOTICE: %s change on the cluster; it holds no reproduction record" % ", ".join(hit)
+    held = "%s reproduction record(s)" % n if n is not None else "reproduction records (the listing failed: read " \
+                                                                  "as present)"
+    if allow and allow in set(roots or ()):
+        return True, "NOTICE: %s change on the cluster, which holds %s; allowed by the recorded deviation %s" % (
+            ", ".join(hit), held, allow)
+    return False, ("refused: the deploy would change %s on the cluster, which holds %s pinning them "
+                   "(inc2.v3fam.require_equivalence would refuse every family score); pass "
+                   "--allow-v3fam-code-change=<a recorded deviation's file> only with a deviation that moves them "
+                   "aside and retakes them" % (", ".join(hit), held))
 
 
 def v3fam_status(inc):
@@ -689,6 +854,10 @@ def v3fam_status(inc):
             hours += h or 0.0
     out["person_jobs"] = items
     out["person_settled_gpuh"] = round(hours, 4)
+    try:
+        out["equivalence"] = v3fam_equivalence(inc)
+    except Exception as e:                      # reported, never fatal: the ticker then reads it as unknown
+        out["equivalence_error"] = "%s: %s" % (type(e).__name__, str(e)[:200])
     return out
 
 
@@ -794,8 +963,10 @@ def stream_summary(sid, dev_exps=()):
         put("capacity/v3fam_score_%s.json" % arm.lower(), inc / "capacity" / ("v3fam_score_%s.json" % arm.lower()))
     put("capacity/v3fam_v1.json", inc / "capacity" / "v3fam_v1.json")
     # deviation 4 (2026-10-20): the continuation verdict over every arm (dev only), the record the domain's
-    # v3fam.verdict_record names once the verdict of 2026-10-13 is in place
+    # v3fam.verdict_record named once the verdict of 2026-10-13 was in place; deviation 5 (2026-10-24): the second
+    # continuation (dev only), the record it names once the continuation of 2026-10-22 is in place
     put("capacity/v3fam_v1_cont.json", inc / "capacity" / "v3fam_v1_cont.json")
+    put("capacity/v3fam_v1_cont2.json", inc / "capacity" / "v3fam_v1_cont2.json")
     try:
         arts[V3FAM_STATUS] = _dev(v3fam_status(inc))
     except Exception as e:                      # a status that cannot be read is reported, never fatal
@@ -925,8 +1096,8 @@ BUILD_FLAGS = {
     ("twostage", "verdict"): {},
     ("v3fam_data", "build"): {},
     ("v3fam", "score"): {"--arm": ("arm", _ENUM(*V3FAM_SCORE_ARMS))},
-    ("v3fam", "verdict"): {"--cap-refused": ("cap_refused", V3FAM_CAP_ITEMS_RE),
-                           "--ticker-failed": ("ticker_failed", V3FAM_FAILED_ITEMS_RE)},
+    ("v3fam_verdict", "verdict"): {"--cap-refused": ("cap_refused", V3FAM_CAP_ITEMS_RE),
+                                   "--ticker-failed": ("ticker_failed", V3FAM_FAILED_ITEMS_RE)},
     ("baseline", "rescore-agnostic"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
     ("base3", "build"): {"--stream": ("stream", _NAME)},
     ("pilot4", "build"): {"--exp": ("exp", _NAME), "--from": ("from_exp", _NAME), "--recipes": ("recipes", _RECIPES)},
@@ -1048,7 +1219,7 @@ def job_name(req, meta):
             return V3FAM_DATA_JOB_NAME
         if (req["module"], req["verb"]) == ("v3fam", "score"):
             return V3FAM_SCORE_JOB_NAME % p["arm"].lower()
-        if (req["module"], req["verb"]) == ("v3fam", "verdict"):
+        if (req["module"], req["verb"]) == ("v3fam_verdict", "verdict"):
             return V3FAM_JOB_NAME
         if (req["module"], req["verb"]) == ("base3", "build"):
             return BASE3_JOB_NAME

@@ -80,8 +80,8 @@ MUTANTS = {
     "DM10": (VR, '        if a == "BCLEAN" and not trig.get("bclean"):\n', '        if a == "BCLEAN":\n', FAST),
     "DM11": (VR, '    ok, why = verdict_ready(cap_refused=cap_refused, failed=ticker_failed)\n', '    ok, why = True, ""\n',
              FAST),
-    "DM12": (VR, '    return cap_path(CONTINUATION["verdict"]) if is_partial() else verdict_path()\n',
-             '    return verdict_path()\n', FAST),
+    "DM12": (VR, '    if not is_partial():\n        return verdict_path()\n',
+             '    if True:\n        return verdict_path()\n', FAST),
     "DM13": (VR, '                if abs(float(a) - float(b)) > CONT_REPRO_TOL:\n',
              '                if abs(float(a) - float(b)) > 1.0:\n', FAST),
     "DM14": (VR, '    if bad or lost:\n', '    if bad:\n', FAST),
@@ -91,8 +91,8 @@ MUTANTS = {
     "DM17": (ST, '            if not ro.get("before_utc") or not rec.get("started_utc") or str(rec["started_utc"]) >= '
                  'ro["before_utc"]:\n                continue\n',
              '            if False:\n                continue\n', FAST),
-    "DM18": (ST, 'if not isinstance(rec, dict) or rec.get("reopened") == marker or rec.get("state") not in',
-             'if not isinstance(rec, dict) or rec.get("state") not in', FAST),
+    "DM18": (ST, ' or rec.get("reopened") == marker \\\n                    or marker in [h.get("marker") for h in '
+                 'rec.get("reopen_history") or [] if isinstance(h, dict)]:\n', ':\n', FAST),
     "DM19": (ST, '            self.st["failed_ids"] = (failed + [i for i in ids if i and i not in failed])'
                  '[-FAILED_IDS_KEEP:]\n', '            pass\n', FAST),
     "DM20": (ST, '        if not marker or not ro.get("items") or not self._v3fam_deployed(ro.get("file"), '

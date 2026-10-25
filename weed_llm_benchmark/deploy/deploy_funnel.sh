@@ -9,7 +9,10 @@
 #
 #   deploy/deploy_funnel.sh            pre-flight, deploy, verify, record the replay, restart the dashboard
 #   deploy/deploy_funnel.sh --no-restart
-#   deploy/deploy_funnel.sh --dry-run  list what would be copied; copy nothing
+#   deploy/deploy_funnel.sh --dry-run  list what would be copied and run the V3F deploy checks; copy nothing
+#   deploy/deploy_funnel.sh --allow-v3fam-code-change=docs/prereg/<deviation>.md
+#                                      (only with a recorded deviation that moves V3F's reproduction records
+#                                      aside and retakes them: see V3F_CODE below)
 #
 # Why the stream ships here: tools/inc_autopilot is one package, and its replay
 # gate (executor.REPLAY_SCRIPTS) runs the stream's scenario and mutation cases,
@@ -46,12 +49,14 @@ RESTART=1
 DRY=0
 ALLOW_PINNED=0
 ALLOW_SHARED=0
+ALLOW_V3F=""
 for a in "$@"; do
   case "$a" in
     --no-restart) RESTART=0 ;;
     --dry-run) DRY=1 ;;
     --allow-pinned-change) ALLOW_PINNED=1 ;;
     --allow-shared-change) ALLOW_SHARED=1 ;;
+    --allow-v3fam-code-change=*) ALLOW_V3F="${a#*=}" ;;
     *) echo "unknown argument: $a" >&2; exit 2 ;;
   esac
 done
@@ -94,6 +99,8 @@ PKG_PATHS=(
   # V3F (2026-10-11): D6's RF-DETR job script (lever L23K)
   run_inc2_detr.sh
   tests/fixtures/collect
+  # deviation 5 (2026-10-24): the cluster's own V3F records the shipped test_stream_ap_v3fam_dev5.py reads
+  tests/fixtures/v3fam_dev5
   # shared libraries the stream job scripts hash (SHARED_RE: never changed by this deploy)
   weed_optimizer_framework/tools/near_dup.py weed_optimizer_framework/tools/semisup_labeler.py
   weed_optimizer_framework/tools/registry_lock.py weed_optimizer_framework/tools/mega_trainer.py
@@ -110,13 +117,24 @@ while IFS= read -r t; do PKG_PATHS+=("$t"); done < <(ls tests/test_funnel_*.py t
 ROOT_PATHS=(docs/FUNNEL_AUDIT.md docs/FUNNEL_AUDIT_RUNNER.md docs/FUNNEL_REPRODUCE.md RESEARCH_LOG.md
             docs/poster/figures_data.json
             docs/CONTINUOUS_LOOP.md docs/INCREMENTAL_PROTOCOL.md docs/INCREMENTAL_PROTOCOL_RUNNER.md docs/INC_AUTOPILOT.md
-            docs/prereg/V3F_2026-10-11.md docs/prereg/V3F_rev29-31_2026-10-11.md docs/prereg/V3F_dev4_2026-10-20.md)
+            docs/prereg/V3F_2026-10-11.md docs/prereg/V3F_rev29-31_2026-10-11.md docs/prereg/V3F_dev4_2026-10-20.md
+            docs/prereg/V3F_dev5_2026-10-24.md)
 # V3F (2026-10-11): the ticker proposes the family's levers only once the deployed tree holds the amendment's byte
 # copy (docs/prereg/V3F_2026-10-11.md) and its Revisions 29-31's (docs/prereg/V3F_rev29-31_2026-10-11.md), each by
 # its sha256; it reopens the items a recorded deviation names only once the deployed tree holds that deviation's
-# file by its sha256 (the domain's v3fam.reopen: docs/prereg/V3F_dev4_2026-10-20.md, deviation 4); the deploy record
-# names whether HEAD descends from the amendment's commit
+# file by its sha256 (the domain's v3fam.reopen: docs/prereg/V3F_dev4_2026-10-20.md, deviation 4;
+# docs/prereg/V3F_dev5_2026-10-24.md, deviation 5); the deploy record names whether HEAD descends from the amendment's
+# commit
 V3F_COMMIT=55cc2d97cd2147d01644c1e193098b73aeba0a06
+# V3F_CODE (deviation 5, 2026-10-24): every reproduction record of the family (the cluster's v3fam/v1/equivalence)
+# pins the sha256 of the code that took it (inc2.v3fam.code_shas: inc2/v3fam.py and the six E3-frozen files), and
+# inc2.v3fam.require_equivalence refuses every family score resting on a record taken by other code; on 2026-10-21 a
+# CLI-only change of inc2/v3fam.py refused twelve score jobs of six arms. Before anything is copied (and in --dry-run)
+# stream_remote.v3fam_deploy_check refuses a tree whose code is not the domain's v3fam.equivalence_code, or that would
+# ship a file the domain's v3fam block pins by sha256 (the amendment, its Revisions, each reopen block's deviation)
+# with another sha256; step 2 refuses, as for PINNED_RE, a change of those files on the cluster while it holds
+# reproduction records (stream_remote.v3fam_records_guard). --allow-v3fam-code-change=<file> passes both only when
+# <file> is a recorded deviation among ROOT_PATHS, and the deploy record names it with its sha256.
 # The replay set envelope autonomy needs a pass for (executor.REPLAY_SCRIPTS: inc, funnel and stream,
 # with both mutation harnesses) plus the stream's end-to-end pipeline: all must pass locally before any
 # copy (docs/CONTINUOUS_LOOP.md 6.5: a failing S-case blocks the funnel's autonomy too). Since 2026-10-04 it
@@ -129,19 +147,47 @@ PREFLIGHT=(tests/test_inc_ap_replay.py tests/test_inc_ap_governance.py tests/tes
 
 for p in "${PKG_PATHS[@]}" "${LAB_ONLY_PATHS[@]}"; do [ -e "$p" ] || { echo "missing package path: $p" >&2; exit 1; }; done
 for p in "${ROOT_PATHS[@]}"; do [ -e "$GIT_ROOT/$p" ] || { echo "missing git-root path: $p" >&2; exit 1; }; done
-if ! git -C "$GIT_ROOT" diff --quiet HEAD -- "${PKG_PATHS[@]}" 2>/dev/null; then
-  echo "WARNING: the deployed package paths differ from HEAD (uncommitted changes); the deploy record names HEAD" >&2
+# (the package paths are relative to $PKG, the working directory: git reads pathspecs relative to it)
+if ! git diff --quiet HEAD -- "${PKG_PATHS[@]}" 2>/dev/null \
+    || ! (cd "$GIT_ROOT" && git diff --quiet HEAD -- "${ROOT_PATHS[@]}" 2>/dev/null); then
+  echo "WARNING: the deployed paths differ from HEAD (uncommitted changes); the deploy record names HEAD" >&2
+fi
+if [ -n "$(git status --porcelain --untracked-files=all -- "${PKG_PATHS[@]}" 2>/dev/null | grep '^??' || true)" ]; then
+  echo "WARNING: the deployed package paths hold untracked files (shipped from the working tree, absent from HEAD):" >&2
+  git status --porcelain --untracked-files=all -- "${PKG_PATHS[@]}" 2>/dev/null | grep '^??' | head -20 >&2
 fi
 HEAD_SHA="$(git -C "$GIT_ROOT" rev-parse HEAD)"
 if git -C "$GIT_ROOT" merge-base --is-ancestor "$V3F_COMMIT" HEAD 2>/dev/null; then V3F_ANCESTOR=true; else V3F_ANCESTOR=false; fi
+if [ -n "$ALLOW_V3F" ]; then
+  case " ${ROOT_PATHS[*]} " in *" $ALLOW_V3F "*) ;; *)
+    echo "refused: --allow-v3fam-code-change names $ALLOW_V3F, not a git-root path this deploy ships" >&2; exit 3 ;; esac
+  V3F_CHANGE="{\"file\": \"$ALLOW_V3F\", \"sha256\": \"$(shasum -a 256 "$GIT_ROOT/$ALLOW_V3F" | cut -c1-64)\"}"
+else
+  V3F_CHANGE=null
+fi
+# V3F_CODE: the deploy-time checks on this tree (no network)
+if ! V3F_CHECK="$("$PY" - "$GIT_ROOT" "$ALLOW_V3F" "${ROOT_PATHS[@]}" <<'PYCHK' 2>&1
+import sys
+from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LS, stream_remote as SR
+ok, lines = SR.v3fam_deploy_check(LS.load_domain("weed"), sys.argv[1], sys.argv[3:], allow=sys.argv[2] or None)
+print("\n".join("v3fam check: %s" % x for x in lines))
+sys.exit(0 if ok else 1)
+PYCHK
+)"; then
+  echo "$V3F_CHECK" >&2
+  echo "refused: the V3F deploy checks failed; nothing was copied" >&2
+  exit 3
+fi
 
 if [ "$DRY" = 1 ]; then
   printf 'package: %s\n' "${PKG_PATHS[@]}"
   printf 'lab-only: %s\n' "${LAB_ONLY_PATHS[@]}"
   printf 'git root: %s\n' "${ROOT_PATHS[@]}"
   printf 'pre-flight: %s\n' "${PREFLIGHT[@]}"
+  echo "$V3F_CHECK"
   exit 0
 fi
+echo "$V3F_CHECK"
 
 LSSH=(ssh -o ConnectTimeout=30 -i "$LAB_SSH_KEY" "$LAB_SSH")
 RSYNC_LAB=(rsync -aR --exclude __pycache__ -e "ssh -o ConnectTimeout=30 -i $LAB_SSH_KEY")
@@ -187,6 +233,29 @@ if grep -Eq "$PINNED_RE" /tmp/deploy_funnel_pre_$TS.txt && [ "$ALLOW_PINNED" != 
   grep -E "$PINNED_RE" /tmp/deploy_funnel_pre_$TS.txt >&2
   "${LSSH[@]}" "rm -rf ~/$STAGE"
   exit 3
+fi
+# V3F_CODE: a change of a file the reproduction records pin, while the cluster holds records (listed by the
+# data-transfer node's rsync; a failed listing reads as records present)
+if grep -Eq "$("$PY" -c 'from weed_optimizer_framework.tools.inc_autopilot import stream_remote as S; print(S.V3FAM_CODE_RE.pattern)')" /tmp/deploy_funnel_pre_$TS.txt; then
+  N_EQ="$("${LSSH[@]}" bash -s -- "$CLUSTER_REPO" "$CLUSTER_DATA_SSH" <<'LAB' || echo unknown
+set -uo pipefail
+CL="$1"; DATA="$2"
+export SSH_ASKPASS="$HOME/.cluster_askpass.sh" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
+unset SSH_AUTH_SOCK
+RSH="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o IdentityAgent=none -o NumberOfPasswordPrompts=1"
+if out="$(setsid -w rsync --list-only -e "$RSH" "$DATA:$CL/results/framework/inc/v3fam/v1/equivalence/" < /dev/null)"; then
+  printf '%s\n' "$out" | awk '$1 ~ /^-/ && $NF ~ /\.json$/' | wc -l | tr -d ' '
+else
+  echo unknown
+fi
+LAB
+)"
+  if ! V3F_GUARD="$("$PY" -c 'import sys; from weed_optimizer_framework.tools.inc_autopilot import stream_remote as S; ok, msg = S.v3fam_records_guard(open(sys.argv[1]).read().split(), sys.argv[2], sys.argv[3] or None, sys.argv[4:]); print(msg); sys.exit(0 if ok else 1)' /tmp/deploy_funnel_pre_$TS.txt "$N_EQ" "$ALLOW_V3F" "${ROOT_PATHS[@]}")"; then
+    echo "$V3F_GUARD" >&2
+    "${LSSH[@]}" "rm -rf ~/$STAGE"
+    exit 3
+  fi
+  echo "  $V3F_GUARD" >&2
 fi
 if grep -Eq "$SHARED_RE" /tmp/deploy_funnel_pre_$TS.txt && [ "$ALLOW_SHARED" != 1 ]; then
   echo "refused: the deploy would change shared library module(s) the live harvest, trainer or scheduler run:" >&2
@@ -265,7 +334,7 @@ fi
 # the stream's own record: the module hashes the snapshot's S23 check compares with the cluster's copy
 "${LSSH[@]}" "cat > ~/$LAB_TREE_REL/results/framework/inc/stream_deployed.json" <<REC
 {"deployed_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "git_head": "$HEAD_SHA", "script": "deploy/deploy_funnel.sh",
- "replay_rc": $REPLAY_RC, "v3fam_amendment_ancestor": $V3F_ANCESTOR,
+ "replay_rc": $REPLAY_RC, "v3fam_amendment_ancestor": $V3F_ANCESTOR, "v3fam_code_change": $V3F_CHANGE,
  "stream_module_sha256": $(cat /tmp/deploy_stream_modules_$TS.json)}
 REC
 echo "done: HEAD $HEAD_SHA"

@@ -962,8 +962,12 @@ def d28(v):
         cites, ["L24", "OP_CARD"], None, {"leaks": hits, "pending": pending, "hold": "TRAIN" if pending else None,
                                           "stream_exists": inited, "cleared": cleared,
                                           "cleared_quarantined": requeued, "lift_pending": lift,
+                                          # L24 only for a leak the stream does not already quarantine (its ledger
+                                          # is the truth): on 2026-10-06/07 the three leaks were quarantined, their
+                                          # L24 was proposed again every tick and declined, and lane STOP stalled
                                           "propose": [{"lever": "L24", "source": h["source"], "cite": "D28"}
-                                                      for h in hits] if inited else []})
+                                                      for h in hits if str(h["source"]) not in qs]
+                                          if inited else []})
 
 
 # ------------------------------------------------------------ D22, D23, D24
@@ -1282,7 +1286,9 @@ def d31(v, prior=None, include_prior=False):
     for b in blamed:
         audits.setdefault(b["exp"], []).append(b["step"])
     props = [{"lever": "L4", "exp": e, "steps": sorted(set(s))} for e, s in sorted(audits.items())]
-    props += [{"lever": "L24", "source": s, "cite": "D31"} for s in q]
+    qdoc = v.queue()
+    qs = set((qdoc.get("quarantined_sources") or {}) if isinstance(qdoc, dict) else ())
+    props += [{"lever": "L24", "source": s, "cite": "D31"} for s in q if s not in qs]   # not one already quarantined
     return _diag("D31", True, "warn", "data blamed on %s -> L4 label audit first%s" % (
         ", ".join("%s/%s (%s%s)" % (b["exp"], b["step"], b["disposition"],
                                      ", truth hurts" if b["truth"] == "hurts" else "") for b in blamed),
@@ -1741,6 +1747,10 @@ def v3fam_terminal(state):
 
 
 V3FAM_NOT_RUN_DATA = "not run (the family's data build failed)"
+# Deviation 5 (2026-10-24): an item a precondition of the platform's own making refused (a reproduction record taken
+# by other code, an E3-frozen file changed): neither due nor ended (the verdict waits for it); the ticker releases it
+# once the snapshot reports the records current (stream.StreamRun._v3fam_release)
+V3FAM_HELD_PLATFORM = "held (platform)"
 V3FAM_DATA_ENDED = ("done", "not run (family cap)")     # the data build's states after which the verdict may come
 
 
@@ -1833,17 +1843,34 @@ def v3fam_plan(fam, fs):
     """{lane: item} the family wants next and {item: why} of its waits, from /stage/v3fam (pure: DR0 and the
     family card read it). One MAINT item in V3F.7's order (L23H; L23J for the arms scored before the builds;
     L23I per build; L23J per arm once its runs are done; L23L once every arm's record is complete or failed,
-    v3fam_verdict_ready) and, on TRAIN, L23K's smoke after L23H and then its seeds."""
+    v3fam_verdict_ready) and, on TRAIN, L23K's smoke after L23H and then its seeds. Deviation 5 (2026-10-24): no
+    L23J while the snapshot reports a reproduction record taken by other code than the deployed one, or one E3RS's
+    job takes not in place (/stage/v3fam/equivalence stale: inc2.v3fam.require_equivalence would refuse the score);
+    an item held after a refusal of the platform's own making waits, named, until the ticker releases it."""
     out, waits = {}, {}
     data = fs.get("data")
     score, build = fs.get("score") or {}, fs.get("build") or {}
     after = fam.get("score_after") or {}
+    eq = fs.get("equivalence") or {}
+    stale = eq.get("state") == "stale"
 
     def score_item(arm):
         st = score.get(arm)
+        if st == V3FAM_HELD_PLATFORM:
+            waits["score:%s" % arm] = ("held: refused by a precondition of the platform's own making (deviation 5); "
+                                       "proposed again once the reproduction records are current")
+            return None
         if not _v3fam_due(st):
             return None
         dep = _v3fam_deps(fs, after.get(arm))
+        if dep == "ok" and stale:
+            waits["score:%s" % arm] = (
+                "the reproduction records %s are taken by other code than the deployed one or not in place (%s): "
+                "inc2.v3fam.require_equivalence would refuse the score; no family score is proposed until a recorded "
+                "deviation restores the code they pin or moves them aside and retakes them (deviation 5)" % (
+                    ", ".join((eq.get("stale") or []) + (eq.get("missing") or [])) or "?",
+                    "stale" if eq.get("stale") else "missing"))
+            return None
         if dep == "ok":
             return {"lever": "L23J", "arm": arm, "item": "score:%s" % arm}
         waits["score:%s" % arm] = "its dependencies %s are not done" % after.get(arm) if dep == "wait" else \

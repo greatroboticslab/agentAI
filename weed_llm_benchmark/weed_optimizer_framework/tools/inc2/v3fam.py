@@ -10,8 +10,7 @@ as one family)", kept byte for byte as docs/prereg/V3F_2026-10-11.md).
     python -m weed_optimizer_framework.tools.inc2.v3fam exif-verdict --frame yes|no --read-by owner|delegate
     python -m weed_optimizer_framework.tools.inc2.v3fam frozen
     python -m weed_optimizer_framework.tools.inc2.v3fam score --arm X          (L23J; SCORE_ARMS, the arm's module)
-    python -m weed_optimizer_framework.tools.inc2.v3fam verdict [--cap-refused ITEM,...] [--ticker-failed ITEM,...]
-                                                                                    (L23L; inc2/v3fam_verdict.py)
+    python -m weed_optimizer_framework.tools.inc2.v3fam verdict [--cap-refused ITEM,...]   (L23L; inc2/v3fam_verdict.py)
     python -m weed_optimizer_framework.tools.inc2.v3fam test-read --arm X --read-by owner|delegate   (a person's)
     python -m weed_optimizer_framework.tools.inc2.v3fam score-test --arm X     (the job test-read prepares)
     python -m weed_optimizer_framework.tools.inc2.v3fam test-report --arm X
@@ -1970,9 +1969,6 @@ def main(argv=None):
     ap.add_argument("--spec", default=None)
     ap.add_argument("--cap-refused", default=None,
                     help="verdict: the family items the ticker recorded 'not run (family cap)', comma-separated")
-    ap.add_argument("--ticker-failed", default=None,
-                    help="verdict: the score, build and D6 items the ticker recorded failed after their own second "
-                         "failure, comma-separated (deviation 4)")
     ap.add_argument("--batch", type=int, default=None, help="protocol %d; another only with %s=1" % (S.BATCH,
                                                                                                     S.TEST_ENV))
     ap.add_argument("--device", default=None)
@@ -2003,8 +1999,7 @@ def main(argv=None):
         elif a.command in ("verdict", "test-read", "score-test", "test-report", "reanalyse-test", "spend"):
             from . import v3fam_verdict as VR
             if a.command == "verdict":
-                VR.verdict(cap_refused=[x for x in (a.cap_refused or "").split(",") if x],
-                           ticker_failed=[x for x in (a.ticker_failed or "").split(",") if x])
+                VR.verdict(cap_refused=[x for x in (a.cap_refused or "").split(",") if x])
             elif a.command == "spend":
                 print(json.dumps(VR.spend(), indent=1, sort_keys=True))
             elif a.command == "reanalyse-test":

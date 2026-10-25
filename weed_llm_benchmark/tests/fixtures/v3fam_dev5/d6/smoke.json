@@ -1,0 +1,201 @@
+{
+ "attempt": {
+  "attempt": "attempt_1",
+  "cleanup": {
+   "kept": [
+    "metrics.csv"
+   ],
+   "removed": [
+    {
+     "bytes": 539439192,
+     "file": "last.ckpt"
+    },
+    {
+     "bytes": 134848584,
+     "file": "checkpoint_best_regular.pth"
+    },
+    {
+     "bytes": 134846468,
+     "file": "checkpoint_best_ema.pth"
+    },
+    {
+     "bytes": 134834300,
+     "file": "checkpoint_best_total.pth"
+    }
+   ]
+  },
+  "epochs": 1,
+  "export": {
+   "bytes": 134809429,
+   "epoch": 1,
+   "equals_inprocess_ema": true,
+   "file": "final_ema.pth",
+   "format": "{model, args, epoch}",
+   "sha256": "11560034fce511527bd7aa5e27ffe247adadfdd7b5232f9c4acd195bb52d2f50"
+  },
+  "export_predictions": {
+   "conf_max_abs_diff": 0.0,
+   "images": 20,
+   "ok": true,
+   "same_rows": true,
+   "xyxy_max_abs_diff_px": 0.0
+  },
+  "finished_utc": "2026-10-21T12:38:15.396305Z",
+  "fit_seconds": 2405.583,
+  "pretrain": {
+   "bytes": 135954129,
+   "file": "rf-detr-large-2026.pth",
+   "md5": "5cb72153541cbcb9aa6efa26222acc75",
+   "sha256": "0f4e20e19a99c0f8a62b5685f57f6c8b5c371c59081feda6752a0561a79ccf38"
+  },
+  "recipe": {
+   "batch_size": 2,
+   "checkpoint_interval": 1000,
+   "early_stopping": false,
+   "ema_decay": 0.993,
+   "ema_tau": 100,
+   "epochs": 1,
+   "eval_interval": 1,
+   "grad_accum_steps": 8,
+   "lr": 0.0001,
+   "lr_encoder": 0.00015,
+   "num_workers": 4,
+   "resolution": 704,
+   "run_test": false,
+   "tensorboard": false,
+   "use_ema": true,
+   "weight_decay": 0.0001
+  },
+  "seed": 0,
+  "seed_mechanism": "rfdetr TrainConfig.seed: seed_everything(seed + global_rank, workers=True) at fit start",
+  "stage_sha256": "06a4cb1887f4c5ed10e04c1575dd795bbcb9af9759038ca22e79a55696144c42",
+  "started_utc": "2026-10-21T11:57:40.697041Z",
+  "train_config": {
+   "accelerator": "auto",
+   "aug_config": null,
+   "auto_batch_ema_headroom": 0.7,
+   "auto_batch_max_targets_per_image": 100,
+   "auto_batch_target_effective": 16,
+   "batch_size": 2,
+   "checkpoint_interval": 1000,
+   "class_names": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry",
+    "OtherPlant"
+   ],
+   "clearml": false,
+   "clip_max_norm": 0.1,
+   "cls_loss_coef": 1.0,
+   "compute_test_loss": true,
+   "compute_val_loss": true,
+   "dataset_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/d6/stage",
+   "dataset_file": "roboflow",
+   "devices": 1,
+   "do_random_resize_via_padding": false,
+   "dont_save_weights": false,
+   "drop_path": 0.0,
+   "early_stopping": false,
+   "early_stopping_min_delta": 0.001,
+   "early_stopping_patience": 10,
+   "early_stopping_use_ema": false,
+   "ema_decay": 0.993,
+   "ema_tau": 100,
+   "ema_update_interval": 1,
+   "epochs": 1,
+   "eval_interval": 1,
+   "eval_max_dets": 500,
+   "expanded_scales": true,
+   "fp16_eval": false,
+   "grad_accum_steps": 8,
+   "group_detr": 13,
+   "ia_bce_loss": true,
+   "log_per_class_metrics": true,
+   "lr": 0.0001,
+   "lr_component_decay": 0.7,
+   "lr_drop": 100,
+   "lr_encoder": 0.00015,
+   "lr_min_factor": 0.0,
+   "lr_scheduler": "step",
+   "lr_vit_layer_decay": 0.8,
+   "mlflow": false,
+   "multi_scale": true,
+   "num_nodes": 1,
+   "num_select": 300,
+   "num_workers": 4,
+   "output_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/d6/smoke/attempt_1",
+   "persistent_workers": null,
+   "pin_memory": null,
+   "prefetch_factor": null,
+   "progress_bar": null,
+   "project": null,
+   "resume": null,
+   "run": null,
+   "run_test": false,
+   "save_dataset_grids": false,
+   "seed": 0,
+   "segmentation_head": false,
+   "square_resize_div_64": true,
+   "strategy": "auto",
+   "sync_bn": false,
+   "tensorboard": false,
+   "train_log_on_step": false,
+   "train_log_sync_dist": false,
+   "use_ema": true,
+   "wandb": false,
+   "warmup_epochs": 0.0,
+   "weight_decay": 0.0001
+  },
+  "trainer": {
+   "archive_checkpoints": [],
+   "archive_every_n_epochs": 1000,
+   "ema": true,
+   "epochs": 1,
+   "run_test": false
+  }
+ },
+ "cap_h": 28.8,
+ "code": {
+  "scorer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+  "scorer_native": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+  "scorer_sidecar": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+  "semisup_labeler": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+  "twostage": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+  "v3fam": "c5e923dcad8f576cdb9761a0433d5c85241def4a87a0a0081063aa57a50e5e78",
+  "verify": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+ },
+ "created_utc": "2026-10-21T12:38:15.663104Z",
+ "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-11): V3F, the v3 experiment family D0-D9 (pre-registered as one family); commit 55cc2d9; docs/prereg/V3F_2026-10-11.md sha256 5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f; Revisions 29-31: docs/prereg/V3F_rev29-31_2026-10-11.md sha256 36f4637898156ace639112f4605fbfe1192ecacad67b81ed47b1a6465bc0f814",
+ "e_trees": {
+  "files": 132,
+  "sha256": "9f0b3ef48bccc81ebc32db9d7a551bbe0803341ac0d99eabfb215e6ed528b690"
+ },
+ "epoch_seconds": 2405.583,
+ "export_removed": {
+  "file": "final_ema.pth",
+  "sha256": "11560034fce511527bd7aa5e27ffe247adadfdd7b5232f9c4acd195bb52d2f50"
+ },
+ "format": "inc2-v3fam-d6-smoke/1",
+ "projection_h": 33.910875000000004,
+ "rule": "epoch time x 50 + 0.5 h <= 0.8 x 36 h",
+ "status": "not run (walltime)",
+ "versions": {
+  "defusedxml": "0.7.1",
+  "env": "/ocean/projects/cis240145p/byler/harry/envs/v3fam_d6",
+  "pytorch_lightning": "2.6.1",
+  "rfdetr": "1.6.5.post0",
+  "supervision": "0.27.0.post2",
+  "torch": "2.5.1+cu121"
+ },
+ "walltime_h": 36.0,
+ "walltime_ok": false
+}
