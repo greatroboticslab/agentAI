@@ -2790,7 +2790,7 @@
       "description": "Lever L23K (R3, envelope-eligible, TRAIN lane; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): run_inc2_detr.sh inc2.v3fam_detr smoke stages base_v2 (no test folder, no holdout image) and trains one epoch, recording the 50-epoch projection; once it is within 0.8 x 36 h, train --seed 0, 1 and 2 are submitted together (run_test false, checkpoint_interval 1000, the final EMA weights exported once). Record only: nothing switches."
     },
     "inc_verdict_v3fam": {
-      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.v3fam verdict [--cap-refused {cap_refused}] [--ticker-failed {ticker_failed}]",
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.v3fam_verdict verdict [--cap-refused {cap_refused}] [--ticker-failed {ticker_failed}]",
       "param_bounds": {
         "pkg": {
           "type": "enum",
@@ -2826,7 +2826,7 @@
         "round-scheduler",
         "human"
       ],
-      "description": "Lever L23L (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): inc2.v3fam verdict records the family's verdict: capacity/v3fam_v1.json (dev only: P1-P5 with Holm on dev, the Tier C gate, the order of the sealed-test reads), written once; P6-P9 and the reported exams in records the platform's evidence never admits. Record only: nothing switches; every sealed-test read is a person's (inc2.v3fam test-read)."
+      "description": "Lever L23L (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11: V3F, the v3 experiment family D0-D9, pre-registered as one family): inc2.v3fam_verdict verdict records the family's verdict: capacity/v3fam_v1.json (dev only: P1-P5 with Holm on dev, the Tier C gate, the order of the sealed-test reads), written once, and its continuations (deviation 4: capacity/v3fam_v1_cont.json; deviation 5: capacity/v3fam_v1_cont2.json), each written once and reproducing every comparison an earlier record decided; P6-P9 and the reported exams in records the platform's evidence never admits. Record only: nothing switches; every sealed-test read is a person's (inc2.v3fam test-read). The verb's CLI is inc2/v3fam_verdict.py, outside the code every reproduction record pins (deviation 5)."
     },
     "inc_build_pilot4": {
       "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.pilot4 build --exp {exp} --from {from_exp} --recipes {recipes}",

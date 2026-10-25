@@ -1,0 +1,264 @@
+{
+ "d28_leaks": [
+  "rf_priyankas-workspace-o43oc__weeds1-dsqzl",
+  "rf_school-wevfc__weeddec2-sqnot",
+  "rf_weedtown__weedsv2-46hkh"
+ ],
+ "d28_propose": [
+  {
+   "cite": "D28",
+   "lever": "L24",
+   "source": "rf_priyankas-workspace-o43oc__weeds1-dsqzl"
+  },
+  {
+   "cite": "D28",
+   "lever": "L24",
+   "source": "rf_school-wevfc__weeddec2-sqnot"
+  },
+  {
+   "cite": "D28",
+   "lever": "L24",
+   "source": "rf_weedtown__weedsv2-46hkh"
+  }
+ ],
+ "declined_l24": [
+  "4466467dba8e57ef3b98ed00f786c6f4",
+  "8f7d7d4f022a1fa6c80d19c408ddf66d",
+  "3311d265fa7f1bd3d601608c7dce818f"
+ ],
+ "format": "test-fixture/d28-live/1",
+ "quarantined_sources": {
+  "fvossel__csgo_player_detection": {
+   "cite": "D28",
+   "seq": 2,
+   "utc": "2026-09-30T06:34:35Z"
+  },
+  "project_agml__crop_weed_detection_latvia": {
+   "cite": "D28",
+   "seq": 4,
+   "utc": "2026-09-30T06:44:49Z"
+  },
+  "rf_bishwarup-halder__crop-health-advisor": {
+   "cite": "D28",
+   "seq": 5,
+   "utc": "2026-09-30T06:54:38Z"
+  },
+  "rf_priyankas-workspace-o43oc__weeds1-dsqzl": {
+   "cite": "D28",
+   "seq": 19,
+   "utc": "2026-10-06T22:11:58Z"
+  },
+  "rf_project-5nvic__weed-detection-0tfsj": {
+   "cite": "D28",
+   "seq": 7,
+   "utc": "2026-09-30T07:15:42Z"
+  },
+  "rf_school-wevfc__weeddec2-sqnot": {
+   "cite": "D28",
+   "seq": 18,
+   "utc": "2026-10-06T19:42:33Z"
+  },
+  "rf_srec-dthh0__crop-weed-poxtn": {
+   "cite": "D28",
+   "seq": 9,
+   "utc": "2026-09-30T07:35:51Z"
+  },
+  "rf_uav-qnoms__uav-wqshy": {
+   "cite": "D28",
+   "seq": 11,
+   "utc": "2026-09-30T07:54:58Z"
+  },
+  "rf_university-of-peradeniya__weed-detection-ekr8i": {
+   "cite": "D28",
+   "seq": 12,
+   "utc": "2026-09-30T08:05:33Z"
+  },
+  "rf_weedtown__weedsv2-46hkh": {
+   "cite": "D28",
+   "seq": 20,
+   "utc": "2026-10-07T13:10:30Z"
+  },
+  "weedai_5c78d067-8750-4803-9cbe-57df8fae55e4": {
+   "cite": "D28",
+   "seq": 21,
+   "utc": "2026-10-01T08:58:22Z"
+  },
+  "zenodo_15808623": {
+   "cite": "D31",
+   "seq": 15,
+   "utc": "2026-10-05T04:54:08Z"
+  }
+ },
+ "sha256": {
+  "diagnoses.json": "93348ce1fe1f2f2e4eb9b1d5e3c586ff11515108978ca2089f5c71ca4477e027",
+  "latest_stream_snapshot.json": "f8bcdd0e948cf8bccaac07648f9fb9c77cf60719b5815994ed7b4a44b45bf338",
+  "state.json": "feb64ce2c9394bd8be45770ab7ebd52349c866515e2cd63f5e8f0e972b884f87"
+ },
+ "sid": "weed_stream_v1_fork1364",
+ "sources": {
+  "rf_priyankas-workspace-o43oc__weeds1-dsqzl": {
+   "admit_done_utc": "2026-10-06T22:59:57Z",
+   "admitted_batches": [
+    "i0010_rf_priyankas-workspace-o43oc__weeds1-dsqzl"
+   ],
+   "admitted_target_boxes": 1213,
+   "attempts": 1,
+   "batch": "i0010_rf_priyankas-workspace-o43oc__weeds1-dsqzl",
+   "batches": [
+    "i0010_rf_priyankas-workspace-o43oc__weeds1-dsqzl"
+   ],
+   "bytes": 308334897,
+   "candidate_synced": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/candidates_sync/rf_priyankas-workspace-o43oc__weeds1-dsqzl.json",
+   "cite": "D28",
+   "failed_attempts": 0,
+   "fetch_remaining": 0,
+   "fetched_utc": "2026-10-06T20:49:57Z",
+   "held_reason": "source leak (D28): quarantine pending",
+   "images": 2685,
+   "intake_deferred": 0,
+   "intake_shard": 1,
+   "intaken_utc": "2026-10-06T21:59:57Z",
+   "max_bytes": 10737418240,
+   "names_resolved": "2026-10-06T20:19:57Z",
+   "names_synced": "2026-10-06T20:29:57Z",
+   "partial": false,
+   "placement": "cluster",
+   "quarantined_utc": "2026-10-06T22:09:57Z",
+   "shard_log": {
+    "i0010_rf_priyankas-workspace-o43oc__weeds1-dsqzl": {
+     "deferred": 0,
+     "n": 1,
+     "prev": null
+    }
+   },
+   "status": "held",
+   "su": 0.104415,
+   "target_boxes_intake": 1650
+  },
+  "rf_school-wevfc__weeddec2-sqnot": {
+   "admit_done_utc": "2026-10-06T19:59:57Z",
+   "admitted_batches": [
+    "i0009_rf_school-wevfc__weeddec2-sqnot"
+   ],
+   "admitted_target_boxes": 2408,
+   "attempts": 1,
+   "batch": "i0009_rf_school-wevfc__weeddec2-sqnot",
+   "batches": [
+    "i0009_rf_school-wevfc__weeddec2-sqnot"
+   ],
+   "bytes": 1139177803,
+   "candidate_synced": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/candidates_sync/rf_school-wevfc__weeddec2-sqnot.json",
+   "cite": "D28",
+   "failed_attempts": 0,
+   "fetch_remaining": 0,
+   "fetched_utc": "2026-10-06T18:49:57Z",
+   "held_reason": "source leak (D28): quarantine pending",
+   "images": 6285,
+   "intake_deferred": 0,
+   "intake_shard": 1,
+   "intaken_utc": "2026-10-06T19:29:57Z",
+   "max_bytes": 10737418240,
+   "names_resolved": "2026-10-06T17:59:57Z",
+   "names_synced": "2026-10-06T18:09:57Z",
+   "partial": false,
+   "placement": "cluster",
+   "quarantined_utc": "2026-10-06T19:39:57Z",
+   "shard_log": {
+    "i0009_rf_school-wevfc__weeddec2-sqnot": {
+     "deferred": 0,
+     "n": 1,
+     "prev": null
+    }
+   },
+   "status": "held",
+   "su": 0.169512,
+   "target_boxes_intake": 5120
+  },
+  "rf_weedtown__weedsv2-46hkh": {
+   "admit_done_utc": "2026-10-07T13:29:58Z",
+   "admitted_batches": [
+    "i0015_rf_weedtown__weedsv2-46hkh"
+   ],
+   "admitted_target_boxes": 281,
+   "attempts": 1,
+   "batch": "i0015_rf_weedtown__weedsv2-46hkh",
+   "batches": [
+    "i0015_rf_weedtown__weedsv2-46hkh"
+   ],
+   "bytes": 53398070,
+   "candidate_synced": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/candidates_sync/rf_weedtown__weedsv2-46hkh.json",
+   "cite": "D28",
+   "failed_attempts": 0,
+   "fetch_remaining": 0,
+   "fetched_utc": "2026-10-07T12:39:58Z",
+   "held_reason": "source leak (D28): quarantine pending",
+   "images": 331,
+   "intake_deferred": 0,
+   "intake_shard": 1,
+   "intaken_utc": "2026-10-07T12:59:58Z",
+   "max_bytes": 10737418240,
+   "names_resolved": "2026-10-07T12:09:58Z",
+   "names_synced": "2026-10-07T12:19:58Z",
+   "partial": false,
+   "placement": "cluster",
+   "quarantined_utc": "2026-10-07T13:09:58Z",
+   "shard_log": {
+    "i0015_rf_weedtown__weedsv2-46hkh": {
+     "deferred": 0,
+     "n": 1,
+     "prev": null
+    }
+   },
+   "status": "held",
+   "su": 0.061124,
+   "target_boxes_intake": 333
+  },
+  "weedai_5c78d067-8750-4803-9cbe-57df8fae55e4": {
+   "admit_done_utc": "2026-10-01T09:18:11Z",
+   "admitted_target_boxes": 656,
+   "attempts": 1,
+   "batch": "i0003_weedai_5c78d067-8750-4803-9cbe-57df8fae55e4",
+   "batches": [
+    "i0003_weedai_5c78d067-8750-4803-9cbe-57df8fae55e4"
+   ],
+   "bytes": 1925536422,
+   "cite": "D28",
+   "failed_attempts": 0,
+   "fetch_remaining": 0,
+   "fetched_utc": "2026-10-01T07:35:29Z",
+   "held_reason": "source leak (D28): quarantine pending",
+   "images": 611,
+   "intake_deferred": 0,
+   "intake_shard": null,
+   "max_bytes": 1925536422,
+   "partial": false,
+   "placement": "cluster",
+   "quarantined_utc": "2026-10-01T08:58:11Z",
+   "shard_log": {
+    "i0003_weedai_5c78d067-8750-4803-9cbe-57df8fae55e4": {
+     "deferred": 0,
+     "n": 1,
+     "prev": null
+    }
+   },
+   "status": "held",
+   "su": 0.046455,
+   "target_boxes_intake": 1894
+  }
+ },
+ "stalls": {
+  "STOP": {
+   "carded": "2026-10-07T15:39:58Z",
+   "last": "L24 (proposal 3311d265fa7f1bd3d601608c7dce818f) was declined earlier and is never proposed again; D28 calls for it on every tick",
+   "levers": [
+    "L24"
+   ],
+   "since_utc": "2026-10-07T13:49:58Z",
+   "ticks": 2028,
+   "triggers": [
+    "D28"
+   ]
+  }
+ },
+ "what": "extract of the lab ticker's campaign weed_stream_v1 as read on 2026-10-25T02:27Z (state.json updated 2026-10-25T02:20:38Z): the sources the stream quarantines while the ticker holds them 'quarantine pending' (verbatim), lane STOP's stall record, the three L24 ids on the declined list, the stream's queue summary quarantined_sources and D28's leaks"
+}

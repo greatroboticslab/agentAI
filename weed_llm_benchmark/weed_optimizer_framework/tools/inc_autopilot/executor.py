@@ -394,8 +394,10 @@ ARGV_FORMS = {
     # L23I builds one training arm (inc2.baseline build --v3fam), L23J scores one arm (inc2.v3fam score), L23K runs
     # D6's RF-DETR jobs on the TRAIN lane (run_inc2_detr.sh inc2.v3fam_detr smoke | train --seeds 0,1,2: the three
     # seed jobs in one submission; a retry names only the seeds not yet trained), L23L records the family's verdict
-    # (inc2.v3fam verdict; --cap-refused names the items the ticker recorded 'not run (family cap)', --ticker-failed
-    # those it recorded failed after their own second failure: deviation 4, 2026-10-20)
+    # (inc2.v3fam_verdict verdict; --cap-refused names the items the ticker recorded 'not run (family cap)',
+    # --ticker-failed those it recorded failed after their own second failure: deviation 4, 2026-10-20; the verb's
+    # CLI lives in inc2/v3fam_verdict.py since deviation 5, 2026-10-24, never in inc2/v3fam.py, whose sha256 every
+    # reproduction record pins)
     "inc_build_v3fam_data": ("{pkg}.v3fam_data", "build", (), ("pkg",)),
     "inc_build_v3fam": ("{pkg}.baseline", "build",
                         (("--exp", "exp", "str"), ("--v3fam", "arm", "str"), ("--seeds", "seeds", "str"),
@@ -403,8 +405,8 @@ ARGV_FORMS = {
                         ("pkg", "exp", "arm", "seeds", "role")),
     "inc_score_v3fam": ("{pkg}.v3fam", "score", (("--arm", "arm", "str"),), ("pkg", "arm")),
     "inc_build_v3fam_detr": ("{pkg}.v3fam_detr", "{verb}", (("--seeds", "seeds", "str"),), ("pkg", "verb")),
-    "inc_verdict_v3fam": ("{pkg}.v3fam", "verdict", (("--cap-refused", "cap_refused", "str"),
-                                                     ("--ticker-failed", "ticker_failed", "str")), ("pkg",)),
+    "inc_verdict_v3fam": ("{pkg}.v3fam_verdict", "verdict", (("--cap-refused", "cap_refused", "str"),
+                                                             ("--ticker-failed", "ticker_failed", "str")), ("pkg",)),
     "inc_stream_collect": ("run_inc_collect.sh", "fetch",
                            (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
                             ("--candidates", "candidates", "str")),

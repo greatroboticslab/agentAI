@@ -209,6 +209,25 @@ RECORD_ONLY_TITLES = {"L23N": "Native-resolution rescore of %s failed (L23N)",
 # seeds' walltime is 36 h).
 V3FAM_LEVERS = ("L23H", "L23I", "L23J", "L23K", "L23L")
 V3FAM_NOT_RUN_CAP = "not run (family cap)"
+# Deviation 5 (2026-10-24; docs/prereg/V3F_dev5_2026-10-24.md). On 2026-10-21 deviation 4's CLI-only change of
+# inc2/v3fam.py left the family's reproduction records taken by other code, inc2.v3fam.require_equivalence refused
+# every score job of six arms ("the code changed since dev_identity.json ran"), and the ticker counted each refusal as
+# the arm's own failure: six arms recorded failed twice and passed to the verdict as --ticker-failed. Now a family
+# job refused by such a precondition of the platform's own making (V3FAM_PLATFORM_REFUSAL_RE, read from the job's
+# provenance: the reproduction records, the E3-frozen files, a superseded record's move) is never the arm's failure
+# (_v3fam_platform_refusal): its fails are not counted, it is never recorded failed or named in --ticker-failed, its
+# GPU-h stay counted (prior_gpuh), its id is retired, it is held (DS.V3FAM_HELD_PLATFORM: neither due nor ended, so
+# the verdict waits) with one card naming the remedy, and released when the snapshot reports the records current
+# again; after V3FAM_PLATFORM_MAX such refusals of one item it stays held for a person, never looped. While the
+# snapshot reports a record taken by other code than the deployed one, no family score is proposed
+# (diagnose_stream.v3fam_plan).
+V3FAM_PLATFORM_REFUSAL_RE = re.compile(
+    r"the code changed since [^\n]{1,120}? ran|is missing or did not pass: no family score is taken without it"
+    r"|no longer hash as V3F\.1 records|the E-series records changed while this family job ran"
+    r"|is never moved over another file|a superseded record could not be moved aside")
+V3FAM_PLATFORM_MAX = 3
+# the family jobs' provenance names (run_inc2_build.sh; L23J's v3fam_score_<arm>, L23I's its experiment)
+V3FAM_PROV = {"L23H": "v3fam_data", "L23L": "v3fam_v1"}
 V3FAM_DETR_OVERDUE_H = 37.0
 V3FAM_CAP_EPS = 1e-6
 # The zoo audit's rerun commands (a person's, on the login node; written records are kept, so both resume)
@@ -298,6 +317,21 @@ def _fmt4(x):
 def _short(text, n=300):
     text = str(text)
     return text if len(text) <= n else text[:n] + "..."
+
+
+def _refusal_text(text, n=900):
+    """A family job's provenance refusal, shortened for the ledger and cards without losing what classes it: the
+    log tail run_inc2_build.sh keeps (its last five lines) ends with the exception's own message, so the tail is
+    kept; a refusal of the platform's own making (V3FAM_PLATFORM_REFUSAL_RE) found anywhere in the full text stays
+    in the result (deviation 5: a head cut at 600 characters dropped the message of a 688-character traceback)."""
+    text = str(text or "")
+    if len(text) <= n:
+        return text
+    out = text[:120] + " ... " + text[-(n - 125):]
+    m = V3FAM_PLATFORM_REFUSAL_RE.search(text)
+    if m and not V3FAM_PLATFORM_REFUSAL_RE.search(out):
+        out = text[:120] + " ... " + m.group(0) + " ... " + text[-(n - 140 - len(m.group(0))):]
+    return out
 
 
 def _record_only(d):
@@ -1544,6 +1578,11 @@ class StreamRun(object):
             hist.append({"exp": d33["exp"], "fired": True, "species": (d33.get("detail") or {}).get("species")})
             st["d33_history"] = hist[-12:]
         d28 = by.get("D28") or {}
+        # the stream ledger's quarantines are the truth (2026-10-24): a source inc2.stream quarantined is recorded so
+        # here, whatever an admit's done handler wrote over it (2026-10-06/07: L24 quarantined three D28 leaks, the
+        # same tick's L17 admit set them back to 'admitted', the next tick held them 'quarantine pending' and
+        # re-rendered the L24 that had run, and lane STOP stalled for 17 days)
+        self._resync_quarantines()
         for h in ((d28.get("detail") or {}).get("leaks") or []) if d28.get("fired") else []:
             s = st["sources"].setdefault(str(h.get("source")), {})
             if s.get("status") not in ("closed", "quarantined", "held"):
@@ -2110,6 +2149,10 @@ class StreamRun(object):
             params = {"pkg": pkg, "source": pr["source"], "cite": pr.get("cite") or did}
             src_st = st["sources"].get(pr["source"]) or {}
             if src_st.get("status") == "quarantined" or src_st.get("leak_kept_by"):
+                return None
+            if str(pr["source"]) in self._stream_quarantined():
+                # the stream's ledger already quarantines it: nothing to run; this state follows the ledger
+                self._resync_quarantines()
                 return None
         elif lever == "LH":
             params = {"pkg": pkg, "stream": self.sid, "hold": pr.get("hold") or "funnel_F9"}
@@ -3406,7 +3449,10 @@ class StreamRun(object):
                 (k for k, v in st["sources"].items() if b in (v.get("batches") or [])), None)
             if src:
                 s = st["sources"][src]
-                s["status"] = "admitted"
+                if s.get("status") not in ("quarantined", "closed"):
+                    # a quarantine or a closure taken while the admit ran stands (2026-10-06/07: three D28
+                    # quarantines were overwritten here)
+                    s["status"] = "admitted"
                 s["admit_done_utc"] = self.utc
                 ab = s.get("admitted_batches")
                 if isinstance(ab, list) or s.get("intake_deferred") is not None:
@@ -4196,7 +4242,7 @@ class StreamRun(object):
             if follow == "job":
                 ids = [str(j) for j in it.get("job_ids") or []]
                 if not ids and it.get("uncertain") and it["lever"] in RECORD_ONLY_LEVERS:
-                    self._follow_record_only(ln, it, queued, names, arts)
+                    self._follow_record_only(ln, it, queued, names, arts, payload=payload)
                     continue
                 if queued is None or any(j.split("_")[0] in queued for j in ids):
                     if it["lever"] == "L23K":
@@ -4211,6 +4257,10 @@ class StreamRun(object):
                 # the refusal line of the job's log (stream_remote.sacct: data jobs only)
                 refusal = "" if ok else "; ".join(str((sacct.get(j) or {}).get("refusal")) for j in ids
                                                   if (sacct.get(j) or {}).get("refusal"))
+                if not ok and not refusal and it["lever"] in V3FAM_LEVERS:
+                    # a family job: its provenance's last attempt when it is this job's (deviation 5: how a
+                    # precondition of the platform's own making is told from the arm's own failure)
+                    refusal = self._v3fam_prov_refusal(payload, it, ids)
                 if p["policy_action"] not in ("inc_label_audit",):
                     for j in ids:
                         if sacct.get(j):
@@ -4329,13 +4379,14 @@ class StreamRun(object):
         if it["lever"] == "L23K":
             return tuple(SR.V3FAM_DETR_JOB_NAMES[str(prm.get("verb"))]), SR.V3FAM_STATUS
         if it["lever"] == "L23L":
-            # the domain's verdict record: capacity/v3fam_v1_cont.json once the verdict of 2026-10-13 is in place
-            # (deviation 4); the job's name is the same
+            # the domain's verdict record: capacity/v3fam_v1_cont.json once the verdict of 2026-10-13 was in place
+            # (deviation 4), capacity/v3fam_v1_cont2.json once the continuation of 2026-10-22 is (deviation 5); the
+            # job's name is the same
             return SR.V3FAM_JOB_NAME, (((self.dom or {}).get("v3fam") or {}).get("verdict_record")
                                        or "capacity/v3fam_v1.json")
         return SR.NATIVE_JOB_NAME % prm.get("exp"), "%s/native_rescore.json" % prm.get("exp")
 
-    def _follow_record_only(self, ln, it, queued, names, arts):
+    def _follow_record_only(self, ln, it, queued, names, arts, payload=None):
         """A record-only item (L23N, L23V, L23E, L23C, L23D, L23Z, L23F,
         L23G) whose submission's outcome is unknown: it runs while a job of
         its name (L23Z: any of its chain's five) is queued; then it is done
@@ -4362,8 +4413,15 @@ class StreamRun(object):
             return
         it["lost"] = int(it.get("lost") or 0) + 1
         if it["lost"] >= BUILD_LOST_SNAPSHOTS:
-            self._failed(ln, it, "its submission's outcome was unknown, and in %d snapshots no job named %s was queued "
-                                 "and %s was not complete" % (it["lost"], job, record), charged=True)
+            why = "its submission's outcome was unknown, and in %d snapshots no job named %s was queued and %s was " \
+                  "not complete" % (it["lost"], job, record)
+            if it["lever"] in V3FAM_LEVERS:
+                # a family job that ran after the submission: its provenance's refusal (deviation 5), so a
+                # precondition of the platform's own making is never counted as the arm's failure here either
+                ref = self._v3fam_prov_refusal(payload, it, None)
+                if ref:
+                    why += "; refused: %s" % ref
+            self._failed(ln, it, why, charged=True)
 
     def _settle_build_job(self, it, queued, sacct):
         """6.6: the build job itself (run_inc2_build.sh holds one V100 on
@@ -4826,19 +4884,32 @@ class StreamRun(object):
         except OSError:
             return False
 
+    def _v3fam_reopen_blocks(self):
+        """The domain's reopen blocks in order: v3fam.reopen (deviation 4's, an object, kept so for a ticker of an
+        earlier deploy that still reads it during a deploy), then v3fam.reopens (deviation 5's and later, a list)."""
+        from . import stream_remote as SR
+        return SR.v3fam_reopen_blocks(self.dom)
+
     def _v3fam_reopen(self):
         """A recorded deviation's reopening (deviation 4, 2026-10-20: the data build, after its defect is fixed, and
-        the verdict, whose record of 2026-10-13 was decided while seven arms had never started and stays as it is): each
-        item the domain's v3fam.reopen names is proposed again once the deployed tree holds the deviation's file
-        with its sha256, once per marker, and only an item whose last attempt started before the deviation
-        (v3fam.reopen.before_utc): an item run after it is never reopened by it. Such an item recorded failed or
+        the verdict, whose record of 2026-10-13 was decided while seven arms had never started and stays as it is;
+        deviation 5, 2026-10-24: the score jobs of D8, D4F, D4N, D4R15, D1 and D5B, which the platform's own stale
+        reproduction records refused on 2026-10-21, and the verdict, whose continuation of 2026-10-22 recorded those
+        arms failed and stays as it is): each item a block of the domain's v3fam.reopen names is proposed again once
+        the deployed tree holds that deviation's file with its sha256, once per marker (an item whose history holds
+        the marker is never reopened by it again), and only an item whose last attempt started before the deviation
+        (the block's before_utc): an item run after it is never reopened by it. Such an item recorded failed or
         done has its spend so far moved into prior_gpuh (every attempt stays counted against the family cap), its
         earlier proposal ids added to failed_ids (a new proposal takes a new id: the executor runs an id once), its
         record kept under reopen_history, and its state set to missing; the verdict's card mark goes with it (the
-        continuation's verdict raises its own card). An item running or never proposed is left as it is. Returns
-        the keys reopened now."""
-        fam = (self.dom or {}).get("v3fam") or {}
-        ro = fam.get("reopen") or {}
+        next verdict raises its own card). An item running or never proposed is left as it is. Returns the keys
+        reopened now."""
+        out = []
+        for ro in self._v3fam_reopen_blocks():
+            out += self._v3fam_reopen_block(ro)
+        return out
+
+    def _v3fam_reopen_block(self, ro):
         marker = ro.get("marker")
         if not marker or not ro.get("items") or not self._v3fam_deployed(ro.get("file"), ro.get("sha256")):
             return []
@@ -4846,7 +4917,9 @@ class StreamRun(object):
         out = []
         for key in ro["items"]:
             rec = f["items"].get(key)
-            if not isinstance(rec, dict) or rec.get("reopened") == marker or rec.get("state") not in ("failed", "done"):
+            if not isinstance(rec, dict) or rec.get("state") not in ("failed", "done", DS.V3FAM_HELD_PLATFORM) \
+                    or rec.get("reopened") == marker \
+                    or marker in [h.get("marker") for h in rec.get("reopen_history") or [] if isinstance(h, dict)]:
                 continue
             if not ro.get("before_utc") or not rec.get("started_utc") or str(rec["started_utc"]) >= ro["before_utc"]:
                 continue
@@ -4859,6 +4932,7 @@ class StreamRun(object):
             rec.update(state="missing", fails=0, proposal=None, reopened=marker, reopened_utc=self.utc,
                        reopen_history=hist)
             rec.pop("why", None)
+            rec.pop("platform_refusals", None)
             failed = self._failed_ids()
             self.st["failed_ids"] = (failed + [i for i in ids if i and i not in failed])[-FAILED_IDS_KEEP:]
             out.append(key)
@@ -4867,10 +4941,10 @@ class StreamRun(object):
                 "V3F: %s reopened under %s (%s): proposed again under new ids, earlier spend kept in prior_gpuh"
                 % (", ".join(out), marker, ro.get("file"))])
             self._card("research", "V3F: %s proposed again (%s)" % (", ".join(out), marker),
-                       "%s, recorded in %s. The verdict of 2026-10-13 stays recorded as it is; the family's "
-                       "continuation verdict comes once every arm's record is complete or failed (V3F.7 step 11). "
-                       "Earlier attempts stay counted against the family cap." % (ro.get("why") or marker,
-                                                                                   ro.get("file")), lever="L23L")
+                       "%s, recorded in %s. The family's verdicts already written stay recorded as they are; the next "
+                       "verdict comes once every arm's record is complete or failed (V3F.7 step 11). Earlier attempts "
+                       "stay counted against the family cap." % (ro.get("why") or marker, ro.get("file")),
+                       lever="L23L")
         return out
 
     def _v3fam_stage(self, exp_status, payload=None):
@@ -4880,7 +4954,12 @@ class StreamRun(object):
         reason), an experiment done, D6's smoke and seeds, the verdict decided; else what the platform ran:
         running, failed_once, failed, not run (family cap); blocked and not needed from the domain and the
         trigger; an arm whose dependency ended without its effect is not run), and the family's GPU-h against
-        its cap. None without a family block."""
+        its cap. Deviation 5 (2026-10-24): the reproduction records against the deployed code (equivalence: current;
+        stale while a record is taken by other code, or, once the score that takes them is done, one the domain names
+        (v3fam.equivalence_records) is not in place; unknown
+        while the snapshot does not report them; a record a recorded deviation supersedes by sha256 is neither), an
+        item held after a refusal of the platform's own making released once they are current, and the first
+        snapshot that shows superseded records moved aside written to the ledger. None without a family block."""
         from . import stream_remote as SR
         fam = (self.dom or {}).get("v3fam") or {}
         if not fam:
@@ -4934,7 +5013,8 @@ class StreamRun(object):
         else:
             train = mine("detr:train") or "missing"
             train = "running" if train == "done" else train
-        out["detr"] = {"smoke": smoke, "train": train}
+        out["detr"] = {"smoke": smoke, "train": train, "smoke_sha256": det.get("smoke_sha256"),
+                       "epoch_seconds": det.get("epoch_seconds"), "projection_h": det.get("projection_h")}
         if out["data"] == "failed":
             # the data build ended without its summary after its second failure: nothing that trains on the family's
             # manifests (the builds) or stages after it (D6) can run; recorded so for the family table, but these
@@ -4966,10 +5046,62 @@ class StreamRun(object):
         vr = self._artifact(fam.get("verdict_record") or "capacity/v3fam_v1.json") or {}
         out["verdict"] = "done" if vr.get("status") == "decided" else (
             "running" if mine("verdict") == "done" else (mine("verdict") or "missing"))
+        out["equivalence"] = self._v3fam_equivalence(status, sc)
+        self._v3fam_release(out)
         out["spend_gpuh"] = round(self._v3fam_spend(exp_status, status, payload), 4)
         out["cap_gpuh"] = float(fam.get("cap_gpu_hours") or 260.0)
         out["cap_refused"] = sorted(k for k, v in items.items() if v.get("state") == V3FAM_NOT_RUN_CAP)
         return out
+
+    def _v3fam_equivalence(self, status, sc):
+        """/stage/v3fam/equivalence from the snapshot's block (stream_remote.v3fam_equivalence): {state: current |
+        stale | unknown, stale, missing, fingerprint, superseded, supersede}. Stale: a record taken by other code
+        than the deployed one (inc2.v3fam.require_equivalence refuses every family score resting on it), or, once the
+        score item that takes them is done, a record the domain names (v3fam.equivalence_records) not in place. The
+        first snapshot that shows records a
+        recorded deviation supersedes moved aside writes one ledger event."""
+        eq = status.get("equivalence")
+        if not isinstance(eq, dict) or not isinstance(eq.get("code"), dict):
+            return {"state": "unknown", "why": _short(status.get("equivalence_error"), 200)
+                    or "the snapshot does not report the reproduction records"}
+        present = {r.get("name") for r in eq.get("records") or [] if isinstance(r, dict)}
+        # the records the domain names (v3fam.equivalence_records: those E3RS's job takes, V3F.3.2) must be in place
+        # once the score item that takes them is done
+        er = ((self.dom or {}).get("v3fam") or {}).get("equivalence_records") or {}
+        missing = sorted(set(er.get("names") or ()) - present) if er.get("after") and sc.get(er["after"]) == "done" \
+            else []
+        stale = sorted(str(x) for x in eq.get("stale") or [])
+        sup = eq.get("supersede") or {}
+        moved = sorted(str(x) for x in sup.get("moved") or [])
+        f = self._v3fam()
+        if moved and f.get("superseded_seen") != moved:
+            f["superseded_seen"] = moved
+            self._ledger("v3fam_superseded", record_only=True, records=moved, reasons=[
+                "the family records a recorded deviation supersedes are moved aside byte for byte (each in its dated "
+                "folder's MANIFEST.json with its sha256): %s" % ", ".join(moved)])
+        return {"state": "stale" if (stale or missing) else "current", "stale": stale, "missing": missing,
+                "fingerprint": eq.get("fingerprint"), "superseded": sorted(eq.get("superseded") or []),
+                "supersede": {k: sorted(sup.get(k) or []) for k in ("pending", "moved", "other")}}
+
+    def _v3fam_release(self, out):
+        """An item held after a refusal of the platform's own making (DS.V3FAM_HELD_PLATFORM) is released (missing:
+        DR0 proposes it again under a new id) once the snapshot reports the reproduction records current, unless it
+        was refused V3FAM_PLATFORM_MAX times (then it stays held for a person); the stage shows it as released."""
+        if (out.get("equivalence") or {}).get("state") != "current":
+            return
+        items = self._v3fam()["items"]
+        rel = []
+        for key, rec in sorted(items.items()):
+            if rec.get("state") == DS.V3FAM_HELD_PLATFORM and int(rec.get("platform_refusals") or 0) < \
+                    V3FAM_PLATFORM_MAX:
+                rec.update(state="missing", released_utc=self.utc)
+                rel.append(key)
+                if key.startswith("score:") and (out.get("score") or {}).get(key[6:]) == DS.V3FAM_HELD_PLATFORM:
+                    out["score"][key[6:]] = "missing"
+        if rel:
+            self._ledger("v3fam_released", record_only=True, v3fam_items=rel, reasons=[
+                "the reproduction records are current under the deployed code: %s proposed again under new ids"
+                % ", ".join(rel)])
 
     def _v3fam_report(self, exp, payload):
         """An experiment's report.json from this snapshot, else from its frozen record."""
@@ -5140,6 +5272,8 @@ class StreamRun(object):
         st = self.st
         p = it["proposal"]
         lever, params = it["lever"], p.get("params") or {}
+        if V3FAM_PLATFORM_REFUSAL_RE.search(str(why or "")):
+            return self._v3fam_platform_refusal(ln, it, why, charged)
         fam = (self.dom or {}).get("v3fam") or {}
         key = self._v3fam_key(lever, params)
         rec = self._v3fam_item(lever, params)
@@ -5185,6 +5319,112 @@ class StreamRun(object):
                    lever=lever, trigger=list(p.get("trigger") or []))
         self._clear(ln)
 
+    def _stream_quarantined(self):
+        """{source: {cite, seq, utc}} the stream's queue summary (inc2.stream's ledger) records quarantined."""
+        q = self._artifact("stream/%s/queue_summary.json" % self.sid) if self.st is not None else None
+        rec = q.get("quarantined_sources") if isinstance(q, dict) else None
+        if isinstance(rec, list):
+            return {str(x): {} for x in rec}
+        return {str(k): (v if isinstance(v, dict) else {}) for k, v in rec.items()} if isinstance(rec, dict) else {}
+
+    def _resync_quarantines(self):
+        """Record as quarantined every source the stream's ledger quarantines while this state says otherwise (an
+        L17 admit done after the same tick's L24 had overwritten it: three D28 leaks on 2026-10-06/07, one on
+        2026-10-01): status, cite, the stream ledger's seq and utc; its 'quarantine pending' reason dropped. One
+        ledger event per source. A closed source stays closed. Returns the sources resynced."""
+        out = []
+        for src, rec in sorted(self._stream_quarantined().items()):
+            s = (self.st.get("sources") or {}).get(src)
+            if not isinstance(s, dict) or s.get("status") in ("quarantined", "closed"):
+                continue
+            prev = s.get("status")
+            s.update(status="quarantined", cite=rec.get("cite") or s.get("cite"), quarantined_seq=rec.get("seq"),
+                     quarantined_stream_utc=rec.get("utc"), quarantine_resynced_utc=self.utc)
+            if not s.get("quarantined_utc"):
+                s["quarantined_utc"] = rec.get("utc") or self.utc
+            s.pop("held_reason", None)
+            self._ledger("source_quarantine_resynced", source=src, cite=rec.get("cite"), seq=rec.get("seq"),
+                         previous=prev, reasons=["the stream ledger quarantines %s (seq %s, %s, %s); this state said %r"
+                                                 % (src, rec.get("seq"), rec.get("cite"), rec.get("utc"), prev)])
+            out.append(src)
+        return out
+
+    def _v3fam_prov_refusal(self, payload, it, ids):
+        """The refusal line of a family job's provenance (the snapshot's builds, remote.status): its last attempt's,
+        when that attempt is one of this item's jobs (ids), or, after a submission whose outcome was unknown (ids
+        None), when it started after this item was submitted; else ''."""
+        builds = ((payload or {}).get("status") or {}).get("builds") or {}
+        lever, prm = it["lever"], it["proposal"].get("params") or {}
+        if lever == "L23J":
+            name = "v3fam_score_%s" % str(prm.get("arm") or "").lower()
+        elif lever == "L23I":
+            name = prm.get("exp") or it["proposal"].get("child_exp")
+        else:
+            name = V3FAM_PROV.get(lever)
+        rec = builds.get(name) if name else None
+        if not isinstance(rec, dict) or not rec.get("refusal"):
+            return ""
+        if ids is not None:
+            if str(rec.get("job_id") or "").split("_")[0] not in {str(j).split("_")[0] for j in ids}:
+                return ""
+        else:
+            t0 = it.get("since_utc") or it.get("started_utc")
+            if not t0 or str(rec.get("started_utc") or "") < str(t0):
+                return ""
+        return _refusal_text(rec.get("refusal"))
+
+    def _v3fam_platform_refusal(self, ln, it, why, charged):
+        """A family job refused by a precondition of the platform's own making (deviation 5,
+        V3FAM_PLATFORM_REFUSAL_RE): a reproduction record taken by other code than the deployed one or not in place,
+        an E3-frozen file changed, the E-series records changed under it, a superseded record that cannot be moved.
+        It is no failure of the arm: its fails are not counted and it is never recorded failed, so it ends nothing
+        and is never named in the verdict's --ticker-failed; its GPU-h stay counted against the family cap
+        (prior_gpuh); its id is retired; it is held (DS.V3FAM_HELD_PLATFORM: neither due nor ended, so the verdict
+        waits) and released once the snapshot reports the reproduction records current (_v3fam_release). One card
+        naming the remedy; after V3FAM_PLATFORM_MAX such refusals of one item it stays held for a person (one
+        escalation card), never looped. No lane failure, no stop-loss."""
+        st = self.st
+        p = it["proposal"]
+        lever, params = it["lever"], p.get("params") or {}
+        key = self._v3fam_key(lever, params)
+        rec = self._v3fam_item(lever, params)
+        if rec.get("spend") == "open":
+            rec["settled"] = float(rec.get("estimate") or 0.0) if charged else 0.0
+            rec["spend"] = "settled"
+        self._v3fam_fold(rec)
+        rec["platform_refusals"] = int(rec.get("platform_refusals") or 0) + 1
+        final = rec["platform_refusals"] >= V3FAM_PLATFORM_MAX
+        rec.update(state=DS.V3FAM_HELD_PLATFORM, proposal=None, held_utc=self.utc,
+                   why="refused by a precondition of the platform's own making: %s" % _short(why, 300))
+        st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+        self._ledger("v3fam_platform_refusal", lane=ln, lever=lever, proposal_id=p["id"], v3fam_item=key,
+                     record_only=True, charged=charged, platform_refusals=rec["platform_refusals"], final=final,
+                     reasons=[_short(why, 1000)])
+        title = RECORD_ONLY_TITLES[lever]
+        title = (title % (params.get("arm") or params.get("verb"))) if "%s" in title else title
+        title = title.replace(" failed (", " refused by the platform's own precondition (")
+        remedy = ("The family's reproduction records (v3fam/v1/equivalence) pin the sha256 of the code that took them "
+                  "(inc2.v3fam.code_shas: the six E3-frozen files and inc2/v3fam.py; the domain's "
+                  "v3fam.equivalence_code). The remedy is a recorded deviation: restore the code they pin byte for "
+                  "byte (deviation 5 did, moving the verdict's CLI to inc2/v3fam_verdict.py), or move the records "
+                  "aside byte for byte and retake them (inc2.v3fam equivalence --item ...) before any family score; "
+                  "deploy_funnel.sh refuses a change to that code while records exist.")
+        if final:
+            self._card("escalation", "%s: held after %d refusals" % (title, rec["platform_refusals"]),
+                       "%s. Refused %d times by a precondition of the platform's own making although the snapshot "
+                       "reported the reproduction records current: it stays held (no fails counted, nothing ended), "
+                       "the family's verdict waits for it, and a person finds why. %s" % (
+                           _short(why, 400), rec["platform_refusals"], remedy), lever=lever,
+                       trigger=list(p.get("trigger") or []))
+        else:
+            self._card("escalation", "%s: held, not the arm's failure" % title,
+                       "%s. This is no failure of the arm (deviation 5): its fails are not counted, it is never "
+                       "recorded failed or passed to the verdict as failed, and it ends nothing; its GPU-h stay counted "
+                       "against the family cap. It is held, and no family score is proposed while the snapshot reports "
+                       "a record taken by other code; once the records are current it is proposed again under a new "
+                       "id. %s" % (_short(why, 400), remedy), lever=lever, trigger=list(p.get("trigger") or []))
+        self._clear(ln)
+
     def _v3fam_rerun(self, lever, params):
         """The command a person submits to rerun a family item by hand (an sbatch job, never a foreground run on the
         login node), with INCAP_DECIDED_BY naming them and sbatch's --export naming that variable (Bridges-2's
@@ -5200,7 +5440,7 @@ class StreamRun(object):
         if lever == "L23L":
             cr = (" --cap-refused %s" % params["cap_refused"]) if params.get("cap_refused") else ""
             cr += (" --ticker-failed %s" % params["ticker_failed"]) if params.get("ticker_failed") else ""
-            return "%s --job-name=inc_build_v3fam_v1 run_inc2_build.sh inc2.v3fam verdict%s" % (sb, cr)
+            return "%s --job-name=inc_build_v3fam_v1 run_inc2_build.sh inc2.v3fam_verdict verdict%s" % (sb, cr)
         if lever == "L23I":
             return ("%s --job-name=inc_build_%s run_inc2_build.sh inc2.baseline build --exp %s --v3fam %s --seeds "
                     "0,1,2 --role baseline" % (sb, params.get("exp"), params.get("exp"), params.get("arm")))
@@ -5326,6 +5566,33 @@ class StreamRun(object):
                        + ". D7 (the lab RTX 3060's latency) is the delegate's at any time after the downloads.",
                        lever="L23H")
         self._v3fam_storage_card(f, fam, fs)
+        eq = fs.get("equivalence") or {}
+        mark = [eq.get("fingerprint"), eq.get("stale"), eq.get("missing")] if eq.get("state") == "stale" else None
+        if mark and f.get("equiv_card") != mark:
+            f["equiv_card"] = mark
+            self._card("escalation", "V3F's family scores wait: reproduction records taken by other code or not in "
+                       "place", "Taken by other code than the deployed one: %s; not in place: %s (the deployed code's "
+                       "fingerprint %s). inc2.v3fam.require_equivalence refuses every family score resting on them "
+                       "('the code changed since ... ran'), so the platform proposes no family score until a recorded "
+                       "deviation restores the code they pin (inc2.v3fam.code_shas, the domain's v3fam.equivalence_code) "
+                       "byte for byte, or moves them aside byte for byte and retakes them (deviation 5)." % (
+                           ", ".join(eq.get("stale") or []) or "none", ", ".join(eq.get("missing") or []) or "none",
+                           str(eq.get("fingerprint"))[:16]), lever="L23J")
+        elif not mark:
+            f.pop("equiv_card", None)
+        # D6's smoke ended its seeds by the walltime rule: one card (deviation 5: on 2026-10-21 that outcome was
+        # recorded with no card, and its epoch time was the whole fit, setup included; it stayed unseen for days)
+        det = fs.get("detr") or {}
+        if str(det.get("smoke") or "").startswith("not run") and f.get("detr_card") != det.get("smoke_sha256"):
+            f["detr_card"] = det.get("smoke_sha256")
+            self._card("research", "V3F: D6 %s by its smoke" % det.get("smoke"),
+                       "D6's smoke (v3fam/v1/d6/smoke/smoke.json, sha256 %s) recorded %s: epoch time %s s x 50 + 0.5 h "
+                       "projects %s h against the 28.8 h rule (V3F.5 D6), so its three seeds are not proposed; D6 stays "
+                       "in C and in the dev Holm set, and P5 is reported 'not run' with this reason. The smoke records "
+                       "the epoch's own time (from the first training epoch's start to the end of fit) and the "
+                       "one-time setup before it apart (deviation 5)." % (
+                           str(det.get("smoke_sha256"))[:12], det.get("smoke"), det.get("epoch_seconds"),
+                           det.get("projection_h")), lever="L23K")
         for k, why in sorted((((by.get("DR0") or {}).get("detail") or {}).get("v3fam_waits") or {}).items()):
             if str(why).startswith("storage") and (f.setdefault("wait_cards", {})).get(k) != why:
                 f["wait_cards"][k] = why
@@ -5368,13 +5635,21 @@ class StreamRun(object):
                      "inc2.v3fam reanalyse-test --read-by owner|delegate. Nothing switches; the headline stays E3-B "
                      "(V3F.3.6).")
         f["verdict_card"] = self.utc
-        if v.get("continues"):
+        cont = v.get("continues") or {}
+        second = bool(cont.get("continuation"))
+        if second:
+            lines.insert(0, "The family's second continuation verdict over every arm (deviation 5); the verdict of "
+                            "2026-10-13 (%s) and its continuation of 2026-10-22 (%s) stay recorded as they are, and "
+                            "every comparison either decided is reproduced here." % (
+                                cont.get("verdict") or "capacity/v3fam_v1.json",
+                                cont.get("continuation") or "capacity/v3fam_v1_cont.json"))
+        elif cont:
             lines.insert(0, "The family's continuation verdict over every arm (deviation 4); the verdict of 2026-10-13 "
                             "(%s) stays recorded as it is, and every comparison it decided is reproduced here."
-                         % ((v.get("continues") or {}).get("verdict") or "capacity/v3fam_v1.json"))
-        self._card("research", "V3F's %sverdict is decided (%s)" % ("continuation " if v.get("continues") else "",
-                                                                     v.get("decided_on", "dev")), "\n".join(lines),
-                   lever="L23L", trigger=["L23L"])
+                         % (cont.get("verdict") or "capacity/v3fam_v1.json"))
+        self._card("research", "V3F's %sverdict is decided (%s)" % (
+            "second continuation " if second else "continuation " if cont else "", v.get("decided_on", "dev")),
+            "\n".join(lines), lever="L23L", trigger=["L23L"])
 
     def _measure_exps(self):
         """The measurement arms' experiments (baselines marked measure) and V3F's build experiments (2026-10-11):

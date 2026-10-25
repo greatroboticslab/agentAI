@@ -747,7 +747,7 @@
   },
   "L23L": {
    "name": "verdict_v3fam",
-   "title": "Record V3F's verdict (inc2.v3fam verdict): P1-P5 on dev with Holm, the Tier C gate and the order of the sealed-test reads; P6-P9 kept off the platform",
+   "title": "Record V3F's verdict (inc2.v3fam_verdict verdict): P1-P5 on dev with Holm, the Tier C gate and the order of the sealed-test reads; P6-P9 kept off the platform",
    "lane": "MAINT",
    "follow": "job",
    "policy_action": "inc_verdict_v3fam",
@@ -756,7 +756,7 @@
    "argv": [
     "python",
     "-m",
-    "weed_optimizer_framework.tools.{pkg}.v3fam",
+    "weed_optimizer_framework.tools.{pkg}.v3fam_verdict",
     "verdict",
     {
      "if": "cap_refused",
@@ -774,10 +774,10 @@
     }
    ],
    "control": "Every comparison's two sides through the one family path (decision 17).",
-   "success": "capacity/v3fam_v1.json decided (dev only), written once and last; once the verdict of 2026-10-13 is in place, capacity/v3fam_v1_cont.json, its continuation over every arm by the same rules (deviation 4).",
+   "success": "capacity/v3fam_v1.json decided (dev only), written once and last; once the verdict of 2026-10-13 is in place, capacity/v3fam_v1_cont.json, its continuation over every arm by the same rules (deviation 4); once the continuation of 2026-10-22 is in place, capacity/v3fam_v1_cont2.json, the second continuation, reproducing every comparison either earlier record decided (deviation 5).",
    "falsifier": "V3F.3.3's rule, V3F.3.4's Holm overlay and Tier C bar Phi^-1(1 - 0.05/14); nothing switches.",
    "estimator": "v3fam_verdict",
-   "note": "Record only (V3F.7 step 11): proposed once every arm's record is complete or failed: the family's data build done, and no score arm, build or D6 job pending or 'not run (the family's data build failed)', which never started (deviation 4, diagnose_stream.v3fam_verdict_ready; the verb refuses too); --cap-refused names the items the ticker recorded 'not run (family cap)', which the verdict writes under v3fam/v1/cap first; --ticker-failed the score, build and D6 items it recorded failed after their own second failure (never the data build), which the verdict writes under v3fam/v1/failed and counts as ending the arms they end, as the ticker does; the sealed-test reads are a person's (inc2.v3fam test-read)."
+   "note": "Record only (V3F.7 step 11): proposed once every arm's record is complete or failed: the family's data build done, and no score arm, build or D6 job pending or 'not run (the family's data build failed)', which never started (deviation 4, diagnose_stream.v3fam_verdict_ready; the verb refuses too); --cap-refused names the items the ticker recorded 'not run (family cap)', which the verdict writes under v3fam/v1/cap first; --ticker-failed the score, build and D6 items it recorded failed after their own second failure (never the data build), which the verdict writes under v3fam/v1/failed and counts as ending the arms they end, as the ticker does; the sealed-test reads are a person's (inc2.v3fam test-read). The verb runs from inc2/v3fam_verdict.py (deviation 5, 2026-10-24): inc2/v3fam.py, whose sha256 every reproduction record pins (inc2.v3fam.code_shas), is never changed for the ticker's plumbing; an item refused by the platform's own precondition (a reproduction record taken by other code, an E3-frozen file changed) is never recorded failed and never named in --ticker-failed."
   },
   "LV": {
    "name": "verdict",

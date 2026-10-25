@@ -509,8 +509,31 @@
   "status": "v3fam/v1/status.json",
   "data_record": "splits/v3fam/summary.json",
   "score_record": "capacity/v3fam_score_%s.json",
-  "verdict_record": "capacity/v3fam_v1_cont.json",
+  "verdict_record": "capacity/v3fam_v1_cont2.json",
+  "continuation_record": "capacity/v3fam_v1_cont.json",
   "partial_verdict_record": "capacity/v3fam_v1.json",
+  "equivalence_code": {
+   "scorer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+   "scorer_native": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+   "scorer_sidecar": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+   "semisup_labeler": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+   "twostage": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+   "v3fam": "3d776daed91d487d2817ba6959f9dd832d82c6e0be048b812916b63f22b239b7",
+   "verify": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+  },
+  "equivalence_records": {
+   "after": "E3RS",
+   "names": [
+    "dev_identity.json",
+    "injection.json",
+    "two_stage_M.json",
+    "two_stage_A.json",
+    "two_stage_B.json",
+    "identity_imageweeds.json",
+    "identity_ooddev_v1.json"
+   ],
+   "why": "The reproduction records E3RS's score job takes (V3F.3.2: dev identity, injection, the three two-stage reproductions, and the identities of the two reported exams); once it is done each must be in place, or no family score is proposed (deviation 5)."
+  },
   "reopen": {
    "marker": "deviation 4 (2026-10-20)",
    "file": "docs/prereg/V3F_dev4_2026-10-20.md",
@@ -522,6 +545,25 @@
    "before_utc": "2026-10-20T00:00:00Z",
    "why": "Deviation 4 (2026-10-20): the family's data build (L23H) failed twice on 2026-10-12 on a defect (inc2.v3fam_data keyed its DINOv2 scans by manifest key, which 6,805 of base_v2's 6,811 keys repeat with two files, and funnel.embed refuses a repeated key), and the verdict of 2026-10-13 (job 49107774) was decided while seven arms had never started (D1, D4F, D4N, D4R15, D5B, D6, D8). The build is fixed (each file is scanned once, keyed by its sha256; no arm's rows change) and proposed again; the verdict of 2026-10-13 stays recorded as it is, and the family's continuation verdict (capacity/v3fam_v1_cont.json, the same rules and Holm sets) comes once every arm's record is complete or failed (V3F.7 step 11)."
   },
+  "reopens": [
+   {
+    "marker": "deviation 5 (2026-10-24)",
+    "file": "docs/prereg/V3F_dev5_2026-10-24.md",
+    "sha256": "96f58b9dd40cebf25566144ae9c17b8b0409b73dd4f2a1629737c7309d19eed8",
+    "items": [
+     "score:D8",
+     "score:D4F",
+     "score:D4N",
+     "score:D4R15",
+     "score:D1",
+     "score:D5B",
+     "detr:smoke",
+     "verdict"
+    ],
+    "before_utc": "2026-10-24T00:00:00Z",
+    "why": "Deviation 5 (2026-10-24): deviation 4 changed inc2/v3fam.py in its CLI only (sha256 3d776dae... to c5e923dc...), and every reproduction record of 2026-10-12 pins that file's sha256 (inc2.v3fam.code_shas), so inc2.v3fam.require_equivalence refused all twelve score jobs of D8, D4F, D4N, D4R15, D1 and D5B on 2026-10-21; the ticker counted those refusals as the arms' failures and the continuation verdict of 2026-10-22 (capacity/v3fam_v1_cont.json) recorded the six arms failed. inc2/v3fam.py is restored byte for byte (3d776dae...), the verdict's CLI moved to inc2/v3fam_verdict.py, and the six arms' scores are proposed again. D6's smoke of 2026-10-21 took the whole one-epoch fit (2,405.6 s, about 905 s of it one-time setup before the epoch) as the epoch time and projected 33.9 h against the 28.8 h rule; the rule takes the epoch's own time, so the smoke is taken again with the epoch timed from its start (inc2.v3fam_detr). The continuation of 2026-10-22 stays recorded as it is, and the family's second continuation (capacity/v3fam_v1_cont2.json, the same rules and Holm sets, reproducing every comparison either earlier record decided) comes once each reopened arm has a record since."
+   }
+  ],
   "seeds": [
    0,
    1,
@@ -735,7 +777,7 @@
    "verdict": 0.01
   },
   "storage_why": "GB each item writes (V3F.5's storage lines): D6's smoke stages base_v2 (at most 3 GB, the transposed copies) and trains one epoch (at most 1.1 GB transient) = 4.1; its train writes at most 1.1 GB transient per running seed and 0.135 GB per final, 3 x 1.235 = 3.7 (the staging is the smoke's). /ocean holds the Hugging Face cache too, so the step-0c downloads (8.7 GB) come out of the same headroom; the ticker raises one card when the items not yet done need more than /ocean holds above the floor and margin.",
-  "why": "V3F, the v3 experiment family D0-D9 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, pre-registered as one family; docs/prereg/V3F_2026-10-11.md): once E3's verdict is decided and the model-zoo audit is complete, the deployed tree holds the amendment (its sha256), v3fam/v1/timestamp.json exists and D0-S's record is complete (the derived status v3fam/v1/status.json the snapshot ships), DR0 proposes, one MAINT item at a time and in V3F.7's order: L23H once (inc2.v3fam_data build), then L23J for E3RS, D2's nine arms, D3 and D9 (inc2.v3fam score --arm X), then L23I for each build (inc2.baseline build --exp E --v3fam ARM; D0BCLEAN first and only when D0-S triggered it; a lane item ends when its build job ends and the seeds' runs overlap), then L23J for BCLEAN, D8, D4F, D4N, D4R15, D1 (after the EXIF frame pre-flight passed) and D6 once its runs (or D6's three seed exports) are done, then L23L once (inc2.v3fam verdict) when every arm is done, failed or not run; on TRAIN, L23K's smoke after L23H, then its three seeds in one item when the smoke's projection is within 28.8 h. Every item is record only: a failure is one card and the item is proposed once more; after a second failure it is recorded failed, never holds the other arms, and keeps its place in the verdict. No item is proposed while storage is under 30 GiB above the 3 % floor for its bytes (a card names the shortfall), or while its estimate would take the family past 260 GPU-h (the family cap, decision 25: running items at their estimates, ended ones settled from sacct or the experiment's report, the person steps from the derived status; it is recorded 'not run (family cap)' and never retried). D5b's three builds train with dev as their only final (Revision 30: the pinned driver's minimum; the family never reads those dev scores). An L23K seed job killed at its walltime fails D6 and is not retried; a retry of L23K's train names only the seeds not yet trained; every attempt of an item counts against the cap; the verdict's argv names the items the ticker refused at the cap. Person and delegate steps are never levers: D0-S's sweep and verdicts, the weight downloads, D7, the EXIF verdict, every sealed-test read and the re-analysis; the family card gives their exact commands."
+  "why": "V3F, the v3 experiment family D0-D9 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, pre-registered as one family; docs/prereg/V3F_2026-10-11.md): once E3's verdict is decided and the model-zoo audit is complete, the deployed tree holds the amendment (its sha256), v3fam/v1/timestamp.json exists and D0-S's record is complete (the derived status v3fam/v1/status.json the snapshot ships), DR0 proposes, one MAINT item at a time and in V3F.7's order: L23H once (inc2.v3fam_data build), then L23J for E3RS, D2's nine arms, D3 and D9 (inc2.v3fam score --arm X), then L23I for each build (inc2.baseline build --exp E --v3fam ARM; D0BCLEAN first and only when D0-S triggered it; a lane item ends when its build job ends and the seeds' runs overlap), then L23J for BCLEAN, D8, D4F, D4N, D4R15, D1 (after the EXIF frame pre-flight passed) and D6 once its runs (or D6's three seed exports) are done, then L23L once (inc2.v3fam_verdict verdict; deviation 5) when every arm is done, failed or not run; on TRAIN, L23K's smoke after L23H, then its three seeds in one item when the smoke's projection is within 28.8 h. Every item is record only: a failure is one card and the item is proposed once more; after a second failure it is recorded failed, never holds the other arms, and keeps its place in the verdict. A refusal of the platform's own making (a reproduction record taken by other code, an E3-frozen file changed: deviation 5) is never a failure: the item is held with a card and proposed again once the snapshot reports the records current; no family score is proposed while a record is taken by other code than the deployed one (v3fam.equivalence_code names the code the cluster's records pin). No item is proposed while storage is under 30 GiB above the 3 % floor for its bytes (a card names the shortfall), or while its estimate would take the family past 260 GPU-h (the family cap, decision 25: running items at their estimates, ended ones settled from sacct or the experiment's report, the person steps from the derived status; it is recorded 'not run (family cap)' and never retried). D5b's three builds train with dev as their only final (Revision 30: the pinned driver's minimum; the family never reads those dev scores). An L23K seed job killed at its walltime fails D6 and is not retried; a retry of L23K's train names only the seeds not yet trained; every attempt of an item counts against the cap; the verdict's argv names the items the ticker refused at the cap. Person and delegate steps are never levers: D0-S's sweep and verdicts, the weight downloads, D7, the EXIF verdict, every sealed-test read and the re-analysis; the family card gives their exact commands."
  },
  "stage_a": {
   "exp": "pilot_v4",

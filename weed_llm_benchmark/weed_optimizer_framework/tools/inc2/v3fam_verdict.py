@@ -2,7 +2,9 @@
 "Amendment (2026-10-11): V3F, the v3 experiment family D0-D9 (pre-registered
 as one family)", V3F.3.3-V3F.3.6, V3F.5, V3F.6.1).
 
-    python -m weed_optimizer_framework.tools.inc2.v3fam verdict                                  (L23L; a job)
+    python -m weed_optimizer_framework.tools.inc2.v3fam_verdict verdict [--cap-refused ITEM,...] [--ticker-failed ITEM,...]
+                                                                                    (L23L; a job; deviation 5)
+    python -m weed_optimizer_framework.tools.inc2.v3fam verdict [--cap-refused ITEM,...]   (the same verb, a person's)
     python -m weed_optimizer_framework.tools.inc2.v3fam test-read --arm X --read-by owner|delegate  (login node)
     sbatch run_inc2_build.sh inc2.v3fam score-test --arm X        (the person test-read names; INCAP_DECIDED_BY)
     python -m weed_optimizer_framework.tools.inc2.v3fam test-report --arm X
@@ -88,14 +90,46 @@ the 2026-10-13 records decided (to 1e-9, the same outcome; a primary
 family-confirmed then stays so), and the reads follow the continuation
 (family_verdict_path): before it, every read refuses.
 
+Deviation 5 (2026-10-24; docs/prereg/V3F_dev5_2026-10-24.md). Deviation 4
+changed inc2/v3fam.py (its CLI only: the --ticker-failed option and the verdict
+call it feeds), so every reproduction record of 2026-10-12, which pins that
+file's sha256 (inc2.v3fam.code_shas), refused every score job of D1, D4F,
+D4N, D4R15, D5B and D8 on 2026-10-21; the ticker counted those refusals as
+the arms' failures, and the continuation of 2026-10-22 (capacity/
+v3fam_v1_cont.json, sha256 CONT_SHA256) recorded the six arms 'failed twice'
+and D6 'missing'. inc2/v3fam.py is restored byte for byte (sha256
+3d776dae...) and the verdict's CLI lives here (main: python -m
+...inc2.v3fam_verdict verdict), outside code_shas. The continuation of
+2026-10-22 stays as it is. When it is the one in place, the verb writes the
+family's second continuation (CONTINUATION_2: capacity/v3fam_v1_cont2.json,
+its external, ext and report files) by the same computation, once, after
+checking that it reproduces every comparison the 2026-10-13 records and the
+2026-10-22 records decided (continuation_check over both: to 1e-9, the same
+outcome; every primary either family-confirmed stays so); it writes nothing
+under an earlier verdict's names, and the reads follow it. It refuses while
+any arm deviation 5 reopened (DEV5_REOPENED_ARMS: the six and D6, whose smoke
+is taken again with the epoch timed from its start) has no record since the
+reopening (complete, not run by a record of its own, or a failure or
+family-cap refusal the ticker names whose item ran a job since
+DEV5_REOPEN_UTC, by its provenance); the attempts of 2026-10-21 and the
+ticker's lists of 2026-10-22 do not count, a failure record written before
+the reopening is not read, and an item named whose own record is complete
+refuses the verb. The ticker's failure records of 2026-10-22 for the six arms
+and D6's smoke record of 2026-10-21 (inc2.v3fam_supersede, by sha256) are
+moved aside before the verdict runs and are never read. D6 with no score
+reports its own smoke's 'not run (walltime)' (V3F.5 D6, V3F.3.4) and BCLEAN
+'not needed' without D0-S's trigger, never 'missing'.
+
 A refusal raises inc2.v3fam.V3famRefused (V3famCapRefused at the family cap).
 """
 from __future__ import annotations
 
+import argparse
 import datetime
 import json
 import os
 import re
+import sys
 import time
 
 from ..inc import common as C
@@ -105,6 +139,7 @@ from . import recipes as RC
 from . import scorer_sidecar as SC
 from . import twostage as TS
 from . import v3fam as F
+from . import v3fam_supersede as SUP
 from . import v3fam_systems as SYS
 
 # ------------------------------------------------------------------ constants (pre-registered)
@@ -248,6 +283,25 @@ PARTIAL_EXTERNAL_SHA256 = "81cd1811d9cbd1870d4b6ecae922320ae9ca7e446e2a9a809afff
 CONTINUATION = {"verdict": "v3fam_v1_cont.json", "external": "v3fam_v1_cont_external.json",
                 "ext": "v3fam_ext_v1_cont.json", "report": "v3fam_v1_cont_report"}
 DEVIATION_4 = "docs/prereg/V3F_dev4_2026-10-20.md"
+# Deviation 5 (2026-10-24, docs/prereg/V3F_dev5_2026-10-24.md; module docstring). The continuation of 2026-10-22
+# (job 49571261, capacity/v3fam_v1_cont.json with this sha256, its external record that one) stays as it is; the
+# family's verdict over every arm is its second continuation, written once under CONTINUATION_2, after reproducing
+# every comparison either earlier record decided, and only once each arm deviation 5 reopened has a record since.
+CONT_SHA256 = "f1a4d60d2d2ef72a682a56be059d4b39defeb909c8a317be4c52c006e211a860"
+CONT_EXTERNAL_SHA256 = "d30e04d027ccd23718a32a58c16fa15169b21de721456f88fe2a78670f07e692"
+CONTINUATION_2 = {"verdict": "v3fam_v1_cont2.json", "external": "v3fam_v1_cont2_external.json",
+                  "ext": "v3fam_ext_v1_cont2.json", "report": "v3fam_v1_cont2_report"}
+DEVIATION_5 = SUP.DEVIATION_5
+DEV5_ARMS = ("D8", "D4F", "D4N", "D4R15", "D1", "D5B")      # the score arms deviation 5 reopened
+DEV5_REOPENED_ARMS = DEV5_ARMS + ("D6",)                     # and D6, whose smoke it takes again (its epoch time)
+# deviation 5's reopening (the domain's reopen block's before_utc): under the second continuation a failure or a
+# family-cap refusal of a reopened arm counts only with a job of it that started since, and a failure record only
+# when written since (the attempts of 2026-10-21 and the failure records of 2026-10-22 never end those arms again)
+DEV5_REOPEN_UTC = "2026-10-24T00:00:00Z"
+# the ticker's failure records of 2026-10-22 for those arms (inc2.v3fam_supersede moves them aside): by sha256
+DEV5_SUPERSEDED_FAILED = {"score:%s" % rel.rsplit("score_", 1)[1][:-len(".json")]: sha
+                          for rel, sha in SUP.superseded_sha256s("v3fam/v1/failed/").items()}
+D6_SMOKE = ("d6", "smoke", "smoke.json")     # under v3fam/v1: D6's smoke record (inc2.v3fam_detr)
 REPRO_FIELDS = ("diff", "z", "interval_90", "outcome", "qualifies")     # a decision the continuation reproduces
 CONT_REPRO_TOL = 1e-9
 # The items the ticker recorded failed after their own second failure (stream state), passed in the verdict's argv
@@ -278,10 +332,25 @@ def is_partial(path=None):
     return vp.is_file() and F._sha(vp) == PARTIAL_VERDICT_SHA256
 
 
+def is_first_continuation(path=None):
+    """True when capacity/v3fam_v1_cont.json is the continuation of 2026-10-22 (deviation 5)."""
+    cp = path or cap_path(CONTINUATION["verdict"])
+    return cp.is_file() and F._sha(cp) == CONT_SHA256
+
+
+def second_continuation_due():
+    """True when the verdict of 2026-10-13 and the continuation of 2026-10-22 are both in place: the family's
+    verdict over every arm is then the second continuation (deviation 5)."""
+    return is_partial() and is_first_continuation()
+
+
 def family_verdict_path():
     """The family's verdict the sealed-test reads follow: capacity/v3fam_v1.json, or its continuation when that
-    file is the verdict of 2026-10-13 (deviation 4), written or not."""
-    return cap_path(CONTINUATION["verdict"]) if is_partial() else verdict_path()
+    file is the verdict of 2026-10-13 (deviation 4), written or not; its second continuation when the continuation
+    in place is the one of 2026-10-22 (deviation 5), written or not."""
+    if not is_partial():
+        return verdict_path()
+    return cap_path(CONTINUATION_2["verdict"]) if is_first_continuation() else cap_path(CONTINUATION["verdict"])
 
 
 def test_dir(arm):
@@ -375,8 +444,121 @@ def record_ticker_failures(items):
     return out
 
 
+def superseded_failure(item, path=None):
+    """True for a failure record of 2026-10-22 deviation 5 supersedes (DEV5_SUPERSEDED_FAILED, by sha256): the
+    platform's refusal of the arm's score jobs, not the arm's failure."""
+    p = path or failed_file(item)
+    return item in DEV5_SUPERSEDED_FAILED and p.is_file() and F._sha(p) == DEV5_SUPERSEDED_FAILED[item]
+
+
 def failure_recorded(item):
-    return failed_file(item).exists()
+    """True when the ticker's failure record of item is in place and counts: never one deviation 5 supersedes (by
+    sha256); while the second continuation is due, only one written since deviation 5's reopening."""
+    p = failed_file(item)
+    if not p.exists() or superseded_failure(item, p):
+        return False
+    if second_continuation_due():
+        d = F._read_json(p)
+        return isinstance(d, dict) and str(d.get("written_utc") or "") >= DEV5_REOPEN_UTC
+    return True
+
+
+def item_jobs(item):
+    """The provenance names of a family item's jobs (run_inc2_build.sh, run_inc2_detr.sh)."""
+    item = str(item)
+    if item.startswith("score:"):
+        return ["v3fam_score_%s" % item[len("score:"):].lower()]
+    if item.startswith("build:"):
+        exp = RC.V3FAM_EXPS.get(item[len("build:"):])
+        return [exp] if exp else []
+    if item == "detr:smoke":
+        return ["v3fam_detr_smoke"]
+    if item == "detr:train":
+        return ["v3fam_detr_s%d" % s for s in F.SEEDS]
+    if item == "data":
+        return ["v3fam_data"]
+    return []
+
+
+def attempted_since(item, utc):
+    """True when a job of item holds a provenance attempt that started at or after utc (the cluster's own record
+    that it ran since)."""
+    for n in item_jobs(item):
+        rec = F._read_json(C.INC_DIR / "_campaign" / "provenance" / ("%s.json" % n))
+        for att in (rec.get("attempts") or []) if isinstance(rec, dict) else []:
+            if isinstance(att, dict) and str(att.get("started_utc") or "") >= utc:
+                return True
+    return False
+
+
+def contradicted(cap_refused=(), failed=()):
+    """The --cap-refused and --ticker-failed items the cluster's own records contradict: a score item whose arm's
+    score record is complete, and the data build while its summary is complete (a stale or wrong list would
+    otherwise end every arm scored after it: deviation 5)."""
+    from . import v3fam_data as VD
+    out = []
+    for it in sorted({str(x).strip() for x in list(cap_refused or ()) + list(failed or ()) if str(x).strip()}):
+        if it.startswith("score:") and (score_record(it[len("score:"):]) or {}).get("status") == "complete":
+            out.append("%s (its score record is complete)" % it)
+        elif it == "data" and VD.read_summary() is not None:
+            out.append("data (its summary is complete)")
+    return out
+
+
+def d6_smoke_status():
+    """D6's smoke record's status (inc2.v3fam_detr writes v3fam/v1/d6/smoke/smoke.json), or None. The smoke of
+    2026-10-21, superseded by sha256 (deviation 5: it took the whole one-epoch fit as the epoch time), is no smoke
+    record, even while it is still in place."""
+    p = F.root().joinpath(*D6_SMOKE)
+    if p.is_file() and SUP.is_superseded(SUP.D6_SMOKE, F._sha(p)):
+        return None
+    d = F._read_json(p)
+    return d.get("status") if isinstance(d, dict) else None
+
+
+def supersede():
+    """inc2.v3fam_supersede.apply on this INC_DIR for every group (the records a recorded deviation supersedes moved
+    aside byte for byte, each named in its folder's manifest), as the score jobs of v3fam_systems' and
+    v3fam_trained's arms do first for theirs and D6's smoke for its own; refused as a family refusal."""
+    return SYS.supersede(groups=SUP.GROUPS)
+
+
+def _write_once_json(path, obj):
+    F.write_once(path, obj)
+
+
+def set_aside_partial(names):
+    """The second continuation's own records (CONTINUATION_2: external, ext, report .json/.md) that an attempt cut
+    off before its verdict file left behind, moved byte for byte (a rename on the same file system: never
+    overwritten, never deleted) into capacity/<verdict stem>_partial_<utc>/, with a MANIFEST.json naming each by
+    sha256, so this attempt writes every record once. Only while the verdict file itself does not exist; it is
+    never moved. Returns [{name, sha256, to}]."""
+    if cap_path(names["verdict"]).exists():
+        raise F.V3famRefused("%s exists: the family's second continuation verdict is written once (deviation 5)"
+                             % cap_path(names["verdict"]))
+    left = [n for n in [names["external"], names["ext"], names["report"] + ".json", names["report"] + ".md"]
+            if cap_path(n).exists()]
+    if not left:
+        return []
+    stem = names["verdict"][:-len(".json")]
+    folder = cap_path("%s_partial_%s" % (stem, F._utc().replace(":", "").replace("-", "")[:15]))
+    k = 1
+    while folder.exists():
+        k += 1
+        folder = cap_path("%s_partial_%s_%d" % (stem, F._utc().replace(":", "").replace("-", "")[:15], k))
+    folder.mkdir(parents=True)
+    out = []
+    for n in left:
+        sha = F._sha(cap_path(n))
+        os.rename(str(cap_path(n)), str(folder / n))
+        out.append({"name": n, "sha256": sha, "to": "%s/%s" % (folder.name, n)})
+        log("second continuation: %s, left by an attempt cut off before its verdict file, moved aside to %s "
+            "(sha256 %s)" % (n, folder.name, sha[:12]))
+    F.write_once(folder / "MANIFEST.json", {"format": "inc2-v3fam-partial-set-aside/1", "records": out,
+                                            "why": "written by an attempt of the second continuation cut off before "
+                                                   "its verdict file (deviation 5): moved aside, never overwritten",
+                                            "job": os.environ.get("SLURM_JOB_ID") or None, "moved_utc": F._utc()})
+    return out
 
 
 def arm_status(arm):
@@ -393,6 +575,10 @@ def arm_status(arm):
         ended = [i for i in ending_items(arm) if failure_recorded(i)]
         if ended:
             return "failed (%s failed twice)" % ", ".join(ended)
+        if arm == "D6" and str(d6_smoke_status() or "").startswith("not run"):
+            return str(d6_smoke_status())         # V3F.5 D6: the walltime refusal is 'not run' with its reason
+        if arm == "BCLEAN" and not d0s_trigger().get("bclean"):
+            return "not needed"                   # V3F.5 D0-S: BCLEAN only when D0-S triggered it
         return "missing"
     st = r.get("status")
     if st == "complete":
@@ -929,29 +1115,57 @@ def verdict_ready(trig=None, cap_refused=(), failed=()):
     build's too.
     An item the ticker recorded failed after its own second failure (failed, the verdict's --ticker-failed, or a
     failure record already written) ends the arms it ends (ending_items), as the ticker counts them: a job can fail
-    before its provenance attempt is written. The data build's failure ends nothing: its summary is needed."""
+    before its provenance attempt is written. The data build's failure ends nothing: its summary is needed.
+    Deviation 5: while the continuation of 2026-10-22 is the one in place (the second continuation is due), each
+    arm deviation 5 reopened (DEV5_REOPENED_ARMS: the six score arms and D6) needs a record written since (complete,
+    not run by its own new record, or a failure or family-cap refusal the ticker names whose item ran a job since
+    the reopening, DEV5_REOPEN_UTC, by its provenance): the score jobs of 2026-10-21, refused by the platform's own
+    stale records, do not count as its start, their failure records (superseded by sha256, or written before the
+    reopening) are not read, and the lists of 2026-10-22 passed again end nothing; an item named failed or refused
+    whose own record is complete (a score, the data summary) refuses the verb (contradicted)."""
     from . import v3fam_data as VD
     trig = d0s_trigger() if trig is None else trig
     refused = {str(x).strip() for x in cap_refused or () if str(x).strip()}
     gone = set(_failed_items(failed))
+    second = second_continuation_due()
     why = []
+    bad = contradicted(refused, gone) if second else []
+    if bad:
+        why.append("the ticker's lists name items the cluster's records contradict: %s" % ", ".join(bad))
     if VD.read_summary() is None and "data" not in refused and not cap_refused_item("data"):
         why.append("the family's data build has no complete %s" % VD._summary_path())
-    never = []
+    never, again, stale = [], [], []
     for a in F.SCORE_ARMS:
         st = arm_status(a)
         if st != "missing":
             continue
         if a == "BCLEAN" and not trig.get("bclean"):
             continue
-        if refused & ({"score:%s" % a, "data"} | set(SCORE_DEPS.get(a, ()))):
+        cap_named = refused & ({"score:%s" % a, "data"} | set(SCORE_DEPS.get(a, ())))
+        fail_named = gone & set(ending_items(a))
+        named = cap_named | fail_named
+        if second and a in DEV5_REOPENED_ARMS:
+            # deviation 5: reopened after its score jobs of 2026-10-21 were refused by the platform's stale records
+            # (D6: its smoke taken again); those attempts do not start it again, and a failure or cap refusal the
+            # ticker names ends it only with a job of that item since the reopening (the lists of 2026-10-22 never
+            # end it again): it needs a record, or such a failure, since the reopening
+            if any(attempted_since(i, DEV5_REOPEN_UTC) for i in named):
+                continue
+            if named:
+                stale.append("%s (%s)" % (a, ", ".join(sorted(named))))
+            again.append(a)
             continue
-        if gone & set(ending_items(a)):
+        if named:
             continue
         if not arm_started(a):
             never.append(a)
     if never:
         why.append("never started: %s" % ", ".join(never))
+    if again:
+        why.append("not scored since deviation 5 reopened them (%s): %s" % (DEVIATION_5, ", ".join(again)))
+    if stale:
+        why.append("named failed or refused with no job of that item since the reopening (%s): %s" % (
+            DEV5_REOPEN_UTC, "; ".join(stale)))
     return (not why), "; ".join(why)
 
 
@@ -980,37 +1194,68 @@ def _reproduces(old, new):
     return bad
 
 
+def _decided(rec):
+    """{id: comparison} of a verdict record: its primaries, Tier S and Tier C comparisons."""
+    rec = rec or {}
+    out = dict(rec.get("primaries") or {}, **(rec.get("tier_s") or {}))
+    out.update({"C_%s" % a: v for a, v in ((rec.get("challengers") or {}).get("comparisons") or {}).items()})
+    return out
+
+
+def _prior_records():
+    """The earlier verdict records a continuation must reproduce: [(label, verdict path, external path)] -- the
+    verdict of 2026-10-13, and when the continuation of 2026-10-22 is in place (deviation 5), that one too."""
+    out = [("2026-10-13", verdict_path(), cap_path(EXTERNAL))]
+    if is_first_continuation():
+        out.append(("2026-10-22", cap_path(CONTINUATION["verdict"]), cap_path(CONTINUATION["external"])))
+    return out
+
+
 def continuation_check(doc, ext):
-    """What the continuation carries of the verdict of 2026-10-13: its name and sha256, and that every comparison it
-    decided (dev: P1-P5, Tier C, Tier S; external: P6-P9 and Tier S off dev) is reproduced to 1e-9 with the same
-    outcome, and every primary it family-confirmed stays confirmed (Holm's step-down over the same sets can only
-    keep it). Refuses otherwise."""
-    old = F._read_json(verdict_path()) or {}
-    olde = F._read_json(cap_path(EXTERNAL)) if cap_path(EXTERNAL).is_file() else None
-    oc = dict(old.get("primaries") or {}, **(old.get("tier_s") or {}))
-    oc.update({"C_%s" % a: v for a, v in ((old.get("challengers") or {}).get("comparisons") or {}).items()})
-    nc = dict(doc.get("primaries") or {}, **(doc.get("tier_s") or {}))
-    nc.update({"C_%s" % a: v for a, v in ((doc.get("challengers") or {}).get("comparisons") or {}).items()})
-    bad = _reproduces(oc, nc)
-    if isinstance(olde, dict):
-        bad += _reproduces(dict(olde.get("primaries") or {}, **(olde.get("tier_s") or {})),
-                           dict(ext.get("primaries") or {}, **(ext.get("tier_s") or {})))
-    lost = sorted(p for p, h in (old.get("holm") or {}).items() if (h or {}).get("family_confirmed")
-                  and not ((doc.get("holm") or {}).get(p) or {}).get("family_confirmed"))
+    """What a continuation carries of the earlier verdicts (the verdict of 2026-10-13; and, for the second
+    continuation, the continuation of 2026-10-22, deviation 5): their names and sha256s, and that every comparison
+    any of them decided (dev: P1-P5, Tier C, Tier S; external: P6-P9 and Tier S off dev) is reproduced to 1e-9 with
+    the same outcome, and every primary any of them family-confirmed stays confirmed (Holm's step-down over the same
+    sets can only keep it). Refuses otherwise."""
+    priors = _prior_records()
+    nc = _decided(doc)
+    bad, lost, by_rec, kept = [], [], {}, set()
+    for label, vp, ep in priors:
+        old = F._read_json(vp) or {}
+        olde = F._read_json(ep) if ep.is_file() else None
+        oc = _decided(old)
+        bad += [(label,) + x for x in _reproduces(oc, nc)]
+        if isinstance(olde, dict):
+            bad += [(label,) + x for x in _reproduces(dict(olde.get("primaries") or {}, **(olde.get("tier_s") or {})),
+                                                      dict(ext.get("primaries") or {}, **(ext.get("tier_s") or {})))]
+        conf = sorted(p for p, h in (old.get("holm") or {}).items() if (h or {}).get("family_confirmed"))
+        kept |= set(conf)
+        lost += ["%s (%s)" % (p, label) for p in conf
+                 if not ((doc.get("holm") or {}).get(p) or {}).get("family_confirmed")]
+        by_rec[label] = sorted(k for k, v in oc.items() if isinstance(v, dict) and v.get("status") == "decided")
     if bad or lost:
-        raise F.V3famRefused("the continuation does not reproduce the verdict of 2026-10-13 (%s): %s%s" % (
-            VERDICT, ["%s %s: %r -> %r" % x for x in bad[:4]], "; no longer family-confirmed: %s" % lost if lost
-            else ""))
-    decided = sorted(k for k, v in oc.items() if isinstance(v, dict) and v.get("status") == "decided")
-    return {"verdict": VERDICT, "sha256": PARTIAL_VERDICT_SHA256, "external": EXTERNAL,
-            "external_sha256": F._sha(cap_path(EXTERNAL)) if cap_path(EXTERNAL).is_file() else None,
-            "external_as_read_on_2026_10_18": (F._sha(cap_path(EXTERNAL)) == PARTIAL_EXTERNAL_SHA256)
-            if cap_path(EXTERNAL).is_file() else False,
-            "deviation": DEVIATION_4, "reproduced": decided, "tolerance": CONT_REPRO_TOL,
-            "family_confirmed_kept": sorted(p for p, h in (old.get("holm") or {}).items()
-                                            if (h or {}).get("family_confirmed")),
-            "note": "the verdict of 2026-10-13 stays as it is; this record is the family's verdict over every arm, by "
-                    "the same rules (deviation 4)"}
+        raise F.V3famRefused("the continuation does not reproduce the verdict of %s (%s): %s%s" % (
+            " and the continuation of ".join(lb for lb, _v, _e in priors), VERDICT,
+            ["%s %s %s: %r -> %r" % x for x in bad[:4]], "; no longer family-confirmed: %s" % lost if lost else ""))
+    first = {"verdict": VERDICT, "sha256": PARTIAL_VERDICT_SHA256, "external": EXTERNAL,
+             "external_sha256": F._sha(cap_path(EXTERNAL)) if cap_path(EXTERNAL).is_file() else None,
+             "external_as_read_on_2026_10_18": (F._sha(cap_path(EXTERNAL)) == PARTIAL_EXTERNAL_SHA256)
+             if cap_path(EXTERNAL).is_file() else False,
+             "deviation": DEVIATION_4, "reproduced": by_rec["2026-10-13"], "tolerance": CONT_REPRO_TOL,
+             "family_confirmed_kept": sorted(kept),
+             "note": "the verdict of 2026-10-13 stays as it is; this record is the family's verdict over every arm, "
+                     "by the same rules (deviation 4)"}
+    if len(priors) == 1:
+        return first
+    cx = cap_path(CONTINUATION["external"])
+    return dict(first, continuation=CONTINUATION["verdict"], continuation_sha256=CONT_SHA256,
+                continuation_external=CONTINUATION["external"],
+                continuation_external_sha256=F._sha(cx) if cx.is_file() else None,
+                continuation_external_as_read_on_2026_10_24=(F._sha(cx) == CONT_EXTERNAL_SHA256) if cx.is_file()
+                else False, deviation=DEVIATION_5, deviations=[DEVIATION_4, DEVIATION_5],
+                reproduced=sorted(set(by_rec["2026-10-13"]) | set(by_rec["2026-10-22"])), reproduced_by_record=by_rec,
+                note="the verdict of 2026-10-13 and its continuation of 2026-10-22 stay as they are; this record is "
+                     "the family's verdict over every arm, by the same rules (deviation 5)")
 
 
 def verdict(cap_refused=None, ticker_failed=None):
@@ -1022,16 +1267,32 @@ def verdict(cap_refused=None, ticker_failed=None):
     2026-10-13 (deviation 4), the same computation writes the continuation's records (CONTINUATION) instead, once,
     after checking that it reproduces every comparison that verdict decided."""
     F.check_frozen()
+    supersede()                              # deviation 5: the records it supersedes moved aside first
     vp = verdict_path()
-    cont = False
+    cont, second = False, False
     if vp.exists():
         if not is_partial(vp):
             raise F.V3famRefused("%s exists: the family's verdict is written once" % vp)
         cont = True
         cp = cap_path(CONTINUATION["verdict"])
         if cp.exists():
-            raise F.V3famRefused("%s exists: the family's continuation verdict is written once (deviation 4)" % cp)
-    names = dict(CONTINUATION) if cont else {"verdict": VERDICT, "external": EXTERNAL, "ext": EXT, "report": REPORT}
+            if not is_first_continuation(cp):
+                raise F.V3famRefused("%s exists: the family's continuation verdict is written once (deviation 4)" % cp)
+            second = True
+            c2 = cap_path(CONTINUATION_2["verdict"])
+            if c2.exists():
+                raise F.V3famRefused("%s exists: the family's second continuation verdict is written once "
+                                     "(deviation 5)" % c2)
+    names = dict(CONTINUATION_2) if second else dict(CONTINUATION) if cont else {
+        "verdict": VERDICT, "external": EXTERNAL, "ext": EXT, "report": REPORT}
+    if second:
+        # never a name of the verdict of 2026-10-13 or of its continuation: those records stay as they are
+        earlier = {VERDICT, EXTERNAL, EXT, REPORT + ".json", REPORT + ".md"} | {
+            CONTINUATION[k] for k in ("verdict", "external", "ext")} | {CONTINUATION["report"] + x for x in
+                                                                        (".json", ".md")}
+        mine = {names[k] for k in ("verdict", "external", "ext")} | {names["report"] + x for x in (".json", ".md")}
+        if earlier & mine:
+            raise F.V3famRefused("the second continuation would write over %s" % sorted(earlier & mine))
     ok, why = verdict_ready(cap_refused=cap_refused, failed=ticker_failed)
     if not ok:
         raise F.V3famRefused("the verdict waits until every arm's record is complete or failed (V3F.7 step 11; "
@@ -1065,19 +1326,30 @@ def verdict(cap_refused=None, ticker_failed=None):
         if continues:
             common["continues"] = continues
             ext["continues"] = continues
-        TS._write_json(cap_path(names["external"]), ext)
-        TS._write_json(cap_path(names["ext"]), dict(common, format=FMT_EXT, arms=ext_record(),
-                                           note="ImageWeeds Ragweed AP50-95 (common ragweed, 2,010 boxes; other "
-                                                "ImageWeeds species scored only as OtherPlant) and agnostic; "
-                                                "ooddev_v1 agnostic; reported only"))
+        if second:
+            # deviation 5: every record of the second continuation is written once (never over a file); one an
+            # attempt cut off before its verdict file left (a full disk, a lost node) is moved aside first
+            aside = set_aside_partial(names)
+            if aside:
+                common["partial_set_aside"] = aside
+                ext["partial_set_aside"] = aside
+        put = _write_once_json if second else TS._write_json
+        put(cap_path(names["external"]), ext)
+        put(cap_path(names["ext"]), dict(common, format=FMT_EXT, arms=ext_record(),
+                                         note="ImageWeeds Ragweed AP50-95 (common ragweed, 2,010 boxes; other "
+                                              "ImageWeeds species scored only as OtherPlant) and agnostic; "
+                                              "ooddev_v1 agnostic; reported only"))
         rep = dict(common, format=FMT_REPORT, decided_on=fam["decided_on"], dev_passes=passes["total"],
                    dev_passes_by_kind=passes["by_kind"],
                    comparisons={k: report_row(v) for k, v in comps.items()},
                    full_dev_beside=fam["full_dev_beside"], e3_reread=fam["e3_reread"],
                    d0s_removals=fam["d0s_removals"], holm=holm, gate=fam["gate"], order=fam["order"], arms=arms,
                    table=_table(), generated_utc=F._utc())
-        TS._write_json(cap_path(names["report"] + ".json"), rep)
-        cap_path(names["report"] + ".md").write_text(_md(rep))
+        put(cap_path(names["report"] + ".json"), rep)
+        if second:
+            F.write_once(cap_path(names["report"] + ".md"), _md(rep).encode("utf-8"))
+        else:
+            cap_path(names["report"] + ".md").write_text(_md(rep))
         doc = dict(common, format=FMT_VERDICT, status="decided", exam="dev", decided_on=fam["decided_on"],
                    dev_minus_h=fam["dev_minus_h"], full_dev_beside=fam["full_dev_beside"],
                    e3_reread=fam["e3_reread"], d0s_removals=fam["d0s_removals"],
@@ -1091,7 +1363,8 @@ def verdict(cap_refused=None, ticker_failed=None):
                                        "classes; Holm per exam; Tier C bar Phi^-1(1 - 0.05/14)",
                    note="dev only; the external primaries in capacity/%s; nothing switches" % names["external"])
         F.write_once(cap_path(names["verdict"]), doc)
-    log("%s: %s; reads %s (%.0fs)" % ("continuation verdict (deviation 4)" if cont else "verdict", ", ".join(
+    log("%s: %s; reads %s (%.0fs)" % ("second continuation verdict (deviation 5)" if second else
+                                      "continuation verdict (deviation 4)" if cont else "verdict", ", ".join(
         "%s %s" % (p, (doc["primaries"].get(p) or {}).get("decision", {}).get(
             "outcome", doc["primaries"].get(p, {}).get("status"))) for p in dev_ids),
         [o["arm"] for o in fam["order"]], time.time() - t0))
@@ -1107,6 +1380,10 @@ def read_verdict():
     if not isinstance(d, dict) or d.get("format") != FMT_VERDICT or d.get("status") != "decided":
         extra = (" (capacity/%s is the verdict of 2026-10-13, decided while seven arms had never started: the reads "
                  "follow its continuation, deviation 4)" % VERDICT) if is_partial() else ""
+        if second_continuation_due():
+            extra = (" (capacity/%s, the continuation of 2026-10-22, recorded six arms failed whose score jobs the "
+                     "platform's stale reproduction records had refused: the reads follow its second continuation, "
+                     "deviation 5)" % CONTINUATION["verdict"])
         raise F.V3famRefused("the family's verdict (%s) is not decided: no sealed-test read before it (V3F.3.6)%s"
                              % (vp, extra))
     return d
@@ -1526,3 +1803,42 @@ def reanalyse_test(read_by, env=None):
         F.write_once(out, rec)
     log("re-analysis written (%.0fs)" % (time.time() - t0))
     return rec
+
+
+# ------------------------------------------------------------------ the verdict's CLI (deviation 5)
+def _items(text):
+    return [x for x in (text or "").split(",") if x]
+
+
+def main(argv=None):
+    """python -m weed_optimizer_framework.tools.inc2.v3fam_verdict verdict [--cap-refused ITEM,...]
+    [--ticker-failed ITEM,...] (L23L). Here, not in inc2/v3fam.py: every reproduction record pins that file's
+    sha256 (inc2.v3fam.code_shas), so the ticker's plumbing never changes it (deviation 5). A refusal prints
+    "[inc2.v3fam_verdict] ERROR: ..." and exits 2; any other error exits 1."""
+    ap = argparse.ArgumentParser(description="V3F's verdict (L23L): the family's comparisons on its committed scores, "
+                                             "written once (deviations 4 and 5: its continuations).")
+    ap.add_argument("command", choices=("verdict",))
+    ap.add_argument("--cap-refused", default=None,
+                    help="the family items the ticker recorded 'not run (family cap)', comma-separated")
+    ap.add_argument("--ticker-failed", default=None,
+                    help="the score, build and D6 items the ticker recorded failed after their own second failure, "
+                         "comma-separated (deviation 4)")
+    a = ap.parse_args(argv)
+    os.environ["YOLO_AUTOINSTALL"] = "false"
+    os.environ["YOLO_OFFLINE"] = "true"
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    try:
+        verdict(cap_refused=_items(a.cap_refused), ticker_failed=_items(a.ticker_failed))
+    except (F.V3famRefused, TS.E3Refused, S.ScorerRefused, SC.SidecarError, V.VerifyError, SUP.SupersedeRefused,
+            ValueError) as e:
+        print("[inc2.v3fam_verdict] ERROR: %s" % e, file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    # run the package's own instance of this module (python -m loads this file a second time as __main__; every
+    # other module of the family imports the package's), so one module state and one set of classes serve the job
+    import importlib
+    sys.exit(importlib.import_module(__spec__.name if __spec__ else
+                                     "weed_optimizer_framework.tools.inc2.v3fam_verdict").main())

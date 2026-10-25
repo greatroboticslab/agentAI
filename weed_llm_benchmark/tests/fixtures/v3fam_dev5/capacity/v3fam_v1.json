@@ -1,0 +1,2025 @@
+{
+ "arms": {
+  "BCLEAN": "missing",
+  "D1": "missing",
+  "D2BC1": "complete",
+  "D2BC2640": "complete",
+  "D2CLIP": "complete",
+  "D2DINOB": "complete",
+  "D2DINOL": "complete",
+  "D2FT": "complete",
+  "D2LAION": "complete",
+  "D2RN50": "complete",
+  "D2SIGLIP": "complete",
+  "D3": "complete",
+  "D4F": "missing",
+  "D4N": "missing",
+  "D4R15": "missing",
+  "D5B": "missing",
+  "D6": "missing",
+  "D8": "missing",
+  "D9": "complete",
+  "E3RS": "complete"
+ },
+ "cap_refused": [],
+ "cap_refused_by_ticker": [],
+ "challengers": {
+  "C": 14,
+  "arms": {
+   "D2BC1": {
+    "diff": -0.023759638014359652,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -4.148890054409507
+   },
+   "D2BC2640": {
+    "diff": -0.002750747974022305,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -1.2973489336399073
+   },
+   "D2CLIP": {
+    "diff": -0.07997763180188089,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -7.808315715216743
+   },
+   "D2DINOB": {
+    "diff": -0.021478546464446024,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -4.055570786395352
+   },
+   "D2DINOL": {
+    "diff": -0.014693976768309858,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -2.625953641141065
+   },
+   "D2FT": {
+    "diff": -0.03717767393509264,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -4.9165275963924335
+   },
+   "D2LAION": {
+    "diff": -0.07572647529979704,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -7.60873193228293
+   },
+   "D2RN50": {
+    "diff": -0.22129275886437483,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -13.390879232195363
+   },
+   "D2SIGLIP": {
+    "diff": -0.0311968790957049,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -5.392835640734969
+   },
+   "D3": {
+    "diff": -0.004151313826865954,
+    "opens_read": false,
+    "qualifies": false,
+    "status": "decided",
+    "z": -1.5056219427554527
+   },
+   "D4F": {
+    "diff": null,
+    "opens_read": false,
+    "qualifies": null,
+    "status": "not run",
+    "z": null
+   },
+   "D4N": {
+    "diff": null,
+    "opens_read": false,
+    "qualifies": null,
+    "status": "not run",
+    "z": null
+   },
+   "D4R15": {
+    "diff": null,
+    "opens_read": false,
+    "qualifies": null,
+    "status": "not run",
+    "z": null
+   },
+   "D6": {
+    "diff": null,
+    "opens_read": false,
+    "qualifies": null,
+    "status": "not run",
+    "z": null
+   }
+  },
+  "bar": 2.690109527158866,
+  "comparisons": {
+   "D2BC1": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.023759638014359652,
+     "flags": [
+      "reversed"
+     ],
+     "interval_90": [
+      -0.03317929634476961,
+      -0.014339979683949695
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.0011398265721994083,
+     "qualifies": false,
+     "se": 0.005650617592129504,
+     "seed_term": 8.661364097945686e-07,
+     "sigma": 0.005726745636247345,
+     "two_sd": 0.0022796531443988167,
+     "z": -4.148890054409507
+    },
+    "diff": -0.023759638014359652,
+    "exam": "dev",
+    "id": "C_D2BC1",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.005650617592129504,
+     "seed": 732005861,
+     "seed_text": "inc2/v3fam/C_D2BC1/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.02319281305522658,
+     -0.0238738934510766,
+     -0.02421220753677611
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.009522464494402697,
+     "seed": 1355169455,
+     "seed_text": "inc2/v3fam/C_D2BC1/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2BC1",
+    "x_label": "BioCLIP-1",
+    "x_values": [
+     0.8618120264690609,
+     0.8614486863242435,
+     0.8632131772777264
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D2BC2640": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.002750747974022305,
+     "flags": [],
+     "interval_90": [
+      -0.006238304532307375,
+      0.0007368085842627652
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.001001811944381973,
+     "qualifies": false,
+     "se": 0.0019561489629252877,
+     "seed_term": 6.690847812709264e-07,
+     "sigma": 0.0021202838362881053,
+     "two_sd": 0.002003623888763946,
+     "z": -1.2973489336399073
+    },
+    "diff": -0.002750747974022305,
+    "exam": "dev",
+    "id": "C_D2BC2640",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.0019561489629252877,
+     "seed": 636103630,
+     "seed_text": "inc2/v3fam/C_D2BC2640/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.0024371111267377232,
+     -0.0017681674607845643,
+     -0.004046965334544739
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.002858754287836872,
+     "seed": 379629896,
+     "seed_text": "inc2/v3fam/C_D2BC2640/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2BC2640",
+    "x_label": "BioCLIP-2@640",
+    "x_values": [
+     0.8825677283975497,
+     0.8835544123145356,
+     0.8833784194799578
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D2CLIP": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.07997763180188089,
+     "flags": [
+      "reversed"
+     ],
+     "interval_90": [
+      -0.09682524690124826,
+      -0.06313001670251352
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.0034368134905507224,
+     "qualifies": false,
+     "se": 0.009850728999290563,
+     "seed_term": 7.874457979220961e-06,
+     "sigma": 0.010242622701080277,
+     "two_sd": 0.006873626981101445,
+     "z": -7.808315715216743
+    },
+    "diff": -0.07997763180188089,
+    "exam": "dev",
+    "id": "C_D2CLIP",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.009850728999290563,
+     "seed": 1304809240,
+     "seed_text": "inc2/v3fam/C_D2CLIP/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.07879126575672424,
+     -0.08419241258246701,
+     -0.07694921706645141
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.02142727604016763,
+     "seed": 850264128,
+     "seed_text": "inc2/v3fam/C_D2CLIP/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2CLIP",
+    "x_label": "OpenAI CLIP ViT-L/14",
+    "x_values": [
+     0.8062135737675632,
+     0.8011301671928531,
+     0.8104761677480511
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D2DINOB": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.021478546464446024,
+     "flags": [
+      "reversed"
+     ],
+     "interval_90": [
+      -0.030189790063547575,
+      -0.012767302865344474
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.0015396151032527577,
+     "qualifies": false,
+     "se": 0.005144703657213039,
+     "seed_term": 1.5802764441093331e-06,
+     "sigma": 0.005296060060521458,
+     "two_sd": 0.0030792302065055155,
+     "z": -4.055570786395352
+    },
+    "diff": -0.021478546464446024,
+    "exam": "dev",
+    "id": "C_D2DINOB",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.005144703657213039,
+     "seed": 366544882,
+     "seed_text": "inc2/v3fam/C_D2DINOB/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.02238633846420668,
+     -0.02069762298600375,
+     -0.021351677943127534
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.007063953617868676,
+     "seed": 437893715,
+     "seed_text": "inc2/v3fam/C_D2DINOB/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2DINOB",
+    "x_label": "DINOv2-B",
+    "x_values": [
+     0.8626185010600808,
+     0.8646249567893164,
+     0.866073706871375
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D2DINOL": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.014693976768309858,
+     "flags": [
+      "reversed"
+     ],
+     "interval_90": [
+      -0.023898039095622194,
+      -0.005489914440997522
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.001220162232724435,
+     "qualifies": false,
+     "se": 0.005506271057987852,
+     "seed_term": 9.925305827780525e-07,
+     "sigma": 0.005595672573231274,
+     "two_sd": 0.00244032446544887,
+     "z": -2.625953641141065
+    },
+    "diff": -0.014693976768309858,
+    "exam": "dev",
+    "id": "C_D2DINOL",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.005506271057987852,
+     "seed": 2002148402,
+     "seed_text": "inc2/v3fam/C_D2DINOL/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.014731369996919264,
+     -0.014378992094027265,
+     -0.014971568213983266
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.007918699101605045,
+     "seed": 1324211251,
+     "seed_text": "inc2/v3fam/C_D2DINOL/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2DINOL",
+    "x_label": "DINOv2-L",
+    "x_values": [
+     0.8702734695273682,
+     0.8709435876812929,
+     0.8724538166005192
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D2FT": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.03717767393509264,
+     "flags": [
+      "reversed"
+     ],
+     "interval_90": [
+      -0.04961568645812358,
+      -0.024739661412061693
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.0038642189840521596,
+     "qualifies": false,
+     "se": 0.006872091690750349,
+     "seed_term": 9.95479223780607e-06,
+     "sigma": 0.007561774688780806,
+     "two_sd": 0.007728437968104319,
+     "z": -4.9165275963924335
+    },
+    "diff": -0.03717767393509264,
+    "exam": "dev",
+    "id": "C_D2FT",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.006872091690750349,
+     "seed": 1265740919,
+     "seed_text": "inc2/v3fam/C_D2FT/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.03255274522422691,
+     -0.04265761496980591,
+     -0.0363226616112452
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.011804747697063397,
+     "seed": 1990647036,
+     "seed_text": "inc2/v3fam/C_D2FT/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2FT",
+    "x_label": "FT-ResNet-50",
+    "x_values": [
+     0.8524520943000605,
+     0.8426649648055142,
+     0.8511027232032573
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D2LAION": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.07572647529979704,
+     "flags": [
+      "reversed"
+     ],
+     "interval_90": [
+      -0.0920970044052625,
+      -0.05935594619433157
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.0030725460715657392,
+     "qualifies": false,
+     "se": 0.00963120223311461,
+     "seed_term": 6.293692907929371e-06,
+     "sigma": 0.009952575011678195,
+     "two_sd": 0.0061450921431314785,
+     "z": -7.60873193228293
+    },
+    "diff": -0.07572647529979704,
+    "exam": "dev",
+    "id": "C_D2LAION",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.00963120223311461,
+     "seed": 1257134604,
+     "seed_text": "inc2/v3fam/C_D2LAION/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.07421631260276407,
+     -0.07953906091664376,
+     -0.07342405237998317
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.021446127892251046,
+     "seed": 1991308025,
+     "seed_text": "inc2/v3fam/C_D2LAION/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2LAION",
+    "x_label": "LAION-2B CLIP ViT-L/14",
+    "x_values": [
+     0.8107885269215234,
+     0.8057835188586764,
+     0.8140013324345193
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D2RN50": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.22129275886437483,
+     "flags": [
+      "reversed"
+     ],
+     "interval_90": [
+      -0.24847500662604696,
+      -0.1941105111027027
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.001330032469544348,
+     "qualifies": false,
+     "se": 0.016489912962749417,
+     "seed_term": 1.1793242466948247e-06,
+     "sigma": 0.016525633233426977,
+     "two_sd": 0.002660064939088696,
+     "z": -13.390879232195363
+    },
+    "diff": -0.22129275886437483,
+    "exam": "dev",
+    "id": "C_D2RN50",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.016489912962749417,
+     "seed": 2053925810,
+     "seed_text": "inc2/v3fam/C_D2RN50/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.22192472410845265,
+     -0.21979106623918176,
+     -0.2221624862454903
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.02409692042343865,
+     "seed": 1844298372,
+     "seed_text": "inc2/v3fam/C_D2RN50/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2RN50",
+    "x_label": "ResNet-50",
+    "x_values": [
+     0.6630801154158348,
+     0.6655315135361384,
+     0.6652628985690122
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D2SIGLIP": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.0311968790957049,
+     "flags": [
+      "reversed"
+     ],
+     "interval_90": [
+      -0.04071215142155374,
+      -0.02168160676985606
+     ],
+     "one_system": false,
+     "outcome": "inconclusive",
+     "pooled_sd": 0.0015568393416440225,
+     "qualifies": false,
+     "se": 0.00564348688042059,
+     "seed_term": 1.6158324904603954e-06,
+     "sigma": 0.0057848748180007944,
+     "two_sd": 0.003113678683288045,
+     "z": -5.392835640734969
+    },
+    "diff": -0.0311968790957049,
+    "exam": "dev",
+    "id": "C_D2SIGLIP",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.00564348688042059,
+     "seed": 153047002,
+     "seed_text": "inc2/v3fam/C_D2SIGLIP/image"
+    },
+    "n_images": 617,
+    "paired_per_seed": [
+     -0.02964955727904839,
+     -0.03259699320077225,
+     -0.03134408680729417
+    ],
+    "restricted_to": null,
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.008519080591365295,
+     "seed": 1445999183,
+     "seed_text": "inc2/v3fam/C_D2SIGLIP/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D2SIGLIP",
+    "x_label": "SigLIP2",
+    "x_values": [
+     0.855355282245239,
+     0.8527255865745479,
+     0.8560812980072083
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D3": {
+    "decision": {
+     "conditions": {
+      "above_2_sd": false,
+      "above_se": false
+     },
+     "diff": -0.004151313826865954,
+     "flags": [],
+     "interval_90": [
+      -0.008686518456148732,
+      0.00038389080241682354
+     ],
+     "one_system": true,
+     "outcome": "inconclusive",
+     "pooled_sd": null,
+     "qualifies": false,
+     "se": 0.0025394226789999326,
+     "seed_term": 1.1535319335466034e-06,
+     "sigma": 0.002757208638490348,
+     "two_sd": 0.0026308157672630026,
+     "z": -1.5056219427554527
+    },
+    "diff": -0.004151313826865954,
+    "exam": "dev",
+    "id": "C_D3",
+    "image": {
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.0025394226789999326,
+     "seed": 28105554,
+     "seed_text": "inc2/v3fam/P4/image"
+    },
+    "n_images": 617,
+    "restricted_to": null,
+    "same_as": "P4",
+    "se_rule": "image",
+    "selection": null,
+    "session": {
+     "deciding": false,
+     "n_sessions": 8,
+     "n_valid": 1000,
+     "resamples": 1000,
+     "se": 0.001992342026727019,
+     "seed": 1080800745,
+     "seed_text": "inc2/v3fam/P4/session"
+    },
+    "species": [
+     "Waterhemp",
+     "MorningGlory",
+     "Purslane",
+     "SpottedSpurge",
+     "Carpetweed",
+     "Ragweed",
+     "Eclipta",
+     "PricklySida",
+     "PalmerAmaranth",
+     "Sicklepod",
+     "Goosegrass",
+     "CutleafGroundcherry"
+    ],
+    "statistic": "species",
+    "status": "decided",
+    "x": "D3",
+    "x_label": "WBF of E3-B's three stage-1 seeds",
+    "x_minus_each_y": [
+     -0.0032385519797833995,
+     -0.003556292230816105,
+     -0.00565909726999847
+    ],
+    "x_values": [
+     0.881766287544504
+    ],
+    "y": "E3B",
+    "y_label": "E3-B",
+    "y_values": [
+     0.8850048395242874,
+     0.8853225797753201,
+     0.8874253848145025
+    ]
+   },
+   "D4F": {
+    "exam": "dev",
+    "id": "C_D4F",
+    "se_rule": "image",
+    "status": "not run",
+    "why": "D4F: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4F/s0/dev.json",
+    "x": "D4F",
+    "x_label": "TS-F",
+    "y": "E3B",
+    "y_label": "E3-B"
+   },
+   "D4N": {
+    "exam": "dev",
+    "id": "C_D4N",
+    "se_rule": "image",
+    "status": "not run",
+    "why": "D4N: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4N/s0/dev.json",
+    "x": "D4N",
+    "x_label": "TS-N",
+    "y": "E3B",
+    "y_label": "E3-B"
+   },
+   "D4R15": {
+    "exam": "dev",
+    "id": "C_D4R15",
+    "se_rule": "image",
+    "status": "not run",
+    "why": "D4R15: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4R15/s0/dev.json",
+    "x": "D4R15",
+    "x_label": "TS-R15",
+    "y": "E3B",
+    "y_label": "E3-B"
+   },
+   "D6": {
+    "exam": "dev",
+    "id": "C_D6",
+    "se_rule": "image",
+    "status": "not run",
+    "why": "D6: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D6/s0/dev.json",
+    "x": "D6",
+    "x_label": "RF-DETR-L 12-class",
+    "y": "E3B",
+    "y_label": "E3-B"
+   }
+  },
+  "opening": []
+ },
+ "code": {
+  "scorer": "18c008371cd2c021104d034d06b837564016f4509e8a969c2a3f850b09dd2de4",
+  "scorer_native": "ba9eeb928a2b5a0756ae8ac0144b54df2fdfb3570fd011f66b4a8022039d6b7d",
+  "scorer_sidecar": "de7aacda903780b32944866be0b4daa5c6b1f76e2c86965f7a99d85f443d5e52",
+  "semisup_labeler": "03b28c50699b30a32720e383ff2b713a2638926650007acb92a367d1f450458c",
+  "twostage": "8fe2edc0e0d2a00d07182c3746407281a112c9e50c76662bc9f48a558b328ddc",
+  "v3fam": "3d776daed91d487d2817ba6959f9dd832d82c6e0be048b812916b63f22b239b7",
+  "v3fam_verdict": "70d26cde911f35d63772404bca1eeb2d7f783ac2acf83f23e54b2cebed92be17",
+  "verify": "602eba3c935f375179d6f922dce28bbf89006054e5bcec5894f0c9cc7b87aa10"
+ },
+ "d0s_removals": null,
+ "decided_by": "docs/CONTINUOUS_LOOP.md, Amendment (2026-10-11): V3F, the v3 experiment family D0-D9 (pre-registered as one family); commit 55cc2d9; docs/prereg/V3F_2026-10-11.md sha256 5826660c92a875bcccf12fd8e7d221f49209653aa4d2cba34388170f05b52f7f; Revisions 29-31: docs/prereg/V3F_rev29-31_2026-10-11.md sha256 36f4637898156ace639112f4605fbfe1192ecacad67b81ed47b1a6465bc0f814",
+ "decided_on": "dev",
+ "dev_minus_h": null,
+ "dev_passes": 164,
+ "dev_passes_by_kind": {
+  "builds_protocol": 0,
+  "d2_gt": 11,
+  "d9a": 15,
+  "family_scores": 133,
+  "reproductions": 5
+ },
+ "e3_reread": null,
+ "e_trees": {
+  "files": 132,
+  "sha256": "9f0b3ef48bccc81ebc32db9d7a551bbe0803341ac0d99eabfb215e6ed528b690"
+ },
+ "exam": "dev",
+ "family": "v1",
+ "format": "inc2-v3fam-verdict/1",
+ "full_dev_beside": null,
+ "holm": {
+  "P1": {
+   "bar": 2.3263478740408408,
+   "exam": "dev",
+   "family_confirmed": true,
+   "m": 5,
+   "rank": 1,
+   "status": "decided",
+   "survives": true,
+   "z": 7.77227630650661
+  },
+  "P2": {
+   "bar": 2.128045234184984,
+   "exam": "dev",
+   "family_confirmed": false,
+   "m": 5,
+   "rank": 3,
+   "status": "not run",
+   "survives": false,
+   "z": null
+  },
+  "P3": {
+   "bar": 1.9599639845400536,
+   "exam": "dev",
+   "family_confirmed": false,
+   "m": 5,
+   "rank": 4,
+   "status": "not run",
+   "survives": false,
+   "z": null
+  },
+  "P4": {
+   "bar": 2.2414027276049464,
+   "exam": "dev",
+   "family_confirmed": false,
+   "m": 5,
+   "rank": 2,
+   "status": "decided",
+   "survives": false,
+   "z": -1.5056219427554527
+  },
+  "P5": {
+   "bar": 1.6448536269514715,
+   "exam": "dev",
+   "family_confirmed": false,
+   "m": 5,
+   "rank": 5,
+   "status": "not run",
+   "survives": false,
+   "z": null
+  }
+ },
+ "note": "dev only; the external primaries in capacity/v3fam_v1_external.json; nothing switches",
+ "primaries": {
+  "P1": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": true,
+     "above_se": true
+    },
+    "diff": 0.07572647529979704,
+    "flags": [],
+    "interval_90": [
+     0.05970041515460549,
+     0.09175253544498858
+    ],
+    "one_system": false,
+    "outcome": "qualifies",
+    "pooled_sd": 0.0030725460715657392,
+    "qualifies": true,
+    "se": 0.00941463396409352,
+    "seed_term": 6.293692907929371e-06,
+    "sigma": 0.009743152753898126,
+    "two_sd": 0.0061450921431314785,
+    "z": 7.77227630650661
+   },
+   "diff": 0.07572647529979704,
+   "exam": "dev",
+   "id": "P1",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.00941463396409352,
+    "seed": 449552193,
+    "seed_text": "inc2/v3fam/P1/image"
+   },
+   "n_images": 617,
+   "paired_per_seed": [
+    0.07421631260276407,
+    0.07953906091664376,
+    0.07342405237998317
+   ],
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.02116962724436803,
+    "seed": 1261629950,
+    "seed_text": "inc2/v3fam/P1/session"
+   },
+   "species": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry"
+   ],
+   "statistic": "species",
+   "status": "decided",
+   "x": "E3B",
+   "x_label": "E3-B",
+   "x_values": [
+    0.8850048395242874,
+    0.8853225797753201,
+    0.8874253848145025
+   ],
+   "y": "D2LAION",
+   "y_label": "LAION-2B CLIP ViT-L/14",
+   "y_values": [
+    0.8107885269215234,
+    0.8057835188586764,
+    0.8140013324345193
+   ]
+  },
+  "P2": {
+   "exam": "dev",
+   "id": "P2",
+   "se_rule": "selection",
+   "status": "not run",
+   "why": "D4F: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4F/s0/dev.json",
+   "x": "E3B",
+   "x_label": "E3-B",
+   "y": "D4F",
+   "y_label": "TS-F"
+  },
+  "P3": {
+   "exam": "dev",
+   "id": "P3",
+   "se_rule": "selection",
+   "status": "not run",
+   "why": "D4N: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4N/s0/dev.json",
+   "x": "E3B",
+   "x_label": "E3-B",
+   "y": "D4N",
+   "y_label": "TS-N"
+  },
+  "P4": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": false,
+     "above_se": false
+    },
+    "diff": -0.004151313826865954,
+    "flags": [],
+    "interval_90": [
+     -0.008686518456148732,
+     0.00038389080241682354
+    ],
+    "one_system": true,
+    "outcome": "inconclusive",
+    "pooled_sd": null,
+    "qualifies": false,
+    "se": 0.0025394226789999326,
+    "seed_term": 1.1535319335466034e-06,
+    "sigma": 0.002757208638490348,
+    "two_sd": 0.0026308157672630026,
+    "z": -1.5056219427554527
+   },
+   "diff": -0.004151313826865954,
+   "exam": "dev",
+   "id": "P4",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.0025394226789999326,
+    "seed": 28105554,
+    "seed_text": "inc2/v3fam/P4/image"
+   },
+   "n_images": 617,
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.001992342026727019,
+    "seed": 1080800745,
+    "seed_text": "inc2/v3fam/P4/session"
+   },
+   "species": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry"
+   ],
+   "statistic": "species",
+   "status": "decided",
+   "x": "D3",
+   "x_label": "WBF of E3-B's three stage-1 seeds",
+   "x_minus_each_y": [
+    -0.0032385519797833995,
+    -0.003556292230816105,
+    -0.00565909726999847
+   ],
+   "x_values": [
+    0.881766287544504
+   ],
+   "y": "E3B",
+   "y_label": "E3-B",
+   "y_values": [
+    0.8850048395242874,
+    0.8853225797753201,
+    0.8874253848145025
+   ]
+  },
+  "P5": {
+   "exam": "dev",
+   "id": "P5",
+   "se_rule": "selection",
+   "status": "not run",
+   "why": "D6: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D6/s0/dev.json",
+   "x": "E3B",
+   "x_label": "E3-B",
+   "y": "D6",
+   "y_label": "RF-DETR-L 12-class"
+  }
+ },
+ "reads": {
+  "bclean_triggered": false,
+  "cap": 5,
+  "order": []
+ },
+ "rule": "V3F.3.3: D > 2 pooled sd and D > SE; combined z; 90 % interval; outcome classes; Holm per exam; Tier C bar Phi^-1(1 - 0.05/14)",
+ "sesoi": 0.005,
+ "status": "decided",
+ "tier_s": {
+  "S_bc1_over_clip": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": true,
+     "above_se": true
+    },
+    "diff": 0.05621799378752124,
+    "flags": [],
+    "interval_90": [
+     0.042428625335634726,
+     0.07000736223940775
+    ],
+    "one_system": false,
+    "outcome": "qualifies",
+    "pooled_sd": 0.0033735135516555124,
+    "qualifies": true,
+    "se": 0.007917912591744077,
+    "seed_term": 7.5870624554689255e-06,
+    "sigma": 0.00838334075807302,
+    "two_sd": 0.006747027103311025,
+    "z": 6.705917773100685
+   },
+   "diff": 0.05621799378752124,
+   "exam": "dev",
+   "id": "S_bc1_over_clip",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.007917912591744077,
+    "seed": 262364870,
+    "seed_text": "inc2/v3fam/S_bc1_over_clip/image"
+   },
+   "n_images": 617,
+   "paired_per_seed": [
+    0.05559845270149766,
+    0.06031851913139041,
+    0.052737009529675305
+   ],
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.014958723699377627,
+    "seed": 1541328242,
+    "seed_text": "inc2/v3fam/S_bc1_over_clip/session"
+   },
+   "species": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry"
+   ],
+   "statistic": "species",
+   "status": "decided",
+   "x": "D2BC1",
+   "x_label": "BioCLIP-1",
+   "x_values": [
+    0.8618120264690609,
+    0.8614486863242435,
+    0.8632131772777264
+   ],
+   "y": "D2CLIP",
+   "y_label": "OpenAI CLIP ViT-L/14",
+   "y_values": [
+    0.8062135737675632,
+    0.8011301671928531,
+    0.8104761677480511
+   ]
+  },
+  "S_bc2_over_bc2640": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": true,
+     "above_se": true
+    },
+    "diff": 0.002750747974022305,
+    "flags": [],
+    "interval_90": [
+     -0.0008111025474000946,
+     0.006312598495444705
+    ],
+    "one_system": false,
+    "outcome": "qualifies",
+    "pooled_sd": 0.001001811944381973,
+    "qualifies": true,
+    "se": 0.0020050174078619287,
+    "seed_term": 6.690847812709264e-07,
+    "sigma": 0.002165451358747246,
+    "two_sd": 0.002003623888763946,
+    "z": 1.2702885072485137
+   },
+   "diff": 0.002750747974022305,
+   "exam": "dev",
+   "id": "S_bc2_over_bc2640",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.0020050174078619287,
+    "seed": 1776533378,
+    "seed_text": "inc2/v3fam/S_bc2_over_bc2640/image"
+   },
+   "n_images": 617,
+   "paired_per_seed": [
+    0.0024371111267377232,
+    0.0017681674607845643,
+    0.004046965334544739
+   ],
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.002758112861146304,
+    "seed": 905302759,
+    "seed_text": "inc2/v3fam/S_bc2_over_bc2640/session"
+   },
+   "species": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry"
+   ],
+   "statistic": "species",
+   "status": "decided",
+   "x": "E3B",
+   "x_label": "E3-B",
+   "x_values": [
+    0.8850048395242874,
+    0.8853225797753201,
+    0.8874253848145025
+   ],
+   "y": "D2BC2640",
+   "y_label": "BioCLIP-2@640",
+   "y_values": [
+    0.8825677283975497,
+    0.8835544123145356,
+    0.8833784194799578
+   ]
+  },
+  "S_bc2_over_clip": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": true,
+     "above_se": true
+    },
+    "diff": 0.07997763180188089,
+    "flags": [],
+    "interval_90": [
+     0.06314064737753602,
+     0.09681461622622575
+    ],
+    "one_system": false,
+    "outcome": "qualifies",
+    "pooled_sd": 0.0034368134905507224,
+    "qualifies": true,
+    "se": 0.009844008717014354,
+    "seed_term": 7.874457979220961e-06,
+    "sigma": 0.010236159709572508,
+    "two_sd": 0.006873626981101445,
+    "z": 7.813245794425084
+   },
+   "diff": 0.07997763180188089,
+   "exam": "dev",
+   "id": "S_bc2_over_clip",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.009844008717014354,
+    "seed": 1345260495,
+    "seed_text": "inc2/v3fam/S_bc2_over_clip/image"
+   },
+   "n_images": 617,
+   "paired_per_seed": [
+    0.07879126575672424,
+    0.08419241258246701,
+    0.07694921706645141
+   ],
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.02141914746821516,
+    "seed": 21135987,
+    "seed_text": "inc2/v3fam/S_bc2_over_clip/session"
+   },
+   "species": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry"
+   ],
+   "statistic": "species",
+   "status": "decided",
+   "x": "E3B",
+   "x_label": "E3-B",
+   "x_values": [
+    0.8850048395242874,
+    0.8853225797753201,
+    0.8874253848145025
+   ],
+   "y": "D2CLIP",
+   "y_label": "OpenAI CLIP ViT-L/14",
+   "y_values": [
+    0.8062135737675632,
+    0.8011301671928531,
+    0.8104761677480511
+   ]
+  },
+  "S_bclean_over_e3b": {
+   "exam": "dev",
+   "id": "S_bclean_over_e3b",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "BCLEAN: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/BCLEAN/s0/dev.json",
+   "x": "BCLEAN",
+   "x_label": "BCLEAN",
+   "y": "E3B",
+   "y_label": "E3-B"
+  },
+  "S_bclean_over_ref": {
+   "exam": "dev",
+   "id": "S_bclean_over_ref",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "BCLEAN: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/BCLEAN/s0/dev.json",
+   "x": "BCLEAN",
+   "x_label": "BCLEAN",
+   "y": "REF",
+   "y_label": "b_v2_m640 (YOLO11m reference)"
+  },
+  "S_d3_stage1_over_e3b": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": false,
+     "above_se": false
+    },
+    "diff": -0.00432079555745879,
+    "flags": [],
+    "interval_90": [
+     -0.008954262660657082,
+     0.00031267154573950354
+    ],
+    "one_system": true,
+    "outcome": "inconclusive",
+    "pooled_sd": null,
+    "qualifies": false,
+    "se": 0.0015321347338614457,
+    "seed_term": 5.587759083985352e-06,
+    "sigma": 0.002816947980827838,
+    "two_sd": 0.005790211956734581,
+    "z": -1.5338570633416542
+   },
+   "diff": -0.00432079555745879,
+   "exam": "dev",
+   "id": "S_d3_stage1_over_e3b",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.0015321347338614457,
+    "seed": 1575861402,
+    "seed_text": "inc2/v3fam/S_d3_stage1_over_e3b/image"
+   },
+   "n_images": 617,
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.0015414910484587278,
+    "seed": 1805713984,
+    "seed_text": "inc2/v3fam/S_d3_stage1_over_e3b/session"
+   },
+   "species": null,
+   "stage1_recompute": {
+    "x": {
+     "max_abs_diff": 8.365378175057003e-06,
+     "recorded": [
+      0.8747940423342688
+     ]
+    },
+    "y": {
+     "max_abs_diff": 0.0008841540850533791,
+     "recorded": [
+      0.8749336354996707,
+      0.8809538989626156,
+      0.8802235609204322
+     ]
+    }
+   },
+   "statistic": "agnostic",
+   "status": "decided",
+   "x": "D3",
+   "x_label": "WBF of E3-B's three stage-1 seeds",
+   "x_minus_each_y": [
+    -0.00101538187228023,
+    -0.006406305939027912,
+    -0.005540698861068449
+   ],
+   "x_values": [
+    0.8748024077124439
+   ],
+   "y": "E3B",
+   "y_label": "E3-B",
+   "y_values": [
+    0.8758177895847241,
+    0.8812087136514718,
+    0.8803431065735123
+   ]
+  },
+  "S_d6_over_ref": {
+   "exam": "dev",
+   "id": "S_d6_over_ref",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "D6: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D6/s0/dev.json",
+   "x": "D6",
+   "x_label": "RF-DETR-L 12-class",
+   "y": "REF",
+   "y_label": "b_v2_m640 (YOLO11m reference)"
+  },
+  "S_d8m_over_d8s": {
+   "exam": "dev",
+   "id": "S_d8m_over_d8s",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "D8M: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D8M/s0/dev.json",
+   "x": "D8M",
+   "x_label": "D8-m (YOLO11m train_core)",
+   "y": "D8S",
+   "y_label": "D8-s (YOLO11s train_core)"
+  },
+  "S_dinol_over_clip": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": true,
+     "above_se": true
+    },
+    "diff": 0.06528365503357103,
+    "flags": [],
+    "interval_90": [
+     0.050269137754962334,
+     0.08029817231217973
+    ],
+    "one_system": false,
+    "outcome": "qualifies",
+    "pooled_sd": 0.003401497455927112,
+    "qualifies": true,
+    "se": 0.008695411634639527,
+    "seed_term": 7.71345662845241e-06,
+    "sigma": 0.009128178357387462,
+    "two_sd": 0.006802994911854224,
+    "z": 7.151882059878549
+   },
+   "diff": 0.06528365503357103,
+   "exam": "dev",
+   "id": "S_dinol_over_clip",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.008695411634639527,
+    "seed": 217260225,
+    "seed_text": "inc2/v3fam/S_dinol_over_clip/image"
+   },
+   "n_images": 617,
+   "paired_per_seed": [
+    0.06405989575980497,
+    0.06981342048843975,
+    0.06197764885246815
+   ],
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.015474912536453538,
+    "seed": 882877452,
+    "seed_text": "inc2/v3fam/S_dinol_over_clip/session"
+   },
+   "species": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry"
+   ],
+   "statistic": "species",
+   "status": "decided",
+   "x": "D2DINOL",
+   "x_label": "DINOv2-L",
+   "x_values": [
+    0.8702734695273682,
+    0.8709435876812929,
+    0.8724538166005192
+   ],
+   "y": "D2CLIP",
+   "y_label": "OpenAI CLIP ViT-L/14",
+   "y_values": [
+    0.8062135737675632,
+    0.8011301671928531,
+    0.8104761677480511
+   ]
+  },
+  "S_e3a_over_d6": {
+   "exam": "dev",
+   "id": "S_e3a_over_d6",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "D6: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D6/s0/dev.json",
+   "x": "E3A",
+   "x_label": "E3-A",
+   "y": "D6",
+   "y_label": "RF-DETR-L 12-class"
+  },
+  "S_e3b_over_tsr15": {
+   "exam": "dev",
+   "id": "S_e3b_over_tsr15",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "D4R15: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4R15/s0/dev.json",
+   "x": "E3B",
+   "x_label": "E3-B",
+   "y": "D4R15",
+   "y_label": "TS-R15"
+  },
+  "S_ft_over_rn50": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": true,
+     "above_se": true
+    },
+    "diff": 0.1841150849292822,
+    "flags": [],
+    "interval_90": [
+     0.1596326573913363,
+     0.20859751246722807
+    ],
+    "one_system": false,
+    "outcome": "qualifies",
+    "pooled_sd": 0.003869221733944882,
+    "qualifies": true,
+    "se": 0.014545122340949002,
+    "seed_term": 9.980584550954292e-06,
+    "sigma": 0.014884259083479031,
+    "two_sd": 0.007738443467889764,
+    "z": 12.369785012251166
+   },
+   "diff": 0.1841150849292822,
+   "exam": "dev",
+   "id": "S_ft_over_rn50",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.014545122340949002,
+    "seed": 1075657771,
+    "seed_text": "inc2/v3fam/S_ft_over_rn50/image"
+   },
+   "n_images": 617,
+   "paired_per_seed": [
+    0.18937197888422574,
+    0.17713345126937585,
+    0.1858398246342451
+   ],
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.02206286525183266,
+    "seed": 853130840,
+    "seed_text": "inc2/v3fam/S_ft_over_rn50/session"
+   },
+   "species": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry"
+   ],
+   "statistic": "species",
+   "status": "decided",
+   "x": "D2FT",
+   "x_label": "FT-ResNet-50",
+   "x_values": [
+    0.8524520943000605,
+    0.8426649648055142,
+    0.8511027232032573
+   ],
+   "y": "D2RN50",
+   "y_label": "ResNet-50",
+   "y_values": [
+    0.6630801154158348,
+    0.6655315135361384,
+    0.6652628985690122
+   ]
+  },
+  "S_laion_over_clip": {
+   "decision": {
+    "conditions": {
+     "above_2_sd": false,
+     "above_se": false
+    },
+    "diff": 0.004251156502083853,
+    "flags": [],
+    "interval_90": [
+     -0.009284952503167205,
+     0.01778726550733491
+    ],
+    "one_system": false,
+    "outcome": "inconclusive",
+    "pooled_sd": 0.00441836264134188,
+    "qualifies": false,
+    "se": 0.007396479620401334,
+    "seed_term": 1.3014618953603729e-05,
+    "sigma": 0.008229369947244805,
+    "two_sd": 0.00883672528268376,
+    "z": 0.5165834722872242
+   },
+   "diff": 0.004251156502083853,
+   "exam": "dev",
+   "id": "S_laion_over_clip",
+   "image": {
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.007396479620401334,
+    "seed": 1718113503,
+    "seed_text": "inc2/v3fam/S_laion_over_clip/image"
+   },
+   "n_images": 617,
+   "paired_per_seed": [
+    0.004574953153960171,
+    0.004653351665823258,
+    0.0035251646864682407
+   ],
+   "restricted_to": null,
+   "se_rule": "image",
+   "selection": null,
+   "session": {
+    "deciding": false,
+    "n_sessions": 8,
+    "n_valid": 1000,
+    "resamples": 1000,
+    "se": 0.005736406363010419,
+    "seed": 455296372,
+    "seed_text": "inc2/v3fam/S_laion_over_clip/session"
+   },
+   "species": [
+    "Waterhemp",
+    "MorningGlory",
+    "Purslane",
+    "SpottedSpurge",
+    "Carpetweed",
+    "Ragweed",
+    "Eclipta",
+    "PricklySida",
+    "PalmerAmaranth",
+    "Sicklepod",
+    "Goosegrass",
+    "CutleafGroundcherry"
+   ],
+   "statistic": "species",
+   "status": "decided",
+   "x": "D2LAION",
+   "x_label": "LAION-2B CLIP ViT-L/14",
+   "x_values": [
+    0.8107885269215234,
+    0.8057835188586764,
+    0.8140013324345193
+   ],
+   "y": "D2CLIP",
+   "y_label": "OpenAI CLIP ViT-L/14",
+   "y_values": [
+    0.8062135737675632,
+    0.8011301671928531,
+    0.8104761677480511
+   ]
+  },
+  "S_ref_over_d8m": {
+   "exam": "dev",
+   "id": "S_ref_over_d8m",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "D8M: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D8M/s0/dev.json",
+   "x": "REF",
+   "x_label": "b_v2_m640 (YOLO11m reference)",
+   "y": "D8M",
+   "y_label": "D8-m (YOLO11m train_core)"
+  },
+  "S_s1_tsf_over_e1a": {
+   "exam": "dev",
+   "id": "S_s1_tsf_over_e1a",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4F/s0/dev.json",
+   "x": "D4F",
+   "x_label": "TS-F",
+   "y": "E3A",
+   "y_label": "E3-A"
+  },
+  "S_s1_tsf_over_e1b": {
+   "exam": "dev",
+   "id": "S_s1_tsf_over_e1b",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4F/s0/dev.json",
+   "x": "D4F",
+   "x_label": "TS-F",
+   "y": "E3B",
+   "y_label": "E3-B"
+  },
+  "S_s1_tsn_over_e1a": {
+   "exam": "dev",
+   "id": "S_s1_tsn_over_e1a",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4N/s0/dev.json",
+   "x": "D4N",
+   "x_label": "TS-N",
+   "y": "E3A",
+   "y_label": "E3-A"
+  },
+  "S_s1_tsn_over_e1b": {
+   "exam": "dev",
+   "id": "S_s1_tsn_over_e1b",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4N/s0/dev.json",
+   "x": "D4N",
+   "x_label": "TS-N",
+   "y": "E3B",
+   "y_label": "E3-B"
+  },
+  "S_s1_tsr15_over_e1a": {
+   "exam": "dev",
+   "id": "S_s1_tsr15_over_e1a",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4R15/s0/dev.json",
+   "x": "D4R15",
+   "x_label": "TS-R15",
+   "y": "E3A",
+   "y_label": "E3-A"
+  },
+  "S_s1_tsr15_over_e1b": {
+   "exam": "dev",
+   "id": "S_s1_tsr15_over_e1b",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4R15/s0/dev.json",
+   "x": "D4R15",
+   "x_label": "TS-R15",
+   "y": "E3B",
+   "y_label": "E3-B"
+  },
+  "S_tsf_over_e3a": {
+   "exam": "dev",
+   "id": "S_tsf_over_e3a",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "D4F: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4F/s0/dev.json",
+   "x": "D4F",
+   "x_label": "TS-F",
+   "y": "E3A",
+   "y_label": "E3-A"
+  },
+  "S_tsf_over_tsr15": {
+   "exam": "dev",
+   "id": "S_tsf_over_tsr15",
+   "se_rule": "image",
+   "status": "not run",
+   "why": "D4F: missing: no family score at /ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/arms/D4F/s0/dev.json",
+   "x": "D4F",
+   "x_label": "TS-F",
+   "y": "D4R15",
+   "y_label": "TS-R15"
+  }
+ },
+ "written_utc": "2026-10-13T12:47:15.794314Z"
+}

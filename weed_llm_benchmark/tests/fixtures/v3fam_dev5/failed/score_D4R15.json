@@ -1,0 +1,8 @@
+{
+ "format": "inc2-v3fam-failed/1",
+ "item": "score:D4R15",
+ "reason": "a job that failed twice (V3F.3.4, V3F.3.5)",
+ "source": "the ticker's record (stream state): failed after its own second failure, passed in the verdict's argv (deviation 4)",
+ "status": "failed",
+ "written_utc": "2026-10-22T00:43:38.726855Z"
+}

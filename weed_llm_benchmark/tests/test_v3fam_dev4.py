@@ -50,6 +50,7 @@ from weed_optimizer_framework.tools.inc2 import v3fam_verdict as VR  # noqa: E40
 from weed_optimizer_framework.tools.inc_autopilot import diagnose_stream as DS  # noqa: E402
 from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LS  # noqa: E402
 from weed_optimizer_framework.tools.inc_autopilot import stream as S  # noqa: E402
+from weed_optimizer_framework.tools.inc_autopilot import stream_remote as SR  # noqa: E402
 
 FAILURES = VT.FAILURES
 check = VT.check
@@ -133,13 +134,15 @@ class Fam(object):
     _v3fam = S.StreamRun._v3fam
     _v3fam_fold = staticmethod(S.StreamRun._v3fam_fold)
     _v3fam_reopen = S.StreamRun._v3fam_reopen
+    _v3fam_reopen_blocks = getattr(S.StreamRun, "_v3fam_reopen_blocks", None)      # deviation 5's list of blocks
+    _v3fam_reopen_block = getattr(S.StreamRun, "_v3fam_reopen_block", None)
     _v3fam_deployed = S.StreamRun._v3fam_deployed
     _v3fam_params = S.StreamRun._v3fam_params
     _failed_ids = S.StreamRun._failed_ids
 
     def __init__(self, root, reopen, st):
         self.paths = Paths(root)
-        self.dom = {"v3fam": dict(FAM, reopen=reopen)}
+        self.dom = {"v3fam": dict(FAM, reopen=reopen, reopens=[])}     # deviation 4's block alone
         self.st = st
         self.utc = "2026-10-21T00:00:00Z"
         self.cards, self.ledger = [], []
@@ -217,15 +220,19 @@ def t_reopen():
           and res["another sha256"] == ([], "failed") and res["no marker"] == ([], "failed")
           and res["an item started after the deviation"] == (["verdict"], "failed")
           and res["an item running"] == (["verdict"], "running"), res)
-    check("the domain names deviation 4's reopening: the data build and the verdict, before 2026-10-20, the "
-          "continuation as the verdict record", FAM["reopen"]["items"] == ["data", "verdict"]
-          and FAM["reopen"]["before_utc"] == "2026-10-20T00:00:00Z"
-          and FAM["reopen"]["file"] == "docs/prereg/V3F_dev4_2026-10-20.md"
-          and FAM["verdict_record"] == "capacity/v3fam_v1_cont.json"
+    ro4 = FAM["reopen"]
+    check("the domain names deviation 4's reopening (v3fam.reopen, an object as a ticker of an earlier deploy reads "
+          "it; deviation 5's in v3fam.reopens after it): the data build and the verdict, before 2026-10-20; its "
+          "continuation stays the record of 2026-10-22 and the verdict record is deviation 5's second continuation",
+          isinstance(ro4, dict) and ro4["marker"] == "deviation 4 (2026-10-20)" and ro4["items"] == ["data", "verdict"]
+          and SR.v3fam_reopen_blocks({"v3fam": FAM})[0] is ro4 and ro4["before_utc"] == "2026-10-20T00:00:00Z"
+          and ro4["file"] == "docs/prereg/V3F_dev4_2026-10-20.md"
+          and FAM["continuation_record"] == "capacity/v3fam_v1_cont.json"
+          and FAM["verdict_record"] == "capacity/v3fam_v1_cont2.json"
           and FAM["partial_verdict_record"] == "capacity/v3fam_v1.json", FAM.get("reopen"))
-    dev4 = pathlib.Path(__file__).resolve().parents[2] / FAM["reopen"]["file"]
+    dev4 = pathlib.Path(__file__).resolve().parents[2] / ro4["file"]
     check("  and the sha256 it records is the committed deviation file's",
-          dev4.is_file() and hashlib.sha256(dev4.read_bytes()).hexdigest() == FAM["reopen"]["sha256"], str(dev4))
+          dev4.is_file() and hashlib.sha256(dev4.read_bytes()).hexdigest() == ro4["sha256"], str(dev4))
 
 
 # ------------------------------------------------------------------ the verb's guard and the read path
@@ -380,7 +387,7 @@ def t_record_only_follow():
     except Exception as e:                       # noqa: BLE001  (NameError: self in a static method)
         err = e
     check("L23L follows the domain's verdict record (the continuation), L23H and L23J theirs, without raising",
-          err is None and got.get("L23L") == ("inc_build_v3fam_v1", "capacity/v3fam_v1_cont.json")
+          err is None and got.get("L23L") == ("inc_build_v3fam_v1", FAM["verdict_record"])
           and got.get("L23H") == ("inc_build_v3fam_data", "splits/v3fam/summary.json")
           and got.get("L23J") == ("inc_build_v3fam_score_d4f", "capacity/v3fam_score_d4f.json"),
           (got, "%s: %s" % (type(err).__name__, err) if err else None))

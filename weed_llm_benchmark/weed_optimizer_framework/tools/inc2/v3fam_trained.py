@@ -520,6 +520,7 @@ def score_arm(arm, embedder=None, lock_check=True, batch=S.BATCH, device=None, w
     """inc2.v3fam score --arm X for this module's arms (D1, D4F, D4N, D4R15, D5B, BCLEAN)."""
     if arm not in TRAINED_ARMS:
         raise F.V3famRefused("--arm %r is not one of %s" % (arm, list(TRAINED_ARMS)))
+    SYS.supersede()                          # deviation 5: the records it supersedes moved aside first
     kw = {"lock_check": lock_check, "batch": batch, "device": device}
     if arm == "D1":
         return score_d1(embedder=embedder, workers=workers, reported=reported, **kw)

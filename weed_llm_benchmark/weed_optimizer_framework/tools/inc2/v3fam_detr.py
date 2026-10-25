@@ -59,7 +59,13 @@ checks, no archive checkpoint and no test folder, the export equal to the
 in-process EMA weights and its predictions on 20 training images equal to
 the in-process model's; it records the epoch time. The seed jobs run only if
 epoch time x 50 + 0.5 h <= 0.8 x 36 h = 28.8 h; otherwise smoke.json records
-"not run (walltime)" and train refuses.
+"not run (walltime)" and train refuses. The epoch time is the epoch's own
+(deviation 5, 2026-10-24: EPOCH_TIME_DEF, from the first training epoch's
+start to the end of fit, timed by a callback that keeps no state); the
+one-time work before it (the dataset construction, the sanity validation) is
+recorded apart as setup_seconds. The smoke of 2026-10-21 took the whole fit
+(2,405.6 s, about 905 s of it before the epoch) and is moved aside by the
+next smoke's own job (inc2.v3fam_supersede, group d6).
 
 Scoring (L23J, --arm D6): each seed's final EMA weights predict every exam
 image (EXIF-transposed, at 704 px, threshold 0.001, the top 300 queries x
@@ -413,10 +419,48 @@ def check_env():
     return vers
 
 
+# ------------------------------------------------------------------ the epoch clock (deviation 5)
+EPOCH_TIME_DEF = ("from the first training epoch's start (pytorch_lightning on_train_epoch_start, after the dataset "
+                  "construction and the sanity validation) to the end of fit: the epoch's training, its validation, "
+                  "its checkpoints and everything after it until fit returns")
+
+
+def _epoch_clock():
+    """A pytorch_lightning Callback that records the wall time each training epoch starts (never during the sanity
+    validation), and nothing else: no state, no effect on the run. The smoke's epoch time is the span from the
+    first epoch's start to the end of fit (EPOCH_TIME_DEF): V3F.5 D6's rule (epoch time x 50 + 0.5 h <= 28.8 h)
+    multiplies the epoch's own time, and the one-time work before it (rfdetr builds its training dataset by decoding
+    every image once, about 870 s on 2026-10-21, then the sanity validation) happens once per job, inside the
+    0.5 h. On 2026-10-21 the whole one-epoch fit (2,405.6 s) was taken as the epoch time (deviation 5)."""
+    import pytorch_lightning as pl
+
+    class EpochClock(pl.Callback):
+        def __init__(self):
+            super().__init__()
+            self.starts = []
+
+        def on_train_epoch_start(self, trainer, pl_module):
+            if not getattr(trainer, "sanity_checking", False):
+                self.starts.append(time.time())
+    return EpochClock()
+
+
+def _clock_record(starts, t0, t1):
+    """{epochs_started, setup_seconds, epoch_seconds, definition}: setup is fit's start to the first epoch's start,
+    epoch_seconds the first epoch's start to the end of fit (None when no epoch started)."""
+    starts = [float(x) for x in starts or []]
+    first = starts[0] if starts else None
+    return {"epochs_started": len(starts), "definition": EPOCH_TIME_DEF,
+            "setup_seconds": round(first - t0, 3) if first is not None else None,
+            "epoch_seconds": round(t1 - first, 3) if first is not None else None,
+            "epoch_start_offsets_s": [round(x - t0, 3) for x in starts[:60]]}
+
+
 # ------------------------------------------------------------------ the backend (rfdetr 1.6.5.post0)
 class RfdetrBackend(object):
     """The RF-DETR calls, imported only here (rfdetr 1.6.5.post0, supervision, torch: D6's environment)."""
     name = "rfdetr"
+    epoch_clock = True                       # train reports the epoch clock (_epoch_clock); the smoke requires it
 
     def versions(self):
         import importlib.metadata as md
@@ -438,10 +482,12 @@ class RfdetrBackend(object):
             raise F.V3famRefused("rfdetr %s: D6 is pre-registered on %s" % (have, RFDETR_VERSION))
         captured = {}
         orig = RT.build_trainer
+        clock = _epoch_clock()
 
         def build(*a, **k):
             tr = orig(*a, **k)
             captured["trainer"], captured["train_config"] = tr, a[0]
+            tr.callbacks.insert(0, clock)    # times only: no state, no effect on the run (deviation 5)
             return tr
         RT.build_trainer = build
         try:
@@ -454,12 +500,15 @@ class RfdetrBackend(object):
             t0 = time.time()
             model.train(dataset_dir=str(stage), output_dir=str(out), epochs=int(epochs), seed=int(seed),
                         **RECIPE)
-            secs = time.time() - t0
+            t1 = time.time()
+            secs = t1 - t0
         finally:
             RT.build_trainer = orig
         tr = captured.get("trainer")
         if tr is None:
             raise F.V3famRefused("rfdetr trained without its trainer factory: port inc2/v3fam_detr.py")
+        if clock not in list(tr.callbacks):
+            raise F.V3famRefused("the epoch clock is not among the trainer's callbacks: port inc2/v3fam_detr.py")
         emas = [c for c in tr.callbacks if callable(getattr(c, "get_ema_model_state_dict", None))]
         best = [c for c in tr.callbacks if type(c).__name__ == "BestModelCallback"]
         arch = [c for c in tr.callbacks if type(c).__name__ == "ModelCheckpoint"
@@ -483,6 +532,7 @@ class RfdetrBackend(object):
                               "archive_every_n_epochs": int(getattr(arch[0], "_every_n_epochs", 0) or 0),
                               "ema": True},
                 "seconds": secs, "model": model, "class_names": names,
+                "epoch_clock": _clock_record(clock.starts, t0, t1),
                 "seed_mechanism": "rfdetr TrainConfig.seed: seed_everything(seed + global_rank, workers=True) at "
                                   "fit start"}
 
@@ -971,6 +1021,8 @@ def _train_attempt(backend, parent, seed, epochs, dest, smoke):
             res = backend.train(stage_dir(), att.dir, seed, epochs, pretrain_path())
         rec["trainer"] = _check_trained(res, epochs, att.dir)
         rec["fit_seconds"] = round(float(res["seconds"]), 3)
+        if isinstance(res.get("epoch_clock"), dict):
+            rec["epoch_clock"] = res["epoch_clock"]
         rec["seed_mechanism"] = res.get("seed_mechanism")
         rec["train_config"] = {k: v for k, v in sorted((res.get("args") or {}).items())
                                if isinstance(v, (int, float, str, bool, type(None), list))}
@@ -1021,6 +1073,7 @@ def smoke(backend=None, exif=None, rows=None):
     v3fam/v1/d6/smoke/smoke.json once; status complete, or 'not run (walltime)' when the projection exceeds
     28.8 h."""
     F.check_frozen()
+    supersede_smoke()                        # deviation 5: the smoke of 2026-10-21 moved aside first
     if (smoke_dir() / "smoke.json").exists():
         raise F.V3famRefused("%s exists: the smoke runs once" % (smoke_dir() / "smoke.json"))
     backend = default_backend(backend)
@@ -1028,12 +1081,14 @@ def smoke(backend=None, exif=None, rows=None):
         stage(exif=exif, rows=rows, backend=backend)
         dest = smoke_dir() / FINAL
         rec, _res = _train_attempt(backend, smoke_dir(), 0, SMOKE_EPOCHS, dest, smoke=True)
-        secs = float(rec["fit_seconds"])
+        secs, measure = smoke_epoch_seconds(rec, backend)
         proj = projection_h(secs)
         ok = proj <= walltime_cap_h() + 1e-9
         exp = rec["export"]
         os.unlink(str(dest))                 # the smoke's export served its checks; written by this job
         doc = {"format": FMT_SMOKE, "status": "complete" if ok else NOT_RUN_WALLTIME, "epoch_seconds": secs,
+               "epoch_time": measure, "fit_seconds": rec["fit_seconds"],
+               "setup_seconds": (rec.get("epoch_clock") or {}).get("setup_seconds"),
                "projection_h": proj, "cap_h": walltime_cap_h(), "walltime_h": WALLTIME_H, "walltime_ok": ok,
                "rule": "epoch time x %d + %.1f h <= %.1f x %.0f h" % (EPOCHS, OVERHEAD_H, WALLTIME_SHARE, WALLTIME_H),
                "attempt": rec, "export_removed": {"file": exp["file"], "sha256": exp["sha256"]},
@@ -1041,9 +1096,37 @@ def smoke(backend=None, exif=None, rows=None):
                "versions": _versions(backend), "decided_by": F.DECIDED_BY, "code": F.code_shas(),
                "created_utc": _utc()}
     F.write_once(smoke_dir() / "smoke.json", doc)     # only once the E-series trees were found unchanged
-    log("smoke: one epoch in %.0fs, projection %.1f h (cap %.1f h): %s" % (secs, proj, walltime_cap_h(),
-                                                                         doc["status"]))
+    log("smoke: one epoch in %.0fs (%s; the whole fit %.0fs), projection %.1f h (cap %.1f h): %s" % (
+        secs, measure, float(rec["fit_seconds"]), proj, walltime_cap_h(), doc["status"]))
     return doc
+
+
+def supersede_smoke():
+    """inc2.v3fam_supersede for D6's smoke record only (group d6): the smoke of 2026-10-21 (job 49542653), which took
+    the whole one-epoch fit as the epoch time, moved aside byte for byte into d6/smoke/superseded_2026-10-24/ with
+    its manifest before this smoke runs (deviation 5). The score jobs move only their own group, so the two never
+    move the same file at once. A move that would overwrite a file refuses the job."""
+    from . import v3fam_supersede as SUP
+    try:
+        return SUP.apply(C.INC_DIR, repo=C.REPO, log=log, groups=(SUP.GROUP_D6,))
+    except SUP.SupersedeRefused as e:
+        raise F.V3famRefused(str(e))
+    except OSError as e:                     # a full disk, a lost mount: the platform's, never the arm's
+        raise F.V3famRefused("a superseded record could not be moved aside (%s: %s): it is left in place and "
+                             "nothing is moved over another file" % (type(e).__name__, e))
+
+
+def smoke_epoch_seconds(rec, backend):
+    """(epoch seconds, how measured) for the walltime rule: the epoch clock's span from the first training epoch's
+    start to the end of fit (EPOCH_TIME_DEF; deviation 5); a backend that keeps no clock (the tests' fakes) gives
+    the whole fit, which can only be longer. The real backend's clock must have seen the epoch, or the smoke refuses
+    (never the whole fit again, as on 2026-10-21)."""
+    ck = rec.get("epoch_clock") or {}
+    if ck.get("epoch_seconds") is not None and int(ck.get("epochs_started") or 0) >= 1:
+        return float(ck["epoch_seconds"]), "epoch clock: " + EPOCH_TIME_DEF
+    if getattr(backend, "epoch_clock", False):
+        raise F.V3famRefused("the epoch clock saw no training epoch (%s): the smoke records no epoch time" % ck)
+    return float(rec["fit_seconds"]), "the whole fit (the backend keeps no epoch clock)"
 
 
 def _versions(backend):

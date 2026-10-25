@@ -841,12 +841,40 @@ class World(object):
         self._w("splits/v3fam/summary.json", {"format": "inc2-v3fam-data/1", "status": "complete", "arms": arms})
 
     def v3fam_score(self, arm, status="complete", reason=None):
-        """inc2.v3fam score --arm X's platform record (capacity/v3fam_score_<arm>.json, dev only)."""
+        """inc2.v3fam score --arm X's platform record (capacity/v3fam_score_<arm>.json, dev only); E3RS's job also
+        takes the family's reproduction records (V3F.3.2) when they are not in place, by this tree's code."""
         doc = {"format": "inc2-v3fam-score-record/1", "family": "v1", "arm": arm, "status": status, "exam": "dev",
                "dev": [], "reported": {"status": "complete", "passes": 0, "failed": 0}}
         if reason:
             doc["reason"] = reason
+        if arm == "E3RS" and status == "complete":
+            d = self.inc / "v3fam" / "v1" / "equivalence"
+            self.v3fam_equiv_records(names=[n for n in self.V3FAM_EQUIV_E3RS if not (d / n).exists()])
         self._w("capacity/v3fam_score_%s.json" % arm.lower(), doc)
+
+    # the reproduction records E3RS's job takes (inc2.v3fam, V3F.3.2) and the code each pins (inc2.v3fam.code_shas:
+    # the six E3-frozen files and inc2/v3fam.py, hashed here as the cluster's job would)
+    V3FAM_EQUIV_E3RS = ("dev_identity.json", "injection.json", "two_stage_M.json", "two_stage_A.json",
+                        "two_stage_B.json", "identity_imageweeds.json", "identity_ooddev_v1.json")
+    V3FAM_CODE_FILES = {"twostage": "tools/inc2/twostage.py", "scorer": "tools/inc/scorer.py",
+                        "scorer_sidecar": "tools/inc2/scorer_sidecar.py", "scorer_native": "tools/inc2/scorer_native.py",
+                        "verify": "tools/inc/verify.py", "semisup_labeler": "tools/semisup_labeler.py",
+                        "v3fam": "tools/inc2/v3fam.py"}
+
+    @classmethod
+    def v3fam_code_now(cls):
+        base = PKG_ROOT / "weed_optimizer_framework"
+        return {k: hashlib.sha256((base / rel).read_bytes()).hexdigest() for k, rel in sorted(cls.V3FAM_CODE_FILES.items())}
+
+    def v3fam_equiv_records(self, code=None, names=None):
+        """Reproduction records under v3fam/v1/equivalence/ (the format and status inc2.v3fam writes), each taken by
+        `code` (default: this tree's)."""
+        names = self.V3FAM_EQUIV_E3RS if names is None else names
+        code = dict(code or self.v3fam_code_now())
+        for n in names:
+            self._w("v3fam/v1/equivalence/%s" % n, {"format": "inc2-v3fam-equivalence/1", "item": n.split(".")[0],
+                                                    "status": "passed", "per": {"0": {"status": "passed"}},
+                                                    "code": code, "created_utc": utc(self.t[0])})
 
     def v3fam_detr(self, smoke=True, walltime_ok=True, trained=()):
         """D6's records: the smoke's (complete within the walltime rule, or not run (walltime)) and each trained
@@ -858,12 +886,26 @@ class World(object):
         for k in trained:
             self._w("v3fam/v1/d6/s%d/train.json" % k, {"format": "inc2-v3fam-d6-train/1", "seed": k, "status": "done"})
 
-    def v3fam_deploy_dev4(self):
-        """Deviation 4's file (docs/prereg/V3F_dev4_2026-10-20.md) in the deployed tree, as a deploy puts it."""
-        n = self.dom["v3fam"]["reopen"]["file"]
+    def _v3fam_deploy(self, marker):
+        fam = self.dom["v3fam"]
+        blocks = []
+        for key in ("reopen", "reopens"):           # deviation 4's object, then deviation 5's list (stream_remote)
+            ro = fam.get(key) or []
+            blocks += [ro] if isinstance(ro, dict) else list(ro)
+        n = next((b["file"] for b in blocks if b["marker"].startswith(marker)), None)
+        if n is None or not (PKG_ROOT.parent / n).is_file():
+            return                                # a tree without that deviation: nothing to deploy
         dst = self.dir / n
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(str(PKG_ROOT.parent / n), str(dst))
+
+    def v3fam_deploy_dev4(self):
+        """Deviation 4's file (docs/prereg/V3F_dev4_2026-10-20.md) in the deployed tree, as a deploy puts it."""
+        self._v3fam_deploy("deviation 4")
+
+    def v3fam_deploy_dev5(self):
+        """Deviation 5's file (docs/prereg/V3F_dev5_2026-10-24.md) in the deployed tree, as a deploy puts it."""
+        self._v3fam_deploy("deviation 5")
 
     def v3fam_verdict(self, order=(("D6", "reference"), ("D8M", "reference")), record=None):
         """inc2.v3fam verdict's platform record (dev only), at the domain's verdict record (the continuation's,
@@ -880,6 +922,10 @@ class World(object):
         if record != "capacity/v3fam_v1.json" and (self.inc / "capacity" / "v3fam_v1.json").exists():
             doc["continues"] = {"verdict": "v3fam_v1.json", "sha256": "c" * 64,
                                 "deviation": "docs/prereg/V3F_dev4_2026-10-20.md", "reproduced": ["P1", "P4"]}
+            if record == "capacity/v3fam_v1_cont2.json" and (self.inc / "capacity" / "v3fam_v1_cont.json").exists():
+                # deviation 5: the second continuation names both earlier records
+                doc["continues"].update(continuation="v3fam_v1_cont.json", continuation_sha256="d" * 64,
+                                        deviation="docs/prereg/V3F_dev5_2026-10-24.md")
         self._w(record, doc)
 
     def v3fam_cluster(self, skip=()):

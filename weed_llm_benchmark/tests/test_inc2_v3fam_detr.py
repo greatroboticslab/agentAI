@@ -524,6 +524,72 @@ def u_attempt():
           and (W.TMP / "rehearsal" / "d6_exif_rehearsal.json").is_file() and not (C.INC_DIR / "rehearsal").exists())
 
 
+def u_smoke_clock():
+    print("the smoke's epoch time (deviation 5): the epoch's own, the one-time setup apart")
+    fix = pathlib.Path(__file__).resolve().parent / "fixtures" / "v3fam_dev5" / "d6" / "smoke.json"
+    old_sha = "1d0691a852f1c4e3345e678e05cdade007b9d5c7de31b8fd52707f4ab597c2b8"
+    size, md5 = plant_pretrain()
+
+    class Clocked(FakeBackend):
+        """rfdetr's run of 2026-10-21 as its log shows it: about 905 s of dataset construction and sanity validation
+        before the epoch, then the epoch; the whole fit 2,405.6 s; an epoch clock kept (as RfdetrBackend keeps one)."""
+        epoch_clock = True
+
+        def __init__(self, setup=905.0, epoch=1500.6, starts=1, **kw):
+            FakeBackend.__init__(self, fit_seconds=setup + epoch, **kw)
+            self.setup, self.epoch, self.starts = setup, epoch, starts
+
+        def train(self, *a, **k):
+            r = FakeBackend.train(self, *a, **k)
+            t0 = 1000.0
+            r["epoch_clock"] = D._clock_record([t0 + self.setup] * self.starts, t0, t0 + self.setup + self.epoch)
+            return r
+    with patched(D, "PRETRAIN_BYTES", size), patched(D, "PRETRAIN_MD5", md5):
+        shutil.rmtree(str(D.smoke_dir()), ignore_errors=True)
+        D.smoke_dir().mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(str(fix), str(D.smoke_dir() / "smoke.json"))      # the smoke of 2026-10-21, byte for byte
+        sm, err = {}, None
+        try:
+            sm = D.smoke(backend=Clocked())
+        except (F.V3famRefused, OSError) as x:
+            err = x
+        moved = D.smoke_dir() / "superseded_2026-10-24" / "smoke.json"
+        man = json.loads((moved.parent / "MANIFEST.json").read_text()) if (moved.parent / "MANIFEST.json").is_file() \
+            else {"entries": {}}
+        check("the smoke of 2026-10-21 (1d0691a8..., its epoch time the whole fit) is moved aside byte for byte by the "
+              "next smoke's own job (its manifest names it), then the smoke runs again: epoch 1,500.6 s timed from the "
+              "first epoch's start (setup 905 s recorded apart; the fit 2,405.6 s), projection %.2f h <= 28.8 h: "
+              "complete, the seeds may run" % float(sm.get("projection_h") or 0),
+              err is None and moved.is_file() and W.sha(moved) == old_sha
+              and (man["entries"].get("smoke.json") or {}).get("sha256") == old_sha
+              and sm.get("status") == "complete" and sm.get("walltime_ok")
+              and abs(float(sm.get("epoch_seconds") or 0) - 1500.6) < 1e-6
+              and abs(float(sm.get("setup_seconds") or 0) - 905.0) < 1e-6
+              and abs(float(sm.get("fit_seconds") or 0) - 2405.6) < 1e-6
+              and abs(float(sm.get("projection_h") or 0) - (1500.6 * 50 / 3600 + 0.5)) < 1e-9
+              and str(sm.get("epoch_time")).startswith("epoch clock")
+              and ((sm.get("attempt") or {}).get("epoch_clock") or {}).get("epochs_started") == 1,
+              (err, sm.get("epoch_time")))
+        shutil.rmtree(str(D.smoke_dir()), ignore_errors=True)
+        e = refused(D.smoke, backend=Clocked(starts=0))
+        check("  a backend that keeps an epoch clock which saw no training epoch: the smoke refuses and writes no "
+              "smoke.json (never the whole fit as the epoch time again)", e is not None
+              and "saw no training epoch" in str(e) and not (D.smoke_dir() / "smoke.json").exists(), e)
+        shutil.rmtree(str(D.smoke_dir()), ignore_errors=True)
+        try:
+            whole = D.smoke(backend=FakeBackend(fit_seconds=2405.6))
+        except F.V3famRefused as x:
+            whole = {"status": "refused: %s" % x, "projection_h": 0.0, "epoch_time": ""}
+        check("  the measure of 2026-10-21 (the whole one-epoch fit, a backend with no clock): 2,405.6 s x 50 + 0.5 h = "
+              "%.1f h > 28.8 h, 'not run (walltime)', so recorded as the whole fit" % whole["projection_h"],
+              whole["status"] == D.NOT_RUN_WALLTIME and abs(whole["projection_h"] - (2405.6 * 50 / 3600 + 0.5)) < 1e-9
+              and whole["epoch_time"].startswith("the whole fit"), whole.get("epoch_time"))
+        shutil.rmtree(str(D.smoke_dir()), ignore_errors=True)
+    rec = D._clock_record([], 0.0, 10.0)
+    check("  the clock's record with no epoch started: no epoch time, no setup", rec["epoch_seconds"] is None
+          and rec["setup_seconds"] is None and rec["epochs_started"] == 0, rec)
+
+
 def u_smoke_train():
     print("smoke and train with the fake backend")
     size, md5 = plant_pretrain()
@@ -601,7 +667,7 @@ def u_smoke_train():
           and len({D.final_record(s)["sha256"] for s in F.SEEDS}) == 3)
 
 
-UNITS = ("u_constants", "u_env", "u_class_map_converter", "u_staging", "u_attempt", "u_smoke_train")
+UNITS = ("u_constants", "u_env", "u_class_map_converter", "u_staging", "u_attempt", "u_smoke_clock", "u_smoke_train")
 
 
 # ================================================================== WORLD
