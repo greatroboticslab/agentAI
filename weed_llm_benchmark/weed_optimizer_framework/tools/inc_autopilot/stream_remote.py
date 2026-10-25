@@ -704,6 +704,40 @@ V3FAM_CODE_RE = re.compile(r"weed_optimizer_framework/(%s)$" % "|".join(
     re.escape(v) for _k, v in sorted(V3FAM_CODE_FILES.items())))
 
 
+def v3fam_reopen_blocks(dom):
+    """The domain's reopen blocks in order: v3fam.reopen (deviation 4's; an object, as a ticker of an earlier deploy
+    reads it while a deploy copies the new domain file before the restart; a list is read too) and then
+    v3fam.reopens (deviation 5's and later, a list)."""
+    fam = (dom or {}).get("v3fam") or {}
+    out = []
+    for key in ("reopen", "reopens"):
+        ro = fam.get(key) or []
+        out += [ro] if isinstance(ro, dict) else [b for b in ro if isinstance(b, dict)]
+    return out
+
+
+def v3fam_allow_ok(dom, git_root, allow, roots):
+    """(ok, why) for --allow-v3fam-code-change=<file>: the file is the newest recorded deviation, i.e. the file of the
+    domain's last reopen block (a deviation that changes the code the records pin comes with its own reopen block,
+    which names what it moves aside and retakes), shipped among the git-root paths (roots) and hashing in git_root
+    as that block pins it. Any other file (the research log, an earlier deviation, an unpinned or edited one) is
+    refused."""
+    if not allow:
+        return False, "no --allow-v3fam-code-change"
+    if allow not in set(roots or ()):
+        return False, "%s is not a git-root path this deploy ships" % allow
+    blocks = v3fam_reopen_blocks(dom)
+    blk = blocks[-1] if blocks and blocks[-1].get("file") == allow else None
+    if blk is None:
+        return False, "%s is not the newest recorded deviation (the domain's last reopen block names %s)" % (
+            allow, blocks[-1].get("file") if blocks else "none")
+    p = Path(git_root) / allow
+    got = hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+    if got != blk.get("sha256"):
+        return False, "%s hashes %s, its reopen block pins %s" % (allow, str(got)[:12], str(blk.get("sha256"))[:12])
+    return True, "%s (sha256 %s), the deviation of the reopen block %r" % (allow, got[:12], blk.get("marker"))
+
+
 def v3fam_deploy_check(dom, git_root, root_paths, allow=None, package=None):
     """(ok, [lines]): deviation 5's deploy-time checks on the tree a deploy ships (deploy/deploy_funnel.sh runs them
     before anything is copied, and in --dry-run; tests/test_stream_pipeline.py runs them):
@@ -732,13 +766,12 @@ def v3fam_deploy_check(dom, git_root, root_paths, allow=None, package=None):
         if not changed:
             lines.append("pass: the code the reproduction records pin (inc2.v3fam.code_shas) is the domain's "
                          "v3fam.equivalence_code (v3fam %s)" % str(now.get("v3fam"))[:12])
-        elif allow and allow in roots and (git_root / allow).is_file():
+        elif allow and v3fam_allow_ok(dom, git_root, allow, roots)[0]:
             lines.append("NOTICE: %s change(s) the code the reproduction records pin (%s); allowed by the recorded "
-                         "deviation %s (sha256 %s): every record taken by other code is refused by "
-                         "inc2.v3fam.require_equivalence until that deviation moves it aside and retakes it" % (
+                         "deviation %s: every record taken by other code is refused by inc2.v3fam.require_equivalence "
+                         "until that deviation moves it aside and retakes it" % (
                              "this tree", ", ".join("%s %s -> %s" % (k, str(pin.get(k))[:12], str(now.get(k))[:12])
-                                                    for k in changed), allow,
-                             hashlib.sha256((git_root / allow).read_bytes()).hexdigest()[:12]))
+                                                    for k in changed), v3fam_allow_ok(dom, git_root, allow, roots)[1]))
         else:
             ok = False
             lines.append("refused: this tree changes the code every reproduction record of the family pins (%s; "
@@ -748,11 +781,11 @@ def v3fam_deploy_check(dom, git_root, root_paths, allow=None, package=None):
                          "them, ship it among the git-root paths and pass --allow-v3fam-code-change=<its file>%s" % (
                              ", ".join("%s %s -> %s" % (k, str(pin.get(k))[:12], str(now.get(k))[:12])
                                        for k in changed),
-                             "" if not allow else " (%s is not a git-root path this deploy ships)" % allow))
+                             "" if not allow else " (not allowed: %s)" % v3fam_allow_ok(dom, git_root, allow,
+                                                                                      roots)[1]))
     named = [(fam.get("amendment_file"), fam.get("amendment_sha256")),
              (fam.get("revision_file"), fam.get("revision_sha256"))]
-    ro = fam.get("reopen") or []
-    named += [(b.get("file"), b.get("sha256")) for b in ([ro] if isinstance(ro, dict) else ro) if isinstance(b, dict)]
+    named += [(b.get("file"), b.get("sha256")) for b in v3fam_reopen_blocks(dom)]
     bad = []
     for f, sha in named:
         if not f:
@@ -773,29 +806,72 @@ def v3fam_deploy_check(dom, git_root, root_paths, allow=None, package=None):
     return ok, lines
 
 
-def v3fam_records_guard(changed, n_records, allow=None, roots=()):
+def _records_list(records):
+    """[{name, sha256, code}] from step 2's fetch ({"records": [...]}, its JSON text, or a list), or None when the
+    fetch failed or says so; an int n is n records of unknown code (an older caller's count)."""
+    if isinstance(records, str):
+        try:
+            records = json.loads(records)
+        except ValueError:
+            try:
+                records = int(records)
+            except ValueError:
+                return None
+    if isinstance(records, bool):
+        return None
+    if isinstance(records, int):
+        return [{"name": "record %d" % (k + 1), "sha256": None, "code": None} for k in range(records)]
+    if isinstance(records, dict):
+        if records.get("error"):
+            return None
+        records = records.get("records")
+    if not isinstance(records, list):
+        return None
+    return [r for r in records if isinstance(r, dict)]
+
+
+def v3fam_records_guard(changed, records, allow=None, roots=(), dom=None, git_root=None, package=None):
     """(ok, message) for deploy_funnel.sh step 2, beside PINNED_RE: `changed`, the paths rsync would change on the
-    cluster; n_records, the reproduction records under the cluster's v3fam/v1/equivalence (an int, or anything else
-    when the listing failed: read as present). A change to a file the records pin (V3FAM_CODE_RE) while records
-    exist is refused unless `allow` names a recorded deviation among the git-root paths (roots)."""
+    cluster; `records`, the cluster's reproduction records under v3fam/v1/equivalence as step 2 fetched them (each
+    with its name, sha256 and code map; a failed fetch reads as records present, taken by unknown code). A change to
+    a file the records pin (V3FAM_CODE_RE) passes when, after it, every record but those a recorded deviation
+    supersedes by sha256 (inc2.v3fam_supersede) pins exactly the code this tree ships (v3fam_code_at(package)): a
+    deploy that restores the bytes the records pin (deviation 5) or changes nothing they pin. Otherwise it is
+    refused unless `allow` is a recorded deviation (v3fam_allow_ok: the file of one of the domain's reopen blocks,
+    shipped and hashing as pinned)."""
     hit = sorted({c for c in changed or () if V3FAM_CODE_RE.search(str(c))})
     if not hit:
         return True, "pass: no file the family's reproduction records pin changes on the cluster"
-    try:
-        n = int(n_records)
-    except (TypeError, ValueError):
-        n = None
-    if n == 0:
+    recs = _records_list(records)
+    if recs is not None and not recs:
         return True, "NOTICE: %s change on the cluster; it holds no reproduction record" % ", ".join(hit)
-    held = "%s reproduction record(s)" % n if n is not None else "reproduction records (the listing failed: read " \
-                                                                  "as present)"
-    if allow and allow in set(roots or ()):
+    shipped = v3fam_code_at(Path(package) if package else Path(__file__).resolve().parents[2])
+    if recs is not None:
+        try:
+            from ..inc2 import v3fam_supersede as SUP
+            sup = {r.get("name") for r in recs
+                   if SUP.is_superseded("%s/%s" % (V3FAM_EQUIV_DIR, r.get("name")), r.get("sha256"))}
+        except ImportError:
+            sup = set()
+        other = sorted(str(r.get("name")) for r in recs if r.get("name") not in sup and r.get("code") != shipped)
+        if not other:
+            return True, ("pass: %s change on the cluster to the code every one of its %d reproduction record(s) pins "
+                          "(v3fam %s)%s" % (", ".join(hit), len(recs) - len(sup), str(shipped.get("v3fam"))[:12],
+                                            "; superseded by a recorded deviation and moved aside by the next family "
+                                            "job: %s" % ", ".join(sorted(sup)) if sup else ""))
+        held = "%d reproduction record(s) taken by other code than this tree ships (%s)" % (len(other),
+                                                                                           ", ".join(other[:8]))
+    else:
+        held = "reproduction records (the fetch failed: read as present, taken by unknown code)"
+    ok_allow, why_allow = v3fam_allow_ok(dom, git_root, allow, roots) if allow else (False, "")
+    if ok_allow:
         return True, "NOTICE: %s change on the cluster, which holds %s; allowed by the recorded deviation %s" % (
-            ", ".join(hit), held, allow)
-    return False, ("refused: the deploy would change %s on the cluster, which holds %s pinning them "
-                   "(inc2.v3fam.require_equivalence would refuse every family score); pass "
+            ", ".join(hit), held, why_allow)
+    return False, ("refused: the deploy would change %s on the cluster, which holds %s "
+                   "(inc2.v3fam.require_equivalence would refuse every family score resting on them); pass "
                    "--allow-v3fam-code-change=<a recorded deviation's file> only with a deviation that moves them "
-                   "aside and retakes them" % (", ".join(hit), held))
+                   "aside and retakes them%s" % (", ".join(hit), held,
+                                                 " (not allowed: %s)" % why_allow if allow else ""))
 
 
 def v3fam_status(inc):
@@ -836,9 +912,23 @@ def v3fam_status(inc):
                                          and ver.get("preflight_sha256") == R._sha256_file(v / "exif" /
                                                                                           "preflight.json"))}
     sm, _i = _read_json(v / "d6" / "smoke" / "smoke.json")
+    # deviation 5 (2026-10-24): the smoke record of 2026-10-21, which took the whole one-epoch fit as the epoch time,
+    # is superseded by sha256 (inc2.v3fam_supersede): reported as no smoke, so the ticker proposes the smoke again;
+    # the smoke's own job moves it aside
+    sm_sha = R._sha256_file(v / "d6" / "smoke" / "smoke.json") if (v / "d6" / "smoke" / "smoke.json").is_file() \
+        else None
+    try:
+        from ..inc2 import v3fam_supersede as SUP
+        sm_sup = SUP.is_superseded(SUP.D6_SMOKE, sm_sha)
+    except Exception:                           # noqa: BLE001 - an older tree: nothing is superseded
+        sm_sup = False
+    if sm_sup:
+        sm = None
     out["detr"] = {"smoke": (sm or {}).get("status") if isinstance(sm, dict) else None,
                    "walltime_ok": (sm or {}).get("walltime_ok") if isinstance(sm, dict) else None,
                    "projection_h": (sm or {}).get("projection_h") if isinstance(sm, dict) else None,
+                   "epoch_seconds": (sm or {}).get("epoch_seconds") if isinstance(sm, dict) else None,
+                   "smoke_sha256": sm_sha, "smoke_superseded": bool(sm_sup),
                    "trained": sorted(int(p.parent.name[1:]) for p in (v / "d6").glob("s[0-9]/train.json"))
                    if (v / "d6").is_dir() else []}
     out["cap_refused"] = sorted(p.stem for p in (v / "cap").glob("*.json")) if (v / "cap").is_dir() else []

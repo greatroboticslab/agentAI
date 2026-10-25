@@ -4,11 +4,11 @@ the executor, the real stream_remote verbs on a fake cluster: tests/test_stream_
 
 - the live state of 2026-10-24 with deviation 5 deployed: the six arms D8, D4F, D4N, D4R15, D1 and D5B recorded
   failed twice (their score jobs refused by the platform's stale records on 2026-10-21), D6's smoke 'not run
-  (walltime)' (the record of job 49542653, byte for byte), the continuation of 2026-10-22 decided, the failure
-  records and identity_probe.json (2026-10-21) on the cluster: the six arms and the verdict reopened once, then the
-  six scores in V3F.7's order (D8 first), then L23L once with no --ticker-failed, writing the second continuation
-  (capacity/v3fam_v1_cont2.json); the earlier verdicts unchanged; one card for it; no family item failed; D6 stays
-  'not run';
+  (walltime)' (the record of job 49542653, byte for byte: its epoch time the whole fit), the continuation of
+  2026-10-22 decided, the failure records and identity_probe.json (2026-10-21) on the cluster: the six arms, D6's
+  smoke and the verdict reopened once, then the six scores in V3F.7's order (D8 first) and, on TRAIN, D6's smoke
+  again, its seeds and its score, then L23L once with no --ticker-failed, writing the second continuation
+  (capacity/v3fam_v1_cont2.json); the earlier verdicts unchanged; one card for it; no family item failed;
 - a deploy that changes the code the reproduction records pin (deviation 4's kind of change) and D8's score job
   refused by them ("the code changed since dev_identity.json ran", in its provenance only): D8 is not failed (no
   fails, nothing declined, its GPU-h kept), held with one card naming the remedy; no other score is proposed while
@@ -125,12 +125,15 @@ def t_live():
     its2 = items(w)
     first = [(e.get("lever"), U._fam_arg(e)) for e in w.events("proposed")[n0:] if e.get("lever") in S.V3FAM_LEVERS]
     rcards = [c for c in w.state().get("cards") or [] if "deviation 5" in c["title"] and "proposed again" in c["title"]]
-    check("before the deploy nothing more is proposed (the family idle, as since 2026-10-22); deployed: the six arms "
-          "and the verdict reopened once (one card), their spend kept in prior_gpuh; L23J D8 first",
+    check("before the deploy nothing more is proposed (the family idle, as since 2026-10-22); deployed: the six arms, "
+          "D6's smoke and the verdict reopened once (one card), their spend kept in prior_gpuh; L23J D8 first on MAINT "
+          "and L23K's smoke again on TRAIN",
           j is not None and len([e for e in quiet if e.get("lever") == "L23J" and U._fam_arg(e) == "D8"]) == 1
           and all(its2["score:%s" % a].get("reopened") == "deviation 5 (2026-10-24)" for a in SIX)
+          and its2["detr:smoke"].get("reopened") == "deviation 5 (2026-10-24)"
           and abs(float(its2["score:D8"].get("prior_gpuh") or 0) - 0.15) < 1e-9 and len(rcards) == 1
-          and first[:1] == [("L23J", "D8")], (first, [(a, its2["score:%s" % a].get("reopened")) for a in SIX]))
+          and [x for x in first if x[0] == "L23J"][:1] == [("L23J", "D8")] and ("L23K", "smoke") in first,
+          (first, [(a, its2["score:%s" % a].get("reopened")) for a in SIX]))
     done = U._fam_run(w, ticks=300, until=lambda: items(w).get("verdict", {}).get("state") == "done"
                       and (cap / "v3fam_v1_cont2.json").exists())
     pro = [(e.get("lever"), U._fam_arg(e)) for e in w.events("proposed")[n0:] if e.get("lever") in S.V3FAM_LEVERS]
@@ -139,13 +142,15 @@ def t_live():
     w.tick(3)
     vc = [c for c in w.state().get("cards") or [] if "second continuation verdict is decided" in c["title"]]
     st_end = items(w)
-    check("then the six arms' scores in V3F.7's order and L23L once with no --ticker-failed: the second continuation "
-          "written, the verdicts of 2026-10-13 and 2026-10-22 unchanged byte for byte, one card for it naming both; no "
-          "family item failed; D6 stays not run (walltime), never proposed",
-          done and l23j == list(SIX) and len(l23l) == 1 and "--ticker-failed" not in (l23l[0].get("argv") or [])
+    check("then the six arms' scores in V3F.7's order, D6's smoke (its epoch timed from its start, within the rule), "
+          "its three seeds and its score, and L23L once with no --ticker-failed: the second continuation written, the "
+          "verdicts of 2026-10-13 and 2026-10-22 unchanged byte for byte, one card for it naming both; no family item "
+          "failed", done and l23j == list(SIX) + ["D6"] and len(l23l) == 1
+          and "--ticker-failed" not in (l23l[0].get("argv") or [])
           and all((cap / n).read_bytes() == b for n, b in before.items()) and len(vc) == 1
           and "2026-10-22" in vc[0]["detail"] and not [k for k, v in st_end.items() if v.get("state") == "failed"]
-          and ("L23K", "0,1,2") not in pro and "score:D6" not in st_end, (done, pro, len(vc)))
+          and ("L23K", "smoke") in pro and ("L23K", "0,1,2") in pro and st_end.get("score:D6", {}).get("state") == "done",
+          (done, pro, len(vc)))
 
 
 def t_code():

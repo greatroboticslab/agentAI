@@ -534,22 +534,22 @@
    ],
    "why": "The reproduction records E3RS's score job takes (V3F.3.2: dev identity, injection, the three two-stage reproductions, and the identities of the two reported exams); once it is done each must be in place, or no family score is proposed (deviation 5)."
   },
-  "reopen": [
-   {
-    "marker": "deviation 4 (2026-10-20)",
-    "file": "docs/prereg/V3F_dev4_2026-10-20.md",
-    "sha256": "5138075662287a1a29a55e622a0efca97db880b94f7f552d448737d402f2ab4a",
-    "items": [
-     "data",
-     "verdict"
-    ],
-    "before_utc": "2026-10-20T00:00:00Z",
-    "why": "Deviation 4 (2026-10-20): the family's data build (L23H) failed twice on 2026-10-12 on a defect (inc2.v3fam_data keyed its DINOv2 scans by manifest key, which 6,805 of base_v2's 6,811 keys repeat with two files, and funnel.embed refuses a repeated key), and the verdict of 2026-10-13 (job 49107774) was decided while seven arms had never started (D1, D4F, D4N, D4R15, D5B, D6, D8). The build is fixed (each file is scanned once, keyed by its sha256; no arm's rows change) and proposed again; the verdict of 2026-10-13 stays recorded as it is, and the family's continuation verdict (capacity/v3fam_v1_cont.json, the same rules and Holm sets) comes once every arm's record is complete or failed (V3F.7 step 11)."
-   },
+  "reopen": {
+   "marker": "deviation 4 (2026-10-20)",
+   "file": "docs/prereg/V3F_dev4_2026-10-20.md",
+   "sha256": "5138075662287a1a29a55e622a0efca97db880b94f7f552d448737d402f2ab4a",
+   "items": [
+    "data",
+    "verdict"
+   ],
+   "before_utc": "2026-10-20T00:00:00Z",
+   "why": "Deviation 4 (2026-10-20): the family's data build (L23H) failed twice on 2026-10-12 on a defect (inc2.v3fam_data keyed its DINOv2 scans by manifest key, which 6,805 of base_v2's 6,811 keys repeat with two files, and funnel.embed refuses a repeated key), and the verdict of 2026-10-13 (job 49107774) was decided while seven arms had never started (D1, D4F, D4N, D4R15, D5B, D6, D8). The build is fixed (each file is scanned once, keyed by its sha256; no arm's rows change) and proposed again; the verdict of 2026-10-13 stays recorded as it is, and the family's continuation verdict (capacity/v3fam_v1_cont.json, the same rules and Holm sets) comes once every arm's record is complete or failed (V3F.7 step 11)."
+  },
+  "reopens": [
    {
     "marker": "deviation 5 (2026-10-24)",
     "file": "docs/prereg/V3F_dev5_2026-10-24.md",
-    "sha256": "cc725b3ccb6c61751be0da641294f3b6b4f5e890e73ee4cf5569d061ccc05e1d",
+    "sha256": "96f58b9dd40cebf25566144ae9c17b8b0409b73dd4f2a1629737c7309d19eed8",
     "items": [
      "score:D8",
      "score:D4F",
@@ -557,10 +557,11 @@
      "score:D4R15",
      "score:D1",
      "score:D5B",
+     "detr:smoke",
      "verdict"
     ],
     "before_utc": "2026-10-24T00:00:00Z",
-    "why": "Deviation 5 (2026-10-24): deviation 4 changed inc2/v3fam.py in its CLI only (sha256 3d776dae... to c5e923dc...), and every reproduction record of 2026-10-12 pins that file's sha256 (inc2.v3fam.code_shas), so inc2.v3fam.require_equivalence refused all twelve score jobs of D8, D4F, D4N, D4R15, D1 and D5B on 2026-10-21; the ticker counted those refusals as the arms' failures and the continuation verdict of 2026-10-22 (capacity/v3fam_v1_cont.json) recorded the six arms failed. inc2/v3fam.py is restored byte for byte (3d776dae...), the verdict's CLI moved to inc2/v3fam_verdict.py, and the six arms' scores are proposed again; the continuation of 2026-10-22 stays recorded as it is, and the family's second continuation (capacity/v3fam_v1_cont2.json, the same rules and Holm sets, reproducing every comparison either earlier record decided) comes once each of the six arms has a record since."
+    "why": "Deviation 5 (2026-10-24): deviation 4 changed inc2/v3fam.py in its CLI only (sha256 3d776dae... to c5e923dc...), and every reproduction record of 2026-10-12 pins that file's sha256 (inc2.v3fam.code_shas), so inc2.v3fam.require_equivalence refused all twelve score jobs of D8, D4F, D4N, D4R15, D1 and D5B on 2026-10-21; the ticker counted those refusals as the arms' failures and the continuation verdict of 2026-10-22 (capacity/v3fam_v1_cont.json) recorded the six arms failed. inc2/v3fam.py is restored byte for byte (3d776dae...), the verdict's CLI moved to inc2/v3fam_verdict.py, and the six arms' scores are proposed again. D6's smoke of 2026-10-21 took the whole one-epoch fit (2,405.6 s, about 905 s of it one-time setup before the epoch) as the epoch time and projected 33.9 h against the 28.8 h rule; the rule takes the epoch's own time, so the smoke is taken again with the epoch timed from its start (inc2.v3fam_detr). The continuation of 2026-10-22 stays recorded as it is, and the family's second continuation (capacity/v3fam_v1_cont2.json, the same rules and Holm sets, reproducing every comparison either earlier record decided) comes once each reopened arm has a record since."
    }
   ],
   "seeds": [

@@ -151,7 +151,7 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/__init__.py tools/inc2/common.py tools/inc2/guard.py tools/inc2/recipes.py tools/inc2/train.py
          tools/inc2/baseline.py tools/inc2/base3.py tools/inc2/base3_v2.json tools/inc2/scorer_sidecar.py
          tools/inc2/scorer_native.py tools/inc2/twostage.py tools/inc2/v3fam.py tools/inc2/v3fam_systems.py
-         tools/inc2/v3fam_detr.py tools/inc2/v3fam_detr_env.txt)
+         tools/inc2/v3fam_detr.py tools/inc2/v3fam_supersede.py tools/inc2/v3fam_detr_env.txt)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 
 prov() {

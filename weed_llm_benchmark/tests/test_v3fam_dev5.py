@@ -78,6 +78,8 @@ SEVEN = ("dev_identity.json", "injection.json", "two_stage_M.json", "two_stage_A
 SIX = ("D8", "D4F", "D4N", "D4R15", "D1", "D5B")
 DEV5_FILE = "docs/prereg/V3F_dev5_2026-10-24.md"
 DEV5_MARKER = "deviation 5 (2026-10-24)"
+SMOKE_1021 = "1d0691a852f1c4e3345e678e05cdade007b9d5c7de31b8fd52707f4ab597c2b8"   # D6's smoke of 2026-10-21 (job 49542653)
+DEV5_ITEMS = ["score:D8", "score:D4F", "score:D4N", "score:D4R15", "score:D1", "score:D5B", "detr:smoke", "verdict"]
 # the records each arm's score job rests on (v3fam_systems.score_d8, v3fam_trained.score_d4/score_d1/score_d5b:
 # inc2.v3fam.equivalence_names per exam; 'made' are taken in the job by require_or_make_identity when absent)
 ARM_RECORDS = {
@@ -108,8 +110,9 @@ def load(rel):
 
 
 def dev5_block():
-    ro = FAM.get("reopen") or []
-    return next((b for b in ([ro] if isinstance(ro, dict) else ro) if b.get("marker") == DEV5_MARKER), None)
+    blocks = SR.v3fam_reopen_blocks(DOM) if hasattr(SR, "v3fam_reopen_blocks") else [
+        b for b in ([FAM.get("reopen")] if isinstance(FAM.get("reopen"), dict) else FAM.get("reopen") or [])]
+    return next((b for b in blocks if isinstance(b, dict) and b.get("marker") == DEV5_MARKER), None)
 
 
 def sup():
@@ -262,12 +265,28 @@ def t_supersede():
     fails = sorted(p.name for p in (FIX / "failed").glob("*.json"))
     for n in fails:
         put_fix("failed/%s" % n, "v3fam/v1/failed/%s" % n)
+    put_fix("d6/smoke.json", "v3fam/v1/d6/smoke/smoke.json")
     want = {"v3fam/v1/equivalence/identity_probe.json": sha(FIX / "equivalence/identity_probe.json")}
     want.update({"v3fam/v1/failed/%s" % n: sha(FIX / "failed" / n) for n in fails})
+    want["v3fam/v1/d6/smoke/smoke.json"] = sha(FIX / "d6" / "smoke.json")
     st0 = SUP.status(C.INC_DIR)
-    check("the entries are the cluster's records by sha256: identity_probe.json (c99a0df0...) and the six failure "
-          "records of 2026-10-22; all pending", SUP.superseded_sha256s() == want and sorted(st0["pending"]) == sorted(
-              want), (st0["pending"], st0["other"]))
+    check("the entries are the cluster's records by sha256: identity_probe.json (c99a0df0...), the six failure "
+          "records of 2026-10-22 and D6's smoke of 2026-10-21 (1d0691a8...); all pending",
+          SUP.superseded_sha256s() == want and sorted(st0["pending"]) == sorted(want)
+          and want["v3fam/v1/d6/smoke/smoke.json"] == SMOKE_1021, (st0["pending"], st0["other"]))
+    sc = SUP.apply(C.INC_DIR, groups=(SUP.GROUP_SCORES,))
+    back = {}
+    for r in sc["moved"]:                       # put them back (the same bytes) for the full run below
+        os.link(str(SUP.dest_of(C.INC_DIR, r, SUP.FOLDER_5)), str(C.INC_DIR / r))
+        os.unlink(str(SUP.dest_of(C.INC_DIR, r, SUP.FOLDER_5)))
+        back[r] = True
+    for d_ in {SUP.dest_of(C.INC_DIR, r, SUP.FOLDER_5).parent for r in sc["moved"]}:
+        (d_ / SUP.MANIFEST).unlink()
+        d_.rmdir()
+    check("  the score jobs' group moves the six failure records and identity_probe.json, never D6's smoke (D6's own "
+          "smoke job, which may run at the same time on TRAIN, moves that one)",
+          sorted(sc["moved"]) == sorted(r for r in want if not r.startswith("v3fam/v1/d6/"))
+          and (C.INC_DIR / "v3fam/v1/d6/smoke/smoke.json").exists(), sc["moved"])
     repo = VT.TMP / "repo_dev5"
     (repo / "docs" / "prereg").mkdir(parents=True, exist_ok=True)
     (repo / DEV5_FILE).write_text("deviation 5\n")
@@ -279,7 +298,9 @@ def t_supersede():
     folder = {r: SUP.dest_of(C.INC_DIR, r, SUP.FOLDER_5) for r in want}
     man_eq = json.loads((F.equiv_dir() / SUP.FOLDER_5 / SUP.MANIFEST).read_text())
     man_f = json.loads((F.root() / "failed" / SUP.FOLDER_5 / SUP.MANIFEST).read_text())
+    man_d6 = json.loads((F.root() / "d6" / "smoke" / SUP.FOLDER_5 / SUP.MANIFEST).read_text())
     ents = dict(man_eq["entries"], **man_f["entries"])
+    ents.update(man_d6["entries"])
     check("apply moves each into its dated folder beside it (superseded_2026-10-24), the same bytes, absent at its "
           "path; the folder's MANIFEST.json names each with its sha256, bytes, job, why and the deviation's sha256; the "
           "seven records of 2026-10-12 untouched", sorted(got["moved"]) == sorted(want)
@@ -305,6 +326,38 @@ def t_supersede():
     check("  another file at an entry's path (a failure the ticker gave after the reopening) is left in place",
           other["moved"] == [] and (C.INC_DIR / r0).exists() and r0 in other["status"]["other"], other["status"])
     (C.INC_DIR / r0).unlink()
+    # a file system that refuses hard links: the copy, and a copy cut off (a full disk)
+    clean()
+    put_fix("equivalence/identity_probe.json", "v3fam/v1/equivalence/identity_probe.json")
+    rp = "v3fam/v1/equivalence/identity_probe.json"
+    dst_p = SUP.dest_of(C.INC_DIR, rp, SUP.FOLDER_5)
+    real_link, real_fsync = SUP.os.link, SUP.os.fsync
+
+    def no_link(a, b):
+        raise PermissionError(1, "Operation not permitted")
+
+    def full(fd):
+        raise OSError(28, "No space left on device")
+    SUP.os.link, SUP.os.fsync = no_link, full
+    e_full = e_sys = None
+    try:
+        try:
+            SUP.apply(C.INC_DIR)
+        except OSError as x:
+            e_full = x
+        e_sys = refused(SYS.supersede)
+        left = sorted(os.listdir(str(dst_p.parent))) if dst_p.parent.is_dir() else []
+        SUP.os.fsync = real_fsync
+        ok_copy = SUP.apply(C.INC_DIR)
+    finally:
+        SUP.os.link, SUP.os.fsync = real_link, real_fsync
+    check("  where hard links are refused the record is copied: a copy cut off (a full disk) leaves no file at the "
+          "destination and no partial copy (only its own temporary file, removed), the record in place, and a family "
+          "job refused as the platform's ('could not be moved aside'); the next run copies it whole",
+          e_full is not None and e_sys is not None and "could not be moved aside" in str(e_sys)
+          and S.V3FAM_PLATFORM_REFUSAL_RE.search(str(e_sys)) is not None and left == []
+          and ok_copy["moved"] == [rp] and sha(dst_p) == want[rp] and not (C.INC_DIR / rp).exists(),
+          (e_full, e_sys, left, ok_copy["moved"]))
     # a destination holding other bytes
     clean()
     put_fix("equivalence/identity_probe.json", "v3fam/v1/equivalence/identity_probe.json")
@@ -376,6 +429,15 @@ def oct22_world():
     return C.INC_DIR / "capacity"
 
 
+def attempt_since(name, utc="2026-10-24T05:00:00Z", status="build_failed"):
+    """A provenance attempt of the family job `name` started at utc (after deviation 5's reopening by default)."""
+    p = C.INC_DIR / "_campaign" / "provenance" / ("%s.json" % name)
+    rec = json.loads(p.read_text()) if p.exists() else {"attempts": []}
+    rec["attempts"].append({"job_id": "77", "status": status, "started_utc": utc, "finished_utc": utc})
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(rec))
+
+
 def t_verb_guard():
     print("the verb's guard on the world of 2026-10-22")
     cap = oct22_world()
@@ -386,31 +448,64 @@ def t_verb_guard():
     ok, why = VR.verdict_ready()
     check("the verdict of 2026-10-13 and the continuation of 2026-10-22 in place (by sha256): the second continuation "
           "is due and the reads follow it (capacity/v3fam_v1_cont2.json)", due and path == "v3fam_v1_cont2.json", path)
-    check("D6 reports its smoke's 'not run (walltime)' (projection 33.9 h > 28.8 h, V3F.5 D6) and BCLEAN 'not needed' "
-          "(no D0-S trigger), never 'missing'; the six arms 'missing' (their failure records of 2026-10-22 not read)",
-          st["D6"] == "not run (walltime)" and st["BCLEAN"] == "not needed"
+    check("D6's smoke of 2026-10-21 (superseded by sha256: its epoch time was the whole fit) is not read: D6 'missing' "
+          "until its smoke is taken again; BCLEAN 'not needed' (no D0-S trigger); the six arms 'missing' (their "
+          "failure records of 2026-10-22 not read)", st["D6"] == "missing" and st["BCLEAN"] == "not needed"
           and all(st[a] == "missing" for a in SIX), st)
-    check("  the verb is not ready: the six arms are not scored since deviation 5 reopened them, named with its file",
-          not ok and "not scored since deviation 5 reopened them" in why and DEV5_FILE in why
-          and all(a in why for a in SIX) and "never started" not in why, why)
+    check("  the verb is not ready: the six arms and D6 are not scored since deviation 5 reopened them, named with its "
+          "file", not ok and "not scored since deviation 5 reopened them" in why and DEV5_FILE in why
+          and all(a in why for a in SIX + ("D6",)) and "never started" not in why, why)
     e = refused(VR.verdict)
     SUP = sup()
     moved = SUP.status(C.INC_DIR)["moved"] if SUP else []
     check("  the verb refuses, naming them; it writes no verdict (the earlier verdicts unchanged byte for byte); its "
-          "first step moved the superseded failure records aside", e is not None and "deviation 5" in str(e)
+          "first step moved the superseded failure records and D6's smoke of 2026-10-21 aside",
+          e is not None and "deviation 5" in str(e)
           and not (cap / "v3fam_v1_cont2.json").exists() and not (cap / "v3fam_v1_cont2_external.json").exists()
           and all((cap / n).read_bytes() == b for n, b in before.items())
-          and sorted(moved) == sorted("v3fam/v1/failed/%s" % p.name for p in (FIX / "failed").glob("*.json")), e)
-    ok_f, why_f = VR.verdict_ready(failed=["score:%s" % a for a in SIX])
+          and sorted(moved) == sorted(["v3fam/v1/failed/%s" % p.name for p in (FIX / "failed").glob("*.json")]
+                                      + ["v3fam/v1/d6/smoke/smoke.json"]), (e, moved))
+    # the lists of 2026-10-22 passed again: the six score items, each with only its attempts of 2026-10-21
+    six_failed = ["score:%s" % a for a in SIX]
+    ok_s, why_s = VR.verdict_ready(failed=six_failed)
+    ok_e, why_e = VR.verdict_ready(failed=["score:E3RS"])
+    ok_c, why_c = VR.verdict_ready(cap_refused=["data"])
+    ok_c6, why_c6 = VR.verdict_ready(cap_refused=six_failed)
+    check("  the ticker's lists of 2026-10-22 passed again (--ticker-failed or --cap-refused naming the six arms' "
+          "score items, whose only jobs ran on 2026-10-21) end nothing: refused, naming them; E3RS named failed while "
+          "its score record is complete, or the data build named refused while its summary is complete: refused as "
+          "contradicted by the cluster's records", not ok_s and "no job of that item since the reopening" in why_s
+          and all("score:%s" % a in why_s for a in SIX) and not ok_e and "score:E3RS (its score record is complete)"
+          in why_e and not ok_c and "data (its summary is complete)" in why_c and not ok_c6
+          and "no job of that item since the reopening" in why_c6, (why_s, why_e, why_c))
+    early = F.root() / "failed" / "score_D8.json"
+    early.parent.mkdir(parents=True, exist_ok=True)
+    early.write_text(json.dumps({"format": "inc2-v3fam-failed/1", "item": "score:D8", "status": "failed",
+                                 "written_utc": "2026-10-23T12:00:00Z"}))
+    st_early = VR.arm_status("D8")
+    early.unlink()
+    check("  a failure record written before the reopening (not one deviation 5 names) is not read under the second "
+          "continuation either", st_early == "missing", st_early)
+    for a in SIX:
+        attempt_since("v3fam_score_%s" % a.lower())
+    ok_f, why_f = VR.verdict_ready(failed=six_failed)
+    attempt_since("v3fam_detr_smoke")
+    ok_f6, why_f6 = VR.verdict_ready(failed=six_failed + ["detr:smoke"])
+    check("  with a job of each since the reopening (their provenance), the ticker's failures end the six arms; D6 "
+          "still waits until its smoke's job since the reopening is named failed too", not ok_f
+          and why_f.endswith("D6") and "D8" not in why_f and ok_f6, (why_f, why_f6))
     for a in SIX[:5]:
         TS._write_json(SYS.score_record_path(a), {"format": SYS.FMT_SCORE_RECORD, "arm": a, "status": "complete",
                                                  "exam": "dev", "dev": []})
+    sm = F.root() / "d6" / "smoke" / "smoke.json"
+    TS._write_json(sm, {"format": "inc2-v3fam-d6-smoke/1", "status": "not run (walltime)", "walltime_ok": False,
+                        "epoch_seconds": 2100.0, "projection_h": 29.67})
     ok5, why5 = VR.verdict_ready()
     VR.record_ticker_failures(["score:D5B"])
     ok6, why6 = VR.verdict_ready()
-    check("  ready once each arm has a record since the reopening: the ticker's failures after the reopening "
-          "(--ticker-failed) end them; five arms scored and D5B still missing: not ready; D5B's failure after the "
-          "reopening recorded: ready", ok_f and not ok5 and why5.endswith("D5B") and ok6, (why_f, why5, why6))
+    check("  five arms scored, D6's new smoke 'not run (walltime)' by its own epoch time (a record of its own, not the "
+          "superseded one) and D5B still missing: not ready; D5B's failure written after the reopening: ready",
+          not ok5 and why5.endswith("D5B") and VR.arm_status("D6") == "not run (walltime)" and ok6, (why5, why6))
     clean()
 
 
@@ -600,7 +695,8 @@ def status_art(eq="current", stale=(), present=SEVEN + ("identity_probe.json",))
     """v3fam/v1/status.json as the snapshot ships it after deviation 5's deploy (stream_remote.v3fam_status)."""
     st = {"format": "inc_autopilot.v3fam_status/1", "data": {"complete": True, "arms": {}},
           "timestamp": {"exists": True}, "sweep": {"complete": True}, "exif": {"passed": True},
-          "detr": {"smoke": "not run (walltime)", "walltime_ok": False, "projection_h": 33.910875, "trained": []},
+          "detr": {"smoke": None, "walltime_ok": None, "projection_h": None, "smoke_superseded": True,
+                   "smoke_sha256": SMOKE_1021, "trained": []},
           "cap_refused": []}
     if eq == "current" or eq == "stale":
         code = F.code_shas()
@@ -628,13 +724,27 @@ def t_reopen():
     print("deviation 5's reopening on the ticker's live items of 2026-10-24")
     root = VT.TMP / "reopen5"
     b5 = dev5_block()
-    check("the domain's deviation 5 reopening: the six arms' scores and the verdict, before 2026-10-24, its file "
-          "shipped with this sha256; deviation 4's block kept before it; the second continuation the verdict record",
-          b5 is not None and b5["items"] == ["score:D8", "score:D4F", "score:D4N", "score:D4R15", "score:D1",
-                                             "score:D5B", "verdict"] and b5["before_utc"] == "2026-10-24T00:00:00Z"
+    check("the domain's deviation 5 reopening: the six arms' scores, D6's smoke and the verdict, before 2026-10-24, "
+          "its file shipped with this sha256; the second continuation the verdict record",
+          b5 is not None and b5["items"] == DEV5_ITEMS and b5["before_utc"] == "2026-10-24T00:00:00Z"
+          and b5["before_utc"] == VR.DEV5_REOPEN_UTC
           and b5["file"] == DEV5_FILE and (GIT / DEV5_FILE).is_file() and sha(GIT / DEV5_FILE) == b5["sha256"]
-          and isinstance(FAM["reopen"], list) and FAM["reopen"][0]["marker"] == "deviation 4 (2026-10-20)"
           and FAM["verdict_record"] == "capacity/v3fam_v1_cont2.json", b5)
+    ro4 = FAM.get("reopen")
+    old_reader = None
+    try:                                          # what the ticker of deviation 4 runs on the domain file (main 004cdbd)
+        ro = FAM.get("reopen") or {}
+        old_reader = (ro.get("marker"), ro.get("items"), ro.get("file"), ro.get("sha256"), ro.get("before_utc"))
+    except AttributeError as e:
+        old_reader = e
+    check("  deviation 4's block stays v3fam.reopen, an object byte for byte as deployed on 2026-10-21 (a ticker of "
+          "that deploy, still running while a deploy copies this domain file before the restart, reads it with "
+          "ro.get(...) and never raises), deviation 5's in v3fam.reopens after it",
+          isinstance(ro4, dict) and isinstance(old_reader, tuple)
+          and old_reader[:2] == ("deviation 4 (2026-10-20)", ["data", "verdict"])
+          and isinstance(FAM.get("reopens"), list) and FAM["reopens"][-1] is b5
+          and [b.get("marker") for b in SR.v3fam_reopen_blocks(DOM)] == ["deviation 4 (2026-10-20)", DEV5_MARKER],
+          old_reader)
     loop = (GIT / "docs" / "CONTINUOUS_LOOP.md").read_bytes()
     check("  the deviation's file is kept byte for byte in docs/CONTINUOUS_LOOP.md",
           (GIT / DEV5_FILE).is_file() and (GIT / DEV5_FILE).read_bytes() in loop)
@@ -642,14 +752,16 @@ def t_reopen():
             arts(), deploy=(DEV5_FILE, "docs/prereg/V3F_dev4_2026-10-20.md"))
     got = f._v3fam_reopen() if f._v3fam_reopen else None
     it = f.st["v3fam"]["items"]
-    check("deployed: the six arms (failed twice on 2026-10-21/22) and the verdict (done 2026-10-22) reopened once: "
-          "missing, fails 0, the marker recorded, their earlier records kept; the data build, D6's smoke and E3RS not",
-          got == ["score:D8", "score:D4F", "score:D4N", "score:D4R15", "score:D1", "score:D5B", "verdict"]
+    check("deployed: the six arms (failed twice on 2026-10-21/22), D6's smoke (done 2026-10-21, its epoch time the "
+          "whole fit) and the verdict (done 2026-10-22) reopened once: missing, fails 0, the marker recorded, their "
+          "earlier records kept; the data build and E3RS not", got == DEV5_ITEMS
           and all(it["score:%s" % a]["state"] == "missing" and it["score:%s" % a]["fails"] == 0
                   and it["score:%s" % a]["reopened"] == DEV5_MARKER
                   and it["score:%s" % a]["reopen_history"][-1]["state"] == "failed" for a in SIX)
           and it["verdict"]["state"] == "missing" and it["data"]["state"] == "done"
-          and it["detr:smoke"]["state"] == "done" and it["score:E3RS"]["state"] == "done", (got, {
+          and it["detr:smoke"]["state"] == "missing" and it["detr:smoke"]["reopened"] == DEV5_MARKER
+          and abs(float(it["detr:smoke"].get("prior_gpuh") or 0) - 0.9372) < 1e-9
+          and it["score:E3RS"]["state"] == "done", (got, {
               k: v.get("state") for k, v in it.items() if not k.startswith("build:")}))
     check("  every attempt stays counted against the family cap: D8's prior 0.0889 + 0.06, the verdict's 0.66 + "
           "0.5778; the earlier ids retired; the verdict's card mark in its history; one card",
@@ -667,11 +779,14 @@ def t_reopen():
     fs = f._v3fam_stage(BUILT)
     plan, waits = DS.v3fam_plan(FAM, fs)
     ready, pending = DS.v3fam_verdict_ready(FAM, fs)
-    check("then: the records current (identity_probe.json superseded, not stale), D6 'not run (a dependency ended "
-          "without its effect)' from its smoke's walltime, L23J D8 first on MAINT, the verdict waiting for the six "
-          "arms", (fs.get("equivalence") or {}).get("state") == "current" and fs["score"]["D6"].startswith("not run")
+    check("then: the records current (identity_probe.json superseded, not stale), D6's smoke of 2026-10-21 reported "
+          "as no smoke (superseded by sha256): L23K's smoke on TRAIN, L23J D8 first on MAINT, the verdict waiting for "
+          "the six arms and D6", (fs.get("equivalence") or {}).get("state") == "current"
+          and fs["detr"]["smoke"] == "missing" and fs["score"]["D6"] == "missing"
+          and plan.get("TRAIN") == {"lever": "L23K", "verb": "smoke", "item": "detr:smoke"}
           and plan.get("MAINT") == {"lever": "L23J", "arm": "D8", "item": "score:D8"} and not ready
-          and set(SIX) <= set(pending) and fs["verdict"] == "missing", (fs.get("equivalence"), plan, pending))
+          and set(SIX) <= set(pending) and "D6" in pending and "detr:smoke" in pending and fs["verdict"] == "missing",
+          (fs.get("equivalence"), fs.get("detr"), plan, pending))
     f.arts = arts(present=tuple(n for n in SEVEN if n != "injection.json"))
     fsm = f._v3fam_stage(BUILT)
     plan_m, waits_m = DS.v3fam_plan(FAM, fsm)
@@ -687,6 +802,16 @@ def t_reopen():
     check("  an item whose reopen history holds a marker is never reopened by that block again (deviation 4's, while "
           "its record names deviation 5's)", hist.st["v3fam"]["items"]["verdict"]["state"] == "failed",
           hist.st["v3fam"]["items"]["verdict"])
+    held = Fam(root / "held", {"v3fam": {"items": {"score:D8": {
+        "state": DS.V3FAM_HELD_PLATFORM, "lever": "L23J", "platform_refusals": 3, "proposal": None,
+        "started_utc": "2026-10-23T01:00:00Z", "spend": "settled", "settled": 0.02, "prior_gpuh": 0.04}}}}, arts(),
+        deploy=(DEV5_FILE,))
+    got_h = held._v3fam_reopen()
+    rh = held.st["v3fam"]["items"]["score:D8"]
+    check("  an item held for a person after three refusals of the platform's own making is reached by a recorded "
+          "deviation's reopening (its sanctioned way out): missing, its refusals count reset, its spend kept",
+          got_h == ["score:D8"] and rh["state"] == "missing" and "platform_refusals" not in rh
+          and abs(float(rh.get("prior_gpuh") or 0) - 0.06) < 1e-9, rh)
     late = Fam(root / "late", {"v3fam": {"items": dict(live_items(), **{"score:D8": dict(
         live_items()["score:D8"], started_utc="2026-10-24T03:00:00Z")})}}, arts(), deploy=(DEV5_FILE,))
     late._v3fam_reopen()
@@ -791,6 +916,27 @@ def t_platform_refusal():
           "whose outcome was unknown, when it started after the item): the snapshot carried it on 2026-10-21 and the "
           "ticker never read it", "the code changed since" in got and other == "" and "the code changed since" in unk
           and late == "", (got[-80:], other, late))
+    # a refusal whose message is only on the traceback's last line, beyond 600 characters (run_inc2_build.sh keeps the
+    # log's last five lines; under python -m a score job's V3famRefused is a traceback): still the platform's
+    inc = "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/v3fam/v1/equivalence"
+    tb = ('  File "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/'
+          'v3fam_trained.py", line 523, in score_arm\n    SYS.supersede()                          # deviation 5: the '
+          'records it supersedes moved aside first\n  File "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/'
+          'weed_optimizer_framework/tools/inc2/v3fam_systems.py", line 133, in supersede\n    raise '
+          'F.V3famRefused(str(e))\nweed_optimizer_framework.tools.inc2.v3fam.V3famRefused: %s/superseded_2026-10-24/'
+          'identity_probe.json exists: the superseded record %s/identity_probe.json is never moved over another file'
+          % (inc, inc))
+    pay_tb = {"status": {"builds": {"v3fam_score_d4r15": {"job_id": "5001", "refusal": tb,
+                                                          "started_utc": "2026-10-24T08:00:00Z"}}}}
+    got_tb = f._v3fam_prov_refusal(pay_tb, item("D4R15", "tb1"), ["5001"]) if f._v3fam_prov_refusal else ""
+    f4 = Fam(root, {"v3fam": {"items": {"score:D4R15": running("D4R15")}}, "declined": []}, arts())
+    f4._v3fam_failed("MAINT", item("D4R15", "tb1"), "job(s) 5001 ended FAILED; refused: %s" % got_tb, True)
+    r4 = f4.st["v3fam"]["items"]["score:D4R15"]
+    check("  a %d-character traceback whose message (a superseded record that cannot be moved) is only on its last "
+          "line, past character 600: the ticker keeps it (the tail, and the phrase that classes it), so the arm is "
+          "held, not failed" % len(tb), len(tb) > 600 and tb.index("is never moved over") > 600
+          and "is never moved over another file" in got_tb and len(got_tb) <= 1000
+          and r4["state"] == DS.V3FAM_HELD_PLATFORM and not r4.get("fails"), (len(tb), got_tb[-120:], r4))
 
 
 def t_pre_score():
@@ -842,11 +988,14 @@ def t_deploy():
     bad, blines = chk(DOM, GIT, roots, package=pkg)
     allow, alines = chk(DOM, GIT, roots, package=pkg, allow=DEV5_FILE)
     nope, _n = chk(DOM, GIT, roots, package=pkg, allow="docs/prereg/none.md")
+    log_, _l = chk(DOM, GIT, roots, package=pkg, allow="RESEARCH_LOG.md")
+    dev4_, _d = chk(DOM, GIT, roots, package=pkg, allow="docs/prereg/V3F_dev4_2026-10-20.md")
     check("a copy of the seven files passes; with inc2/v3fam.py changed (deviation 4's kind of change) it is refused "
-          "naming v3fam and the remedy; --allow-v3fam-code-change with a recorded deviation among the git-root paths "
-          "passes with a notice, with any other file it is refused", ok_copy and not bad
+          "naming v3fam and the remedy; --allow-v3fam-code-change with the newest recorded deviation (the domain's "
+          "last reopen block's file, shipped and hashing as pinned) passes with a notice; with any other file (one "
+          "not shipped, the research log, deviation 4's) it is refused", ok_copy and not bad
           and "v3fam 3d776daed91d" in " ".join(blines) and "--allow-v3fam-code-change" in " ".join(blines) and allow
-          and "NOTICE" in " ".join(alines) and not nope, (blines[:1], alines[:1]))
+          and "NOTICE" in " ".join(alines) and not nope and not log_ and not dev4_, (blines[:1], alines[:1]))
     git2 = VT.TMP / "git2"
     for f_ in roots:
         if (GIT / f_).is_file():
@@ -855,27 +1004,80 @@ def t_deploy():
     ok2, _l2 = chk(DOM, git2, roots)
     (git2 / DEV5_FILE).write_text((git2 / DEV5_FILE).read_text() + "\nan edit after the pin\n")
     edited, elines = chk(DOM, git2, roots)
+    edited_allow, _ea = chk(DOM, git2, roots, package=pkg, allow=DEV5_FILE)
+    check("  --allow-v3fam-code-change naming the newest deviation's file edited after its pin is refused (the file "
+          "must hash as its reopen block pins it)", not edited_allow and not SR.v3fam_allow_ok(DOM, git2, DEV5_FILE,
+                                                                                             roots)[0], _ea)
     gone, glines = chk(DOM, GIT, [r for r in roots if r != DEV5_FILE])
     check("a deviation's file edited after its pin (its sha256 no longer the domain's) is refused, naming it; a pinned "
           "file left out of the git-root paths is refused", ok2 and not edited and DEV5_FILE in " ".join(elines)
           and not gone and "not a git-root path" in " ".join(glines), (elines[-1:], glines[-1:]))
     changed = ["weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam.py",
                "weed_optimizer_framework/tools/inc2/v3fam.py", "weed_optimizer_framework/tools/inc2/v3fam_verdict.py"]
-    g = {"8 records": guard(changed, 8), "no record": guard(changed, 0), "listing failed": guard(changed, "unknown"),
-         "allowed": guard(changed, 8, DEV5_FILE, roots), "allowed, not shipped": guard(changed, 8, "x.md", roots),
-         "other files only": guard(changed[2:], 8),
-         "a frozen file": guard(["weed_optimizer_framework/tools/inc2/twostage.py"], 8)}
-    check("step 2 (beside PINNED_RE): a change of inc2/v3fam.py on the cluster while it holds records is refused, also "
-          "when the listing failed; with no record, or allowed by a recorded deviation, it passes; other files pass; "
-          "an E3-frozen file is refused too",
-          not g["8 records"][0] and g["no record"][0] and not g["listing failed"][0] and g["allowed"][0]
-          and not g["allowed, not shipped"][0] and g["other files only"][0] and not g["a frozen file"][0],
+    # the cluster's records as step 2 fetches them (name, sha256, code map): the seven of 2026-10-12 and
+    # identity_probe.json of 2026-10-21, byte for byte
+    recs = {"records": [{"name": n, "sha256": sha(FIX / "equivalence" / n), "code": load("equivalence/%s" % n)["code"]}
+                        for n in SEVEN + ("identity_probe.json",)]}
+    stale_recs = {"records": [dict(r, code=dict(r["code"], v3fam=DEV4_V3FAM)) for r in recs["records"]]}
+    kw = {"dom": DOM, "git_root": GIT}
+    g = {"restore (this deploy)": guard(changed, recs, None, roots, **kw),
+         "restore, as JSON text": guard(changed, json.dumps(recs), None, roots, **kw),
+         "records of other code": guard(changed, stale_recs, None, roots, **kw),
+         "this tree changed": guard(changed, recs, None, roots, package=pkg, **kw),
+         "changed, newest deviation": guard(changed, recs, DEV5_FILE, roots, package=pkg, **kw),
+         "changed, deviation 4": guard(changed, recs, "docs/prereg/V3F_dev4_2026-10-20.md", roots, package=pkg, **kw),
+         "changed, the research log": guard(changed, recs, "RESEARCH_LOG.md", roots, package=pkg, **kw),
+         "8 records of unknown code": guard(changed, 8, None, roots, **kw),
+         "no record": guard(changed, {"records": []}, None, roots, **kw),
+         "fetch failed": guard(changed, {"error": "the fetch failed"}, None, roots, **kw),
+         "unreadable": guard(changed, "not json", None, roots, **kw),
+         "other files only": guard(changed[2:], recs, None, roots, **kw),
+         "a frozen file, unknown records": guard(["weed_optimizer_framework/tools/inc2/twostage.py"], 8, None, roots,
+                                                 **kw)}
+    check("step 2 (beside PINNED_RE): a change of inc2/v3fam.py on the cluster passes when every record (but "
+          "identity_probe.json, superseded by sha256) pins the code this tree ships: deviation 5's own deploy, which "
+          "restores the bytes they pin, needs no flag; records taken by other code than the tree ships, a fetch that "
+          "failed or cannot be read, or records of unknown code refuse it (an E3-frozen file too), unless the newest "
+          "recorded deviation is named (deviation 4's file or the research log refused); no record, or other files "
+          "only, pass", g["restore (this deploy)"][0] and g["restore, as JSON text"][0]
+          and "identity_probe.json" in g["restore (this deploy)"][1] and not g["records of other code"][0]
+          and not g["this tree changed"][0] and g["changed, newest deviation"][0]
+          and not g["changed, deviation 4"][0] and not g["changed, the research log"][0]
+          and not g["8 records of unknown code"][0] and g["no record"][0] and not g["fetch failed"][0]
+          and not g["unreadable"][0] and g["other files only"][0] and not g["a frozen file, unknown records"][0],
           {k: v[0] for k, v in g.items()})
     check("deploy_funnel.sh runs both: the tree's checks before anything is copied and in --dry-run, step 2's guard "
           "on rsync's list of changes, the flag recorded in stream_deployed.json",
           "SR.v3fam_deploy_check" in sh and "S.v3fam_records_guard" in sh and "--allow-v3fam-code-change=*" in sh
+          and "--include='*.json' --exclude='*'" in sh and 'package="weed_optimizer_framework"' in sh
           and '"v3fam_code_change": $V3F_CHANGE' in sh
           and sh.index("v3fam_deploy_check") < sh.index('if [ "$DRY" = 1 ]; then'), None)
+
+
+# ------------------------------------------------------------------ D6's smoke taken again
+def t_d6():
+    print("D6's smoke of 2026-10-21 superseded: the snapshot, the verb and the card")
+    clean()
+    put_fix("d6/smoke.json", "v3fam/v1/d6/smoke/smoke.json")
+    rec = load("d6/smoke.json")
+    st = SR.v3fam_status(C.INC_DIR)
+    det = st.get("detr") or {}
+    check("the smoke record of 2026-10-21 (job 49542653: epoch_seconds = fit_seconds = 2,405.583, projection 33.91 h) "
+          "is reported by the snapshot as no smoke, superseded by sha256 (so the ticker proposes the smoke again), and "
+          "the verb reads no D6 status from it", rec["epoch_seconds"] == rec["attempt"]["fit_seconds"] == 2405.583
+          and det.get("smoke") is None and det.get("walltime_ok") is None and det.get("smoke_superseded") is True
+          and det.get("smoke_sha256") == SMOKE_1021 and VR.d6_smoke_status() is None, det)
+    (F.root() / "d6" / "smoke" / "smoke.json").unlink()
+    TS._write_json(F.root() / "d6" / "smoke" / "smoke.json", {
+        "format": "inc2-v3fam-d6-smoke/1", "status": "not run (walltime)", "walltime_ok": False,
+        "epoch_seconds": 2100.0, "projection_h": 29.67, "epoch_time": "epoch clock: ..."})
+    st2 = SR.v3fam_status(C.INC_DIR)
+    check("  a smoke record of its own (the epoch timed from its start) is read as it says, by the snapshot and the "
+          "verb", (st2.get("detr") or {}).get("smoke") == "not run (walltime)"
+          and (st2.get("detr") or {}).get("smoke_superseded") is False
+          and (st2.get("detr") or {}).get("epoch_seconds") == 2100.0 and VR.d6_smoke_status() == "not run (walltime)",
+          st2.get("detr"))
+    clean()
 
 
 # ------------------------------------------------------------------ D28
@@ -927,7 +1129,7 @@ def t_d28():
 def main():
     try:
         for fn in (t_code, t_arm_records, t_cli, t_supersede, t_verb_guard, t_cont2_check, t_reopen,
-                   t_platform_refusal, t_pre_score, t_deploy, t_d28):
+                   t_platform_refusal, t_pre_score, t_deploy, t_d6, t_d28):
             try:
                 fn()
             except Exception as e:               # noqa: BLE001

@@ -50,6 +50,7 @@ from weed_optimizer_framework.tools.inc2 import v3fam_verdict as VR  # noqa: E40
 from weed_optimizer_framework.tools.inc_autopilot import diagnose_stream as DS  # noqa: E402
 from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LS  # noqa: E402
 from weed_optimizer_framework.tools.inc_autopilot import stream as S  # noqa: E402
+from weed_optimizer_framework.tools.inc_autopilot import stream_remote as SR  # noqa: E402
 
 FAILURES = VT.FAILURES
 check = VT.check
@@ -141,7 +142,7 @@ class Fam(object):
 
     def __init__(self, root, reopen, st):
         self.paths = Paths(root)
-        self.dom = {"v3fam": dict(FAM, reopen=reopen)}
+        self.dom = {"v3fam": dict(FAM, reopen=reopen, reopens=[])}     # deviation 4's block alone
         self.st = st
         self.utc = "2026-10-21T00:00:00Z"
         self.cards, self.ledger = [], []
@@ -219,11 +220,12 @@ def t_reopen():
           and res["another sha256"] == ([], "failed") and res["no marker"] == ([], "failed")
           and res["an item started after the deviation"] == (["verdict"], "failed")
           and res["an item running"] == (["verdict"], "running"), res)
-    ro4 = next(b for b in FAM["reopen"] if b["marker"] == "deviation 4 (2026-10-20)")
-    check("the domain names deviation 4's reopening (first in its list of reopenings, deviation 5's after it): the "
-          "data build and the verdict, before 2026-10-20; its continuation stays the record of 2026-10-22 and the "
-          "verdict record is deviation 5's second continuation", ro4["items"] == ["data", "verdict"]
-          and FAM["reopen"][0] is ro4 and ro4["before_utc"] == "2026-10-20T00:00:00Z"
+    ro4 = FAM["reopen"]
+    check("the domain names deviation 4's reopening (v3fam.reopen, an object as a ticker of an earlier deploy reads "
+          "it; deviation 5's in v3fam.reopens after it): the data build and the verdict, before 2026-10-20; its "
+          "continuation stays the record of 2026-10-22 and the verdict record is deviation 5's second continuation",
+          isinstance(ro4, dict) and ro4["marker"] == "deviation 4 (2026-10-20)" and ro4["items"] == ["data", "verdict"]
+          and SR.v3fam_reopen_blocks({"v3fam": FAM})[0] is ro4 and ro4["before_utc"] == "2026-10-20T00:00:00Z"
           and ro4["file"] == "docs/prereg/V3F_dev4_2026-10-20.md"
           and FAM["continuation_record"] == "capacity/v3fam_v1_cont.json"
           and FAM["verdict_record"] == "capacity/v3fam_v1_cont2.json"

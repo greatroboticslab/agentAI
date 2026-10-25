@@ -8,9 +8,11 @@ continuation of 2026-10-22), as the cluster's records stood on 2026-10-24:
   stale records), D6 'not run (walltime)' from its smoke record; both pinned by sha256 as the code pins the cluster's;
 - the reads follow the second continuation and refuse before it; the verb refuses while any of the six arms has no
   record since the reopening, writing no verdict (its first step moves the superseded failure records aside);
-- once the arms are rescored (D5B failing again after the reopening): written once under its own names, every
-  earlier record unchanged byte for byte, every comparison either earlier verdict decided reproduced (P1 and P4
-  equal), P2 and P3 decided, P5 'not run' with D6's walltime reason; a second run refuses;
+- D6's smoke of 2026-10-21 (its epoch time the whole fit) superseded: D6 waits too, and the verb's first step moves
+  that record aside; the ticker's failure of D5B with only its jobs of 2026-10-21 ends nothing;
+- once the arms are rescored (D5B failing again after the reopening, a job of it since; D6 scored): written once
+  under its own names, every earlier record unchanged byte for byte, every comparison either earlier verdict decided
+  reproduced (P1 and P4 equal), P2, P3 and P5 decided; a second run refuses;
 - an attempt cut off before its verdict file left partial records: moved aside, then every record written once;
 - a continuation of 2026-10-22 the second continuation does not reproduce (P1's D 1e-6 off): refused, nothing written.
 Slow (four verdicts with the bootstraps): the mutation run uses it only for the verb's own mutants.
@@ -64,6 +66,9 @@ def t_second_continuation():
     F.comparison = functools.partial(real[0], resamples=VT.RESAMPLES)
     made = []
     cap = C.INC_DIR / "capacity"
+    smoke_sha = F._sha(smoke)
+    if SUP is not None:
+        SUP.ENTRIES = ()                                    # the records as written then: nothing superseded yet
     try:
         VR.verdict_ready = lambda *a, **k: (True, "")
         v1 = VR.verdict()                                  # the verdict of 2026-10-13, as written then
@@ -75,7 +80,10 @@ def t_second_continuation():
         VR.CONT_SHA256 = F._sha(cap / VR.CONTINUATION["verdict"])
         sup = {"v3fam/v1/failed/score_%s.json" % a: F._sha(VR.failed_file("score:%s" % a)) for a in SIX}
         if SUP is not None:
-            SUP.ENTRIES = tuple((r, s, SUP.DEVIATION_5, SUP.FOLDER_5, "the synthetic family's") for r, s in sup.items())
+            # deviation 5's entries on the synthetic family: its six failure records, and D6's smoke of 2026-10-21
+            # (job 49542653's record byte for byte, its epoch time the whole fit)
+            SUP.ENTRIES = tuple((r, s, SUP.DEVIATION_5, SUP.FOLDER_5, "the synthetic family's") for r, s in sup.items()) \
+                + ((SUP.D6_SMOKE, smoke_sha, SUP.DEVIATION_5, SUP.FOLDER_5, "the smoke of 2026-10-21"),)
             VR.DEV5_SUPERSEDED_FAILED = {"score:%s" % a: sup["v3fam/v1/failed/score_%s.json" % a] for a in SIX}
         before = {n: (cap / n).read_bytes() for n in [VR.VERDICT, VR.EXTERNAL, VR.EXT, VR.REPORT + ".json",
                                                       VR.REPORT + ".md"] + names_of(VR.CONTINUATION)}
@@ -84,29 +92,44 @@ def t_second_continuation():
               and all(cont["arms"][a].startswith("failed") for a in SIX)
               and cont["arms"]["D6"] == "not run (walltime)", cont["arms"])
         e_read = refused(VR.read_verdict)
-        st = {a: VR.arm_status(a) for a in SIX}
+        st = {a: VR.arm_status(a) for a in SIX + ("D6",)}
         check("the reads follow the second continuation and refuse until it is decided, naming deviation 5; the six "
-              "arms read 'missing' (their failure records of 2026-10-22 not read)",
-              VR.family_verdict_path().name == "v3fam_v1_cont2.json" and e_read is not None
+              "arms read 'missing' (their failure records of 2026-10-22 not read), and D6 too (its smoke of 2026-10-21 "
+              "superseded: taken again)", VR.family_verdict_path().name == "v3fam_v1_cont2.json" and e_read is not None
               and "deviation 5" in str(e_read) and all(v == "missing" for v in st.values()), (e_read, st))
         e_wait = refused(VR.verdict)
         moved = sorted(p.name for p in (VR.failed_dir() / "superseded_2026-10-24").glob("score_*.json"))
-        check("  the verb refuses while the six arms have no record since the reopening, naming them and deviation 5; "
-              "no record of the second continuation written, the earlier ones unchanged; its first step moved the six "
-              "failure records aside byte for byte", e_wait is not None and "deviation 5" in str(e_wait)
-              and all(a in str(e_wait) for a in SIX) and not any((cap / n).exists() for n in names_of(VR.CONTINUATION_2))
+        smoke_moved = (smoke.parent / "superseded_2026-10-24" / "smoke.json")
+        check("  the verb refuses while the six arms and D6 have no record since the reopening, naming them and "
+              "deviation 5; no record of the second continuation written, the earlier ones unchanged; its first step "
+              "moved the six failure records and D6's smoke of 2026-10-21 aside byte for byte", e_wait is not None
+              and "deviation 5" in str(e_wait) and all(a in str(e_wait) for a in SIX + ("D6",))
+              and not any((cap / n).exists() for n in names_of(VR.CONTINUATION_2))
               and all((cap / n).read_bytes() == b for n, b in before.items())
-              and moved == sorted("score_%s.json" % a for a in SIX), (e_wait, moved))
-        for name in ("D4F", "D4N", "D4R15", "D8S", "D8M"):
+              and moved == sorted("score_%s.json" % a for a in SIX) and not smoke.exists()
+              and smoke_moved.is_file() and F._sha(smoke_moved) == smoke_sha, (e_wait, moved))
+        for name in ("D4F", "D4N", "D4R15", "D8S", "D8M", "D6"):
             for sd in F.SEEDS:
                 VT.put(name, "dev", sd, VT.SHIFT[name], arm=VR.SIDES[name][3])
-        for a in ("D4F", "D4N", "D4R15", "D8", "D1"):
+        for a in ("D4F", "D4N", "D4R15", "D8", "D1", "D6"):
             TS._write_json(SYS.score_record_path(a), {"format": SYS.FMT_SCORE_RECORD, "arm": a, "status": "complete",
                                                      "exam": "dev", "dev": []})
         e_d5b = refused(VR.verdict)
         check("  five arms rescored, D5B not: still refused, naming D5B only", e_d5b is not None
               and str(e_d5b).endswith("D5B"), e_d5b)
         (cap / VR.CONTINUATION_2["external"]).write_text('{"partial": "an attempt cut off before its verdict file"}')
+        e_old = refused(VR.verdict, ticker_failed=["score:D5B"])
+        check("  D5B named failed by the ticker while its only score jobs ran before the reopening (the list of "
+              "2026-10-22 again): refused, naming it, nothing written", e_old is not None
+              and "no job of that item since the reopening" in str(e_old) and "score:D5B" in str(e_old)
+              and not (cap / VR.CONTINUATION_2["verdict"]).exists(), e_old)
+        pv = C.INC_DIR / "_campaign" / "provenance" / "v3fam_score_d5b.json"
+        prv = json.loads(pv.read_text()) if pv.exists() else {"attempts": []}
+        prv["attempts"].append({"job_id": "5", "status": "build_failed", "started_utc": "2026-10-24T06:00:00Z",
+                                "finished_utc": "2026-10-24T06:10:00Z"})
+        pv.parent.mkdir(parents=True, exist_ok=True)
+        pv.write_text(json.dumps(prv))
+        made.append(pv)
         c2 = VR.verdict(ticker_failed=["score:D5B"])          # D5B failed twice again after the reopening
         c = c2["continues"]
         part = sorted(p.name for p in cap.glob("v3fam_v1_cont2_partial_*"))
@@ -126,10 +149,10 @@ def t_second_continuation():
               == v1["primaries"]["P1"]["decision"] and c2["primaries"]["P4"]["decision"] ==
               v1["primaries"]["P4"]["decision"] and c2["primaries"]["P2"]["status"] == "decided"
               and c2["primaries"]["P3"]["status"] == "decided", (c.get("reproduced"), want))
-        check("  P5 'not run' with D6's walltime reason (V3F.5 D6), D6 keeps its place; D5B 'failed (score:D5B failed "
-              "twice)' from the failure the ticker gave after the reopening; the rescored arms complete",
-              c2["primaries"]["P5"]["status"] == "not run" and "walltime" in str(c2["primaries"]["P5"].get("why"))
-              and c2["arms"]["D6"] == "not run (walltime)" and c2["arms"]["D5B"] == "failed (score:D5B failed twice)"
+        check("  P5 decided now (D6 scored after its smoke was taken again); D5B 'failed (score:D5B failed twice)' from "
+              "the failure the ticker gave after the reopening (a job of it since); the rescored arms complete",
+              c2["primaries"]["P5"]["status"] == "decided" and c2["arms"]["D6"] == "complete"
+              and c2["arms"]["D5B"] == "failed (score:D5B failed twice)"
               and all(c2["arms"][a] == "complete" for a in ("D8", "D4F", "D4N", "D4R15", "D1")), c2["arms"])
         e_twice = refused(VR.verdict)
         check("  written once: a second run refuses", e_twice is not None and "second continuation" in str(e_twice),

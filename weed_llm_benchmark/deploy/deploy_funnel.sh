@@ -11,8 +11,9 @@
 #   deploy/deploy_funnel.sh --no-restart
 #   deploy/deploy_funnel.sh --dry-run  list what would be copied and run the V3F deploy checks; copy nothing
 #   deploy/deploy_funnel.sh --allow-v3fam-code-change=docs/prereg/<deviation>.md
-#                                      (only with a recorded deviation that moves V3F's reproduction records
-#                                      aside and retakes them: see V3F_CODE below)
+#                                      (only with a recorded deviation, the file of one of the domain's reopen
+#                                      blocks, that moves V3F's reproduction records aside and retakes them: see
+#                                      V3F_CODE below; a deploy that restores the bytes they pin needs none)
 #
 # Why the stream ships here: tools/inc_autopilot is one package, and its replay
 # gate (executor.REPLAY_SCRIPTS) runs the stream's scenario and mutation cases,
@@ -132,9 +133,12 @@ V3F_COMMIT=55cc2d97cd2147d01644c1e193098b73aeba0a06
 # CLI-only change of inc2/v3fam.py refused twelve score jobs of six arms. Before anything is copied (and in --dry-run)
 # stream_remote.v3fam_deploy_check refuses a tree whose code is not the domain's v3fam.equivalence_code, or that would
 # ship a file the domain's v3fam block pins by sha256 (the amendment, its Revisions, each reopen block's deviation)
-# with another sha256; step 2 refuses, as for PINNED_RE, a change of those files on the cluster while it holds
-# reproduction records (stream_remote.v3fam_records_guard). --allow-v3fam-code-change=<file> passes both only when
-# <file> is a recorded deviation among ROOT_PATHS, and the deploy record names it with its sha256.
+# with another sha256; step 2 refuses, as for PINNED_RE, a change of those files on the cluster that would leave a
+# reproduction record taken by other code than the tree ships (stream_remote.v3fam_records_guard reads each record's
+# code map: a change that restores the bytes the records pin passes, as deviation 5's deploy does).
+# --allow-v3fam-code-change=<file> passes both only when <file> is the deviation file of one of the domain's reopen
+# blocks, among ROOT_PATHS and hashing as that block pins it (stream_remote.v3fam_allow_ok), and the deploy record
+# names it with its sha256.
 # The replay set envelope autonomy needs a pass for (executor.REPLAY_SCRIPTS: inc, funnel and stream,
 # with both mutation harnesses) plus the stream's end-to-end pipeline: all must pass locally before any
 # copy (docs/CONTINUOUS_LOOP.md 6.5: a failing S-case blocks the funnel's autonomy too). Since 2026-10-04 it
@@ -234,23 +238,50 @@ if grep -Eq "$PINNED_RE" /tmp/deploy_funnel_pre_$TS.txt && [ "$ALLOW_PINNED" != 
   "${LSSH[@]}" "rm -rf ~/$STAGE"
   exit 3
 fi
-# V3F_CODE: a change of a file the reproduction records pin, while the cluster holds records (listed by the
-# data-transfer node's rsync; a failed listing reads as records present)
+# V3F_CODE: a change of a file the reproduction records pin, while the cluster holds records: the records (top-level
+# *.json of v3fam/v1/equivalence) are copied through the data-transfer node into a temporary folder on the lab, and
+# each one's name, sha256 and code map read there; the change passes when every record but those a recorded
+# deviation supersedes pins the code this tree ships (a restore of the bytes they pin, as deviation 5's deploy is), or
+# with --allow-v3fam-code-change naming a reopen block's deviation; a failed fetch reads as records present
 if grep -Eq "$("$PY" -c 'from weed_optimizer_framework.tools.inc_autopilot import stream_remote as S; print(S.V3FAM_CODE_RE.pattern)')" /tmp/deploy_funnel_pre_$TS.txt; then
-  N_EQ="$("${LSSH[@]}" bash -s -- "$CLUSTER_REPO" "$CLUSTER_DATA_SSH" <<'LAB' || echo unknown
+  "${LSSH[@]}" bash -s -- "$CLUSTER_REPO" "$CLUSTER_DATA_SSH" > /tmp/deploy_funnel_eq_$TS.json <<'LAB' || echo '{"error": "the lab step failed"}' > /tmp/deploy_funnel_eq_$TS.json
 set -uo pipefail
 CL="$1"; DATA="$2"
 export SSH_ASKPASS="$HOME/.cluster_askpass.sh" SSH_ASKPASS_REQUIRE=force DISPLAY=:0
 unset SSH_AUTH_SOCK
 RSH="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 -o IdentityAgent=none -o NumberOfPasswordPrompts=1"
-if out="$(setsid -w rsync --list-only -e "$RSH" "$DATA:$CL/results/framework/inc/v3fam/v1/equivalence/" < /dev/null)"; then
-  printf '%s\n' "$out" | awk '$1 ~ /^-/ && $NF ~ /\.json$/' | wc -l | tr -d ' '
+T="$(mktemp -d)"
+if setsid -w rsync -a --include='*.json' --exclude='*' -e "$RSH" "$DATA:$CL/results/framework/inc/v3fam/v1/equivalence/" "$T/" < /dev/null; then
+  python3 - "$T" <<'PY'
+import hashlib, json, os, sys
+d, out = sys.argv[1], []
+for n in sorted(os.listdir(d)):
+    p = os.path.join(d, n)
+    if not n.endswith(".json") or not os.path.isfile(p) or os.path.islink(p):
+        continue
+    b = open(p, "rb").read()
+    try:
+        code = json.loads(b.decode("utf-8")).get("code")
+    except (ValueError, AttributeError, UnicodeDecodeError):
+        code = None
+    out.append({"name": n, "sha256": hashlib.sha256(b).hexdigest(), "code": code if isinstance(code, dict) else None})
+print(json.dumps({"records": out}))
+PY
 else
-  echo unknown
+  echo '{"error": "the fetch failed"}'
 fi
+rm -rf "$T"
 LAB
-)"
-  if ! V3F_GUARD="$("$PY" -c 'import sys; from weed_optimizer_framework.tools.inc_autopilot import stream_remote as S; ok, msg = S.v3fam_records_guard(open(sys.argv[1]).read().split(), sys.argv[2], sys.argv[3] or None, sys.argv[4:]); print(msg); sys.exit(0 if ok else 1)' /tmp/deploy_funnel_pre_$TS.txt "$N_EQ" "$ALLOW_V3F" "${ROOT_PATHS[@]}")"; then
+  if ! V3F_GUARD="$("$PY" - /tmp/deploy_funnel_pre_$TS.txt /tmp/deploy_funnel_eq_$TS.json "$GIT_ROOT" "$ALLOW_V3F" "${ROOT_PATHS[@]}" <<'PYG'
+import sys
+from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LS, stream_remote as S
+ok, msg = S.v3fam_records_guard(open(sys.argv[1]).read().split(), open(sys.argv[2]).read(), sys.argv[4] or None,
+                                sys.argv[5:], dom=LS.load_domain("weed"), git_root=sys.argv[3],
+                                package="weed_optimizer_framework")
+print(msg)
+sys.exit(0 if ok else 1)
+PYG
+)"; then
     echo "$V3F_GUARD" >&2
     "${LSSH[@]}" "rm -rf ~/$STAGE"
     exit 3

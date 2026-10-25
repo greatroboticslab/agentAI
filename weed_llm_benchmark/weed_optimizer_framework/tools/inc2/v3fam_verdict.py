@@ -107,14 +107,18 @@ checking that it reproduces every comparison the 2026-10-13 records and the
 2026-10-22 records decided (continuation_check over both: to 1e-9, the same
 outcome; every primary either family-confirmed stays so); it writes nothing
 under an earlier verdict's names, and the reads follow it. It refuses while
-any of the six arms has no record since deviation 5 reopened it (DEV5_ARMS:
-complete, not run, refused at the family cap, or failed after the reopening
-as the ticker records it); the attempts of 2026-10-21 do not count. The
-ticker's failure records of 2026-10-22 for the six arms (inc2.v3fam_supersede,
-by sha256) are moved aside before the verdict runs and are never read as
-failures. D6 with no score reports its smoke's own 'not run (walltime)'
-(V3F.5 D6, V3F.3.4) and BCLEAN 'not needed' without D0-S's trigger, never
-'missing'.
+any arm deviation 5 reopened (DEV5_REOPENED_ARMS: the six and D6, whose smoke
+is taken again with the epoch timed from its start) has no record since the
+reopening (complete, not run by a record of its own, or a failure or
+family-cap refusal the ticker names whose item ran a job since
+DEV5_REOPEN_UTC, by its provenance); the attempts of 2026-10-21 and the
+ticker's lists of 2026-10-22 do not count, a failure record written before
+the reopening is not read, and an item named whose own record is complete
+refuses the verb. The ticker's failure records of 2026-10-22 for the six arms
+and D6's smoke record of 2026-10-21 (inc2.v3fam_supersede, by sha256) are
+moved aside before the verdict runs and are never read. D6 with no score
+reports its own smoke's 'not run (walltime)' (V3F.5 D6, V3F.3.4) and BCLEAN
+'not needed' without D0-S's trigger, never 'missing'.
 
 A refusal raises inc2.v3fam.V3famRefused (V3famCapRefused at the family cap).
 """
@@ -289,6 +293,11 @@ CONTINUATION_2 = {"verdict": "v3fam_v1_cont2.json", "external": "v3fam_v1_cont2_
                   "ext": "v3fam_ext_v1_cont2.json", "report": "v3fam_v1_cont2_report"}
 DEVIATION_5 = SUP.DEVIATION_5
 DEV5_ARMS = ("D8", "D4F", "D4N", "D4R15", "D1", "D5B")      # the score arms deviation 5 reopened
+DEV5_REOPENED_ARMS = DEV5_ARMS + ("D6",)                     # and D6, whose smoke it takes again (its epoch time)
+# deviation 5's reopening (the domain's reopen block's before_utc): under the second continuation a failure or a
+# family-cap refusal of a reopened arm counts only with a job of it that started since, and a failure record only
+# when written since (the attempts of 2026-10-21 and the failure records of 2026-10-22 never end those arms again)
+DEV5_REOPEN_UTC = "2026-10-24T00:00:00Z"
 # the ticker's failure records of 2026-10-22 for those arms (inc2.v3fam_supersede moves them aside): by sha256
 DEV5_SUPERSEDED_FAILED = {"score:%s" % rel.rsplit("score_", 1)[1][:-len(".json")]: sha
                           for rel, sha in SUP.superseded_sha256s("v3fam/v1/failed/").items()}
@@ -443,20 +452,75 @@ def superseded_failure(item, path=None):
 
 
 def failure_recorded(item):
-    return failed_file(item).exists() and not superseded_failure(item)
+    """True when the ticker's failure record of item is in place and counts: never one deviation 5 supersedes (by
+    sha256); while the second continuation is due, only one written since deviation 5's reopening."""
+    p = failed_file(item)
+    if not p.exists() or superseded_failure(item, p):
+        return False
+    if second_continuation_due():
+        d = F._read_json(p)
+        return isinstance(d, dict) and str(d.get("written_utc") or "") >= DEV5_REOPEN_UTC
+    return True
+
+
+def item_jobs(item):
+    """The provenance names of a family item's jobs (run_inc2_build.sh, run_inc2_detr.sh)."""
+    item = str(item)
+    if item.startswith("score:"):
+        return ["v3fam_score_%s" % item[len("score:"):].lower()]
+    if item.startswith("build:"):
+        exp = RC.V3FAM_EXPS.get(item[len("build:"):])
+        return [exp] if exp else []
+    if item == "detr:smoke":
+        return ["v3fam_detr_smoke"]
+    if item == "detr:train":
+        return ["v3fam_detr_s%d" % s for s in F.SEEDS]
+    if item == "data":
+        return ["v3fam_data"]
+    return []
+
+
+def attempted_since(item, utc):
+    """True when a job of item holds a provenance attempt that started at or after utc (the cluster's own record
+    that it ran since)."""
+    for n in item_jobs(item):
+        rec = F._read_json(C.INC_DIR / "_campaign" / "provenance" / ("%s.json" % n))
+        for att in (rec.get("attempts") or []) if isinstance(rec, dict) else []:
+            if isinstance(att, dict) and str(att.get("started_utc") or "") >= utc:
+                return True
+    return False
+
+
+def contradicted(cap_refused=(), failed=()):
+    """The --cap-refused and --ticker-failed items the cluster's own records contradict: a score item whose arm's
+    score record is complete, and the data build while its summary is complete (a stale or wrong list would
+    otherwise end every arm scored after it: deviation 5)."""
+    from . import v3fam_data as VD
+    out = []
+    for it in sorted({str(x).strip() for x in list(cap_refused or ()) + list(failed or ()) if str(x).strip()}):
+        if it.startswith("score:") and (score_record(it[len("score:"):]) or {}).get("status") == "complete":
+            out.append("%s (its score record is complete)" % it)
+        elif it == "data" and VD.read_summary() is not None:
+            out.append("data (its summary is complete)")
+    return out
 
 
 def d6_smoke_status():
-    """D6's smoke record's status (inc2.v3fam_detr writes v3fam/v1/d6/smoke/smoke.json), or None."""
-    d = F._read_json(F.root().joinpath(*D6_SMOKE))
+    """D6's smoke record's status (inc2.v3fam_detr writes v3fam/v1/d6/smoke/smoke.json), or None. The smoke of
+    2026-10-21, superseded by sha256 (deviation 5: it took the whole one-epoch fit as the epoch time), is no smoke
+    record, even while it is still in place."""
+    p = F.root().joinpath(*D6_SMOKE)
+    if p.is_file() and SUP.is_superseded(SUP.D6_SMOKE, F._sha(p)):
+        return None
+    d = F._read_json(p)
     return d.get("status") if isinstance(d, dict) else None
 
 
 def supersede():
-    """inc2.v3fam_supersede.apply on this INC_DIR (the records a recorded deviation supersedes moved aside byte for
-    byte, each named in its folder's manifest), as the score jobs of v3fam_systems' and v3fam_trained's arms do
-    first; refused as a family refusal."""
-    return SYS.supersede()
+    """inc2.v3fam_supersede.apply on this INC_DIR for every group (the records a recorded deviation supersedes moved
+    aside byte for byte, each named in its folder's manifest), as the score jobs of v3fam_systems' and
+    v3fam_trained's arms do first for theirs and D6's smoke for its own; refused as a family refusal."""
+    return SYS.supersede(groups=SUP.GROUPS)
 
 
 def _write_once_json(path, obj):
@@ -1053,32 +1117,45 @@ def verdict_ready(trig=None, cap_refused=(), failed=()):
     failure record already written) ends the arms it ends (ending_items), as the ticker counts them: a job can fail
     before its provenance attempt is written. The data build's failure ends nothing: its summary is needed.
     Deviation 5: while the continuation of 2026-10-22 is the one in place (the second continuation is due), each
-    arm deviation 5 reopened (DEV5_ARMS) needs a record written since (complete, or a failure or family-cap record
-    the ticker gave after the reopening): the score jobs of 2026-10-21, refused by the platform's own stale
-    records, do not count as its start, and their failure records (superseded by sha256) are not read."""
+    arm deviation 5 reopened (DEV5_REOPENED_ARMS: the six score arms and D6) needs a record written since (complete,
+    not run by its own new record, or a failure or family-cap refusal the ticker names whose item ran a job since
+    the reopening, DEV5_REOPEN_UTC, by its provenance): the score jobs of 2026-10-21, refused by the platform's own
+    stale records, do not count as its start, their failure records (superseded by sha256, or written before the
+    reopening) are not read, and the lists of 2026-10-22 passed again end nothing; an item named failed or refused
+    whose own record is complete (a score, the data summary) refuses the verb (contradicted)."""
     from . import v3fam_data as VD
     trig = d0s_trigger() if trig is None else trig
     refused = {str(x).strip() for x in cap_refused or () if str(x).strip()}
     gone = set(_failed_items(failed))
     second = second_continuation_due()
     why = []
+    bad = contradicted(refused, gone) if second else []
+    if bad:
+        why.append("the ticker's lists name items the cluster's records contradict: %s" % ", ".join(bad))
     if VD.read_summary() is None and "data" not in refused and not cap_refused_item("data"):
         why.append("the family's data build has no complete %s" % VD._summary_path())
-    never, again = [], []
+    never, again, stale = [], [], []
     for a in F.SCORE_ARMS:
         st = arm_status(a)
         if st != "missing":
             continue
         if a == "BCLEAN" and not trig.get("bclean"):
             continue
-        if refused & ({"score:%s" % a, "data"} | set(SCORE_DEPS.get(a, ()))):
-            continue
-        if gone & set(ending_items(a)):
-            continue
-        if second and a in DEV5_ARMS:
-            # deviation 5: reopened after its score jobs of 2026-10-21 were refused by the platform's stale records;
-            # those attempts do not start it again: it needs a record (or the ticker's failure) since the reopening
+        cap_named = refused & ({"score:%s" % a, "data"} | set(SCORE_DEPS.get(a, ())))
+        fail_named = gone & set(ending_items(a))
+        named = cap_named | fail_named
+        if second and a in DEV5_REOPENED_ARMS:
+            # deviation 5: reopened after its score jobs of 2026-10-21 were refused by the platform's stale records
+            # (D6: its smoke taken again); those attempts do not start it again, and a failure or cap refusal the
+            # ticker names ends it only with a job of that item since the reopening (the lists of 2026-10-22 never
+            # end it again): it needs a record, or such a failure, since the reopening
+            if any(attempted_since(i, DEV5_REOPEN_UTC) for i in named):
+                continue
+            if named:
+                stale.append("%s (%s)" % (a, ", ".join(sorted(named))))
             again.append(a)
+            continue
+        if named:
             continue
         if not arm_started(a):
             never.append(a)
@@ -1086,6 +1163,9 @@ def verdict_ready(trig=None, cap_refused=(), failed=()):
         why.append("never started: %s" % ", ".join(never))
     if again:
         why.append("not scored since deviation 5 reopened them (%s): %s" % (DEVIATION_5, ", ".join(again)))
+    if stale:
+        why.append("named failed or refused with no job of that item since the reopening (%s): %s" % (
+            DEV5_REOPEN_UTC, "; ".join(stale)))
     return (not why), "; ".join(why)
 
 

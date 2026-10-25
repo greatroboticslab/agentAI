@@ -224,7 +224,7 @@ V3FAM_NOT_RUN_CAP = "not run (family cap)"
 V3FAM_PLATFORM_REFUSAL_RE = re.compile(
     r"the code changed since [^\n]{1,120}? ran|is missing or did not pass: no family score is taken without it"
     r"|no longer hash as V3F\.1 records|the E-series records changed while this family job ran"
-    r"|is never moved over another file")
+    r"|is never moved over another file|a superseded record could not be moved aside")
 V3FAM_PLATFORM_MAX = 3
 # the family jobs' provenance names (run_inc2_build.sh; L23J's v3fam_score_<arm>, L23I's its experiment)
 V3FAM_PROV = {"L23H": "v3fam_data", "L23L": "v3fam_v1"}
@@ -317,6 +317,21 @@ def _fmt4(x):
 def _short(text, n=300):
     text = str(text)
     return text if len(text) <= n else text[:n] + "..."
+
+
+def _refusal_text(text, n=900):
+    """A family job's provenance refusal, shortened for the ledger and cards without losing what classes it: the
+    log tail run_inc2_build.sh keeps (its last five lines) ends with the exception's own message, so the tail is
+    kept; a refusal of the platform's own making (V3FAM_PLATFORM_REFUSAL_RE) found anywhere in the full text stays
+    in the result (deviation 5: a head cut at 600 characters dropped the message of a 688-character traceback)."""
+    text = str(text or "")
+    if len(text) <= n:
+        return text
+    out = text[:120] + " ... " + text[-(n - 125):]
+    m = V3FAM_PLATFORM_REFUSAL_RE.search(text)
+    if m and not V3FAM_PLATFORM_REFUSAL_RE.search(out):
+        out = text[:120] + " ... " + m.group(0) + " ... " + text[-(n - 140 - len(m.group(0))):]
+    return out
 
 
 def _record_only(d):
@@ -4870,9 +4885,10 @@ class StreamRun(object):
             return False
 
     def _v3fam_reopen_blocks(self):
-        """The domain's v3fam.reopen blocks in order (one dict, or a list: deviation 4's, then deviation 5's)."""
-        ro = ((self.dom or {}).get("v3fam") or {}).get("reopen") or []
-        return [ro] if isinstance(ro, dict) else [b for b in ro if isinstance(b, dict)]
+        """The domain's reopen blocks in order: v3fam.reopen (deviation 4's, an object, kept so for a ticker of an
+        earlier deploy that still reads it during a deploy), then v3fam.reopens (deviation 5's and later, a list)."""
+        from . import stream_remote as SR
+        return SR.v3fam_reopen_blocks(self.dom)
 
     def _v3fam_reopen(self):
         """A recorded deviation's reopening (deviation 4, 2026-10-20: the data build, after its defect is fixed, and
@@ -4901,7 +4917,8 @@ class StreamRun(object):
         out = []
         for key in ro["items"]:
             rec = f["items"].get(key)
-            if not isinstance(rec, dict) or rec.get("state") not in ("failed", "done") or rec.get("reopened") == marker \
+            if not isinstance(rec, dict) or rec.get("state") not in ("failed", "done", DS.V3FAM_HELD_PLATFORM) \
+                    or rec.get("reopened") == marker \
                     or marker in [h.get("marker") for h in rec.get("reopen_history") or [] if isinstance(h, dict)]:
                 continue
             if not ro.get("before_utc") or not rec.get("started_utc") or str(rec["started_utc"]) >= ro["before_utc"]:
@@ -4996,7 +5013,8 @@ class StreamRun(object):
         else:
             train = mine("detr:train") or "missing"
             train = "running" if train == "done" else train
-        out["detr"] = {"smoke": smoke, "train": train}
+        out["detr"] = {"smoke": smoke, "train": train, "smoke_sha256": det.get("smoke_sha256"),
+                       "epoch_seconds": det.get("epoch_seconds"), "projection_h": det.get("projection_h")}
         if out["data"] == "failed":
             # the data build ended without its summary after its second failure: nothing that trains on the family's
             # manifests (the builds) or stages after it (D6) can run; recorded so for the family table, but these
@@ -5353,7 +5371,7 @@ class StreamRun(object):
             t0 = it.get("since_utc") or it.get("started_utc")
             if not t0 or str(rec.get("started_utc") or "") < str(t0):
                 return ""
-        return _short(rec.get("refusal"), 600)
+        return _refusal_text(rec.get("refusal"))
 
     def _v3fam_platform_refusal(self, ln, it, why, charged):
         """A family job refused by a precondition of the platform's own making (deviation 5,
@@ -5562,6 +5580,19 @@ class StreamRun(object):
                            str(eq.get("fingerprint"))[:16]), lever="L23J")
         elif not mark:
             f.pop("equiv_card", None)
+        # D6's smoke ended its seeds by the walltime rule: one card (deviation 5: on 2026-10-21 that outcome was
+        # recorded with no card, and its epoch time was the whole fit, setup included; it stayed unseen for days)
+        det = fs.get("detr") or {}
+        if str(det.get("smoke") or "").startswith("not run") and f.get("detr_card") != det.get("smoke_sha256"):
+            f["detr_card"] = det.get("smoke_sha256")
+            self._card("research", "V3F: D6 %s by its smoke" % det.get("smoke"),
+                       "D6's smoke (v3fam/v1/d6/smoke/smoke.json, sha256 %s) recorded %s: epoch time %s s x 50 + 0.5 h "
+                       "projects %s h against the 28.8 h rule (V3F.5 D6), so its three seeds are not proposed; D6 stays "
+                       "in C and in the dev Holm set, and P5 is reported 'not run' with this reason. The smoke records "
+                       "the epoch's own time (from the first training epoch's start to the end of fit) and the "
+                       "one-time setup before it apart (deviation 5)." % (
+                           str(det.get("smoke_sha256"))[:12], det.get("smoke"), det.get("epoch_seconds"),
+                           det.get("projection_h")), lever="L23K")
         for k, why in sorted((((by.get("DR0") or {}).get("detail") or {}).get("v3fam_waits") or {}).items()):
             if str(why).startswith("storage") and (f.setdefault("wait_cards", {})).get(k) != why:
                 f["wait_cards"][k] = why

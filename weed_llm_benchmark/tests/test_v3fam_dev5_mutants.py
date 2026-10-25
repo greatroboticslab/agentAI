@@ -42,6 +42,26 @@ scenario per run: DEV5_WORLD), tests/test_v3fam_dev5_verdict.py (the verb end to
   EM34  stream            the ticker's rerun command uses inc2.v3fam verdict                        fast
   EM36  stream_remote     the snapshot reports no record taken by other code                        world code
   EM37  stream_remote     a record a deviation supersedes reported stale                            world live
+  (round 2, 2026-10-25: the review's findings)
+  EM38  v3fam_verdict     a failure or cap refusal of a reopened arm named with no job since         fast
+  EM39  v3fam_verdict     an item named whose own record is complete (E3RS, the data) not refused    fast
+  EM40  v3fam_verdict     a failure record written before the reopening read                        fast
+  EM41  v3fam_verdict     D6 not among the reopened arms                                            fast
+  EM42  v3fam_verdict     D6's superseded smoke read as its status                                  fast
+  EM43  stream_remote     the snapshot reports D6's superseded smoke as its status                  fast
+  EM44  stream_remote     step 2 refuses a deploy that restores the bytes the records pin           fast
+  EM45  stream_remote     the allow flag takes any recorded deviation, not the newest               fast
+  EM46  stream_remote     the allow flag takes a deviation file edited after its pin                 fast
+  EM47  stream            a provenance refusal cut at 600 characters (its message lost)             fast
+  EM48  v3fam_supersede   a copy cut off leaves its partial file                                    fast
+  EM49  v3fam_supersede   the score jobs' group moves D6's smoke too (a race with D6's own job)     fast
+  EM50  v3fam_systems     an OSError while moving aside is not the platform's refusal               fast
+  EM51  stream            an item held for a person never reached by a deviation's reopening        fast
+  EM53  stream_remote     deviation 4's block (v3fam.reopen) not read                               fast
+  EM54  v3fam_detr        the smoke's projection from the whole fit                                 detr units
+  EM55  v3fam_detr        the smoke does not move the record of 2026-10-21 aside first              detr units
+  EM56  v3fam_detr        a backend's epoch clock that saw no epoch accepted                        detr units
+  EM57  stream_remote     D6's superseded smoke reported (the ticker never reruns the smoke)        world live
 
 Run:  python3 tests/test_v3fam_dev5_mutants.py [EM1 EM5 ...]
 """
@@ -63,6 +83,8 @@ VR = "weed_optimizer_framework/tools/inc2/v3fam_verdict.py"
 SUP = "weed_optimizer_framework/tools/inc2/v3fam_supersede.py"
 SYS = "weed_optimizer_framework/tools/inc2/v3fam_systems.py"
 TRN = "weed_optimizer_framework/tools/inc2/v3fam_trained.py"
+DETR = "weed_optimizer_framework/tools/inc2/v3fam_detr.py"
+DETR_UNITS = "tests/test_inc2_v3fam_detr.py?V3FAM_ONLY=units"
 FAST = "tests/test_v3fam_dev5.py"
 W_CODE = "tests/test_stream_ap_v3fam_dev5.py?DEV5_WORLD=code"
 W_LIVE = "tests/test_stream_ap_v3fam_dev5.py?DEV5_WORLD=live"
@@ -85,9 +107,9 @@ MUTANTS = {
     "EM8": (DS, 'V3FAM_HELD_PLATFORM = "held (platform)"', 'V3FAM_HELD_PLATFORM = "failed_once"', FAST),
     "EM9": (ST, '        missing = sorted(set(er.get("names") or ()) - present) if er.get("after") and sc.get(er["after"]) == '
                 '"done" \\\n            else []\n', "        missing = []\n", FAST),
-    "EM10": (VR, "        if second and a in DEV5_ARMS:\n", "        if False:\n", FAST),
-    "EM11": (VR, "    return failed_file(item).exists() and not superseded_failure(item)\n",
-             "    return failed_file(item).exists()\n", FAST),
+    "EM10": (VR, "        if second and a in DEV5_REOPENED_ARMS:\n", "        if False:\n", FAST),
+    "EM11": (VR, "    if not p.exists() or superseded_failure(item, p):\n        return False\n",
+             "    if not p.exists():\n        return False\n", FAST),
     "EM12": (VR, "    if is_first_continuation():\n        out.append(", "    if False:\n        out.append(", FAST),
     "EM13": (VR, '    return cap_path(CONTINUATION_2["verdict"]) if is_first_continuation() else '
                  'cap_path(CONTINUATION["verdict"])\n', '    return cap_path(CONTINUATION["verdict"])\n', FAST),
@@ -107,7 +129,8 @@ MUTANTS = {
     "EM23": (SRM, "        changed = sorted(k for k in V3FAM_CODE_FILES if now.get(k) != pin.get(k))\n",
              "        changed = []\n", FAST),
     "EM24": (SRM, "        elif got != sha:\n", "        elif False:\n", FAST),
-    "EM25": (SRM, "    if n == 0:\n", "    if True:\n", FAST),
+    "EM25": (SRM, "        if not other:\n            return True, (\"pass:", "        if True:\n            return True, (\"pass:",
+             FAST),
     "EM27": (DS, '                                                      for h in hits if str(h["source"]) not in qs]\n',
              "                                                      for h in hits]\n", W_D28),
     "EM28": (ST, '            if str(pr["source"]) in self._stream_quarantined():\n', "            if False:\n", FAST),
@@ -126,6 +149,35 @@ MUTANTS = {
              W_CODE),
     "EM37": (SRM, "        if superseded:\n            sup.append(p.name)\n", "        if False:\n            sup.append(p.name)\n",
              W_LIVE),
+    # round 2 (2026-10-25): the review's findings
+    "EM38": (VR, "            if any(attempted_since(i, DEV5_REOPEN_UTC) for i in named):\n", "            if named:\n",
+             FAST),
+    "EM39": (VR, "    bad = contradicted(refused, gone) if second else []\n", "    bad = []\n", FAST),
+    "EM40": (VR, '        return isinstance(d, dict) and str(d.get("written_utc") or "") >= DEV5_REOPEN_UTC\n',
+             "        return True\n", FAST),
+    "EM41": (VR, 'DEV5_REOPENED_ARMS = DEV5_ARMS + ("D6",)', "DEV5_REOPENED_ARMS = DEV5_ARMS", FAST),
+    "EM42": (VR, "    if p.is_file() and SUP.is_superseded(SUP.D6_SMOKE, F._sha(p)):\n        return None\n",
+             "    if False:\n        return None\n", FAST),
+    "EM43": (SRM, "    if sm_sup:\n        sm = None\n", "    if False:\n        sm = None\n", FAST),
+    "EM44": (SRM, "        if not other:\n            return True, (\"pass:", "        if False:\n            return True, (\"pass:",
+             FAST),
+    "EM45": (SRM, '    blk = blocks[-1] if blocks and blocks[-1].get("file") == allow else None\n',
+             '    blk = next((b for b in blocks if b.get("file") == allow), None)\n', FAST),
+    "EM46": (SRM, '    if got != blk.get("sha256"):\n', "    if False:\n", FAST),
+    "EM47": (ST, '        return _refusal_text(rec.get("refusal"))\n', '        return _short(rec.get("refusal"), 600)\n', FAST),
+    "EM48": (SUP, "        if os.path.lexists(str(tmp)):\n            os.unlink(str(tmp))",
+             "        if False:\n            os.unlink(str(tmp))", FAST),
+    "EM49": (SUP, "    return GROUP_D6 if rel == D6_SMOKE else GROUP_SCORES\n", "    return GROUP_SCORES\n", FAST),
+    "EM50": (SYS, "    except OSError as e:                     # a full disk, a lost mount: the platform's, never the arm's\n",
+             "    except ZeroDivisionError as e:\n", FAST),
+    "EM51": (ST, '("failed", "done", DS.V3FAM_HELD_PLATFORM)', '("failed", "done")', FAST),
+    "EM53": (SRM, '    for key in ("reopen", "reopens"):\n', '    for key in ("reopens",):\n', FAST),
+    "EM54": (DETR, "        secs, measure = smoke_epoch_seconds(rec, backend)\n",
+             '        secs, measure = float(rec["fit_seconds"]), "the whole fit"\n', DETR_UNITS),
+    "EM55": (DETR, "    supersede_smoke()                        # deviation 5: the smoke of 2026-10-21 moved aside first\n",
+             "    pass\n", DETR_UNITS),
+    "EM56": (DETR, '    if getattr(backend, "epoch_clock", False):\n        raise', "    if False:\n        raise", DETR_UNITS),
+    "EM57": (SRM, "    if sm_sup:\n        sm = None\n", "    if False:\n        sm = None\n", W_LIVE),
 }
 
 

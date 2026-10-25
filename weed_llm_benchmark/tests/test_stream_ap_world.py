@@ -887,8 +887,12 @@ class World(object):
             self._w("v3fam/v1/d6/s%d/train.json" % k, {"format": "inc2-v3fam-d6-train/1", "seed": k, "status": "done"})
 
     def _v3fam_deploy(self, marker):
-        ro = self.dom["v3fam"]["reopen"]
-        n = next((b["file"] for b in ([ro] if isinstance(ro, dict) else ro) if b["marker"].startswith(marker)), None)
+        fam = self.dom["v3fam"]
+        blocks = []
+        for key in ("reopen", "reopens"):           # deviation 4's object, then deviation 5's list (stream_remote)
+            ro = fam.get(key) or []
+            blocks += [ro] if isinstance(ro, dict) else list(ro)
+        n = next((b["file"] for b in blocks if b["marker"].startswith(marker)), None)
         if n is None or not (PKG_ROOT.parent / n).is_file():
             return                                # a tree without that deviation: nothing to deploy
         dst = self.dir / n

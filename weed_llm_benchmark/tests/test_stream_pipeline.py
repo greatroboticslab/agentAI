@@ -1704,9 +1704,8 @@ def stage_deploy():
     from weed_optimizer_framework.tools.inc_autopilot import levers_stream as LSM
     roots = [ln.split(": ", 1)[1] for ln in dry.stdout.splitlines() if ln.startswith("git root: ")]
     fam = LSM.load_domain("weed").get("v3fam") or {}
-    ro = fam.get("reopen") or []
     named = [f for f in [fam.get("amendment_file"), fam.get("revision_file")] + [
-        b.get("file") for b in ([ro] if isinstance(ro, dict) else ro)] if f]
+        b.get("file") for b in SRM.v3fam_reopen_blocks({"v3fam": fam})] if f]
     check("every file the weed domain's v3fam block names by sha256 (%s) is a git-root path the deploy ships"
           % ", ".join(named), len(named) == 4 and all(f in roots for f in named), (named, roots))
     # deviation 5: the deploy-time checks (the code the reproduction records pin, every pinned file's sha256)

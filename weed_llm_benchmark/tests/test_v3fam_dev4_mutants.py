@@ -86,8 +86,8 @@ MUTANTS = {
              '                if abs(float(a) - float(b)) > 1.0:\n', FAST),
     "DM14": (VR, '    if bad or lost:\n', '    if bad:\n', FAST),
     "DM15": (VR, '            names.append(RC.V3FAM_EXPS[d[len("build:"):]])\n', '            pass\n', FAST),
-    "DM16": (VR, '        if refused & ({"score:%s" % a, "data"} | set(SCORE_DEPS.get(a, ()))):\n',
-             '        if refused & {"score:%s" % a, "data"}:\n', FAST),
+    "DM16": (VR, '        cap_named = refused & ({"score:%s" % a, "data"} | set(SCORE_DEPS.get(a, ())))\n',
+             '        cap_named = refused & {"score:%s" % a, "data"}\n', FAST),
     "DM17": (ST, '            if not ro.get("before_utc") or not rec.get("started_utc") or str(rec["started_utc"]) >= '
                  'ro["before_utc"]:\n                continue\n',
              '            if False:\n                continue\n', FAST),
@@ -102,8 +102,8 @@ MUTANTS = {
     "DM22": (VR, '        continues = continuation_check(dev_doc, ext) if cont else None   # before anything is written\n',
              '        continues = dict(verdict=VERDICT, sha256=PARTIAL_VERDICT_SHA256, deviation=DEVIATION_4, '
              'reproduced=[]) if cont else None\n', FULL),
-    "DM23": (VR, '        if gone & set(ending_items(a)):\n            continue\n',
-             '        if False:\n            continue\n', FAST),
+    "DM23": (VR, '        fail_named = gone & set(ending_items(a))\n',
+             '        fail_named = set()\n', FAST),
     "DM24": (ST, '            failed = sorted(k for k, v in items.items() if v.get("state") == "failed" and k not in '
                  '("verdict", "data"))\n', '            failed = []\n', FAST),
     "DM25": (VR, '        ("score:%s" % SCORED_AFTER_ALL,) if arm != SCORED_AFTER_ALL else ())\n', '        ())\n', FAST),
