@@ -627,6 +627,7 @@ class Fam(object):
     _failed_ids = bind("_failed_ids")
     _stream_quarantined = bind("_stream_quarantined")
     _resync_quarantines = bind("_resync_quarantines")
+    _resync_lifts = bind("_resync_lifts")
     _done = bind("_done")
     _note_done = bind("_note_done")
 
