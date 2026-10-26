@@ -28,6 +28,25 @@ its file), runs the test file against the copy and requires it to fail.
   SG20  both job scripts  the job's settings copy keeps mlflow as the shared file has it
   SG21  both job scripts  the job's settings are exported whatever the check found
   SG22  run_inc2_job.sh   the block missing from one job script
+  SG23  both job scripts  an inherited job copy (a parent job's YOLO_CONFIG_DIR) read as the shared settings
+  SG24  both job scripts  the in-job advance hands the job's own copy to the next array
+  SG25  stream            a source's repeated failure counts against the lane again
+  SG26  diagnose_stream   D20 ranks a failed source first again
+  SG27  stream            a source held for a person leaves the zero-yield run (a sweep of every candidate)
+  SG28  stream            a refusal naming the machine (ImportError) read as the source's
+  SG29  stream            no_data_files closes the source on one refusal
+  SG30  stream            the same refusal on every source never holds the lane
+  SG31  stream            a person's denial of a fetch leaves its source the top candidate
+  SG32  stream            the replan takes the whole per-source room (not bounded, not by the envelope)
+  SG33  stream            a Content-Length cap below the plan read as the source's size
+  SG34  stream            'fits in X GB' compared to the plan to 1 %, not at its two decimals
+  SG35  diagnose_stream   an audit that compared no box with a baseline read as conclusive
+  SG36  diagnose_stream   an above-baseline audit of under the share is no finding
+  SG37  stream            blames before a person's lift still close the source (D21)
+  SG38  stream            a person's lift of a quarantine never reaches the ticker's record
+  SG39  diagnose_stream   D21 closes a source a person kept
+  SG40  stream            stream reopen never releases a source the stream held for a person
+  SG41  stream            over_byte_plan replanned more than once
 
 Run:  python3 tests/test_stream_ap_stalls_mutants.py [SG1 SG5 ...]
 """
@@ -60,8 +79,8 @@ MUTANTS = {
             STALLS),
     "SG8": (DSM, "        got = _audit_result(v, evs.get(e), e, ss, share)\n", "        got = None\n", STALLS),
     "SG9": (DSM, "        elif isinstance(ran.get(e), dict):\n", "        elif False:\n", STALLS),
-    "SG10": (DSM, "        conclusive = boxes > 0 and judged >= share * boxes - EPS\n", "        conclusive = True\n",
-             STALLS),
+    "SG10": (DSM, "conclusive = boxes > 0 and judged >= share * boxes - EPS and compared",
+             "conclusive = boxes > 0 and compared", STALLS),
     "SG11": (DSM, '                    if line is None or line > lifted.get(str(s0), -1):\n',
              "                    if True:\n", STALLS),
     "SG12": (ST, '        elif it.get("lever") == "L24" and src and params.get("cite") == "D31":\n',
@@ -72,16 +91,50 @@ MUTANTS = {
              "        return max(1, min(cap, int(_num(est) or default)))\n", STALLS),
     "SG15": (ST, '            ref = None if res.get("lost") else self._collector_refusal(it, res.get("rc"), '
                  'self._collect_result(res))\n', "            ref = None\n", STALLS),
-    "SG16": (ST, '        if kind == "replan" and (room <= plan or int(s.get("attempts") or 0) >= lim):\n',
-             '        if kind == "replan":\n', STALLS),
-    "SG17": (ST, '                    self._zero_yield(src, "refused")\n', "                    pass\n", STALLS),
-    "SG18": (ST, "            if bound is not None and plan and bound < 0.99 * plan:\n", "            if False:\n",
-             STALLS),
+    "SG16": (ST, "            if new is None:\n                kind = \"close\"\n",
+             "            if True:\n                kind = \"close\"\n", STALLS),
+    "SG17": (ST, '                    self._zero_yield(src, "refused", reasons={ref["code"]: 1})\n',
+             "                    pass\n", STALLS),
+    "SG18": (ST, "                if exact and cap < 0.99 * plan:\n", "                if False:\n", STALLS),
     "SG19": (ST, 'SOURCE_REFUSAL_PERSON = ("licence_unresolved",',
              'SOURCE_REFUSAL_PERSON = ("download_failed", "licence_unresolved",', STALLS),
     "SG20": ((J1, J2), 's["mlflow"] = False\n', 's["mlflow"] = s["mlflow"]\n', MLF),
     "SG21": ((J1, J2), "if why:\n    sys.exit", "if False:\n    sys.exit", MLF),
     "SG22": (J2, "# >>> mlflow-off", "# >>> (removed)", MLF),
+    "SG23": ((J1, J2), 'case "${YOLO_CONFIG_DIR:-}" in */ultralytics_cfg_*) unset YOLO_CONFIG_DIR ;; esac\n', ":\n",
+             MLF),
+    "SG24": ((J1, J2), '    (if [ -n "${UL_CALLER_SET:-}" ]; then export YOLO_CONFIG_DIR="$UL_CALLER"; else unset '
+                       'YOLO_CONFIG_DIR; fi\n', "    (:\n", MLF),
+    "SG25": (ST, '        repeat = bool(src) and ln == "DATA" and str(src) in run\n', "        repeat = False\n",
+             STALLS),
+    "SG26": (DSM, '    out.sort(key=lambda sc: (int(_num(sc[1].get("failures")) or 0), -sc[0], str(sc[1].get("id"))))\n',
+             '    out.sort(key=lambda sc: (-sc[0], str(sc[1].get("id"))))\n', STALLS),
+    "SG27": (ST, '            self._zero_yield(src, "held", reasons={ref["code"]: 1})\n', "            pass\n", STALLS),
+    "SG28": (ST, "        elif ENVIRONMENT_RE.search(detail):\n", "        elif False:\n", STALLS),
+    "SG29": (ST, '        elif action == "close" or (action is None and code in SOURCE_REFUSAL_CLOSE):\n',
+             '        elif action == "close" or code in SOURCE_REFUSAL_CLOSE + SOURCE_REFUSAL_RETRY:\n', STALLS),
+    "SG30": (ST, '        if len(last) >= REFUSAL_RUN_HOLD and len({r["code"] for r in last}) == 1:\n',
+             "        if False:\n", STALLS),
+    "SG31": (ST, '        elif it.get("lever") in DENIED_CLOSES and src and it.get("lever") not in REVIEW_LEVERS:\n',
+             "        elif False:\n", STALLS),
+    "SG32": (ST, "        got = min(want, room) if left is None else min(want, room, left)\n", "        got = room\n",
+             STALLS),
+    "SG33": (ST, 'BYTE_CAP_FORMS = ((re.compile(r"(\\d+) bytes listed, over the (\\d+)-byte cap"), 1, 2),\n'
+                 '                  (re.compile(r"Content-Length (\\d+) over the (\\d+)-byte cap"), 1, 2),\n',
+             'BYTE_CAP_FORMS = ((re.compile(r"(\\d+) bytes listed, over the (\\d+)-byte cap"), 1, 2),\n', STALLS),
+    "SG34": (ST, '                if not exact and cap < float("%.2f" % (plan / 1e9)) * 1e9 - 1:\n',
+             "                if not exact and cap < 0.99 * plan:\n", STALLS),
+    "SG35": (DSM, " and compared >= share * judged - EPS\n", "\n", STALLS),
+    "SG36": (DSM, '        above = sp.get("above_baseline") is True and compared > 0\n', "        above = False\n",
+             STALLS),
+    "SG37": (ST, '            st["sources"].setdefault(src, {})["blames"] = int(n if counted is None else counted.get(src) '
+                 'or 0)\n', '            st["sources"].setdefault(src, {})["blames"] = int(n)\n', STALLS),
+    "SG38": (ST, "        self._resync_lifts()\n        return out\n", "        return out\n", STALLS),
+    "SG39": (DSM, '        if int(r.get("blames") or 0) >= blames and not r.get("blame_kept_by"):\n',
+             '        if int(r.get("blames") or 0) >= blames:\n', STALLS),
+    "SG40": (ST, '            if s and s.get("status") == "held" and s.get("held_by") == "stream" and rec.get("utc") \\\n',
+             '            if False and s.get("held_by") == "stream" and rec.get("utc") \\\n', STALLS),
+    "SG41": (ST, '            if _num(s.get("byte_plan")):\n', "            if False:\n", STALLS),
 }
 
 

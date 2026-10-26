@@ -16,14 +16,25 @@ the lab's records (tests/fixtures/platform_stalls/).
   pairs   the same guard for DHOLD -> L17 scan-holds, DCMP -> LC, D23 -> L19 and D25 -> L21 (unit level).
   lift    a source quarantined on D31's word and lifted by a person (inc2.stream unquarantine): no L24 again; a
           person's denial of D31's L24 likewise.
-  units   _audit_result's readings, the byte plan, the collector refusal's classes.
+  units   _audit_result's readings (a judged share compared with no baseline is no finding; an above-baseline
+          partial audit is), the byte plan and its bounded replan, the collector refusal's classes (every
+          over_byte_plan form, a detail naming the machine).
   palmer  the 2026-10-07 sequence: the top-ranked lab source refused over_byte_plan twice (the collector's result as
-          the lab recorded it): planned again once at the per-source cap, then closed with its reason; lane DATA
-          neither failed nor held; the next candidate proposed on the next tick.
-  systemic two download failures still hold lane DATA (the stop-loss for a systemic failure stands).
+          the lab recorded it): planned again once at a bounded larger plan (1 GB), then closed with its reason;
+          lane DATA neither failed nor held; the next candidate proposed on the next tick.
+  systemic a download failure on two different sources in a row still holds lane DATA; the failed source is ranked
+          after the next one (not proposed again first).
+  deadlink one source failing describe_failed on every attempt (a dead link): its repeats count against the source,
+          closed after its 3 attempts; lane DATA never held.
+  sweep   sources the collector holds for a person (archive_unreadable) hold lane DATA after 3 (S20), never sweep
+          every candidate; a refusal naming the machine (ImportError) is the lane's failure; no_data_files on 3
+          sources in a row holds the lane (the same code: the machine's or the config's).
+  denied  a filed fetch a person denies closes its source: the next source is proposed, no declined id recalled, no
+          stall.
+  envelope a replan bounded by the collect envelope (never filed for a person); one the envelope cannot fit closes
+          the source with that reason.
   release the lab's DATA state of 2026-10-26 (held since 2026-10-07): a person's release (stream release) frees the
-          lane; gh_geezacoleman__palmer_detection is proposed under a new id (its third attempt), and refused again
-          it is closed with its reason while the lane takes the next source.
+          lane; the next source (weedai_0935d5a0) comes first, palmer (2 failed attempts) after it.
 
 Run:  python3 tests/test_stream_ap_stalls.py          (STALLS=l4,palmer runs only those)
 """
@@ -177,6 +188,7 @@ def t_judged():
     for s in ("inc0001", "inc0003", "inc0004"):
         sp = aud["audits"][s]["species"]
         sp.update(boxes_judged=1364, above_baseline=(s == "inc0003"), conflict=200, conflict_rate=0.147)
+        sp["baseline_for_mix"]["boxes"] = 1364
     write_audit(w, exp, json.dumps(aud).encode())
     n0 = len(w.ledger())
     w.tick(6)
@@ -191,13 +203,14 @@ def t_judged():
     aud2 = json.loads(AUDIT_BYTES)
     for s in ("inc0001", "inc0003", "inc0004"):
         aud2["audits"][s]["species"].update(boxes_judged=1300, above_baseline=False)
+        aud2["audits"][s]["species"]["baseline_for_mix"]["boxes"] = 1300
     write_audit(w, exp, json.dumps(aud2).encode())
     st = w.state()
     st["refreeze"][exp]["state"] = "pending"     # taken again, as a re-audit would be
     state_write(w, st)
     w.tick(3)
     res = (((diag(w, "D31").get("detail") or {}).get("audits") or {}).get(exp)) or {}
-    check("judged on 1,300 of 1,364 boxes and not above: labels not the cause, nothing called for",
+    check("judged and compared on 1,300 of 1,364 boxes, not above: labels not the cause, nothing called for",
           res.get("verdict") == "not_labels" and not (set(diag(w, "D31").get("levers") or []) & {"L4", "X3"}),
           (res.get("verdict"), diag(w, "D31").get("levers")))
 
@@ -318,14 +331,17 @@ def t_lift():
     w.queue(0, extra={"quarantined_sources": {"src_q": {"cite": "D31", "seq": q[-1]["seq"], "utc": q[-1]["utc"]}}}
             if q else None)
     w.tick(2)
+    st = w.state()
+    st["sources"]["src_q"]["admitted_batches"] = ["src_q_b1"]     # what the source gave before its quarantine
+    state_write(w, st)
     w.stream_event("unquarantine", source="src_q", by=OWNER)
     w.queue(0, extra={"quarantined_sources": {}})
-    st = w.state()
-    st["sources"]["src_q"]["status"] = "admitted"       # a person's lift: the source collectable again
-    state_write(w, st)
     n0 = len(w.ledger())
     w.tick(14)
     led = led_since(w, n0)
+    check("the ticker reads the person's lift from the stream's ledger: src_q admitted again (one "
+          "source_lift_resynced)", w.state()["sources"]["src_q"].get("status") == "admitted"
+          and len([e for e in led if e.get("event") == "source_lift_resynced"]) == 1, w.state()["sources"].get("src_q"))
     l24 = [e for e in led if e.get("lever") == "L24" and e.get("event") in ("proposed", "executed", "recovered",
                                                                            "not_taken")]
     d31 = diag(w, "D31")
@@ -334,27 +350,21 @@ def t_lift():
           and "src_q" in ((d31.get("detail") or {}).get("lifted") or {})
           and not [x for x in (d31.get("detail") or {}).get("propose") or [] if x.get("lever") == "L24"],
           ([(e.get("event"), e.get("lever")) for e in l24], d31.get("summary")))
-    # two blames committed after the lift count again: D31 calls for L24 on src_q; the ticker's own record of the
-    # source still says quarantined (a person's lift changes the stream's ledger only), so nothing runs and nothing
-    # stalls, and the id would be a new one (the lift starts a new attempt)
+    # two blames committed after the lift count again: D31 calls for L24 on src_q, and it is quarantined again
+    # under a new id (the lift starts a new attempt); no stall
     e2 = w.segment(2, [("J3", "REJECT", 0.0, [], "neutral", ["src_q"]), ("J4", "REJECT", 0.0, [], "neutral",
                                                                                   ["src_q"])])
     w._commit(e2)
     n1 = len(w.ledger())
     w.tick(6)
-    d31 = diag(w, "D31")
-    run = W_run(w)
-    run._build_evidence()
-    st = run.st
-    st["sources"]["src_q"]["status"] = "admitted"
-    p = run._proposal("L24", {"lever": "L24", "source": "src_q", "cite": "D31"}, "D31", {"cites": []})
-    first = [e for e in w.ledger() if e.get("lever") == "L24" and e.get("event") == "proposed"]
-    check("two blames committed after the lift: D31 calls for L24 on src_q again; no stall; rendered (were the "
-          "ticker's record lifted too) under a new id", any(x.get("lever") == "L24" and x.get("source") == "src_q"
-                                                           for x in (d31.get("detail") or {}).get("propose") or [])
-          and not [e for e in led_since(w, n1) if e.get("event") == "lane_stalled"]
-          and p is not None and first and p["id"] != first[0]["proposal_id"],
-          (d31.get("summary"), p and p["id"], [e.get("proposal_id") for e in first]))
+    led1 = led_since(w, n1)
+    props = [e for e in w.ledger() if e.get("lever") == "L24" and e.get("event") == "proposed"]
+    q2 = [e for e in w.stream_ledger() if e.get("event") == "quarantine" and e.get("source") == "src_q"]
+    check("two blames committed after the lift: L24 on src_q proposed again under a new id and run (a second "
+          "quarantine in the stream's ledger); no stall", len(props) == 2 and props[1]["proposal_id"]
+          != props[0]["proposal_id"] and len(q2) == 2
+          and not [e for e in led1 if e.get("event") == "lane_stalled"],
+          ([e.get("proposal_id") for e in props], len(q2), diag(w, "D31").get("summary")))
     # a denial (shadow mode: L24 filed for a person, denied) keeps the source
     run = W_run(w)
     run._build_evidence()
@@ -392,13 +402,53 @@ def t_units():
     a2 = copy.deepcopy(aud)
     a2["audits"]["inc0001"]["species"].update(boxes_judged=681, above_baseline=True)
     r = DS._audit_result(None, FakeEv({"x/audit/label_audit.json": a2}), "x", ["inc0001"], 0.5)[0]
-    check("681 of 1,364 judged (under half): not judged, its above_baseline not read", r["verdict"] == "not_judged", r)
+    check("681 of 1,364 judged, none compared with a baseline, above_baseline true as written: not judged (an "
+          "above_baseline that compared nothing is no finding)", r["verdict"] == "not_judged", r)
     a2["audits"]["inc0001"]["species"].update(boxes_judged=682)
+    a2["audits"]["inc0001"]["species"]["baseline_for_mix"]["boxes"] = 682
     r = DS._audit_result(None, FakeEv({"x/audit/label_audit.json": a2}), "x", ["inc0001"], 0.5)[0]
-    check("682 of 1,364 judged and above: labels", r["verdict"] == "labels" and r["labels"] == ["inc0001"], r)
+    check("682 of 1,364 judged and compared, above: labels", r["verdict"] == "labels" and r["labels"] == ["inc0001"],
+          r)
+    a3 = copy.deepcopy(aud)
+    a3["audits"]["inc0001"]["species"].update(boxes_judged=1300, conflict=900, above_baseline=False)
+    a3["audits"]["inc0001"]["species"]["baseline_for_mix"].update(boxes=0, species_without_baseline={"Waterhemp": 1300})
+    a3["audits"]["inc0001"]["no_embedding_reasons"] = {}
+    r = DS._audit_result(None, FakeEv({"x/audit/label_audit.json": a3}), "x", ["inc0001"], 0.5)[0]
+    said = DS._audit_said("x", r)
+    check("1,300 of 1,364 judged, 900 conflicts, 0 compared with a baseline: not judged (never 'labels are not the "
+          "cause'), the species without a baseline named, no crops explanation", r["verdict"] == "not_judged"
+          and "not the cause" not in said and "Waterhemp 1300" in said and "Step 1's crops" not in said, (r, said))
+    a3["audits"]["inc0001"]["species"]["baseline_for_mix"]["boxes"] = 649
+    r = DS._audit_result(None, FakeEv({"x/audit/label_audit.json": a3}), "x", ["inc0001"], 0.5)[0]
+    check("1,300 judged, 649 compared (under half of the judged): not judged", r["verdict"] == "not_judged", r)
+    a3["audits"]["inc0001"]["species"]["baseline_for_mix"]["boxes"] = 650
+    r = DS._audit_result(None, FakeEv({"x/audit/label_audit.json": a3}), "x", ["inc0001"], 0.5)[0]
+    check("1,300 judged, 650 compared, not above: labels not the cause", r["verdict"] == "not_labels", r)
+    a4 = copy.deepcopy(aud)
+    a4["audits"]["inc0001"]["species"].update(boxes_judged=545, above_baseline=True)
+    a4["audits"]["inc0001"]["species"]["baseline_for_mix"]["boxes"] = 545
+    r = DS._audit_result(None, FakeEv({"x/audit/label_audit.json": a4}), "x", ["inc0001"], 0.5)[0]
+    said = DS._audit_said("x", r)
+    check("545 of 1,364 judged (under half) and above its baseline on them: a finding (labels, X3), named partial",
+          r["verdict"] == "labels" and r["labels"] == ["inc0001"] and "under the share" in said, (r, said))
+    check("the live audit's summary keeps its crops explanation (image_not_in_crops)",
+          "Step 1's crops" in DS._audit_said("x", got[0]))
     pilot = FakeEv({"audit/x_audit.json": a2})
     check("the pilot's root audit is read too", DS._audit_result(None, pilot, "x", ["inc0001"], 0.5)[0]["artifact"]
           == "audit/x_audit.json")
+    class FV(object):
+        def __init__(self, sources):
+            self.th, self.src = W.LS.load_thresholds(), sources
+
+        def c(self, ptr):
+            return {"/sources": self.src}.get(ptr)
+
+        def ccite(self, ptr):
+            return {"pointer": ptr}
+    d21 = DS.d21(FV({"kept": {"status": "admitted", "blames": 3, "blame_kept_by": OWNER},
+                     "blamed": {"status": "admitted", "blames": 2}}))
+    check("D21 closes a source blamed twice, never one a person kept (blame_kept_by)",
+          [c["source"] for c in (d21.get("detail") or {}).get("close") or []] == ["blamed"], d21)
     w = W.World("stl_units")
     w.tick()
     run = W_run(w)
@@ -419,12 +469,69 @@ def t_units():
         run._collector_refusal(it, 2, {"status": st_, "code": c, "action": a, "risk": r_}) is None for st_, c, a, r_ in (
             ("refused", "download_failed", "refuse", None), ("refused", "listing_failed", "refuse", None),
             ("held", "credentials_missing", "hold", "R3"), ("held", "byte_envelope", "hold", "R3"))))
-    check("never_train (close), no_data_files: close; licence_unresolved: a person", (
-        run._collector_refusal(it, 2, {"status": "closed", "code": "never_train", "action": "close"}) or {}).get(
+    check("never_train (close): close; no_data_files (the collector refuses, never closes): retry; licence_unresolved "
+          "and over_source_cap: a person", (
+              run._collector_refusal(it, 2, {"status": "closed", "code": "never_train", "action": "close"}) or {}).get(
         "kind") == "close" and (run._collector_refusal(it, 2, {"status": "refused", "code": "no_data_files",
-                                                              "action": "refuse"}) or {}).get("kind") == "close"
+                                                              "action": "refuse"}) or {}).get("kind") == "retry"
         and (run._collector_refusal(it, 2, {"status": "held", "code": "licence_unresolved", "action": "hold",
+                                            "risk": "R3"}) or {}).get("kind") == "person"
+        and (run._collector_refusal(it, 2, {"status": "held", "code": "over_source_cap", "action": "hold",
                                             "risk": "R3"}) or {}).get("kind") == "person")
+    check("a cluster job's refusal line (no action): never_train closes, no_data_files retries",
+          (run._collector_refusal(it, 2, {"code": "never_train", "detail": "x"}) or {}).get("kind") == "close"
+          and (run._collector_refusal(it, 2, {"code": "no_data_files", "detail": "x"}) or {}).get("kind") == "retry")
+    env = [run._collector_refusal(it, 2, {"status": "held", "code": c, "action": "hold", "risk": "R3", "detail": d})
+           for c, d in (("normalise_failed", "ImportError: No module named 'pyarrow'"),
+                        ("archive_unreadable", "an archive of a does not read ([Errno 28] No space left on device)"))]
+    check("a refusal whose detail names the machine (a missing module, a full disk): the lane's failure",
+          env == [None, None], env)
+    G = 10 ** 9
+    it30 = {"lever": "L16L", "proposal": {"params": {"source": "a", "max_bytes": 30 * G}}}
+    forms = {"streaming": "x.zip: more than the %d-byte cap",
+             "content_length": "x.zip: Content-Length 40000000000 over the %d-byte cap",
+             "content_range": "x.zip: Content-Range total 40000000000 over the %d-byte cap",
+             "listed": "x.zip: 40000000000 bytes listed, over the %d-byte cap",
+             "ftp": "ftp://h/x.zip: more than %d bytes"}
+    below = {k: run._collector_refusal(it30, 2, {"status": "held", "code": "over_byte_plan", "action": "hold",
+                                                 "detail": f % (12 * G)}) for k, f in forms.items()}
+    check("every over_byte_plan form with the collector's cap (12 GB) below the plan (30 GB): the lane's failure",
+          all(v is None for v in below.values()), below)
+    at = {k: (run._collector_refusal(it30, 2, {"status": "held", "code": "over_byte_plan", "action": "hold",
+                                               "detail": f % (30 * G)}) or {}) for k, f in forms.items()}
+    check("every form at the plan: replan; the stated size read where the provider gave one",
+          all(v.get("kind") == "replan" for v in at.values()) and at["content_length"].get("size") == 40 * G
+          and at["listed"].get("size") == 40 * G and at["streaming"].get("size") is None, at)
+    fits = {}
+    for plan, x in ((64145408, "0.06"), (64145408, "0.05"), (400000000, "0.40"), (1320000000, "1.32"),
+                    (1320000000, "1.20")):
+        itp = {"lever": "L16L", "proposal": {"params": {"source": "a", "max_bytes": plan}}}
+        fits[(plan, x)] = (run._collector_refusal(itp, 2, {"status": "held", "code": "over_byte_plan", "action": "hold",
+                                                           "detail": "no selected file fits in %s GB (the caps; a "
+                                                                     "person may approve more)" % x}) or {}).get("kind")
+    check("'no selected file fits in X GB' read at its two decimals: the plan's X replans (0.06 for 64,145,408 bytes, "
+          "0.40, 1.32), a smaller X is another cap", fits == {(64145408, "0.06"): "replan", (64145408, "0.05"): None,
+                                                               (400000000, "0.40"): "replan",
+                                                               (1320000000, "1.32"): "replan",
+                                                               (1320000000, "1.20"): None}, fits)
+    check("the bounded replan: 64,145,408 bytes, no stated size -> 1 GB; a stated 84,379,800 bytes -> 1 GB; a "
+          "30 GB plan -> the 50 GB the per-source limit leaves",
+          run._replan_bytes("a", 64145408, None) == (G, None) and run._replan_bytes("a", 64145408, 84379800)
+          == (G, None) and run._replan_bytes("a", 30 * G, None) == (CAP, None),
+          (run._replan_bytes("a", 64145408, None), run._replan_bytes("a", 30 * G, None)))
+    check("a stated size the per-source limit cannot fit (60 GB, plan 30 GB): no replan",
+          run._replan_bytes("a", 30 * G, 60 * G)[0] is None, run._replan_bytes("a", 30 * G, 60 * G))
+    w.set_config(collect_gb_envelope=0.5)
+    run = W_run(w)
+    run.st.setdefault("sources", {})
+    check("a collect envelope of 0.5 GB bounds the replan (0.5 GB, never filed); of 0.1 GB, no replan, the envelope "
+          "named", run._replan_bytes("a", 64145408, None) == (int(0.5 * G), None), run._replan_bytes("a", 64145408,
+                                                                                                    None))
+    w.set_config(collect_gb_envelope=0.1)
+    run = W_run(w)
+    rp = run._replan_bytes("a", 64145408, None)
+    check("  (0.1 GB)", rp[0] is None and "collect envelope" in str(rp[1]), rp)
+    w.set_config(collect_gb_envelope=None)
     check("a crash (rc 1), a sync or an admit: the lane's failure", run._collector_refusal(it, 1, res10) is None
           and run._collector_refusal(dict(it, lever="L16S"), 2, res10) is None
           and run._collector_refusal(dict(it, lever="L17"), 2, res10) is None)
@@ -491,10 +598,10 @@ def t_palmer():
     jobs = palmer_jobs(w)
     st = w.state()
     check("refused over_byte_plan (the lab's result of 2026-10-07 byte for byte): not a failure (lane fails 0, no "
-          "step failure, not held), planned again at the 50 GB the per-source limit leaves, under a new id",
-          st["lanes"]["DATA"].get("fails") == 0 and not st["lanes"]["DATA"].get("hold")
+          "step failure, not held), planned again at a bounded 1 GB (never the whole 50 GB per-source room), under a "
+          "new id", st["lanes"]["DATA"].get("fails") == 0 and not st["lanes"]["DATA"].get("hold")
           and not [k for k in st.get("step_failures") or {} if k.startswith("L16")]
-          and len(jobs) == 2 and plan_of(jobs[1]) == CAP and jobs[1]["job"] != jobs[0]["job"]
+          and len(jobs) == 2 and plan_of(jobs[1]) == 10 ** 9 and jobs[1]["job"] != jobs[0]["job"]
           and any(e.get("event") == "source_replanned" for e in led_since(w, n0)),
           (st["lanes"]["DATA"], [(j["job"], plan_of(j)) for j in jobs]))
     if len(jobs) < 2:
@@ -505,37 +612,193 @@ def t_palmer():
     st = w.state()
     led = led_since(w, n1)
     src = st["sources"].get(PALMER) or {}
-    check("refused again at the cap: palmer closed with its reason (how a person may approve more)",
+    check("refused again at 1 GB: palmer closed with its reason (planned once already; how a person may approve more)",
           src.get("status") == "closed" and "over_byte_plan" in str(src.get("closed_reason"))
+          and "planned once already" in str(src.get("closed_reason"))
           and "approved_bytes" in str(src.get("closed_reason")), src)
-    check("lane DATA neither failed nor held; palmer in the zero-yield run (one source, under the 3-source fuse)",
-          st["lanes"]["DATA"].get("fails") == 0 and not st["lanes"]["DATA"].get("hold")
-          and [r.get("source") for r in st.get("zero_run") or []] == [PALMER], (st["lanes"]["DATA"], st.get("zero_run")))
+    check("lane DATA neither failed nor held; palmer in the zero-yield run with its code (one source, under the "
+          "3-source fuse)", st["lanes"]["DATA"].get("fails") == 0 and not st["lanes"]["DATA"].get("hold")
+          and [(r.get("source"), r.get("reasons")) for r in st.get("zero_run") or []]
+          == [(PALMER, {"over_byte_plan": 1})], (st["lanes"]["DATA"], st.get("zero_run")))
     nxt = [e for e in led if e.get("event") == "proposed" and e.get("lane") == "DATA"]
     check("the next candidate (%s) is proposed" % NEXT, any(NEXT in " ".join(e.get("argv") or []) for e in nxt),
           [(e.get("lever"), e.get("argv")) for e in nxt])
     check("no stop-loss card, no lane_held", not [e for e in w.ledger() if e.get("event") == "lane_held"])
 
 
+def lab_world(tag, ids, **kw):
+    """Lab-fetched GitHub candidates `ids`, ranked in that order."""
+    w = W.World(tag, **kw)
+    w.ready_r0()
+    w.queue(0)
+    w.placement({"hf": "pass", "ftp": "fail"})
+    w.candidates([{"id": s, "provider": "github", "licence": "MIT", "target_classes": ["PalmerAmaranth"],
+                   "bytes": 64145408, "expected_target_boxes": 500 - k} for k, s in enumerate(ids)])
+    return w
+
+
+def jobs_of(w, src):
+    return [x for x in w.runner.launched if "fetch" in x["argv"] and src in x["argv"]]
+
+
+def lab_refuse(w, launched, code, detail, action="refuse", status="refused", risk=None):
+    """A lab fetch refused by the collector (rc 2, its closing JSON in the tail)."""
+    doc = {"action": action, "code": code, "detail": detail, "error": "%s: %s" % (code, detail),
+           "failures": [{"action": action, "code": code, "detail": detail}], "format": "collect-result/1",
+           "risk": risk, "status": status, "utc": W.utc(w.t[0]), "verb": "fetch"}
+    w.runner.results[launched["job"]] = {"ok": False, "rc": 2, "seconds": 3.0,
+                                         "stderr_tail": "[collect] fetch refused: %s: %s\n" % (code, detail),
+                                         "tail": "[collect] fetch: %s\n" % json.dumps(doc, sort_keys=True)}
+
+
+def run_until(w, src, n, code, detail, ticks=4, **kw):
+    """Refuses the next lab fetch of `src` (its n-th launch) and ticks; False when it was never launched."""
+    jobs = jobs_of(w, src)
+    if len(jobs) < n:
+        return False
+    lab_refuse(w, jobs[n - 1], code, detail, **kw)
+    w.tick(ticks)
+    return True
+
+
 def t_systemic():
-    print("systemic: two download failures still hold lane DATA")
-    w = data_world("stl_systemic")
+    print("systemic: a download failure on two different sources in a row still holds lane DATA")
+    A, B = "gh_sys_a", "gh_sys_b"
+    w = lab_world("stl_systemic", [A, B])
     w.tick(3)
-    for k in range(2):
-        jobs = palmer_jobs(w)
-        if len(jobs) <= k:
-            check("attempt %d launched" % (k + 1), False, [j["job"] for j in jobs])
-            return
-        res = {"ok": False, "rc": 2, "seconds": 3.0,
-               "stderr_tail": "[collect] fetch refused: download_failed: github: HTTP 502\n",
-               "tail": '[collect] fetch: {"action": "refuse", "code": "download_failed", "detail": "github: HTTP 502", '
-                       '"status": "refused", "format": "collect-result/1", "verb": "fetch"}\n'}
-        w.runner.results[jobs[k]["job"]] = res
-        w.tick(3)
+    ok = run_until(w, A, 1, "download_failed", "github: HTTP 502")
     st = w.state()
-    check("download_failed twice: lane DATA held by its stop-loss (2 consecutive failed steps)",
+    check("A failed once: lane fails 1, A a candidate with 1 failure, and B (not A again) is fetched next",
+          ok and st["lanes"]["DATA"].get("fails") == 1 and st["sources"][A].get("failures") == 1
+          and len(jobs_of(w, A)) == 1 and len(jobs_of(w, B)) == 1, (st["lanes"]["DATA"], st["sources"].get(A),
+                                                                     [x["job"] for x in w.runner.launched]))
+    run_until(w, B, 1, "download_failed", "github: HTTP 502")
+    st = w.state()
+    check("B failed too: lane DATA held by its stop-loss (2 consecutive failed steps on two sources)",
           str(st["lanes"]["DATA"].get("hold") or "").startswith("stop-loss: 2 consecutive failed steps")
-          and st["sources"][PALMER].get("failures") == 2, (st["lanes"]["DATA"], st["sources"].get(PALMER)))
+          and st["sources"][A].get("failures") == 1 and st["sources"][B].get("failures") == 1,
+          (st["lanes"]["DATA"], st["sources"].get(A), st["sources"].get(B)))
+
+
+def t_deadlink():
+    print("deadlink: one source failing on every attempt never holds lane DATA; it is closed after its 3")
+    D = "gh_dead"
+    w = lab_world("stl_deadlink", [D])
+    w.tick(3)
+    for k in range(1, 4):
+        if not run_until(w, D, k, "describe_failed", "github: 404 Not Found"):
+            check("attempt %d launched" % k, False, [x["job"] for x in w.runner.launched])
+            return
+    st = w.state()
+    led = w.ledger()
+    rep = [e for e in led if e.get("event") == "failed" and e.get("source_repeat") == D]
+    check("three attempts under three ids, each describe_failed: the 2nd and 3rd counted against the source only "
+          "(source_repeat), lane fails 1, never held", len({j["job"] for j in jobs_of(w, D)}) == 3 and len(rep) == 2
+          and st["lanes"]["DATA"].get("fails") == 1 and not st["lanes"]["DATA"].get("hold")
+          and not [e for e in led if e.get("event") == "lane_held"], (st["lanes"]["DATA"], len(rep)))
+    check("the source closed after its 3 failed attempts, in the zero-yield run", st["sources"][D].get("status")
+          == "closed" and [r.get("source") for r in st.get("zero_run") or []] == [D], st["sources"].get(D))
+
+
+def t_sweep():
+    print("sweep: refusals held for a person stop after 3 sources; the machine's refusal is the lane's failure")
+    ids = ["gh_sw_%d" % k for k in range(5)]
+    w = lab_world("stl_sweep", ids)
+    w.tick(3)
+    for k, s in enumerate(ids[:3]):
+        if not run_until(w, s, 1, "archive_unreadable", "an archive of %s does not read (BadZipFile)" % s,
+                         action="hold", status="held", risk="R3"):
+            check("%s launched" % s, False, [x["job"] for x in w.runner.launched])
+            return
+    st = w.state()
+    led = w.ledger()
+    check("3 sources held for a person (one card each), then lane DATA held (S20); the other 2 never fetched",
+          [st["sources"][s].get("status") for s in ids[:3]] == ["held"] * 3
+          and str(st["lanes"]["DATA"].get("hold") or "").startswith("stop-loss: 3 consecutive sources")
+          and not jobs_of(w, ids[3]) and not jobs_of(w, ids[4])
+          and len([e for e in led if e.get("event") == "card" and "held for a person" in str(e.get("title"))]) == 3,
+          (st["lanes"]["DATA"].get("hold"), [st["sources"].get(s) for s in ids]))
+    check("the S20 card names each source's refusal code", any(
+        e.get("event") == "card" and "zero-yield" in str(e.get("title")) and "archive_unreadable 1" in str(e.get(
+            "detail")) for e in led))
+    # a person reviews one: stream reopen --source releases the stream's hold
+    S.configure_stream(NAME, OWNER, cfg_hooks=w.hooks, lab_repo=str(w.lab), reopen_source=ids[0],
+                       reopen_why="test: the archive reads now", clock=w.clock)
+    w.tick(1)
+    check("stream reopen releases a source the stream held for a person", w.state()["sources"][ids[0]].get("status")
+          == "candidate", w.state()["sources"].get(ids[0]))
+    # the machine's refusal (a missing module): the lane's failure
+    w2 = lab_world("stl_sweep_env", ["gh_env_a", "gh_env_b"])
+    w2.tick(3)
+    run_until(w2, "gh_env_a", 1, "normalise_failed", "ImportError: No module named 'pyarrow'", action="hold",
+              status="held", risk="R3")
+    st = w2.state()
+    check("normalise_failed naming a missing module: the lane's failure (fails 1), the source not held for a person",
+          st["lanes"]["DATA"].get("fails") == 1 and st["sources"]["gh_env_a"].get("status") != "held"
+          and st["sources"]["gh_env_a"].get("failures") == 1, (st["lanes"]["DATA"], st["sources"].get("gh_env_a")))
+    # one code on every source (no_data_files: the collector refuses, never closes): held after 3
+    ids3 = ["gh_nd_%d" % k for k in range(4)]
+    w3 = lab_world("stl_sweep_nd", ids3)
+    w3.tick(3)
+    for s in ids3[:3]:
+        run_until(w3, s, 1, "no_data_files", "no file of the 3 listed matches the selection")
+    st = w3.state()
+    check("no_data_files on 3 sources in a row: each a candidate with 1 failure (not closed on one refusal), lane "
+          "DATA held (the same code: the machine's or the config's), the 4th never fetched",
+          [st["sources"][s].get("status") for s in ids3[:3]] == ["candidate"] * 3
+          and [st["sources"][s].get("failures") for s in ids3[:3]] == [1, 1, 1]
+          and "3 sources in a row refused no_data_files" in str(st["lanes"]["DATA"].get("hold"))
+          and not jobs_of(w3, ids3[3]) and int(st["lanes"]["DATA"].get("fails") or 0) == 0,
+          (st["lanes"]["DATA"], [st["sources"].get(s) for s in ids3]))
+
+
+def t_denied():
+    print("denied: a filed fetch a person denies closes its source; the next source is proposed, no stall")
+    A, B = "gh_den_a", "gh_den_b"
+    w = lab_world("stl_denied", [A, B], floors=(None, None))
+    w.tick(2)
+    it = w.lane("DATA").get("item") or {}
+    check("set-up: A's lab fetch filed for a person", it.get("status") == "filed" and A in " ".join(
+        (it.get("proposal") or {}).get("argv") or []), (it.get("lever"), it.get("status")))
+    W.AP.decide(w.domain, it.get("approval_id"), "deny", OWNER, "test: a person denies the fetch", w.clock(),
+                root=str(w.lab))
+    n0 = len(w.ledger())
+    w.tick(16)
+    led = led_since(w, n0)
+    st = w.state()
+    it2 = w.lane("DATA").get("item") or {}
+    check("A closed on the person's denial (closed_by), B's fetch filed next; no declined id recalled, no stall",
+          st["sources"][A].get("status") == "closed" and st["sources"][A].get("closed_by") == OWNER
+          and B in " ".join((it2.get("proposal") or {}).get("argv") or [])
+          and not [e for e in led if "declined earlier" in str(e.get("reasons"))]
+          and not [e for e in led if e.get("event") == "lane_stalled"],
+          (st["sources"].get(A), it2.get("lever"), [e.get("event") for e in led if "stall" in str(e.get("event"))]))
+
+
+def t_envelope():
+    print("envelope: a replan bounded by the collect envelope is never filed; one it cannot fit closes the source")
+    for env, want in ((0.5, "replan"), (0.1, "close")):
+        w = data_world("stl_env_%s" % str(env).replace(".", ""))
+        w.set_config(collect_gb_envelope=env)
+        w.tick(3)
+        jobs = palmer_jobs(w)
+        if not jobs:
+            check("palmer launched (envelope %g GB)" % env, False, [x["job"] for x in w.runner.launched])
+            continue
+        refuse(w, jobs[0], plan_of(jobs[0]))
+        w.tick(3)
+        st = w.state()
+        jobs = palmer_jobs(w)
+        filed = [e for e in w.ledger() if e.get("event") == "filed" and e.get("lever") == "L16L"]   # palmer's
+        src = st["sources"].get(PALMER) or {}
+        if want == "replan":
+            check("envelope 0.5 GB: replanned at 0.5 GB and run, never filed for a person",
+                  len(jobs) == 2 and plan_of(jobs[1]) == 500000000 and not filed, ([plan_of(j) for j in jobs], filed))
+        else:
+            check("envelope 0.1 GB: no replan the envelope can fit; palmer closed with the envelope named, the lane "
+                  "free and nothing filed", len(jobs) == 1 and src.get("status") == "closed"
+                  and "collect envelope" in str(src.get("closed_reason")) and not filed
+                  and not st["lanes"]["DATA"].get("hold"), (src, filed))
 
 
 def t_release():
@@ -556,37 +819,25 @@ def t_release():
     w.tick(3)
     led = led_since(w, n0)
     st = w.state()
-    jobs = palmer_jobs(w)
     check("the release frees lane DATA (lane_released, fails 0, its step failures cleared)",
           out.get("held_lanes", {}).get("DATA") and any(e.get("event") == "lane_released" and e.get("lane") == "DATA"
                                                         for e in led)
           and not st["lanes"]["DATA"].get("hold") and not [k for k, v in (st.get("step_failures") or {}).items()
                                                            if (v or {}).get("lane") == "DATA"], st["lanes"]["DATA"])
-    check("palmer proposed under a new id at its estimate (its third attempt)", jobs and plan_of(jobs[-1])
-          == 64145408 and st["sources"][PALMER].get("attempts") == 3
+    prop = [e for e in led if e.get("event") == "proposed" and e.get("lane") == "DATA"]
+    check("the next source (%s, a dataset) is proposed first; palmer (2 failed attempts) waits behind it as a "
+          "candidate, never proposed under an old id" % NEXT, prop and any(NEXT in " ".join(e.get("argv") or [])
+                                                                           for e in prop)
+          and not [e for e in prop if PALMER in " ".join(e.get("argv") or [])] and not palmer_jobs(w) and (st["sources"].get(PALMER) or {}).get("status") == "candidate"
           and not [e for e in led if e.get("proposal_id") == LIVE_DATA["step_failures"]["L16L:01d67f6e8755"][
-              "proposal_id"]], ([(j["job"], plan_of(j)) for j in jobs], st["sources"].get(PALMER)))
-    if not jobs:
-        return
-    refuse(w, jobs[-1], plan_of(jobs[-1]))
-    n1 = len(w.ledger())
-    w.tick(3)
-    st = w.state()
-    led = led_since(w, n1)
-    check("refused again (its zip is 84,379,800 bytes): its attempts used up, palmer is closed with its reason; lane "
-          "DATA neither failed nor held, and the next candidate (%s) is proposed" % NEXT,
-          (st["sources"].get(PALMER) or {}).get("status") == "closed"
-          and "approved_bytes" in str((st["sources"].get(PALMER) or {}).get("closed_reason"))
-          and not st["lanes"]["DATA"].get("hold") and int(st["lanes"]["DATA"].get("fails") or 0) == 0
-          and any(NEXT in " ".join(e.get("argv") or []) for e in led if e.get("event") == "proposed"),
-          (st["sources"].get(PALMER), st["lanes"]["DATA"].get("hold"),
-           [(e.get("event"), e.get("lever")) for e in led][-8:]))
+              "proposal_id"]], ([(e.get("lever"), e.get("argv")) for e in prop], st["sources"].get(PALMER)))
 
 
 def main():
     want = [x for x in os.environ.get("STALLS", "").split(",") if x]
     try:
-        for fn in (t_units, t_l4, t_judged, t_done, t_pairs, t_lift, t_palmer, t_systemic, t_release):
+        for fn in (t_units, t_l4, t_judged, t_done, t_pairs, t_lift, t_palmer, t_systemic, t_deadlink, t_sweep,
+                   t_denied, t_envelope, t_release):
             if want and fn.__name__[2:] not in want:
                 continue
             try:

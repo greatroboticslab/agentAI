@@ -89,6 +89,14 @@ conda activate bench || { echo "FATAL: conda activate bench failed" >&2; exit 1;
 # only "mlflow" set false: YOLO_CONFIG_DIR is exported only after Ultralytics, imported under it, reads every other
 # key equal to the shared file's, rewrites nothing and registers no MLflow hook. Otherwise the job runs as before,
 # MLflow on, with a WARNING. The shared settings.json, datasets_dir and runs/mlflow are never touched.
+# A chained array inherits this job's environment (the in-job advance submits it from inside the job, and
+# inc.driver.submission_env keeps every variable but SLURM_*/SBATCH_*). A YOLO_CONFIG_DIR that is a job's own
+# copy (ultralytics_cfg_*, on node-local disk that ends with that job) is never read as the shared settings:
+# Ultralytics would fall back to a fresh default config (another datasets_dir, MLflow on). The caller's own
+# value is kept (UL_CALLER) and the advance below hands it, never the job's copy, to the next array.
+case "${YOLO_CONFIG_DIR:-}" in */ultralytics_cfg_*) unset YOLO_CONFIG_DIR ;; esac
+UL_CALLER_SET="${YOLO_CONFIG_DIR+1}"
+UL_CALLER="${YOLO_CONFIG_DIR:-}"
 UL_SHARED="${YOLO_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}}/Ultralytics"
 UL_JOB="${LOCAL:-${TMPDIR:-/tmp}}/ultralytics_cfg_${SLURM_JOB_ID:-$$}${SLURM_ARRAY_TASK_ID:+_$SLURM_ARRAY_TASK_ID}"
 if mkdir -p "$UL_JOB/Ultralytics" 2>/dev/null && python - "$UL_SHARED" "$UL_JOB/Ultralytics" <<'PYEOF'
@@ -201,7 +209,9 @@ rc=$?
 echo "=== executor exit $rc after $(( $(date +%s) - t0 ))s  $(date) ==="
 
 advance() {
-    python -u -m weed_optimizer_framework.tools.inc.driver advance --exp "$EXP" --quiet \
+    # the next array takes the caller's YOLO_CONFIG_DIR (or none), never this job's settings copy (mlflow-off)
+    (if [ -n "${UL_CALLER_SET:-}" ]; then export YOLO_CONFIG_DIR="$UL_CALLER"; else unset YOLO_CONFIG_DIR; fi
+     python -u -m weed_optimizer_framework.tools.inc.driver advance --exp "$EXP" --quiet) \
         || echo "WARNING: driver advance --exp $EXP failed (ignored; the next advance collects this run)" >&2
 }
 
