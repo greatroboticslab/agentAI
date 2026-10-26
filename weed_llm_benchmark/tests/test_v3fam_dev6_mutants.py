@@ -33,6 +33,18 @@ text (which must occur exactly once in its file), runs the test against the copy
   FM25  weed.json         the block reopens score:D5B too
   FM26  deploy_funnel     the deviation's file not shipped
   FM27  run_inc2_build    the job's module list without inc2/v3fam_loader.py
+  FM28  stream            E3's ground-truth and frame refusals counted as the arm's failure
+  FM29  stream            a deterministic refusal not held for a person (released and proposed again)
+  FM30  stream            the release ignores the person hold
+  FM31  stream            a later reopen block leaves the person hold in place
+  FM32  v3fam_loader      an identity whose observer check refuses is left in place (blocks D1 for good)
+  FM33  v3fam_loader      an identity created since the reopening without its note refused, not moved aside
+  FM34  v3fam_loader      the pre-flight record read back although the code it pins changed
+  FM35  v3fam_loader      a kept pass taken against another pre-flight record kept
+  FM36  v3fam_loader      D1's score record without the caveat on plain ood23 numbers
+  FM37  stream_remote     a head that does not descend from the deployed head passes
+  FM38  deploy_funnel     the descent check's refusal does not stop the deploy
+  FM39  diagnose_stream   the planner's wait says a person-held item comes back with the records
 
 Run:  python3 tests/test_v3fam_dev6_mutants.py [FM1 FM5 ...]
 """
@@ -54,6 +66,8 @@ VR = "weed_optimizer_framework/tools/inc2/v3fam_verdict.py"
 ST = "weed_optimizer_framework/tools/inc_autopilot/stream.py"
 WJ = "weed_optimizer_framework/tools/inc_autopilot/stream_domains/weed.json"
 DF = "deploy/deploy_funnel.sh"
+SRM = "weed_optimizer_framework/tools/inc_autopilot/stream_remote.py"
+DSM = "weed_optimizer_framework/tools/inc_autopilot/diagnose_stream.py"
 RB = "run_inc2_build.sh"
 FAST = "tests/test_v3fam_dev6.py"
 MUTANTS = {
@@ -74,7 +88,7 @@ MUTANTS = {
     "FM11": (LDR, "        out[key] = min(1.0, bh / float(h), bw / float(w))\n", "        out[key] = 1.0\n", FAST),
     "FM12": (LDR, '        if e.get("manifest_sha256") != (C.sha256_file(mp) if mp.is_file() else None):\n',
              "        if False:\n", FAST),
-    "FM13": (LDR, "    elif changed:\n", "    elif False:\n", FAST),
+    "FM13": (LDR, "    if p.exists() and changed and not _noted(exam, p):\n", "    if False:\n", FAST),
     "FM14": (TRN, "                            with LD.deciding(exam) as obs:   # deviation 6: ood22 and ood23 only\n",
              '                            with LD.deciding("dev") as obs:\n', FAST),
     "FM15": (TRN, '                            LD.check_kept(TS._read_json(F.root() / got["file"]), exam, shapes, what)\n',
@@ -88,7 +102,8 @@ MUTANTS = {
     "FM20": (VR, "    return DEV6_REOPEN_UTC if str(item) in DEV6_ITEMS else DEV5_REOPEN_UTC\n",
              "    return DEV5_REOPEN_UTC\n", FAST),
     "FM21": (VR, 'DEV6_REOPEN_UTC = "2026-10-25T17:00:00Z"', 'DEV6_REOPEN_UTC = "2026-10-25T15:00:00Z"', FAST),
-    "FM22": (ST, '    r"|deviation 6\'s loader check refuses")', '    r"|deviation 6\'s loader check refuses, never")', FAST),
+    "FM22": (ST, '    r"|deviation 6\'s loader check refuses|" + V3FAM_E3_FRAME)\n',
+             '    r"|deviation 6\'s loader check refuses, never|" + V3FAM_E3_FRAME)\n', FAST),
     "FM23": (ST, '        if V3FAM_LOADER_REFUSAL in str(why or ""):\n', "        if False:\n", FAST),
     "FM24": (WJ, '"before_utc": "2026-10-25T17:00:00Z",', '"before_utc": "2026-10-25T16:00:00Z",', FAST),
     "FM25": (WJ, '     "score:D1"\n    ],\n    "before_utc": "2026-10-25T17:00:00Z"',
@@ -97,6 +112,22 @@ MUTANTS = {
              "            docs/prereg/V3F_dev5_2026-10-24.md)", FAST),
     "FM27": (RB, "tools/inc2/v3fam_supersede.py tools/inc2/v3fam_loader.py\n",
              "tools/inc2/v3fam_supersede.py\n", FAST),
+    "FM28": (ST, '    r"|deviation 6\'s loader check refuses|" + V3FAM_E3_FRAME)\n',
+             '    r"|deviation 6\'s loader check refuses")\n', FAST),
+    "FM29": (ST, '        person = bool(V3FAM_PERSON_REFUSAL_RE.search(str(why or "")))\n', "        person = False\n", FAST),
+    "FM30": (ST, 'V3FAM_PLATFORM_MAX and not rec.get("held_for_person"):\n', "V3FAM_PLATFORM_MAX:\n", FAST),
+    "FM31": (ST, '            rec.pop("held_for_person", None)\n', "            pass\n", FAST),
+    "FM32": (LDR, "            if p.exists():\n                _move_unchecked(p, \"taken under deviation 6's loader fix and "
+                  "refused", "            if False:\n                _move_unchecked(p, \"taken under deviation 6's loader "
+                  "fix and refused", FAST),
+    "FM33": (LDR, "or made < DEV6_SINCE:\n", "or True:\n", FAST),
+    "FM34": (LDR, '    if code.pop("v3fam_loader", None) != here or code != F.code_shas():\n', "    if False:\n", FAST),
+    "FM35": (LDR, '        if lf.get("record_sha256") != F._sha(record_path()):\n', "        if False:\n", FAST),
+    "FM36": (LDR, '            "note": UNFIXED_NOTE}\n', "            }\n", FAST),
+    "FM37": (SRM, "    if anc != 0:\n", "    if False:\n", FAST),
+    "FM38": (DF, '    echo "refused: $DESCENDS; nothing was copied" >&2\n    exit 3\n',
+             '    echo "refused: $DESCENDS; nothing was copied" >&2\n', FAST),
+    "FM39": (DSM, '            if "score:%s" % arm in (fs.get("held_person") or ()):\n', "            if False:\n", FAST),
 }
 
 

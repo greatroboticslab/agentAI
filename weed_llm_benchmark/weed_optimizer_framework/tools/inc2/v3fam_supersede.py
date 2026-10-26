@@ -39,6 +39,12 @@ tagged 6 or 8 (inc2.v3fam_loader); its family identity pass and its plain locked
 with difference 0), and identity mode never runs E3's geometry check, so it does not cover the path under the loader
 fix. It goes (group "scores"), and D1's job takes it again under the fix (inc2.v3fam_loader.identity).
 
+Deviation 6 also moves aside, by its own sha256 (move_unchecked, called by inc2.v3fam_loader.identity), an ood23
+identity record D1's job took under the loader fix whose observer check refused it or never completed (the job cut
+off between the record and its note): it is never read (no note names it), so it goes into
+equivalence/superseded_dev6_unchecked/ under its name with its sha256's first 16 hex digits, recorded in that
+folder's MANIFEST.json as apply() records its moves, and D1's job takes the identity again.
+
 Each entry belongs to a group: "scores" (the score jobs move these: GROUP_SCORES) and "d6" (D6's smoke job moves its
 own record: GROUP_D6). The score jobs (MAINT) and D6's smoke (TRAIN) may run at the same time, so each moves only its
 own group; the verdict's job, which runs after every arm, moves both.
@@ -78,6 +84,7 @@ _WHY_OOD23 = ("taken 2026-10-25T15:31:06Z by D1's score job 49820090 while Ultra
               "width and height for JPEG only), so both of its scores letterboxed those photos at 0.8 or 0.9 of the "
               "scale ratio_pad records; identity mode never runs E3's geometry check, which refused D1's first ood23 "
               "pass (WY_2, 0.109094); D1's job takes it again under deviation 6's loader fix (inc2.v3fam_loader)")
+FOLDER_6_UNCHECKED = "superseded_dev6_unchecked"   # move_unchecked: records taken under the loader fix, unchecked
 GROUP_SCORES = "scores"
 GROUP_D6 = "d6"
 GROUPS = (GROUP_SCORES, GROUP_D6)
@@ -257,6 +264,41 @@ def apply(inc, repo=None, job=None, log=None, groups=GROUPS):
         if log:
             log("superseded (%s): %s -> %s (sha256 %s)" % (dev, rel, dst.relative_to(inc), sha[:12]))
     return {"moved": moved, "status": status(inc)}
+
+
+def move_unchecked(inc, rel, why, repo=None, job=None, log=None, deviation=DEVIATION_6, folder=FOLDER_6_UNCHECKED):
+    """Deviation 6 (module docstring): the record at rel (under INC_DIR), whatever its sha256 but never an entry's
+    record (apply() moves those), moved aside byte for byte as apply() moves one: into folder beside it, named
+    <stem>.<its sha256's first 16 hex digits><suffix>, so each such record is its own file, recorded in the folder's
+    MANIFEST.json. Refuses (SupersedeRefused) before touching it when the destination holds other bytes. Returns the
+    destination's path under inc."""
+    inc = Path(inc)
+    src = inc / rel
+    if src.is_symlink() or not src.is_file():
+        raise SupersedeRefused("%s is not a file: nothing is moved" % src)
+    sha = _sha(src)
+    if is_superseded(rel, sha):
+        raise SupersedeRefused("%s (sha256 %s) is the record a recorded deviation supersedes: apply() moves it"
+                               % (src, sha[:12]))
+    dst = src.parent / folder / ("%s.%s%s" % (src.stem, sha[:16], src.suffix))
+    if dst.is_symlink() or (dst.exists() and _sha_or_none(dst) != sha):
+        raise SupersedeRefused("%s exists: the record %s is never moved over another file" % (dst, src))
+    if not dst.exists():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        _link_or_copy(src, dst)
+        if _sha(dst) != sha:
+            os.unlink(str(dst))
+            raise SupersedeRefused("%s does not hash as %s after the link: nothing is moved" % (dst, src))
+    devp = (Path(repo) / deviation) if repo else None
+    _write_manifest(dst.parent, {"name": dst.name, "from": rel, "to": str(dst.relative_to(inc)), "sha256": sha,
+                                 "bytes": dst.stat().st_size, "moved_utc": _utc(),
+                                 "job": job if job is not None else (os.environ.get("SLURM_JOB_ID") or None),
+                                 "host": socket.gethostname(), "why": why, "deviation": deviation,
+                                 "deviation_sha256": _sha_or_none(devp) if devp else None})
+    os.unlink(str(src))
+    if log:
+        log("moved aside (%s): %s -> %s (sha256 %s)" % (deviation, rel, dst.relative_to(inc), sha[:12]))
+    return str(dst.relative_to(inc))
 
 
 def main(argv=None):

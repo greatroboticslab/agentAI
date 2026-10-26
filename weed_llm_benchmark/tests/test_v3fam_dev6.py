@@ -18,8 +18,10 @@ dataloader (no model, no scoring pass), so tests/test_v3fam_dev6_mutants.py runs
   written once; a fix that changes nothing refuses, writing nothing; a changed manifest refuses the record;
 - D1's score job: every pass on ood22 and ood23 under the fix and checked against the record before it is committed
   (each carries loader_shape_fix), dev without it; ood23's identity taken under the fix and noted, an identity without
-  its note refused; a pass whose label cache never called exif_size refused; a kept ood23 pass without the note refused;
-  the fix never left installed;
+  its note refused unless created since deviation 6's reopening (then moved aside and retaken); an identity whose
+  observer check refuses moved aside before the refusal; a pass whose label cache never called exif_size refused; a
+  kept ood23 pass without the note, or taken against another pre-flight record, refused; the record refused once the
+  code it pins changed; D1's score record carrying the caveat on plain ood23 numbers; the fix never left installed;
 - the record superseded: identity_ood23.json (3c297647..., the cluster's bytes) moved aside byte for byte into
   equivalence/superseded_2026-10-25/ with a manifest naming deviation 6; identity_ood22.json left; reported superseded,
   never stale, while in place;
@@ -29,9 +31,13 @@ dataloader (no model, no scoring pass), so tests/test_v3fam_dev6_mutants.py runs
   DEV6_REOPEN_UTC equals the domain block's before_utc;
 - the ticker: on its live items of 2026-10-25 the block reopens score:D1 once and nothing else, its spend kept
   (1.0684 + 0.0928 GPU-h), its ids retired; L23L then waits for D1 and L23J D1 is proposed; never without the file;
-- a refusal of the loader check is the platform's (held, not counted); E3's own geometry refusal still the arm's;
+- a refusal of the loader check, or of E3's ground-truth and frame checks (the geometry refusal of 2026-10-25 among
+  them), is the platform's and deterministic: held for a person at the first refusal, never counted, never released
+  by the records' state, proposed again only by a later deviation's reopen block; an E3 refusal resting on the arm's
+  own boxes stays the arm's;
 - the deploy: the deviation's file shipped and pinned by sha256, kept byte for byte in docs/CONTINUOUS_LOOP.md; the code
-  the records pin unchanged (inc2/v3fam.py 3d776dae...); the job script lists the new module.
+  the records pin unchanged (inc2/v3fam.py 3d776dae...); the job script lists the new module; a deploy whose head does
+  not descend from the deployed head refused before anything is copied.
 
 Run:  python3 tests/test_v3fam_dev6.py
 """
@@ -334,6 +340,20 @@ def t_preflight():
     mp.write_bytes(keep)
     check("  a manifest changed since: the record is refused (the loader check's refusal)", e is not None
           and REFUSAL6 in str(e) and "ood22's manifest changed" in str(e), e)
+    rb = LD.record_path().read_bytes()
+    alt = json.loads(rb)
+    alt["code"]["v3fam_loader"] = "0" * 64
+    LD.record_path().write_text(json.dumps(alt))
+    e_code = refused_by(LD.require_record)
+    alt["code"] = dict(rec["code"], twostage="0" * 64)
+    LD.record_path().write_text(json.dumps(alt))
+    e_code2 = refused_by(LD.require_record)
+    LD.record_path().write_bytes(rb)
+    check("  the record pins the code that took it: refused once inc2/v3fam_loader.py, or a file inc2.v3fam.code_shas "
+          "names, is other than the record's; read back once they are", e_code is not None and REFUSAL6 in str(e_code)
+          and "taken by other code" in str(e_code) and e_code2 is not None and "taken by other code" in str(e_code2)
+          and refused_by(LD.require_record) is None and (rec.get("code") or {}).get("v3fam_loader")
+          == sha(pathlib.Path(LD.__file__).resolve()), (str(e_code)[:200], str(e_code2)[:200]))
     os.rename(str(LD.record_path()), str(LD.record_path()) + ".kept")
     real = LD.fixed_size
     LD.fixed_size = lambda orig, img: tuple(orig(img))
@@ -390,7 +410,7 @@ def t_score_d1():
         saved.setdefault((mod, name), getattr(mod, name))
         setattr(mod, name, val)
     log = {"passes": [], "commits": [], "identity_builds": {}}
-    mode = {"skip_build": None}
+    mode = {"skip_build": None, "identity_builds": 2, "created": None}
 
     def fake_pass(weights, exam, cfg, arm, **kw):
         log["passes"].append((exam, cfg.get("mode"), bool(getattr(ul_exif_size(), "_v3fam_dev6", False))))
@@ -402,9 +422,10 @@ def t_score_d1():
         p = F.equiv_dir() / ("identity_%s.json" % exam)
         if not p.exists():
             log["identity_builds"][exam] = bool(getattr(ul_exif_size(), "_v3fam_dev6", False))
-            emulate_build(exam)
-            emulate_build(exam)
-            F.write_once(p, {"format": F.FMT_EQUIV, "item": "identity", "status": "passed", "exam": exam})
+            for _ in range(mode["identity_builds"]):
+                emulate_build(exam)
+            F.write_once(p, {"format": F.FMT_EQUIV, "item": "identity", "status": "passed", "exam": exam,
+                             "created_utc": mode["created"] or F._utc()})
         return {}
 
     def fake_commit(arm, dirname, seed, exam, ps, cfg, names, classifier=None, extra=None, **k):
@@ -454,12 +475,49 @@ def t_score_d1():
         check("  D1's score record names the deviation, the record and the changed counts; the fix is not left "
               "installed", ((rec or {}).get("extra") or {}).get("loader_shape_fix", {}).get("changed")
               == {"ood22": 0, "ood23": 2} and not getattr(ul_exif_size(), "_v3fam_dev6", False), rec)
+        lsf = ((rec or {}).get("extra") or {}).get("loader_shape_fix") or {}
+        check("  and carries the caveat on plain ood23 numbers (b0_v1's 0.1861 / 0.1236 taken without the fix) with the "
+              "record's count of images the letterbox shrank without it", "b0_v1" in str(lsf.get("note"))
+              and "0.1861" in str(lsf.get("note")) and "0.1236" in str(lsf.get("note"))
+              and lsf.get("unfixed_shrunk") == {"ood22": 0, "ood23": 2}, lsf)
         # an identity record in place without its note, on an exam the fix changes
         os.unlink(str(F.exif_dir() / "loader_identity_ood23.json"))
+        p23 = F.equiv_dir() / "identity_ood23.json"
+        old_rec = p23.read_bytes()
+        p23.write_text(json.dumps(dict(json.loads(old_rec), created_utc="2026-10-25T15:31:06.816709Z")))
         e = refused_by(VTR.score_d1, reported=False)
-        check("an ood23 identity record in place that its note does not name: refused (the loader check's refusal)",
-              e is not None and REFUSAL6 in str(e) and "was not taken under the loader fix" in str(e), e)
-        os.unlink(str(F.equiv_dir() / "identity_ood23.json"))
+        check("an ood23 identity record in place that its note does not name, created before deviation 6's reopening: "
+              "refused (the loader check's refusal), left in place", e is not None and REFUSAL6 in str(e)
+              and "was not taken under the loader fix" in str(e) and p23.is_file(), e)
+        os.unlink(str(p23))
+        # deviation 6's identity order: a record taken under the fix whose observer check refuses is moved aside
+        ud = F.equiv_dir() / "superseded_dev6_unchecked"
+        mode["identity_builds"] = 1
+        e_id = refused_by(VTR.score_d1, reported=False)
+        mode["identity_builds"] = 2
+        moved = sorted(ud.glob("identity_ood23.*.json")) if ud.is_dir() else []
+        mf = F._read_json(ud / "MANIFEST.json") or {}
+        check("an identity whose observer check refuses (one build, not two): the refusal is the loader check's, the "
+              "record it wrote is moved aside byte for byte into equivalence/superseded_dev6_unchecked/ (named by its "
+              "sha256, in the folder's manifest), nothing left in place, no note", e_id is not None
+              and REFUSAL6 in str(e_id) and "identity reproduction" in str(e_id) and not p23.exists()
+              and len(moved) == 1 and moved[0].name == "identity_ood23.%s.json" % sha(moved[0])[:16]
+              and ((mf.get("entries") or {}).get(moved[0].name) or {}).get("sha256") == sha(moved[0])
+              and not (F.exif_dir() / "loader_identity_ood23.json").exists(), (str(e_id)[:200], moved))
+        # a job cut off between the record and its note: created since the reopening, no note
+        mode["created"] = "2026-10-25T18:00:00.000001Z"
+        SYS.require_or_make_identity("ood23", "D1", {})
+        mode["created"] = None
+        cut = sha(p23)
+        rec_cut = VTR.score_d1(reported=False)
+        note = F._read_json(F.exif_dir() / "loader_identity_ood23.json") or {}
+        moved = sorted(ud.glob("identity_ood23.*.json"))
+        check("an identity created since deviation 6's reopening with no note (cut off before it): moved aside the same "
+              "way, taken again under the fix and noted; the job completes", rec_cut is not None
+              and (ud / ("identity_ood23.%s.json" % cut[:16])).is_file() and len(moved) == 2
+              and sha(p23) != cut and note.get("identity_sha256") == sha(p23), (cut[:12], moved, note))
+        os.unlink(str(F.exif_dir() / "loader_identity_ood23.json"))
+        os.unlink(str(p23))
         mode["skip_build"] = "ood23"
         log["passes"].clear()
         e2 = refused_by(VTR.score_d1, reported=False)
@@ -474,6 +532,17 @@ def t_score_d1():
         kept.clear()
         check("a kept ood23 pass committed without the loader fix: refused", e3 is not None and REFUSAL6 in str(e3)
               and "committed without the loader fix" in str(e3), e3)
+        doc.write_text(json.dumps({"format": F.FMT_SCORE, "exam": "ood23", "loader_shape_fix": {
+            "deviation": DEV6_FILE, "record_sha256": "0" * 64}}))
+        kept[("D1A1", 0, "ood23")] = {"file": "arms/D1A1/s0/ood23.json", "sha256": "k", "status": "kept"}
+        e4 = refused_by(VTR.score_d1, reported=False)
+        doc.write_text(json.dumps({"format": F.FMT_SCORE, "exam": "ood23", "loader_shape_fix": {
+            "deviation": DEV6_FILE, "record_sha256": sha(LD.record_path())}}))
+        e5 = refused_by(VTR.score_d1, reported=False)
+        kept.clear()
+        check("a kept ood23 pass taken against another pre-flight record: refused; one taken against the record in "
+              "place: kept", e4 is not None and REFUSAL6 in str(e4) and "another pre-flight record" in str(e4)
+              and e5 is None, (e4, e5))
         check("  after each refusal the fix is not left installed", not getattr(ul_exif_size(), "_v3fam_dev6", False))
     finally:
         for (mod, name), val in saved.items():
@@ -648,23 +717,67 @@ def t_reopen():
 
 
 def t_refusal():
-    print("a refusal of the loader check is the platform's")
+    print("a refusal of the loader check, or of E3's ground-truth and frame checks, is the platform's: held for a person")
     tb = ('  File "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework/tools/inc2/'
           'v3fam_trained.py", line 455, in score_d1\n    x["loader_shape_fix"] = obs.check(...)\n'
           'weed_optimizer_framework.tools.inc2.v3fam.V3famRefused: %s: D1 A1 seed 0 on ood23: it saw 0 of the exam\'s '
           '1784 images' % REFUSAL6)
     geo = json.loads((FIX / "provenance_v3fam_score_d1.json").read_text())["attempts"][-1]["refusal"]
+    arm_own = ("job(s) 7 ended FAILED; refused: weed_optimizer_framework.tools.inc2.v3fam.V3famRefused: E3's path "
+               "refuses: the two-stage pass recorded no stage-1 boxes for exam image ood23__x")
     rx = S.V3FAM_PLATFORM_REFUSAL_RE
-    check("the loader check's refusal is a precondition of the platform's own making; E3's geometry refusal of "
-          "2026-10-25 (the arm's pass) is not", rx.search(tb) is not None and rx.search(geo) is None, tb[-120:])
-    f = D5.Fam(VT.TMP / "refusal6", {"v3fam": {"items": {"score:D1": D5.running("D1")}}, "declined": []},
-               ticker_arts())
+    px = getattr(S, "V3FAM_PERSON_REFUSAL_RE", None)
+    check("the loader check's refusal and E3's ground-truth geometry refusal of 2026-10-25 (the cluster's provenance) "
+          "are preconditions of the platform's own making, both deterministic (held for a person); an E3 refusal that "
+          "rests on the arm's boxes is neither", rx.search(tb) is not None and GT_GEOMETRY in geo
+          and rx.search(geo) is not None and px is not None and px.search(tb) is not None
+          and px.search(geo) is not None and rx.search(arm_own) is None and px.search(arm_own) is None, geo[-160:])
+    dep = ("docs/prereg/V3F_dev4_2026-10-20.md", D5.DEV5_FILE, DEV6_FILE)
+
+    def d1_job():
+        # D1's score job after deviation 6's deploy (started after the block's before_utc: never reopened by it)
+        return dict(D5.running("D1"), started_utc="2026-10-26T00:10:00Z", reopened=DEV6_MARKER)
+    f = D5.Fam(VT.TMP / "refusal6", {"v3fam": {"items": {"score:D1": d1_job()}}, "declined": []},
+               ticker_arts(), deploy=dep)
     f._v3fam_failed("MAINT", D5.item("D1", "r1"), "job(s) 5 ended FAILED; refused: %s" % tb, True)
     r = f.st["v3fam"]["items"]["score:D1"]
     card = f.cards[-1] if f.cards else {}
-    check("  held, no fails counted, one card naming the loader check (not the reproduction records' remedy)",
-          r["state"] == DS.V3FAM_HELD_PLATFORM and not r.get("fails") and "loader_shapes.json" in card.get("detail", "")
-          and "restore the code they pin" not in card.get("detail", ""), (r.get("state"), card))
+    check("  the loader check: held for a person at the first refusal, no fails counted, one card naming the loader "
+          "check (not the reproduction records' remedy)", r["state"] == DS.V3FAM_HELD_PLATFORM and not r.get("fails")
+          and r.get("held_for_person") is True and "held for a person" in card.get("title", "")
+          and "loader_shapes.json" in card.get("detail", "") and "restore the code they pin" not in card.get("detail", "")
+          and len(f.cards) == 1, (r.get("state"), card))
+    fs = f._v3fam_stage(D5.BUILT)
+    plan, waits = DS.v3fam_plan(FAM, fs)
+    p23l, _c = f._v3fam_params("L23L", {}, "inc2", {})
+    check("  never released although the snapshot reports the records current: the stage names it held for a person, "
+          "no L23J D1 is proposed, the planner's wait says why, L23L's argv names no D1 failure",
+          (fs.get("score") or {}).get("D1") == DS.V3FAM_HELD_PLATFORM and fs.get("held_person") == ["score:D1"]
+          and r["state"] == DS.V3FAM_HELD_PLATFORM and (plan.get("MAINT") or {}).get("arm") != "D1"
+          and "held for a person" in str(waits.get("score:D1")) and "score:D1" not in json.dumps(p23l)
+          and not [e for e in f.ledger if e.get("event") == "v3fam_released"], (fs.get("score", {}).get("D1"),
+                                                                                waits.get("score:D1")))
+    g = D5.Fam(VT.TMP / "refusal6g", {"v3fam": {"items": {"score:D1": d1_job()}}, "declined": []},
+               ticker_arts(), deploy=dep)
+    g._v3fam_failed("MAINT", D5.item("D1", "r2"), "job(s) 49821128 ended FAILED; refused: %s" % geo, True)
+    rg = g.st["v3fam"]["items"]["score:D1"]
+    cg = g.cards[-1] if g.cards else {}
+    check("  E3's geometry refusal (as on 2026-10-25): held for a person, never counted as D1's failure, its card "
+          "naming E3's ground-truth and frame checks", rg["state"] == DS.V3FAM_HELD_PLATFORM and not rg.get("fails")
+          and rg.get("held_for_person") is True and "ground-truth and frame checks" in cg.get("detail", "")
+          and not [e for e in g.ledger if e.get("event") == "failed"], (rg.get("state"), cg.get("title")))
+    blk = next((b for b in SR.v3fam_reopen_blocks(DOM) if b.get("marker") == DEV6_MARKER), None) or {}
+    g.utc = "2026-10-27T01:00:00Z"
+    later = dict(blk, marker="a later deviation (test)", before_utc="2026-10-27T00:00:00Z")
+    got = g._v3fam_reopen_block(later)
+    check("  a later recorded deviation's reopen block proposes it again: missing, the person hold cleared",
+          got == ["score:D1"] and rg["state"] == "missing" and "held_for_person" not in rg, (got, rg.get("state")))
+    h = D5.Fam(VT.TMP / "refusal6h", {"v3fam": {"items": {"score:D1": d1_job()}}, "declined": []},
+               ticker_arts(), deploy=dep)
+    h._v3fam_failed("MAINT", D5.item("D1", "r3"), arm_own, True)
+    rh = h.st["v3fam"]["items"]["score:D1"]
+    check("  an E3 refusal that rests on the arm's own boxes stays the arm's failure (failed once)",
+          rh["state"] == "failed_once" and rh.get("fails") == 1 and not rh.get("held_for_person"), rh.get("state"))
 
 
 # ------------------------------------------------------------------ the deploy
@@ -681,6 +794,54 @@ def t_deploy():
     mods = (PKG / "run_inc2_build.sh").read_text().split("MODULES=(", 1)[1].split(")", 1)[0]
     check("  the job script's module list (outer and nested copies compared) names inc2/v3fam_loader.py",
           "tools/inc2/v3fam_loader.py" in mods.split())
+    t_descends(sh)
+
+
+def t_descends(sh):
+    print("a deploy whose head does not descend from the deployed head is refused")
+    import subprocess
+    fn = getattr(SR, "deploy_descends", None)
+    if fn is None:
+        check("stream_remote.deploy_descends exists", False)
+        return
+    g = VT.TMP / "descends_git"
+    shutil.rmtree(str(g), ignore_errors=True)
+    g.mkdir(parents=True)
+    env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
+               GIT_COMMITTER_EMAIL="t@t")
+
+    def git(*a):
+        return subprocess.run(["git", "-C", str(g)] + list(a), capture_output=True, text=True, env=env,
+                              check=True).stdout.strip()
+    git("init", "-q")
+    shas = []
+    for n in ("a", "b"):
+        (g / n).write_text(n)
+        git("add", n)
+        git("commit", "-q", "-m", n)
+        shas.append(git("rev-parse", "HEAD"))
+    git("checkout", "-q", "-b", "old", shas[0])
+    (g / "c").write_text("c")
+    git("add", "c")
+    git("commit", "-q", "-m", "c")
+    old_head = git("rev-parse", "HEAD")
+    rec = lambda h: json.dumps({"git_head": h, "script": "deploy/deploy_funnel.sh"})  # noqa: E731
+    ok_same = fn(g, rec(old_head))[0]
+    git("checkout", "-q", shas[1])
+    ok_desc = fn(g, rec(shas[0]))[0] and fn(g, rec(shas[1]))[0]
+    bad_old, why_old = fn(g, rec(old_head))
+    bad_unknown, why_unknown = fn(g, rec("f" * 40))
+    first = fn(g, "")[0] and fn(g, "not json")[0]
+    check("stream_remote.deploy_descends: a head that holds the deployed commit passes; one cut before it (a branch "
+          "from an older main) is refused, as is a deployed head this checkout does not know; no record passes",
+          ok_same and ok_desc and not bad_old and "does not descend" in why_old and not bad_unknown
+          and "not in this checkout" in why_unknown and first, (why_old, why_unknown))
+    pre = sh.split('echo "== 0) pre-flight', 1)[0]
+    check("  deploy_funnel.sh runs it on the lab's stream_deployed.json before its pre-flight and any copy, refusing "
+          "(exit 3) unless --allow-older-head; --dry-run stays without network", "S.deploy_descends(" in pre
+          and "stream_deployed.json" in pre and 'if [ "$ALLOW_OLDER" != 1 ]; then' in pre
+          and 'echo "refused: $DESCENDS; nothing was copied" >&2\n    exit 3' in pre
+          and pre.index("S.deploy_descends(") > pre.index('if [ "$DRY" = 1 ]; then'), None)
 
 
 def main():

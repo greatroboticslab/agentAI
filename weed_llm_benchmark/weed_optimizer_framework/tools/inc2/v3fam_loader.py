@@ -43,8 +43,20 @@ proves the cached size and the letterbox on every image D1 reads under the fix.
 
 The identity reproduction of an exam whose record lists changed images is taken under the fix too (identity()):
 both of its locked-scorer calls observed, and a note (v3fam/v1/exif/loader_identity_<exam>.json, written once) names
-its sha256; an identity record in place without that note is refused for such an exam. The record of 2026-10-25
-(identity_ood23.json, sha256 3c297647..., taken without the fix) is moved aside by inc2.v3fam_supersede first.
+its sha256. The record of 2026-10-25 (identity_ood23.json, sha256 3c297647..., taken without the fix) is moved aside
+by inc2.v3fam_supersede first. The identity record is written by inc2.v3fam (pinned, unedited) before the observer's
+check can run, so a record whose check refuses is moved aside at once (inc2.v3fam_supersede.move_unchecked), and one
+in place without its note that was created since deviation 6's reopening (DEV6_SINCE: a job cut off between the
+record and its note) is moved aside the same way and taken again; any other identity record in place without its
+note is refused for such an exam.
+
+The record pins the code that took it (inc2.v3fam.code_shas and this module's sha256): it is refused once either
+changed, and a pass kept from an earlier attempt must carry the sha256 of the record in place, so one D1 score record
+never mixes two versions of the check.
+
+A plain locked score of ood23 (inc.scorer.score without the fix: b0_v1's v1-protocol ood23 numbers of 2026-09-27
+among them) letterboxed the images the record lists as changed at the scale it records without the fix; D1's score
+record says so beside its numbers (summary()).
 
 Every refusal here starts with REFUSAL ("deviation 6's loader check refuses"): a precondition of the platform's own
 making, which the ticker holds instead of counting as the arm's failure (inc_autopilot.stream,
@@ -68,8 +80,10 @@ from pathlib import Path
 from ..inc import common as C
 from ..inc import scorer as S
 from . import v3fam as F
+from . import v3fam_supersede as SUP
 
 DEVIATION_6 = "docs/prereg/V3F_dev6_2026-10-25.md"
+DEV6_SINCE = "2026-10-25T17:00:00Z"          # deviation 6's reopening (the domain block's before_utc; the verdict's)
 FORMAT = "inc2-v3fam-loader-shapes/1"
 FMT_IDENTITY = "inc2-v3fam-loader-identity/1"
 RECORD = "loader_shapes.json"                # under v3fam/v1/exif/
@@ -404,8 +418,8 @@ def preflight(exams=EXAMS, threads=None):
 
 def require_record():
     """The pre-flight record, checked: written by this deviation, every exam's manifest unchanged, taken with the
-    Ultralytics that runs now, the fix's size equal to the loader's frame and the letterbox's scale 1 for every
-    image. Refused otherwise."""
+    Ultralytics and the code (inc2.v3fam.code_shas, this module) that run now, the fix's size equal to the loader's
+    frame and the letterbox's scale 1 for every image. Refused otherwise."""
     p = record_path()
     d = F._read_json(p)
     if not isinstance(d, dict) or d.get("format") != FORMAT:
@@ -414,6 +428,11 @@ def require_record():
     now = _versions().get("ultralytics")
     if (d.get("versions") or {}).get("ultralytics") != now:
         probs.append("taken with Ultralytics %s, this is %s" % ((d.get("versions") or {}).get("ultralytics"), now))
+    code = dict(d.get("code") or {})
+    here = C.sha256_file(Path(__file__).resolve())
+    if code.pop("v3fam_loader", None) != here or code != F.code_shas():
+        probs.append("taken by other code (inc2/v3fam_loader.py %s, this is %s; or the code inc2.v3fam.code_shas "
+                     "names changed)" % (str((d.get("code") or {}).get("v3fam_loader"))[:12], here[:12]))
     for exam in EXAMS:
         e = (d.get("exams") or {}).get(exam) or {}
         mp = C.manifest_path(exam)
@@ -436,42 +455,86 @@ def exam_keys(exam):
 
 
 # ------------------------------------------------------------------ what D1's job calls
+def _noted(exam, p):
+    n = F._read_json(note_path(exam))
+    return isinstance(n, dict) and n.get("format") == FMT_IDENTITY and n.get("identity_sha256") == F._sha(p)
+
+
+def _move_unchecked(p, why):
+    """An identity record taken under the fix whose check refused or never completed, moved aside byte for byte
+    (inc2.v3fam_supersede.move_unchecked); never read, since no note names it."""
+    try:
+        return SUP.move_unchecked(C.INC_DIR, str(Path(p).relative_to(C.INC_DIR)), why, repo=C.REPO, log=log)
+    except (SUP.SupersedeRefused, OSError, ValueError) as e:
+        refuse("%s could not be moved aside: %s" % (p, e))
+
+
 def identity(exam, arm, kw, rec):
     """The identity reproduction a D1 pass on exam rests on (V3F.3.2 item 3; v3fam_systems.require_or_make_identity),
     taken if missing under the fix, both locked-scorer calls observed, and noted once (note_path) by its sha256. When
-    the record lists images the fix changes on exam, an identity record in place must be the one its note names."""
+    the record lists images the fix changes on exam, an identity record in place must be the one its note names: one
+    created since DEV6_SINCE without its note (its check refused or cut off) is moved aside and taken again, any other
+    is refused; a record whose check refuses is moved aside before the refusal (module docstring)."""
     from . import v3fam_systems as SYS
     name = "identity_%s.json" % exam
     p = F.equiv_dir() / name
     changed = changed_of(rec, exam)
+    if p.exists() and changed and not _noted(exam, p):
+        d = F._read_json(p)
+        made = str((d or {}).get("created_utc") or "") if isinstance(d, dict) else ""
+        if SUP.is_superseded(str(p.relative_to(C.INC_DIR)), F._sha(p)) or made < DEV6_SINCE:
+            refuse("%s (sha256 %s, created %s) was not taken under the loader fix, and the fix changes %d image(s) of "
+                   "%s: it is moved aside (inc2.v3fam_supersede) and retaken" % (p, str(F._sha(p))[:12], made or "?",
+                                                                                 len(changed), exam))
+        _move_unchecked(p, "taken by D1's job under deviation 6's loader fix (created %s) with no note naming it: its "
+                           "observer check refused it or the job was cut off before the note; never read, taken "
+                           "again" % made)
     if not p.exists():
         with loader_fix(exam) as obs:
             SYS.require_or_make_identity(exam, arm, kw)
-        got = obs.check(exam_keys(exam), changed, 2, "%s's identity reproduction" % exam)
+        try:
+            got = obs.check(exam_keys(exam), changed, 2, "%s's identity reproduction" % exam)
+        except F.V3famRefused as e:
+            if p.exists():
+                _move_unchecked(p, "taken under deviation 6's loader fix and refused by its observer check: %s"
+                                % str(e)[:300])
+            raise
+        if note_path(exam).exists():
+            refuse("%s exists and names another record (sha256 %s), so %s cannot be noted" % (
+                note_path(exam), str((F._read_json(note_path(exam)) or {}).get("identity_sha256"))[:12], p))
         F.write_once(note_path(exam), dict(got, format=FMT_IDENTITY, exam=exam, identity=name,
                                            identity_sha256=F._sha(p), written_utc=F._utc()))
-    elif changed:
-        n = F._read_json(note_path(exam))
-        if not isinstance(n, dict) or n.get("format") != FMT_IDENTITY or n.get("identity_sha256") != F._sha(p):
-            refuse("%s (sha256 %s) was not taken under the loader fix, and the fix changes %d image(s) of %s: it is "
-                   "moved aside (inc2.v3fam_supersede) and retaken" % (p, str(F._sha(p))[:12], len(changed), exam))
     return SYS.require_or_make_identity(exam, arm, kw)
 
 
 def check_kept(doc, exam, rec, what):
-    """A pass kept from an earlier attempt on an exam whose record lists changed images must carry the fix's note."""
+    """A pass kept from an earlier attempt on an exam whose record lists changed images must carry the fix's note,
+    taken against the record in place (its sha256: the record pins the code that took it, require_record)."""
     if exam in EXAMS and changed_of(rec, exam):
-        if ((doc or {}).get("loader_shape_fix") or {}).get("deviation") != DEVIATION_6:
+        lf = (doc or {}).get("loader_shape_fix") or {}
+        if lf.get("deviation") != DEVIATION_6:
             refuse("%s on %s was committed without the loader fix, which changes %d of its images" % (
                 what, exam, len(changed_of(rec, exam))))
+        if lf.get("record_sha256") != F._sha(record_path()):
+            refuse("%s on %s was committed against another pre-flight record (sha256 %s, in place %s)" % (
+                what, exam, str(lf.get("record_sha256"))[:12], str(F._sha(record_path()))[:12]))
+
+
+UNFIXED_NOTE = ("every pass of D1 on ood22 and ood23 is taken under deviation 6's loader fix; a plain locked score of "
+                "ood23 (inc.scorer.score without the fix: b0_v1's v1-protocol ood23 numbers of 2026-09-27, 12-class "
+                "0.1861 and agnostic 0.1236 in b0_v1/report.md, among them) letterboxed the images 'changed' counts "
+                "at 0.8 or 0.9 of the scale ratio_pad records (the record's unfixed scales): such numbers are not on "
+                "D1's path, and a gap between them and D1's is not only training data")
 
 
 def summary(rec):
-    """What D1's score record carries of this deviation."""
+    """What D1's score record carries of this deviation, with the caveat on plain (unfixed) ood23 numbers."""
     return {"deviation": DEVIATION_6, "record": "v3fam/%s/exif/%s" % (F.NAME, RECORD),
             "record_sha256": F._sha(record_path()),
             "changed": {e: len(changed_of(rec, e)) for e in EXAMS},
-            "identity_notes": {e: F._sha(note_path(e)) for e in EXAMS if note_path(e).exists()}}
+            "unfixed_shrunk": {e: ((rec.get("exams") or {}).get(e) or {}).get("unfixed_shrunk") for e in EXAMS},
+            "identity_notes": {e: F._sha(note_path(e)) for e in EXAMS if note_path(e).exists()},
+            "note": UNFIXED_NOTE}
 
 
 def main(argv=None):

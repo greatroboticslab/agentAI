@@ -716,6 +716,36 @@ def v3fam_reopen_blocks(dom):
     return out
 
 
+def deploy_descends(git_root, deployed_text, head="HEAD"):
+    """(ok, why): the tree deployed now (the git_head of the lab's stream_deployed.json, deployed_text) is an ancestor
+    of the head a deploy ships (deploy/deploy_funnel.sh, before anything is copied). A deploy from a branch that does
+    not hold the deployed commit would put older files back over newer ones (rsync without --delete keeps only what
+    it does not overwrite), so it is refused: so is a deployed head this checkout does not know (fetch it first). A
+    deploy record that is absent or unreadable passes with that said (a first deploy)."""
+    try:
+        d = json.loads(deployed_text or "")
+    except ValueError:
+        d = None
+    dep = str((d or {}).get("git_head") or "").strip() if isinstance(d, dict) else ""
+    if not re.fullmatch(r"[0-9a-f]{40}", dep):
+        return True, "no deployed git_head on the lab (%s): nothing to compare" % ("unreadable record" if deployed_text
+                                                                                 else "no record")
+    try:
+        known = subprocess.run(["git", "-C", str(git_root), "cat-file", "-e", dep + "^{commit}"],
+                               capture_output=True, timeout=60).returncode == 0
+        if not known:
+            return False, ("the deployed head %s is not in this checkout: fetch it, and deploy only a head that "
+                           "descends from it" % dep[:12])
+        anc = subprocess.run(["git", "-C", str(git_root), "merge-base", "--is-ancestor", dep, head],
+                             capture_output=True, timeout=60).returncode
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, "git could not compare the deployed head %s with %s: %s" % (dep[:12], head, e)
+    if anc != 0:
+        return False, ("%s does not descend from the deployed head %s: the deploy would put older files back over "
+                       "newer ones; merge or rebase onto it first" % (head, dep[:12]))
+    return True, "%s descends from the deployed head %s" % (head, dep[:12])
+
+
 def v3fam_allow_ok(dom, git_root, allow, roots):
     """(ok, why) for --allow-v3fam-code-change=<file>: the file is the newest recorded deviation, i.e. the file of the
     domain's last reopen block (a deviation that changes the code the records pin comes with its own reopen block,

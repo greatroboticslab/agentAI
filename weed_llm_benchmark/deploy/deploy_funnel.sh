@@ -10,6 +10,7 @@
 #   deploy/deploy_funnel.sh            pre-flight, deploy, verify, record the replay, restart the dashboard
 #   deploy/deploy_funnel.sh --no-restart
 #   deploy/deploy_funnel.sh --dry-run  list what would be copied and run the V3F deploy checks; copy nothing
+#   deploy/deploy_funnel.sh --allow-older-head   (only to put back an older tree on purpose: see DESCENDS below)
 #   deploy/deploy_funnel.sh --allow-v3fam-code-change=docs/prereg/<deviation>.md
 #                                      (only with a recorded deviation, the file of one of the domain's reopen
 #                                      blocks, that moves V3F's reproduction records aside and retakes them: see
@@ -51,12 +52,14 @@ DRY=0
 ALLOW_PINNED=0
 ALLOW_SHARED=0
 ALLOW_V3F=""
+ALLOW_OLDER=0
 for a in "$@"; do
   case "$a" in
     --no-restart) RESTART=0 ;;
     --dry-run) DRY=1 ;;
     --allow-pinned-change) ALLOW_PINNED=1 ;;
     --allow-shared-change) ALLOW_SHARED=1 ;;
+    --allow-older-head) ALLOW_OLDER=1 ;;
     --allow-v3fam-code-change=*) ALLOW_V3F="${a#*=}" ;;
     *) echo "unknown argument: $a" >&2; exit 2 ;;
   esac
@@ -197,6 +200,26 @@ LSSH=(ssh -o ConnectTimeout=30 -i "$LAB_SSH_KEY" "$LAB_SSH")
 RSYNC_LAB=(rsync -aR --exclude __pycache__ -e "ssh -o ConnectTimeout=30 -i $LAB_SSH_KEY")
 TS="$(date +%Y%m%d_%H%M%S)"
 STAGE="funnel_stage_$TS"
+
+# DESCENDS (V3F deviation 6, 2026-10-25): the head this deploy ships must descend from the head deployed now (the
+# lab's stream_deployed.json): the copies below are rsync -a without --delete, so a deploy from a branch cut before
+# the deployed commit would put that commit's older files back (a recorded deviation's code, its reopen block, its
+# ticker rules) with every other check passing. Refused before anything is copied, unless --allow-older-head.
+echo "== 0a) the deployed head is an ancestor of HEAD"
+DEPLOYED_REC="$("${LSSH[@]}" "cat ~/$LAB_TREE_REL/results/framework/inc/stream_deployed.json 2>/dev/null" || true)"
+if ! DESCENDS="$(printf '%s' "$DEPLOYED_REC" | "$PY" -c 'import sys
+from weed_optimizer_framework.tools.inc_autopilot import stream_remote as S
+ok, why = S.deploy_descends(sys.argv[1], sys.stdin.read())
+print(why)
+sys.exit(0 if ok else 1)' "$GIT_ROOT" 2>&1)"; then
+  if [ "$ALLOW_OLDER" != 1 ]; then
+    echo "refused: $DESCENDS; nothing was copied" >&2
+    exit 3
+  fi
+  echo "  --allow-older-head: $DESCENDS" >&2
+else
+  echo "  $DESCENDS"
+fi
 
 echo "== 0) pre-flight: the replay set (inc, funnel, stream) and the stream pipeline pass locally"
 for t in "${PREFLIGHT[@]}"; do

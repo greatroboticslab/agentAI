@@ -224,13 +224,24 @@ V3FAM_NOT_RUN_CAP = "not run (family cap)"
 # Deviation 6 (2026-10-25; docs/prereg/V3F_dev6_2026-10-25.md): D1's passes on its two season exams run under the
 # loader fix and its pre-flight (inc2.v3fam_loader); a refusal of that check ("deviation 6's loader check refuses": the
 # exam's frames, the label cache's sizes, the letterbox, an identity record not taken under the fix) is about the
-# platform's loader and records, never D1's detectors, so it is held as the platform's too.
+# platform's loader and records, never D1's detectors, so it is held as the platform's too. So is a refusal of E3's
+# ground-truth and frame checks (V3FAM_E3_FRAME): the ground-truth boxes through the geometry against the exam's
+# labels, the label rows of each box, an image's EXIF tag and its size after transposition; they read the exam's
+# labels, its image headers and the loader's batch geometry, never the arm's weights, so they come out the same for
+# every arm and seed. Both kinds are deterministic (the same code on the same exam refuses the same way), so such a
+# refusal is held for a person at once (V3FAM_PERSON_REFUSAL_RE; never released by the records' state): a person finds
+# why, and a recorded deviation's reopen block proposes the item again.
+V3FAM_E3_FRAME = (r"E3's path refuses: [^\n]{1,300}?(?:: ground-truth box \d+ comes back through the geometry "
+                  r"|: ground-truth box \d+ \(class \d+\) has no label box of its class"
+                  r"|: \d+ ground-truth boxes in the batch, \d+ distinct label rows"
+                  r"| has EXIF orientation | after EXIF transposition, Ultralytics read it as )")
+V3FAM_LOADER_REFUSAL = "deviation 6's loader check refuses"
 V3FAM_PLATFORM_REFUSAL_RE = re.compile(
     r"the code changed since [^\n]{1,120}? ran|is missing or did not pass: no family score is taken without it"
     r"|no longer hash as V3F\.1 records|the E-series records changed while this family job ran"
     r"|is never moved over another file|a superseded record could not be moved aside"
-    r"|deviation 6's loader check refuses")
-V3FAM_LOADER_REFUSAL = "deviation 6's loader check refuses"
+    r"|deviation 6's loader check refuses|" + V3FAM_E3_FRAME)
+V3FAM_PERSON_REFUSAL_RE = re.compile(r"deviation 6's loader check refuses|" + V3FAM_E3_FRAME)
 V3FAM_PLATFORM_MAX = 3
 # the family jobs' provenance names (run_inc2_build.sh; L23J's v3fam_score_<arm>, L23I's its experiment)
 V3FAM_PROV = {"L23H": "v3fam_data", "L23L": "v3fam_v1"}
@@ -4939,6 +4950,7 @@ class StreamRun(object):
                        reopen_history=hist)
             rec.pop("why", None)
             rec.pop("platform_refusals", None)
+            rec.pop("held_for_person", None)
             failed = self._failed_ids()
             self.st["failed_ids"] = (failed + [i for i in ids if i and i not in failed])[-FAILED_IDS_KEEP:]
             out.append(key)
@@ -5057,6 +5069,8 @@ class StreamRun(object):
         out["spend_gpuh"] = round(self._v3fam_spend(exp_status, status, payload), 4)
         out["cap_gpuh"] = float(fam.get("cap_gpu_hours") or 260.0)
         out["cap_refused"] = sorted(k for k, v in items.items() if v.get("state") == V3FAM_NOT_RUN_CAP)
+        out["held_person"] = sorted(k for k, v in items.items()
+                                    if v.get("state") == DS.V3FAM_HELD_PLATFORM and v.get("held_for_person"))
         return out
 
     def _v3fam_equivalence(self, status, sc):
@@ -5092,14 +5106,15 @@ class StreamRun(object):
     def _v3fam_release(self, out):
         """An item held after a refusal of the platform's own making (DS.V3FAM_HELD_PLATFORM) is released (missing:
         DR0 proposes it again under a new id) once the snapshot reports the reproduction records current, unless it
-        was refused V3FAM_PLATFORM_MAX times (then it stays held for a person); the stage shows it as released."""
+        was refused V3FAM_PLATFORM_MAX times or by a deterministic check (held_for_person: deviation 6's loader check,
+        E3's ground-truth and frame checks); then it stays held for a person. The stage shows it as released."""
         if (out.get("equivalence") or {}).get("state") != "current":
             return
         items = self._v3fam()["items"]
         rel = []
         for key, rec in sorted(items.items()):
             if rec.get("state") == DS.V3FAM_HELD_PLATFORM and int(rec.get("platform_refusals") or 0) < \
-                    V3FAM_PLATFORM_MAX:
+                    V3FAM_PLATFORM_MAX and not rec.get("held_for_person"):
                 rec.update(state="missing", released_utc=self.utc)
                 rel.append(key)
                 if key.startswith("score:") and (out.get("score") or {}).get(key[6:]) == DS.V3FAM_HELD_PLATFORM:
@@ -5388,7 +5403,10 @@ class StreamRun(object):
         (prior_gpuh); its id is retired; it is held (DS.V3FAM_HELD_PLATFORM: neither due nor ended, so the verdict
         waits) and released once the snapshot reports the reproduction records current (_v3fam_release). One card
         naming the remedy; after V3FAM_PLATFORM_MAX such refusals of one item it stays held for a person (one
-        escalation card), never looped. No lane failure, no stop-loss."""
+        escalation card), never looped. Deviation 6: a refusal of a deterministic check (V3FAM_PERSON_REFUSAL_RE:
+        deviation 6's loader check, E3's ground-truth and frame checks, which read the exam and the loader, never the
+        arm's weights) is held for a person at the first refusal (held_for_person; never released, never proposed
+        again by itself): a recorded deviation's reopen block proposes it again. No lane failure, no stop-loss."""
         st = self.st
         p = it["proposal"]
         lever, params = it["lever"], p.get("params") or {}
@@ -5399,13 +5417,16 @@ class StreamRun(object):
             rec["spend"] = "settled"
         self._v3fam_fold(rec)
         rec["platform_refusals"] = int(rec.get("platform_refusals") or 0) + 1
-        final = rec["platform_refusals"] >= V3FAM_PLATFORM_MAX
+        person = bool(V3FAM_PERSON_REFUSAL_RE.search(str(why or "")))
+        if person:
+            rec["held_for_person"] = True
+        final = person or rec["platform_refusals"] >= V3FAM_PLATFORM_MAX
         rec.update(state=DS.V3FAM_HELD_PLATFORM, proposal=None, held_utc=self.utc,
                    why="refused by a precondition of the platform's own making: %s" % _short(why, 300))
         st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
         self._ledger("v3fam_platform_refusal", lane=ln, lever=lever, proposal_id=p["id"], v3fam_item=key,
                      record_only=True, charged=charged, platform_refusals=rec["platform_refusals"], final=final,
-                     reasons=[_short(why, 1000)])
+                     held_for_person=person, reasons=[_short(why, 1000)])
         title = RECORD_ONLY_TITLES[lever]
         title = (title % (params.get("arm") or params.get("verb"))) if "%s" in title else title
         title = title.replace(" failed (", " refused by the platform's own precondition (")
@@ -5421,7 +5442,22 @@ class StreamRun(object):
                       "proves, a pass the fix did not see whole, or an identity record not taken under the fix. "
                       "It is the platform's loader or records, not the arm's detectors; a person finds why, and a "
                       "recorded deviation moves the records aside or changes the check.")
-        if final:
+        elif person:
+            remedy = ("E3's ground-truth and frame checks (inc2/twostage.py, unedited) found a ground-truth box that "
+                      "does not come back through the geometry to its label, a box without its label row, or an image "
+                      "whose EXIF tag or transposed size is not the frame the loader read. They read the exam's labels "
+                      "and image headers and the loader's batch geometry, never the arm's weights: the platform's "
+                      "loader or exam, not the arm (deviation 6, which found one such defect on 2026-10-25). A person "
+                      "finds why; a recorded deviation fixes it and its reopen block proposes the item again.")
+        if person:
+            self._card("escalation", "%s: held for a person, not the arm's failure" % title,
+                       "%s. A deterministic check of the platform's own making refused it (deviation 6): its fails "
+                       "are not counted, it is never recorded failed or passed to the verdict as failed, it ends "
+                       "nothing, and its GPU-h stay counted against the family cap. The same code on the same exam "
+                       "refuses the same way, so it is held for a person at once and never proposed again by itself; "
+                       "the family's verdict waits for it. %s" % (_short(why, 400), remedy), lever=lever,
+                       trigger=list(p.get("trigger") or []))
+        elif final:
             self._card("escalation", "%s: held after %d refusals" % (title, rec["platform_refusals"]),
                        "%s. Refused %d times by a precondition of the platform's own making although the snapshot "
                        "reported the reproduction records current: it stays held (no fails counted, nothing ended), "
