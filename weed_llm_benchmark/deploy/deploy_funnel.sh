@@ -105,6 +105,8 @@ PKG_PATHS=(
   tests/fixtures/collect
   # deviation 5 (2026-10-24): the cluster's own V3F records the shipped test_stream_ap_v3fam_dev5.py reads
   tests/fixtures/v3fam_dev5
+  # 2026-10-26: the lab's records the shipped test_stream_ap_stalls.py replays (D31's L4, the DATA lane's hold)
+  tests/fixtures/platform_stalls
   # shared libraries the stream job scripts hash (SHARED_RE: never changed by this deploy)
   weed_optimizer_framework/tools/near_dup.py weed_optimizer_framework/tools/semisup_labeler.py
   weed_optimizer_framework/tools/registry_lock.py weed_optimizer_framework/tools/mega_trainer.py

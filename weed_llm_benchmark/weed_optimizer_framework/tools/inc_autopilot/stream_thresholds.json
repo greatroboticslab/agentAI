@@ -156,6 +156,10 @@
   "blames_to_quarantine": {
    "value": 2,
    "why": "Contract 6.4 D31: a source blamed for data twice is quarantined (L24) and D21 closes it."
+  },
+  "audit_min_judged_share": {
+   "value": 0.5,
+   "why": "D31 reads the label audit (L4) it called for: a blamed step counts as judged only when the audit gave a species verdict on at least this share of its boxes, and only then does the record's above_baseline (labels the cause -> X3) or its absence (labels not the cause) say anything. Below it the audit is 'not judged': one card, and L4 is not called for again. Amended 2026-10-26 (docs/CONTINUOUS_LOOP.md): s001's audit of 2026-10-05 judged 0 of 4,092 boxes (every image image_not_in_crops: tools/inc/audit.py reads Step 1's crops only) and wrote above_baseline false as an empty default."
   }
  },
  "D32": {

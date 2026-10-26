@@ -13,6 +13,22 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-26 — The loop's two stalls ended at their cause: done work is never called for again, D31 reads its audit, one bad source never stops collection; training jobs stop copying weights into runs/mlflow
+
+- **Where the data stands.** No image has entered the stream since 2026-10-07: lane DATA was held for 19 days. The ranked queue holds 5 sources ready to fetch (38.25 GB) and 51 more once their class names are resolved (34,715 listed images); the target stays tens to hundreds of thousands of verified images. Accuracy is unchanged: E3-B 0.8859 dev species mAP50-95, 0.0141 under 0.90.
+- **Why.**
+  - Lane MAINT: D31 called on every tick for the label audit L4 that ran on 2026-10-05 (job 47429146). The audit was written after s001 was frozen, so the evidence never carried it, and D31 did not read audits anyway. The executor refused the same id as already run, the ticker filed a done id as declined, and lane MAINT was carded stalled six times.
+  - The audit found nothing: 0 of 4,092 boxes judged (`image_not_in_crops`; the audit reads Step 1's crops only). Its `above_baseline: false` is an empty default.
+  - Lane DATA: the top-ranked source (a GitHub repository planned at its 64 MB git size; its zip is 84 MB) was refused `over_byte_plan` twice, each refusal counted as a failed lane step, and the stop-loss held collection before the per-source rule could close the source. The repository holds labels only, for images of a source quarantined since 2026-10-01.
+  - Storage: Ultralytics' MLflow callback had copied 337 GB of weights into `runs/mlflow`.
+- **Change.**
+  - `inc_autopilot/stream.py`: an id that ended done is recorded (`done_ids`; older ones from the ledger) and, called for again, gets one `done_recalled` event and one card: never run, declined or stalled on. A frozen experiment is snapshotted again for an audit run after its freeze (the old record moved aside). A collector refusal of the source (over the plan, a close action, no data files, a source-specific R3 hold) is the source's outcome: planned once more within the per-source limit, then closed with its reason, or held for a person; the lane takes the next source, and three closed sources in a row still hold it. A person's lift or denial of a D31 quarantine is respected.
+  - `inc_autopilot/diagnose_stream.py`: D31 reads the audit (`D31.audit_min_judged_share` 0.5, new): labels the cause -> X3; not the cause; not judged -> one card, never L4 again; nothing while the ticker reports the audit ran.
+  - `run_inc_job.sh`, `run_inc2_job.sh`: each training job reads its own copy of the shared Ultralytics settings with only `mlflow` false, exported only once Ultralytics reads every other key (datasets_dir first) as the shared file has it.
+  - `docs/CONTINUOUS_LOOP.md`: Amendment 2026-10-26; the open item and items 10 and 19 answered.
+- **The data, next.** inc0001, inc0003 and inc0004 stay rejected and zenodo_15808623 stays quarantined (fully taken in). Likely cause, not measured: each increment held 13 to 25 video clips, up to 486 frames from one clip. A per-clip-capped re-admission would be a new pre-registered rule, a person's decision.
+- **Deploy and release.** One commit through `deploy/deploy_funnel.sh` (no `--allow-*` flag), `executor.run_replay_tests`, then `stream release --name weed_stream_v1 --by human:harry567566@gmail.com` as the delegate under the owner's 2026-09-30 grant.
+
 ## 2026-10-25 — V3F deviation 6 completed before deploy: geometry refusals held for a person, identities never left unchecked, the plain ood23 caveat, no deploy from an older branch
 
 - **Where the family stands.** Unchanged: E3-B 0.8859 species mAP50-95 on dev, 0.0141 under 0.90 (sealed two-stage test 0.8950, 0.005 under). D1 waits for this deploy; D6's three seeds are training; the second continuation waits for both.

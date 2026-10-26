@@ -2458,11 +2458,11 @@ Each item: the defect, the fix, and the check that covers it. Where an item chan
 16. **A failed canary holds TRAIN (DCAN)** and escalates to a person, since §10's R0 acceptance is "canary within 1 sd". B0 ∪ tsw is built after the required baselines and blocks nothing.
 17. **Dev scores are no longer requested by the snapshot.** D25 reads inc2.stream's recorded comparison instead of recomputing the permutation test. `stream-snapshot --dev-scores` remains available.
 18. **A STOP lane** takes L24 (quarantine) and L7 (unblock), so a busy DATA lane never delays a quarantine.
-19. **The L4 label audit on a stream segment** reuses the existing v1 lever and `run_inc_audit.sh` on the segment's `exp.json`. Whether that script accepts a v2 segment's manifests is [to verify on cluster].
+19. **The L4 label audit on a stream segment** reuses the existing v1 lever and `run_inc_audit.sh` on the segment's `exp.json`. Whether that script accepts a v2 segment's manifests is [to verify on cluster]. *Verified 2026-10-26:* it runs on a v2 segment (job 47429146, 5 min 9 s, exit 0) but judges no box of a stream increment: every image is `image_not_in_crops`, because `tools/inc/audit.py` reads Step 1's `crops.csv` only. D31 reads such a record as not judged (Amendment 2026-10-26).
 
 **Not done.**
 - **Two wirings in files group F does not own.** The dashboard's harvest route does not call `old_path_refusal(..., auto_sync=True)` yet. The brain (tier2) digest covers experiment campaigns only; no brain may request a stream action, since the policy rows allow only `round-scheduler` and `human`.
-- **Cluster checks.** The `projects` and `my_quotas` output layouts, the lab-to-cluster `rsync` hosts (`CLUSTER_SSH`, the data node), and the L4 audit on a v2 segment are [to verify on cluster].
+- **Cluster checks.** The `projects` and `my_quotas` output layouts, the lab-to-cluster `rsync` hosts (`CLUSTER_SSH`, the data node), and the L4 audit on a v2 segment are [to verify on cluster]. (The L4 audit: verified 2026-10-26, item 19.)
 - **No end-to-end run with real code on real data.** Nothing has run on the lab or the cluster, and no run joins the real `inc2.stream`, `inc2.step1_stream` and `collect` to this ticker on real data. The world fakes those verbs and writes their formats. The argv checks use their real parsers and the commit fake uses the real `inc2.stream.dispose`.
 - **No `tests/fixtures/inc_replay/realloop_v1/`.** The funnel's pinned copy is reused by sha256 instead.
 - **`test_brain_api`'s shadow-review check fails on `brain/supervision_health.py`,** as it did at HEAD before this build. That file is not group F's.
@@ -2713,7 +2713,7 @@ The groups' own mutation checks, recorded in their build notes, stand beside the
    - MFWD over FTP (6.78 GB for POROL) and the Roboflow export;
    - the owner's acceptance of the EPPO table and the PAGS8 card table;
    - `floor_gb` and `floor_su` from the first wave.
-10. **The L4 label audit on a v2 segment.** `run_inc_audit.sh` must read v2 manifests, and the policy's paths must match the cluster's INC_DIR.
+10. **The L4 label audit on a v2 segment.** `run_inc_audit.sh` must read v2 manifests, and the policy's paths must match the cluster's INC_DIR. *Verified 2026-10-26:* it reads them and runs, and judges 0 boxes of a stream increment (Step 1's crops only); see Amendment 2026-10-26.
 11. **The pinned `inc.report` on v2 experiments with real scores.** In the run it wrote every baseline's, Stage C's and every segment's report.
 
 ### V.6 The R0 command sequence the platform runs
@@ -3750,7 +3750,7 @@ Group F's ticker (`inc_autopilot/stream.py`, `diagnose_stream.py`). §6.6's stop
 
 ### Open items
 
-- D31 keeps calling for an L4 audit that already ran (`_audit_proposal`'s id has no attempt): the declined id is now visible (one `not_taken`, then a `stall` card), not fixed.
+- D31 keeps calling for an L4 audit that already ran (`_audit_proposal`'s id has no attempt): the declined id is now visible (one `not_taken`, then a `stall` card), not fixed. *Closed 2026-10-26* (Amendment 2026-10-26): D31 reads the audit's record, and a done id is never declined or stalled on.
 - TRAIN's failure count is still 1 from the 05:35:05Z short refusal; this fix does not rewrite past records. The next ordinary failure would hold TRAIN; a person's `stream release` (or `enable`) clears it, as does any TRAIN item that ends done.
 - The declined L16S `22b59a187f1c00415b9c2d70a0858c3f` is not proposed again (its source's estimate is 0), so its run stays unread; its source is never fetched while the estimate stays 0.
 
@@ -4667,3 +4667,55 @@ The cause is in Ultralytics 8.4.37 (the locked scorer's pin; 8.4.129 has the sam
 **Not a deviation.** Reading the cluster's records, logs and image headers (read-only, one command at a time through the lab) wrote nothing in the cluster's trees, and the storage work on `/ocean` was not touched. Two imports of Ultralytics 8.4.37 in the lab's scratch environment (18:06:37Z and 18:34:11Z) rewrote the lab's shared `~/.config/Ultralytics/settings.json`; each file they wrote is kept in the scratch folder, the shared file is back to the 8.4.129 defaults for the dashboard's working directory (sha256 d5a0a32f…), and every later scratch run set `YOLO_CONFIG_DIR`.
 
 **Implemented in.** `tools/inc2/v3fam_loader.py` (new: 1, 2, 3), `tools/inc2/v3fam_trained.py` (1, 2, 3), `tools/inc2/v3fam_supersede.py` and `tools/inc2/v3fam_systems.py` (3), `tools/inc2/v3fam_verdict.py` (5), `tools/inc_autopilot/stream.py` and `tools/inc_autopilot/diagnose_stream.py` (6), `tools/inc_autopilot/stream_domains/weed.json` (4), `tools/inc_autopilot/stream_remote.py` (7), `run_inc2_build.sh` (the job's module list), `deploy/deploy_funnel.sh` (ships this file; 7), with their tests (`tests/test_v3fam_dev6.py`, `tests/test_v3fam_dev6_mutants.py`, `tests/fixtures/v3fam_dev6`; `tests/test_v3fam_dev5.py`, `tests/test_v3fam_dev5_mutants.py` and `tests/test_stream_pipeline.py` follow deviation 6's block and the moved verdict code). Deployed as every family change is (V3F.6.6): the lab and both cluster copies from one commit, this file among the git-root paths, no `--allow-*` flag, the dashboard restarted, `executor.run_replay_tests`; the ticker then reopens score:D1 by itself, and a person lifts the hold.
+
+## Amendment (2026-10-26): a lane never waits on work already done, D31 reads its audit, a source's refusal is the source's outcome, and training jobs log no MLflow copies
+
+Decided by the delegate under the owner's 2026-09-30 grant. Platform code only: no code_shas file (`inc2/v3fam.py` and the six E3-frozen files), no `PINNED_RE` or `SHARED_RE` file is changed, and no V3F artifact is touched.
+
+### What happened
+
+- **Lane MAINT, 2026-10-05 to 2026-10-26.** D31 blamed data on s001's inc0001, inc0003 and inc0004 (one source, zenodo_15808623, three blames) and called for L4. L4 (proposal befef2c8…, job 47429146) ran 5 min 9 s and wrote `s001/audit/label_audit.json` at 05:01:53Z. s001 had been frozen at 04:23:46Z, so the evidence never carried the audit. D31 never read an audit anyway and called for the same id on every tick; the executor refused it as already run, the ticker filed the done id as declined, and lane MAINT was carded stalled six times (10-05, 10-13, 10-22, 10-25, 10-26 twice).
+- **What the audit found.** Nothing: 0 of 4,092 boxes judged, every image `image_not_in_crops`. `tools/inc/audit.py` (pinned) looks boxes up in Step 1's `crops.csv` only; the stream's increments are cropped and verified at their own intake (`step1_stream`). Its `above_baseline: false` is an empty default, not a finding.
+- **Lane DATA, held since 2026-10-07T16:49:58Z.** D20 ranked gh_geezacoleman__palmer_detection first (500 placeholder boxes over 0.064 GB) and planned the fetch at its estimate, 64,145,408 bytes: GitHub's repository size, the git object store. The provider downloads the branch's zip, whose size is not listed; it is 84,379,800 bytes (measured 2026-10-26). Two identical lab fetches were refused `over_byte_plan` (R3, hold). Each counted as a failed lane step, and the lane's stop-loss (2 consecutive) held DATA before the per-source rule (3 attempts, 7.5) could close the source. No data entered the stream for 19 days. The repository holds labels only (6,513 YOLO txt, 1,232 VOC xml); its images are Weed-AI 5c78d067…, quarantined under D28 since 2026-10-01.
+- **Storage.** Ultralytics' MLflow callback copies every training run's weights directory into `runs/mlflow` (about 0.08 GB a run; 337 GB, about 320 GB of it byte-identical to the run folders' epoch files).
+
+### What changed
+
+| # | What changed | Why | How verified |
+|---|---|---|---|
+| 1 | **A done id is never declined or stalled on** (`stream.py`: `done_ids`, `_done_at`, `_note_done`, `_done_recalled`; `_materialise` counts wanted lanes per intent; `_on_result`). Every item that ends done records its id (at most 400; older ones are read from the campaign ledger's `item_done`). A diagnosis that calls for a done id again gets one `not_taken` (`done_recalled`) and one card naming it; the id is not run again, not declined, not a stall, and the lane is not wanted for it, so a stall it held ends (`lane_stall_ended`). The executor's "already ran" of a done id clears the lane without declining it. Lab items keep their own path (`_recover_lab`, `_renew`). | The class: a diagnosis keyed on permanent facts re-renders the same id after its lever ran (D28→L24 four times, fixed in deviation 5; D20→L16S; D31→L4). The same guard covers DHOLD→L17, DCMP→LC, D23→L19, D25→L21 and DR0's items, where no live case was seen. | `test_stream_ap_stalls.py` `done`, `pairs`. |
+| 2 | **A frozen experiment is snapshotted again for an audit run after its freeze** (`_audits_run`, `_refreeze_pending`, `_settle_refreeze`; `audits_run` seeded once from the ledger's L4 `item_done` lines). It joins the snapshot's experiments until a snapshot carries `<exp>/audit/label_audit.json`; then the frozen record is replaced and the old one moved to `frozen/superseded/` (never deleted). After 3 snapshots without it, one card. Health checks skip it. | `_record` read only the frozen copy, so an audit written after the freeze never reached the evidence. | `l4`. |
+| 3 | **D31 reads the audit it called for** (`diagnose_stream._audit_result`; context `/audits`). A blamed step counts as judged only when the audit gave a species verdict on at least `D31.audit_min_judged_share` (0.5, new, pre-registered here) of its boxes. Judged and above baseline: labels are the cause, card X3. Judged and not above: labels are not the cause. Otherwise "not judged": one card, and L4 is not called for again. While the ticker reports that L4 ran and its record is not in the evidence yet, nothing is called for. | L4 ran once and was called for 3 weeks; a 0-judged record must never read as "labels clean". | `l4`, `judged`, `units`. |
+| 4 | **D31's L24 respects a person.** Only blames committed after a person's last `unquarantine` of the source count; a person's denial of D31's L24 keeps the source (`blame_kept_by`), and the ticker renders no L24 for it. A quarantine after a lift takes a new id. The summary no longer says "L24 on X" for a source already quarantined. | A person's lift would otherwise be overridden, or re-call a done id. | `lift`. |
+| 5 | **The byte plan** (`stream._byte_plan`, for L16 and its review forms): the estimate first (one 10 GiB shard without one), or the larger plan a refusal raised it to (item 6), at most the per-source cap (50 GB). | An estimate can be short of what is fetched; raising every first plan instead (to 10 GiB) would make each attempt reserve, and each attempt whose bytes are unknown count, 10 GiB against the byte limits. | `units`, `palmer`, `release`. |
+| 6 | **A collector refusal of the source is the source's outcome** (`_collector_refusal`, `_source_refused`, `SOURCE_REFUSAL_*`; lab fetches by the collector's closing JSON, cluster fetches and intakes by the job log's refusal line). `over_byte_plan` at the plan: planned once more at what the per-source limit leaves (counted as `executor.fetched_bytes` counts it), then closed with its reason and how a person approves more. A close action, `no_data_files` or `over_source_cap`: closed with its reason. A source-specific R3 hold (licence, image-level only, no target class, an unreadable archive): held for a person with one data card. None of these counts as the lane's or the step's failure; the run's id is retired and the lane takes the next source. A closed source enters the zero-yield run, so three in a row still hold DATA (S20). A byte cap below the plan (the lab's disk, the byte envelope), transport, listing, describe and download errors, missing credentials, crashes and killed runs keep the lane's stop-loss. | One deterministic refusal of the top-ranked source held the whole lane for 19 days; the stop-loss is for systemic failures. | `palmer`, `systemic`, `release`, `units`. |
+| 7 | **Training jobs without MLflow's copies** (`run_inc_job.sh`, `run_inc2_job.sh`, the same block after `conda activate bench`). The job writes its own copy of the shared `settings.json` with only `"mlflow": false` (shared fonts linked), and exports `YOLO_CONFIG_DIR` to it only after Ultralytics, imported under it, reads every other key (datasets_dir, runs_dir, weights_dir…) equal to the shared file's, rewrites nothing and registers no MLflow hook. Otherwise a WARNING and the job runs as before. | No `MLFLOW_*` variable disables the callback, and a bare `YOLO_CONFIG_DIR` gives fresh default settings (datasets_dir `~/datasets`). | `test_job_mlflow_off.py`, on the cluster's bench env (Ultralytics 8.4.37, mlflow 3.12.0) with the account's real shared settings, read only. |
+| 8 | `deploy_funnel.sh` ships `tests/fixtures/platform_stalls` (the lab's records the new test replays). | | `--dry-run`. |
+
+`collect/fetch.py` is not changed: recording a `held` event for a mid-download `over_byte_plan` would make the collector hold the source, which the planned retry of item 6 must not meet.
+
+### The data, next
+
+- **inc0001, inc0003, inc0004** stay rejected; their dispositions are the commit's. The audit is recorded as not judged: the platform has no evidence that labels caused the rejections.
+- **zenodo_15808623** stays quarantined (stream ledger seq 15, cite D31). It is fully taken in (fetch_remaining 0, intake_deferred 0): nothing is left to collect. Each 1,364-image increment held 13 to 25 video clips of 3 species, up to 486 frames from one clip; the source holds 331 clips in 40,859 frames. Redundant frames, not labels, are the likely cause (a hypothesis from clip counts, not a measurement). A re-admission capped per clip would be a new pre-registered rule: a person's decision.
+- **gh_geezacoleman__palmer_detection**, once released: its third attempt is planned at its estimate under a new id; refused again, its attempts are used up, so it is closed with its reason (zero-yield, 1 of the 3-source fuse) and the lane goes on. It holds no usable data anyway (labels only, for a quarantined source's images). D20 then proposes weedai_0935d5a0 (Palmer amaranth, 995 images, 1.32 GB).
+
+### Release (after the deploy, by the delegate under the owner's grant)
+
+```
+cd ~/weed_llm_benchmark && .venv/bin/python -m weed_optimizer_framework.tools.inc_autopilot.stream release --name weed_stream_v1 --by human:harry567566@gmail.com
+```
+
+Then check: the ledger has `configured` and, on the next tick, `lane_released` (lane DATA); `lanes.DATA.hold` is null and `fails` 0; a DATA `proposed` follows; `/api/health/inc` is clean. Storage gate, 2026-10-26T17:50Z: /ocean 692.7 GB free of 7,520.7 GB; DATA needs 3 % (225.6 GB) + the 200 GB envelope = 425.6 GB; D27 silent; V3F's floor plus its 30 GiB margin is 257.8 GB, under the point where collection stops itself.
+
+### Deploy
+
+`stream.py`, `diagnose_stream.py` and `stream_thresholds.json` change `executor.code_hash()` and the stream rules version: the ticker writes a new prospective stream record before the next L18, and `executor.run_replay_tests` runs again before envelope grants resume. The job scripts apply to jobs submitted after the deploy (sbatch copies a script at submission; the running V3F reads are untouched). Sync the lab and both cluster copies from one commit descending from e875e61 with `deploy/deploy_funnel.sh` (no `--allow-*` flag). No state edit is needed: the first tick seeds `audits_run` and reads befef2c8's `item_done` from the ledger.
+
+### Open items
+
+- `executor.fetched_bytes` still counts zenodo_15808623's attempt killed on 2026-10-03 (an unclosed `fetch_started`) at its 49.7 GB plan: the collect envelope shows 83.6 GB left where about 133 GB are.
+- D20 ranks placeholder estimates first (500 boxes over a small repository), so code repositories come before datasets.
+- After a person's `unquarantine`, the ticker's own source record still says quarantined; D31 counts only blames after the lift, and the ticker renders no L24 while its record says quarantined.
+- L4 cannot judge stream increments (`tools/inc/audit.py` is pinned); making it do so would largely repeat the intake verifier.
+- `runs/mlflow` (337 GB) is kept as it is; deduplicating it is a separate decision.
