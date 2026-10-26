@@ -47,6 +47,7 @@ its file), runs the test file against the copy and requires it to fail.
   SG39  diagnose_stream   D21 closes a source a person kept
   SG40  stream            stream reopen never releases a source the stream held for a person
   SG41  stream            over_byte_plan replanned more than once
+  SG42  stream            a lift read over a quarantine the ticker took after it
 
 Run:  python3 tests/test_stream_ap_stalls_mutants.py [SG1 SG5 ...]
 """
@@ -135,6 +136,8 @@ MUTANTS = {
     "SG40": (ST, '            if s and s.get("status") == "held" and s.get("held_by") == "stream" and rec.get("utc") \\\n',
              '            if False and s.get("held_by") == "stream" and rec.get("utc") \\\n', STALLS),
     "SG41": (ST, '            if _num(s.get("byte_plan")):\n', "            if False:\n", STALLS),
+    "SG42": (ST, '            if not e.get("utc") or str(e["utc"]) <= str(s.get("quarantined_utc") or ""):\n',
+             "            if False:\n", STALLS),
 }
 
 

@@ -365,6 +365,10 @@ def t_lift():
           != props[0]["proposal_id"] and len(q2) == 2
           and not [e for e in led1 if e.get("event") == "lane_stalled"],
           ([e.get("proposal_id") for e in props], len(q2), diag(w, "D31").get("summary")))
+    check("the second quarantine stands in the ticker's record (the earlier lift is not read over it)",
+          w.state()["sources"]["src_q"].get("status") == "quarantined"
+          and len([e for e in w.ledger() if e.get("event") == "source_lift_resynced"]) == 1,
+          w.state()["sources"].get("src_q"))
     # a denial (shadow mode: L24 filed for a person, denied) keeps the source
     run = W_run(w)
     run._build_evidence()

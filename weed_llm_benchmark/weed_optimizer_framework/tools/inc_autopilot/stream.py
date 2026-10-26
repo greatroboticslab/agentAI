@@ -5895,8 +5895,8 @@ class StreamRun(object):
 
     def _resync_lifts(self):
         """A quarantine a person lifted (inc2.stream unquarantine, by human:): once the stream's queue summary,
-        read whole, no longer lists the source, this state's 'quarantined' record of an admitted source becomes
-        'admitted' again (one event), so that blames committed after the lift can quarantine it again (D31 counts
+        read whole, no longer lists the source, this state's 'quarantined' record of an admitted source, taken
+        before that lift, becomes 'admitted' again (one event), so that blames committed after the lift can quarantine it again (D31 counts
         only those; L24 under a new id). A summary that cannot be read, or a source with nothing admitted, is left
         as it is."""
         q = self._artifact("stream/%s/queue_summary.json" % self.sid)
@@ -5913,6 +5913,9 @@ class StreamRun(object):
             if src in qs or not isinstance(s, dict) or s.get("status") != "quarantined" \
                     or not (s.get("admitted_batches") or s.get("admit_done_utc")):
                 continue
+            if not e.get("utc") or str(e["utc"]) <= str(s.get("quarantined_utc") or ""):
+                continue                          # a quarantine this state took after that lift (an L24 that ran
+                #                                   since the snapshot): the next snapshot lists it
             s.update(status="admitted", lifted_by=e.get("by"), lifted_utc=e.get("utc"), lifted_seq=e.get("seq"))
             self._ledger("source_lift_resynced", source=src, decided_by=e.get("by"), seq=e.get("seq"),
                          reasons=["a person lifted the quarantine of %s (stream ledger seq %s, %s): admitted again; "
