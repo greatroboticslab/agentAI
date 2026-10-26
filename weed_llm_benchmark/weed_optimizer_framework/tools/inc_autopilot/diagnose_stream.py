@@ -1846,7 +1846,8 @@ def v3fam_plan(fam, fs):
     v3fam_verdict_ready) and, on TRAIN, L23K's smoke after L23H and then its seeds. Deviation 5 (2026-10-24): no
     L23J while the snapshot reports a reproduction record taken by other code than the deployed one, or one E3RS's
     job takes not in place (/stage/v3fam/equivalence stale: inc2.v3fam.require_equivalence would refuse the score);
-    an item held after a refusal of the platform's own making waits, named, until the ticker releases it."""
+    an item held after a refusal of the platform's own making waits, named, until the ticker releases it (deviation 6:
+    one the ticker holds for a person, fs['held_person'], until a recorded deviation reopens it)."""
     out, waits = {}, {}
     data = fs.get("data")
     score, build = fs.get("score") or {}, fs.get("build") or {}
@@ -1857,6 +1858,13 @@ def v3fam_plan(fam, fs):
     def score_item(arm):
         st = score.get(arm)
         if st == V3FAM_HELD_PLATFORM:
+            if "score:%s" % arm in (fs.get("held_person") or ()):
+                # deviation 6: a deterministic check of the platform's own making refused it (the ticker's
+                # held_for_person); never released by the records' state
+                waits["score:%s" % arm] = ("held for a person: refused by a deterministic check of the platform's own "
+                                           "making (deviation 6); proposed again only by a recorded deviation's "
+                                           "reopen block")
+                return None
             waits["score:%s" % arm] = ("held: refused by a precondition of the platform's own making (deviation 5); "
                                        "proposed again once the reproduction records are current")
             return None

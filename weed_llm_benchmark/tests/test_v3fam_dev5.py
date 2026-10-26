@@ -272,7 +272,8 @@ def t_supersede():
     st0 = SUP.status(C.INC_DIR)
     check("the entries are the cluster's records by sha256: identity_probe.json (c99a0df0...), the six failure "
           "records of 2026-10-22 and D6's smoke of 2026-10-21 (1d0691a8...); all pending",
-          SUP.superseded_sha256s() == want and sorted(st0["pending"]) == sorted(want)
+          {r: h for r, h, d, _f, _w in SUP.ENTRIES if d == SUP.DEVIATION_5} == want      # (deviation 6 adds its own)
+          and sorted(st0["pending"]) == sorted(want)
           and want["v3fam/v1/d6/smoke/smoke.json"] == SMOKE_1021, (st0["pending"], st0["other"]))
     sc = SUP.apply(C.INC_DIR, groups=(SUP.GROUP_SCORES,))
     back = {}
@@ -488,6 +489,8 @@ def t_verb_guard():
           "continuation either", st_early == "missing", st_early)
     for a in SIX:
         attempt_since("v3fam_score_%s" % a.lower())
+    # deviation 6 (2026-10-25): D1's failures count only with a job of it since its own reopening
+    attempt_since("v3fam_score_d1", utc=getattr(VR, "DEV6_REOPEN_UTC", "2026-10-24T05:00:00Z"))
     ok_f, why_f = VR.verdict_ready(failed=six_failed)
     attempt_since("v3fam_detr_smoke")
     ok_f6, why_f6 = VR.verdict_ready(failed=six_failed + ["detr:smoke"])
@@ -742,8 +745,8 @@ def t_reopen():
           "ro.get(...) and never raises), deviation 5's in v3fam.reopens after it",
           isinstance(ro4, dict) and isinstance(old_reader, tuple)
           and old_reader[:2] == ("deviation 4 (2026-10-20)", ["data", "verdict"])
-          and isinstance(FAM.get("reopens"), list) and FAM["reopens"][-1] is b5
-          and [b.get("marker") for b in SR.v3fam_reopen_blocks(DOM)] == ["deviation 4 (2026-10-20)", DEV5_MARKER],
+          and isinstance(FAM.get("reopens"), list) and FAM["reopens"][0] is b5
+          and [b.get("marker") for b in SR.v3fam_reopen_blocks(DOM)][:2] == ["deviation 4 (2026-10-20)", DEV5_MARKER],
           old_reader)
     loop = (GIT / "docs" / "CONTINUOUS_LOOP.md").read_bytes()
     check("  the deviation's file is kept byte for byte in docs/CONTINUOUS_LOOP.md",
@@ -986,7 +989,8 @@ def t_deploy():
     (pkg / "tools" / "inc2" / "v3fam.py").write_text((pkg / "tools" / "inc2" / "v3fam.py").read_text()
                                                      + "\n# a CLI change\n")
     bad, blines = chk(DOM, GIT, roots, package=pkg)
-    allow, alines = chk(DOM, GIT, roots, package=pkg, allow=DEV5_FILE)
+    newest = SR.v3fam_reopen_blocks(DOM)[-1]["file"]          # deviation 6's since 2026-10-25
+    allow, alines = chk(DOM, GIT, roots, package=pkg, allow=newest)
     nope, _n = chk(DOM, GIT, roots, package=pkg, allow="docs/prereg/none.md")
     log_, _l = chk(DOM, GIT, roots, package=pkg, allow="RESEARCH_LOG.md")
     dev4_, _d = chk(DOM, GIT, roots, package=pkg, allow="docs/prereg/V3F_dev4_2026-10-20.md")
@@ -1002,15 +1006,15 @@ def t_deploy():
             (git2 / f_).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(str(GIT / f_), str(git2 / f_))
     ok2, _l2 = chk(DOM, git2, roots)
-    (git2 / DEV5_FILE).write_text((git2 / DEV5_FILE).read_text() + "\nan edit after the pin\n")
+    (git2 / newest).write_text((git2 / newest).read_text() + "\nan edit after the pin\n")
     edited, elines = chk(DOM, git2, roots)
-    edited_allow, _ea = chk(DOM, git2, roots, package=pkg, allow=DEV5_FILE)
+    edited_allow, _ea = chk(DOM, git2, roots, package=pkg, allow=newest)
     check("  --allow-v3fam-code-change naming the newest deviation's file edited after its pin is refused (the file "
-          "must hash as its reopen block pins it)", not edited_allow and not SR.v3fam_allow_ok(DOM, git2, DEV5_FILE,
+          "must hash as its reopen block pins it)", not edited_allow and not SR.v3fam_allow_ok(DOM, git2, newest,
                                                                                              roots)[0], _ea)
     gone, glines = chk(DOM, GIT, [r for r in roots if r != DEV5_FILE])
     check("a deviation's file edited after its pin (its sha256 no longer the domain's) is refused, naming it; a pinned "
-          "file left out of the git-root paths is refused", ok2 and not edited and DEV5_FILE in " ".join(elines)
+          "file left out of the git-root paths is refused", ok2 and not edited and newest in " ".join(elines)
           and not gone and "not a git-root path" in " ".join(glines), (elines[-1:], glines[-1:]))
     changed = ["weed_llm_benchmark/weed_optimizer_framework/tools/inc2/v3fam.py",
                "weed_optimizer_framework/tools/inc2/v3fam.py", "weed_optimizer_framework/tools/inc2/v3fam_verdict.py"]
@@ -1024,7 +1028,7 @@ def t_deploy():
          "restore, as JSON text": guard(changed, json.dumps(recs), None, roots, **kw),
          "records of other code": guard(changed, stale_recs, None, roots, **kw),
          "this tree changed": guard(changed, recs, None, roots, package=pkg, **kw),
-         "changed, newest deviation": guard(changed, recs, DEV5_FILE, roots, package=pkg, **kw),
+         "changed, newest deviation": guard(changed, recs, newest, roots, package=pkg, **kw),
          "changed, deviation 4": guard(changed, recs, "docs/prereg/V3F_dev4_2026-10-20.md", roots, package=pkg, **kw),
          "changed, the research log": guard(changed, recs, "RESEARCH_LOG.md", roots, package=pkg, **kw),
          "8 records of unknown code": guard(changed, 8, None, roots, **kw),

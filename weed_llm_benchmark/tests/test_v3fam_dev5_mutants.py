@@ -107,7 +107,7 @@ MUTANTS = {
     "EM8": (DS, 'V3FAM_HELD_PLATFORM = "held (platform)"', 'V3FAM_HELD_PLATFORM = "failed_once"', FAST),
     "EM9": (ST, '        missing = sorted(set(er.get("names") or ()) - present) if er.get("after") and sc.get(er["after"]) == '
                 '"done" \\\n            else []\n', "        missing = []\n", FAST),
-    "EM10": (VR, "        if second and a in DEV5_REOPENED_ARMS:\n", "        if False:\n", FAST),
+    "EM10": (VR, "        if second and reopen_utc_of(a):\n", "        if False:\n", FAST),      # (deviation 6 moved it)
     "EM11": (VR, "    if not p.exists() or superseded_failure(item, p):\n        return False\n",
              "    if not p.exists():\n        return False\n", FAST),
     "EM12": (VR, "    if is_first_continuation():\n        out.append(", "    if False:\n        out.append(", FAST),
@@ -150,10 +150,10 @@ MUTANTS = {
     "EM37": (SRM, "        if superseded:\n            sup.append(p.name)\n", "        if False:\n            sup.append(p.name)\n",
              W_LIVE),
     # round 2 (2026-10-25): the review's findings
-    "EM38": (VR, "            if any(attempted_since(i, DEV5_REOPEN_UTC) for i in named):\n", "            if named:\n",
+    "EM38": (VR, "            if any(attempted_since(i, ru) for i in named):\n", "            if named:\n",
              FAST),
     "EM39": (VR, "    bad = contradicted(refused, gone) if second else []\n", "    bad = []\n", FAST),
-    "EM40": (VR, '        return isinstance(d, dict) and str(d.get("written_utc") or "") >= DEV5_REOPEN_UTC\n',
+    "EM40": (VR, '        return isinstance(d, dict) and str(d.get("written_utc") or "") >= item_reopen_utc(item)\n',
              "        return True\n", FAST),
     "EM41": (VR, 'DEV5_REOPENED_ARMS = DEV5_ARMS + ("D6",)', "DEV5_REOPENED_ARMS = DEV5_ARMS", FAST),
     "EM42": (VR, "    if p.is_file() and SUP.is_superseded(SUP.D6_SMOKE, F._sha(p)):\n        return None\n",

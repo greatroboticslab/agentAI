@@ -1,0 +1,770 @@
+{
+ "failed_ids": [
+  "4f028d0cb1090ef00bd046e6e670759b",
+  "958759ffe0d2b1b2299437fd8e1145b2",
+  "62b0de5a90282dca704e070c6aab08c7",
+  "b79afda5439dd2a778fdb99478497022",
+  "dab10856b24b672fcb406d32cbf065c7",
+  "afed84a1dfd7711522beaa28541d06d2",
+  "ceb3ad134703fbc80732dc81f5bd70b4",
+  "af0b335893516ead95811f949cebf2d0",
+  "b26b2ed0d4d9cf574d8d5621a147dbf6",
+  "aa4aff10d6740712d643573b691a3a9e",
+  "e341251282d18872d3d6cc0c6c6cb2ba",
+  "55f87a868b476d625e04076b5a7d46b5",
+  "5e5bdd10385e4c04179e9e3531921e5c",
+  "2a7f5002ebc6cbead69010b2b7839fba",
+  "c122189e118b98d4671a81d3f575cb3b",
+  "eef2b32ef1aeca437548c15b40be5c2c",
+  "97a7b5147b4f7c4c42a94923d38a358f",
+  "5220f1e01ef8a5808f1372e0d48b87d0",
+  "669bc97b17bfc538aebf22ca53b4e4d7",
+  "d6a9917c5aa1d222848525288c2e138c",
+  "5dcc28af3a0cc3b5f10251dc0cd7073a",
+  "e35929068a5a2fc9f3d19562dd6dcb66",
+  "efe666570075ecb7b27e26c6c05cb275",
+  "89375dd33553719d074b0b71ab54caa8",
+  "8dca3a02bdcc3f20c0a5cbbb84ebf13e",
+  "c2c612f722ce9afcf89df7dfd3f60b51",
+  "5d9648974f559b5a54bf3ade9abb10ed",
+  "3d767d9ebb444e30a5263e982e67ee9c",
+  "6e782a424ae5077fc7ede348e68b5fe4",
+  "5f98133609330c21a83ed305d2603ce1",
+  "59a6a52876f3b3f6203893caab88acbc",
+  "85c081b778ded112d6954de86c126e12",
+  "a28e626d4ff41c8f2f782834c7273201",
+  "54e3fd24ffbf024da91c6201a33d6b6d",
+  "620adf36840ee82121a88537d40ac43f"
+ ],
+ "items": {
+  "build:D1A1": {
+   "estimate": 18.509,
+   "exp": "v3_d1_a1_m640",
+   "lever": "L23I",
+   "proposal": "9f18b46d539e9253fe23125aafbe177e",
+   "settled": 13.3334,
+   "spend": "settled",
+   "started_utc": "2026-10-21T14:40:33Z",
+   "state": "done"
+  },
+  "build:D1A12": {
+   "estimate": 7.934,
+   "exp": "v3_d1_a12_m640",
+   "lever": "L23I",
+   "proposal": "7037dc7a143c5d0b0e88c1f48204a2b9",
+   "settled": 3.8817,
+   "spend": "settled",
+   "started_utc": "2026-10-21T15:30:33Z",
+   "state": "done"
+  },
+  "build:D1B1": {
+   "estimate": 18.282,
+   "exp": "v3_d1_b1_m640",
+   "lever": "L23I",
+   "proposal": "26ffb0707cb09a84121a06554f3b446b",
+   "settled": 13.8165,
+   "spend": "settled",
+   "started_utc": "2026-10-21T15:00:33Z",
+   "state": "done"
+  },
+  "build:D4F": {
+   "estimate": 18.544,
+   "exp": "v3_d4_f_m640",
+   "lever": "L23I",
+   "proposal": "4b6993dd0169688154af8f94cbb2e6cd",
+   "settled": 13.1879,
+   "spend": "settled",
+   "started_utc": "2026-10-21T12:30:33Z",
+   "state": "done"
+  },
+  "build:D4N": {
+   "estimate": 18.347,
+   "exp": "v3_d4_n_m640",
+   "lever": "L23I",
+   "proposal": "12c64897a89851b7338c188c075f28ae",
+   "settled": 12.9577,
+   "spend": "settled",
+   "started_utc": "2026-10-21T12:50:33Z",
+   "state": "done"
+  },
+  "build:D4R15": {
+   "estimate": 18.544,
+   "exp": "v3_d4_r15_m640",
+   "lever": "L23I",
+   "proposal": "0f12ee136abdab3596b0d5016f79d436",
+   "settled": 13.1726,
+   "spend": "settled",
+   "started_utc": "2026-10-21T14:20:33Z",
+   "state": "done"
+  },
+  "build:D5B0": {
+   "estimate": 11.796,
+   "exp": "v3_d5b_0_m640",
+   "lever": "L23I",
+   "proposal": "bbe7087a8a84cf51a0aa56e03ed91f5c",
+   "settled": 7.7073,
+   "spend": "settled",
+   "started_utc": "2026-10-21T16:30:33Z",
+   "state": "done"
+  },
+  "build:D5B100": {
+   "estimate": 12.353,
+   "exp": "v3_d5b_100_m640",
+   "lever": "L23I",
+   "proposal": "126c11118499a3af2b50e28856898b35",
+   "settled": 7.8995,
+   "spend": "settled",
+   "started_utc": "2026-10-21T17:40:33Z",
+   "state": "done"
+  },
+  "build:D5B25": {
+   "estimate": 11.934,
+   "exp": "v3_d5b_25_m640",
+   "lever": "L23I",
+   "proposal": "d3ff48f8f5b6f310a97493646a44626f",
+   "settled": 7.3643,
+   "spend": "settled",
+   "started_utc": "2026-10-21T17:00:33Z",
+   "state": "done"
+  },
+  "build:D8M": {
+   "estimate": 7.907,
+   "exp": "v3_d8_m640_tc",
+   "lever": "L23I",
+   "proposal": "1a4ae6d18bd3a521e9ceb9ab34fa7068",
+   "settled": 3.7609,
+   "spend": "settled",
+   "started_utc": "2026-10-21T11:50:33Z",
+   "state": "done"
+  },
+  "build:D8S": {
+   "estimate": 6.408,
+   "exp": "v3_d8_s640_tc",
+   "lever": "L23I",
+   "proposal": "b6a5304bf6f7e4ace1dee73eac3ee873",
+   "settled": 2.2008,
+   "spend": "settled",
+   "started_utc": "2026-10-21T12:10:33Z",
+   "state": "done"
+  },
+  "data": {
+   "attempts": [
+    {
+     "gpuh": 0.5592,
+     "how": "settled",
+     "proposal": "5220f1e01ef8a5808f1372e0d48b87d0"
+    },
+    {
+     "gpuh": 0.2328,
+     "how": "settled",
+     "proposal": "669bc97b17bfc538aebf22ca53b4e4d7"
+    }
+   ],
+   "estimate": 2.0,
+   "exp": null,
+   "fails": 0,
+   "lever": "L23H",
+   "prior_gpuh": 0.792,
+   "proposal": "68f74474b39d44cca69e9e19adc847f1",
+   "reopen_history": [
+    {
+     "attempts": [
+      {
+       "gpuh": 0.5592,
+       "how": "settled",
+       "proposal": "5220f1e01ef8a5808f1372e0d48b87d0"
+      },
+      {
+       "gpuh": 0.2328,
+       "how": "settled",
+       "proposal": "669bc97b17bfc538aebf22ca53b4e4d7"
+      }
+     ],
+     "estimate": 2.0,
+     "exp": null,
+     "fails": 2,
+     "lever": "L23H",
+     "marker": "deviation 4 (2026-10-20)",
+     "prior_gpuh": 0.5592,
+     "proposal": "669bc97b17bfc538aebf22ca53b4e4d7",
+     "reopened_utc": "2026-10-21T09:20:33Z",
+     "settled": 0.2328,
+     "spend": "settled",
+     "started_utc": "2026-10-12T12:24:57Z",
+     "state": "failed"
+    }
+   ],
+   "reopened": "deviation 4 (2026-10-20)",
+   "reopened_utc": "2026-10-21T09:20:33Z",
+   "settled": 1.9875,
+   "spend": "settled",
+   "started_utc": "2026-10-21T09:20:33Z",
+   "state": "done"
+  },
+  "detr:smoke": {
+   "attempts": [
+    {
+     "gpuh": 0.9372,
+     "how": "settled",
+     "proposal": "a28e626d4ff41c8f2f782834c7273201"
+    }
+   ],
+   "estimate": 0.5,
+   "exp": null,
+   "fails": 0,
+   "lever": "L23K",
+   "prior_gpuh": 0.9372,
+   "proposal": "bcbf1368c7d7d6148d3c02577fc41c84",
+   "reopen_history": [
+    {
+     "estimate": 0.5,
+     "exp": null,
+     "lever": "L23K",
+     "marker": "deviation 5 (2026-10-24)",
+     "proposal": "a28e626d4ff41c8f2f782834c7273201",
+     "reopened_utc": "2026-10-25T10:59:35Z",
+     "settled": 0.9372,
+     "spend": "settled",
+     "started_utc": "2026-10-21T11:40:33Z",
+     "state": "done"
+    }
+   ],
+   "reopened": "deviation 5 (2026-10-24)",
+   "reopened_utc": "2026-10-25T10:59:35Z",
+   "settled": 0.9031,
+   "spend": "settled",
+   "started_utc": "2026-10-25T10:59:35Z",
+   "state": "done"
+  },
+  "detr:train": {
+   "estimate": 72.0,
+   "exp": null,
+   "lever": "L23K",
+   "proposal": "2eaeb7b610aae53e29273b0cc0394c58",
+   "settled": null,
+   "spend": "open",
+   "started_utc": "2026-10-25T12:09:35Z",
+   "state": "running"
+  },
+  "score:D1": {
+   "attempts": [
+    {
+     "gpuh": 0.1203,
+     "how": "settled",
+     "proposal": "8dca3a02bdcc3f20c0a5cbbb84ebf13e"
+    },
+    {
+     "gpuh": 0.0831,
+     "how": "settled",
+     "proposal": "59a6a52876f3b3f6203893caab88acbc"
+    },
+    {
+     "gpuh": 0.865,
+     "how": "settled",
+     "proposal": "620adf36840ee82121a88537d40ac43f"
+    }
+   ],
+   "estimate": 4.1,
+   "exp": null,
+   "fails": 2,
+   "lever": "L23J",
+   "prior_gpuh": 1.0684,
+   "proposal": "f6ba1f35efd7a9f6c1e20375310f5c1a",
+   "reopen_history": [
+    {
+     "attempts": [
+      {
+       "gpuh": 0.1203,
+       "how": "settled",
+       "proposal": "8dca3a02bdcc3f20c0a5cbbb84ebf13e"
+      },
+      {
+       "gpuh": 0.0831,
+       "how": "settled",
+       "proposal": "59a6a52876f3b3f6203893caab88acbc"
+      }
+     ],
+     "estimate": 4.1,
+     "exp": null,
+     "fails": 2,
+     "lever": "L23J",
+     "marker": "deviation 5 (2026-10-24)",
+     "prior_gpuh": 0.1203,
+     "proposal": "59a6a52876f3b3f6203893caab88acbc",
+     "reopened_utc": "2026-10-25T10:59:35Z",
+     "settled": 0.0831,
+     "spend": "settled",
+     "started_utc": "2026-10-21T23:00:33Z",
+     "state": "failed"
+    }
+   ],
+   "reopened": "deviation 5 (2026-10-24)",
+   "reopened_utc": "2026-10-25T10:59:35Z",
+   "settled": 0.0928,
+   "spend": "settled",
+   "started_utc": "2026-10-25T16:29:35Z",
+   "state": "failed"
+  },
+  "score:D2BC1": {
+   "estimate": 1.0,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "dc46b0f483e8aa5e6c66207c39ed3053",
+   "settled": 0.7222,
+   "spend": "settled",
+   "started_utc": "2026-10-12T23:44:57Z",
+   "state": "done"
+  },
+  "score:D2BC2640": {
+   "estimate": 1.0,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "a6acfa4e56cb80fde972c5678b494348",
+   "settled": 0.7042,
+   "spend": "settled",
+   "started_utc": "2026-10-13T01:44:58Z",
+   "state": "done"
+  },
+  "score:D2CLIP": {
+   "estimate": 1.0,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "121bcc1916b5a116ea07a787f773c198",
+   "settled": 0.6003,
+   "spend": "settled",
+   "started_utc": "2026-10-12T16:14:57Z",
+   "state": "done"
+  },
+  "score:D2DINOB": {
+   "estimate": 1.0,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "4f44dc5c394907ea7799a51b24309d26",
+   "settled": 0.5811,
+   "spend": "settled",
+   "started_utc": "2026-10-12T18:04:57Z",
+   "state": "done"
+  },
+  "score:D2DINOL": {
+   "estimate": 1.0,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "4191600bba00a8d8e0c686b95002febc",
+   "settled": 0.5033,
+   "spend": "settled",
+   "started_utc": "2026-10-12T17:04:57Z",
+   "state": "done"
+  },
+  "score:D2FT": {
+   "estimate": 2.75,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "5a5d97fd6eb74c281c00c585843045eb",
+   "settled": 1.3947,
+   "spend": "settled",
+   "started_utc": "2026-10-13T02:54:58Z",
+   "state": "done"
+  },
+  "score:D2LAION": {
+   "estimate": 1.0,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "9da314daecb0e60160b43c684df41873",
+   "settled": 0.6869,
+   "spend": "settled",
+   "started_utc": "2026-10-12T15:14:57Z",
+   "state": "done"
+  },
+  "score:D2RN50": {
+   "estimate": 1.0,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "aacb914f230f4718325f5552e4609474",
+   "settled": 1.115,
+   "spend": "settled",
+   "started_utc": "2026-10-12T21:24:57Z",
+   "state": "done"
+  },
+  "score:D2SIGLIP": {
+   "estimate": 1.5,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "7541539779ef6202bd700ddf5380fe8c",
+   "settled": 0.6383,
+   "spend": "settled",
+   "started_utc": "2026-10-12T20:24:57Z",
+   "state": "done"
+  },
+  "score:D3": {
+   "estimate": 0.5,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "cefefb33810f40deb3115925c1d860d2",
+   "settled": 0.4761,
+   "spend": "settled",
+   "started_utc": "2026-10-13T06:44:58Z",
+   "state": "done"
+  },
+  "score:D4F": {
+   "attempts": [
+    {
+     "gpuh": 0.0494,
+     "how": "settled",
+     "proposal": "e35929068a5a2fc9f3d19562dd6dcb66"
+    },
+    {
+     "gpuh": 0.0456,
+     "how": "settled",
+     "proposal": "3d767d9ebb444e30a5263e982e67ee9c"
+    }
+   ],
+   "estimate": 1.0,
+   "exp": null,
+   "fails": 0,
+   "lever": "L23J",
+   "prior_gpuh": 0.095,
+   "proposal": "c4f8dfeff0e6d3bd8726a36a07502419",
+   "reopen_history": [
+    {
+     "attempts": [
+      {
+       "gpuh": 0.0494,
+       "how": "settled",
+       "proposal": "e35929068a5a2fc9f3d19562dd6dcb66"
+      },
+      {
+       "gpuh": 0.0456,
+       "how": "settled",
+       "proposal": "3d767d9ebb444e30a5263e982e67ee9c"
+      }
+     ],
+     "estimate": 1.0,
+     "exp": null,
+     "fails": 2,
+     "lever": "L23J",
+     "marker": "deviation 5 (2026-10-24)",
+     "prior_gpuh": 0.0494,
+     "proposal": "3d767d9ebb444e30a5263e982e67ee9c",
+     "reopened_utc": "2026-10-25T10:59:35Z",
+     "settled": 0.0456,
+     "spend": "settled",
+     "started_utc": "2026-10-21T20:30:33Z",
+     "state": "failed"
+    }
+   ],
+   "reopened": "deviation 5 (2026-10-24)",
+   "reopened_utc": "2026-10-25T10:59:35Z",
+   "settled": 0.7847,
+   "spend": "settled",
+   "started_utc": "2026-10-25T11:39:35Z",
+   "state": "done"
+  },
+  "score:D4N": {
+   "attempts": [
+    {
+     "gpuh": 0.0422,
+     "how": "settled",
+     "proposal": "efe666570075ecb7b27e26c6c05cb275"
+    },
+    {
+     "gpuh": 0.0053,
+     "how": "settled",
+     "proposal": "6e782a424ae5077fc7ede348e68b5fe4"
+    }
+   ],
+   "estimate": 1.0,
+   "exp": null,
+   "fails": 0,
+   "lever": "L23J",
+   "prior_gpuh": 0.0475,
+   "proposal": "7c692bed5b39f6b0d9e5755fba77bd77",
+   "reopen_history": [
+    {
+     "attempts": [
+      {
+       "gpuh": 0.0422,
+       "how": "settled",
+       "proposal": "efe666570075ecb7b27e26c6c05cb275"
+      },
+      {
+       "gpuh": 0.0053,
+       "how": "settled",
+       "proposal": "6e782a424ae5077fc7ede348e68b5fe4"
+      }
+     ],
+     "estimate": 1.0,
+     "exp": null,
+     "fails": 2,
+     "lever": "L23J",
+     "marker": "deviation 5 (2026-10-24)",
+     "prior_gpuh": 0.0422,
+     "proposal": "6e782a424ae5077fc7ede348e68b5fe4",
+     "reopened_utc": "2026-10-25T10:59:35Z",
+     "settled": 0.0053,
+     "spend": "settled",
+     "started_utc": "2026-10-21T21:30:33Z",
+     "state": "failed"
+    }
+   ],
+   "reopened": "deviation 5 (2026-10-24)",
+   "reopened_utc": "2026-10-25T10:59:35Z",
+   "settled": 0.94,
+   "spend": "settled",
+   "started_utc": "2026-10-25T12:49:35Z",
+   "state": "done"
+  },
+  "score:D4R15": {
+   "attempts": [
+    {
+     "gpuh": 0.0864,
+     "how": "settled",
+     "proposal": "89375dd33553719d074b0b71ab54caa8"
+    },
+    {
+     "gpuh": 0.0806,
+     "how": "settled",
+     "proposal": "5f98133609330c21a83ed305d2603ce1"
+    }
+   ],
+   "estimate": 1.0,
+   "exp": null,
+   "fails": 0,
+   "lever": "L23J",
+   "prior_gpuh": 0.167,
+   "proposal": "518ebb71bb7d3202df00c2c61e37245f",
+   "reopen_history": [
+    {
+     "attempts": [
+      {
+       "gpuh": 0.0864,
+       "how": "settled",
+       "proposal": "89375dd33553719d074b0b71ab54caa8"
+      },
+      {
+       "gpuh": 0.0806,
+       "how": "settled",
+       "proposal": "5f98133609330c21a83ed305d2603ce1"
+      }
+     ],
+     "estimate": 1.0,
+     "exp": null,
+     "fails": 2,
+     "lever": "L23J",
+     "marker": "deviation 5 (2026-10-24)",
+     "prior_gpuh": 0.0864,
+     "proposal": "5f98133609330c21a83ed305d2603ce1",
+     "reopened_utc": "2026-10-25T10:59:35Z",
+     "settled": 0.0806,
+     "spend": "settled",
+     "started_utc": "2026-10-21T22:10:33Z",
+     "state": "failed"
+    }
+   ],
+   "reopened": "deviation 5 (2026-10-24)",
+   "reopened_utc": "2026-10-25T10:59:35Z",
+   "settled": 0.8189,
+   "spend": "settled",
+   "started_utc": "2026-10-25T14:09:35Z",
+   "state": "done"
+  },
+  "score:D5B": {
+   "attempts": [
+    {
+     "gpuh": 0.1194,
+     "how": "settled",
+     "proposal": "c2c612f722ce9afcf89df7dfd3f60b51"
+    },
+    {
+     "gpuh": 0.0928,
+     "how": "settled",
+     "proposal": "85c081b778ded112d6954de86c126e12"
+    }
+   ],
+   "estimate": 0.6,
+   "exp": null,
+   "fails": 0,
+   "lever": "L23J",
+   "prior_gpuh": 0.2122,
+   "proposal": "25069b15532862267678caa892b986f3",
+   "reopen_history": [
+    {
+     "attempts": [
+      {
+       "gpuh": 0.1194,
+       "how": "settled",
+       "proposal": "c2c612f722ce9afcf89df7dfd3f60b51"
+      },
+      {
+       "gpuh": 0.0928,
+       "how": "settled",
+       "proposal": "85c081b778ded112d6954de86c126e12"
+      }
+     ],
+     "estimate": 0.6,
+     "exp": null,
+     "fails": 2,
+     "lever": "L23J",
+     "marker": "deviation 5 (2026-10-24)",
+     "prior_gpuh": 0.1194,
+     "proposal": "85c081b778ded112d6954de86c126e12",
+     "reopened_utc": "2026-10-25T10:59:35Z",
+     "settled": 0.0928,
+     "spend": "settled",
+     "started_utc": "2026-10-22T00:00:33Z",
+     "state": "failed"
+    }
+   ],
+   "reopened": "deviation 5 (2026-10-24)",
+   "reopened_utc": "2026-10-25T10:59:35Z",
+   "settled": 0.0967,
+   "spend": "settled",
+   "started_utc": "2026-10-25T16:49:35Z",
+   "state": "done"
+  },
+  "score:D8": {
+   "attempts": [
+    {
+     "gpuh": 0.0889,
+     "how": "settled",
+     "proposal": "5dcc28af3a0cc3b5f10251dc0cd7073a"
+    },
+    {
+     "gpuh": 0.06,
+     "how": "settled",
+     "proposal": "5d9648974f559b5a54bf3ade9abb10ed"
+    }
+   ],
+   "estimate": 0.6,
+   "exp": null,
+   "fails": 0,
+   "lever": "L23J",
+   "prior_gpuh": 0.1489,
+   "proposal": "f991a4c4aad9fc3c7b918510ef6af930",
+   "reopen_history": [
+    {
+     "attempts": [
+      {
+       "gpuh": 0.0889,
+       "how": "settled",
+       "proposal": "5dcc28af3a0cc3b5f10251dc0cd7073a"
+      },
+      {
+       "gpuh": 0.06,
+       "how": "settled",
+       "proposal": "5d9648974f559b5a54bf3ade9abb10ed"
+      }
+     ],
+     "estimate": 0.6,
+     "exp": null,
+     "fails": 2,
+     "lever": "L23J",
+     "marker": "deviation 5 (2026-10-24)",
+     "prior_gpuh": 0.0889,
+     "proposal": "5d9648974f559b5a54bf3ade9abb10ed",
+     "reopened_utc": "2026-10-25T10:59:35Z",
+     "settled": 0.06,
+     "spend": "settled",
+     "started_utc": "2026-10-21T18:30:33Z",
+     "state": "failed"
+    }
+   ],
+   "reopened": "deviation 5 (2026-10-24)",
+   "reopened_utc": "2026-10-25T10:59:35Z",
+   "settled": 0.1514,
+   "spend": "settled",
+   "started_utc": "2026-10-25T11:09:35Z",
+   "state": "done"
+  },
+  "score:D9": {
+   "estimate": 4.4,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "2235ae3578880342d72398a8460f0715",
+   "settled": 3.9678,
+   "spend": "settled",
+   "started_utc": "2026-10-13T07:44:58Z",
+   "state": "done"
+  },
+  "score:E3RS": {
+   "estimate": 4.3,
+   "exp": null,
+   "lever": "L23J",
+   "proposal": "6a0372feaf4b0a07aa73375ffb0be105",
+   "settled": 1.4797,
+   "spend": "settled",
+   "started_utc": "2026-10-12T13:24:57Z",
+   "state": "done"
+  },
+  "verdict": {
+   "attempts": [
+    {
+     "gpuh": 0.66,
+     "how": "settled",
+     "proposal": "d6a9917c5aa1d222848525288c2e138c"
+    },
+    {
+     "gpuh": 0.5778,
+     "how": "settled",
+     "proposal": "54e3fd24ffbf024da91c6201a33d6b6d"
+    }
+   ],
+   "estimate": 0.5,
+   "exp": null,
+   "fails": 0,
+   "lever": "L23L",
+   "prior_gpuh": 1.2378,
+   "proposal": null,
+   "reopen_history": [
+    {
+     "estimate": 0.5,
+     "exp": null,
+     "lever": "L23L",
+     "marker": "deviation 4 (2026-10-20)",
+     "proposal": "d6a9917c5aa1d222848525288c2e138c",
+     "reopened_utc": "2026-10-21T09:20:33Z",
+     "settled": 0.66,
+     "spend": "settled",
+     "started_utc": "2026-10-13T12:04:58Z",
+     "state": "done",
+     "verdict_card": "2026-10-13T13:14:58Z"
+    },
+    {
+     "attempts": [
+      {
+       "gpuh": 0.66,
+       "how": "settled",
+       "proposal": "d6a9917c5aa1d222848525288c2e138c"
+      },
+      {
+       "gpuh": 0.5778,
+       "how": "settled",
+       "proposal": "54e3fd24ffbf024da91c6201a33d6b6d"
+      }
+     ],
+     "estimate": 0.5,
+     "exp": null,
+     "fails": 0,
+     "lever": "L23L",
+     "marker": "deviation 5 (2026-10-24)",
+     "prior_gpuh": 0.66,
+     "proposal": "54e3fd24ffbf024da91c6201a33d6b6d",
+     "reopened": "deviation 4 (2026-10-20)",
+     "reopened_utc": "2026-10-25T10:59:35Z",
+     "settled": 0.5778,
+     "spend": "settled",
+     "started_utc": "2026-10-22T00:20:33Z",
+     "state": "done",
+     "verdict_card": "2026-10-22T01:30:34Z"
+    }
+   ],
+   "reopened": "deviation 5 (2026-10-24)",
+   "reopened_utc": "2026-10-25T10:59:35Z",
+   "settled": null,
+   "spend": null,
+   "started_utc": "2026-10-22T00:20:33Z",
+   "state": "missing"
+  }
+ },
+ "read_utc": "2026-10-25T18:42:22Z",
+ "source": "the lab's campaigns/weed_stream_v1/state.json (read only): v3fam.items and failed_ids"
+}

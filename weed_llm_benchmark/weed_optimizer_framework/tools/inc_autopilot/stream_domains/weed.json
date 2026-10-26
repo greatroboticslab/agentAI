@@ -562,6 +562,16 @@
     ],
     "before_utc": "2026-10-24T00:00:00Z",
     "why": "Deviation 5 (2026-10-24): deviation 4 changed inc2/v3fam.py in its CLI only (sha256 3d776dae... to c5e923dc...), and every reproduction record of 2026-10-12 pins that file's sha256 (inc2.v3fam.code_shas), so inc2.v3fam.require_equivalence refused all twelve score jobs of D8, D4F, D4N, D4R15, D1 and D5B on 2026-10-21; the ticker counted those refusals as the arms' failures and the continuation verdict of 2026-10-22 (capacity/v3fam_v1_cont.json) recorded the six arms failed. inc2/v3fam.py is restored byte for byte (3d776dae...), the verdict's CLI moved to inc2/v3fam_verdict.py, and the six arms' scores are proposed again. D6's smoke of 2026-10-21 took the whole one-epoch fit (2,405.6 s, about 905 s of it one-time setup before the epoch) as the epoch time and projected 33.9 h against the 28.8 h rule; the rule takes the epoch's own time, so the smoke is taken again with the epoch timed from its start (inc2.v3fam_detr). The continuation of 2026-10-22 stays recorded as it is, and the family's second continuation (capacity/v3fam_v1_cont2.json, the same rules and Holm sets, reproducing every comparison either earlier record decided) comes once each reopened arm has a record since."
+   },
+   {
+    "marker": "deviation 6 (2026-10-25)",
+    "file": "docs/prereg/V3F_dev6_2026-10-25.md",
+    "sha256": "abdac968df34cb8ece46606995161c856cd147e3a3883fb5b646897518cacd13",
+    "items": [
+     "score:D1"
+    ],
+    "before_utc": "2026-10-25T17:00:00Z",
+    "why": "Deviation 6 (2026-10-25): D1's score jobs 49820090 and 49821128 (2026-10-25) were refused by E3's geometry check on ood23 (ood23__20230804_HTRC_iPhone12_WY_2: ground-truth box 0 back through the geometry 0.109094 from its label): Ultralytics 8.4.37's exif_size swaps width and height for EXIF orientation 6 or 8 only when PIL names the file JPEG, so for the 289 ood23 photos PIL names MPO (iPhone files with an MPF segment) the label cache held the stored landscape size, the rect batches put them in landscape batches, and the letterbox shrank them by a further 0.8 or 0.9 that ratio_pad does not record. A defect of the platform's loader, not of D1's detectors. D1's passes on ood22 and ood23 now run under the loader fix with its pre-flight (inc2.v3fam_loader: every ood22 and ood23 frame, label-cache size and letterbox proved), identity_ood23.json is moved aside and retaken under the fix, and score:D1 is proposed again; its earlier spend stays in prior_gpuh. The second continuation (capacity/v3fam_v1_cont2.json) comes once D1 has a record since this reopening."
    }
   ],
   "seeds": [

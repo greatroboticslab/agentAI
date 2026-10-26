@@ -47,12 +47,20 @@ E3's pin) of the crops whose key is an A' row (the keys of D1A12's
 manifest, which D1A1's must equal), E3's protocol (twostage.cross_validate,
 twostage._fit_lr through inc2.v3fam_embed.fit_lr_protocol). Then, after the
 EXIF frame pre-flight has passed (inc2.v3fam.exif_preflight_passed: ood23's
-tags 3, 6 and 8 are read only then) and ood22's and ood23's identity
-reproductions (taken if missing), every seed of A'1 and B'1 in stage1 mode
-(their box sets and P7's ignore-region arrays), TS-A' and TS-B' (their boxes
-named by the D1 classifier) and A'12 (identity) on ood22, ood23 and dev
-(dev reported only); and ooddev_v1 for A'1, B'1 (stage1) and A'12 (identity)
-in the zoo's root, reported. ImageWeeds is the builds' plain finals only.
+tags 3, 6 and 8 are read only then), deviation 6's loader pre-flight
+(inc2.v3fam_loader.preflight: v3fam/v1/exif/loader_shapes.json, written
+once) and ood22's and ood23's identity reproductions (taken if missing,
+under the loader fix), every seed of A'1 and B'1 in stage1 mode (their box
+sets and P7's ignore-region arrays), TS-A' and TS-B' (their boxes named by
+the D1 classifier) and A'12 (identity) on ood22, ood23 and dev (dev
+reported only); and ooddev_v1 for A'1, B'1 (stage1) and A'12 (identity) in
+the zoo's root, reported. ImageWeeds is the builds' plain finals only.
+Deviation 6 (2026-10-25; docs/prereg/V3F_dev6_2026-10-25.md): every pass on
+ood22 and ood23 runs under inc2.v3fam_loader.loader_fix (Ultralytics'
+label-cache size for a photo PIL reads as MPO tagged 6 or 8 swapped as for
+a JPEG, every call observed and checked against the pre-flight record
+before the pass is committed; each such pass carries loader_shape_fix);
+dev and ooddev_v1 run without it.
 
 D5b (score_d5b; V3F.5 D5b): each dose's three base runs through the
 identity pass on the probe, in the probe's own root (a subprocess with
@@ -89,6 +97,7 @@ from . import scorer_native as SN
 from . import scorer_sidecar as SC
 from . import twostage as TS
 from . import v3fam as F
+from . import v3fam_loader as LD
 from . import v3fam_systems as SYS
 
 # ------------------------------------------------------------------ constants (pre-registered)
@@ -411,11 +420,12 @@ def score_d1(embedder=None, workers=None, lock_check=True, batch=S.BATCH, device
         if not F.exif_preflight_passed():
             raise F.V3famRefused("the EXIF frame pre-flight has not passed (V3F.3.2): D1 reads ood23's tags 3, 6 and 8 "
                                  "only after it (inc2.v3fam exif-preflight, then exif-verdict by a named viewer)")
+        shapes = LD.preflight()              # deviation 6: every ood22/ood23 frame and letterbox proved, once
         dcfg, _drec, dshas = d1_classifier()
         dev_names = F.equivalence_names("dev")
         eqs = F.require_equivalence(dev_names)
         for exam in D1_DECIDING_EXAMS:
-            SYS.require_or_make_identity(exam, "D1", kw)
+            LD.identity(exam, "D1", kw, shapes)  # deviation 6: taken under the loader fix when missing
         plan = [("A1", "D1A1", "stage1"), ("B1", "D1B1", "stage1"), ("TSA", "D1A1", "two_stage"),
                 ("TSB", "D1B1", "two_stage"), ("A12", "D1A12", "identity")]
         dev_files, passes = [], []
@@ -426,6 +436,9 @@ def score_d1(embedder=None, workers=None, lock_check=True, batch=S.BATCH, device
                     dirname = D1_DIRS[key]
                     for s in F.SEEDS:
                         got = SYS.existing(dirname, s, exam)
+                        what = "D1 %s seed %d" % (key, s)
+                        if got is not None:
+                            LD.check_kept(TS._read_json(F.root() / got["file"]), exam, shapes, what)
                         if got is None:
                             src = srcs[build][s]
                             if mode == "two_stage":
@@ -435,10 +448,13 @@ def score_d1(embedder=None, workers=None, lock_check=True, batch=S.BATCH, device
                                 clf = dshas
                             else:
                                 cfg, clf = {"mode": mode, "nms": NMS if mode == "stage1" else "locked"}, None
-                            ps = F._family_pass(src["weights"], exam, cfg, "D1", **kw)
-                            got = SYS.commit("D1", dirname, s, exam, ps, cfg, names, classifier=clf,
-                                             extra={"source": SYS.source_record(src), "build": build,
-                                                    "d1": key, "d1_classifier": clf})
+                            x = {"source": SYS.source_record(src), "build": build, "d1": key, "d1_classifier": clf}
+                            with LD.deciding(exam) as obs:   # deviation 6: ood22 and ood23 only
+                                ps = F._family_pass(src["weights"], exam, cfg, "D1", **kw)
+                            if obs is not None:
+                                x["loader_shape_fix"] = obs.check(LD.exam_keys(exam), LD.changed_of(shapes, exam),
+                                                                  1, what)
+                            got = SYS.commit("D1", dirname, s, exam, ps, cfg, names, classifier=clf, extra=x)
                             log("D1 %s seed %d on %s: species %s, agnostic %s" % (
                                 key, s, exam, ps["result"].get("species_map50_95"),
                                 ps["result"].get("agnostic_map50_95")))
@@ -449,7 +465,8 @@ def score_d1(embedder=None, workers=None, lock_check=True, batch=S.BATCH, device
                                            "sha256": got["sha256"], "status": got["status"], "deciding": True})
             rec = SYS.score_record("D1", dev_files, eqs, before=before,
                                    reported={"status": "pending" if reported else "not run"},
-                                   extra={"d1_classifier": dshas, "deciding_exams": len(D1_DECIDING_EXAMS)})
+                                   extra={"d1_classifier": dshas, "deciding_exams": len(D1_DECIDING_EXAMS),
+                                          "loader_shape_fix": LD.summary(shapes)})
             if reported:
                 try:
                     SYS.require_or_make_identity(SYS.OODDEV, "D1", kw)
@@ -481,7 +498,8 @@ def score_d1(embedder=None, workers=None, lock_check=True, batch=S.BATCH, device
                                                      "statistic": "agnostic (weed boxes only)"})
                         SYS.reported_pass(passes, item, one)
             rec = SYS.score_record("D1", dev_files, eqs, before=before, reported=SYS.write_reported("D1", passes),
-                                   extra={"d1_classifier": dshas, "deciding_exams": len(D1_DECIDING_EXAMS)})
+                                   extra={"d1_classifier": dshas, "deciding_exams": len(D1_DECIDING_EXAMS),
+                                          "loader_shape_fix": LD.summary(shapes)})
     log("D1: %d dev files, %d other passes, %.0fs" % (len(dev_files), len(passes), time.time() - t0))
     return rec
 

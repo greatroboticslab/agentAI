@@ -330,7 +330,8 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/twostage.py tools/inc/audit.py
          tools/inc2/v3fam.py tools/inc2/v3fam_data.py tools/inc2/v3fam_sweep.py tools/inc2/v3fam_embed.py
          tools/inc2/v3fam_wbf.py tools/inc2/v3fam_detr.py tools/inc2/v3fam_systems.py tools/inc2/v3fam_trained.py
-         tools/inc2/v3fam_verdict.py tools/inc2/v3fam_supersede.py tools/inc2/v3fam_detr_env.txt
+         tools/inc2/v3fam_verdict.py tools/inc2/v3fam_supersede.py tools/inc2/v3fam_loader.py
+         tools/inc2/v3fam_detr_env.txt
          tools/inc_autopilot/stream_thresholds.json)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 

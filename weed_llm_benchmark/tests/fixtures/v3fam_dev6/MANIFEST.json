@@ -1,0 +1,46 @@
+{
+ "files": {
+  "identity_ood22.json": {
+   "bytes": 2615,
+   "from": "cluster: results/framework/inc/v3fam/v1/equivalence/identity_ood22.json (D1's job 49820090, 2026-10-25T15:28:45Z)",
+   "sha256": "aebd81bc4cae8a31e96342f3b6b55824252968e17d8be8c803a2a1d71ef3eef6"
+  },
+  "identity_ood23.json": {
+   "bytes": 2553,
+   "from": "cluster: results/framework/inc/v3fam/v1/equivalence/identity_ood23.json (D1's job 49820090, 2026-10-25T15:31:06Z)",
+   "sha256": "3c29764783b8303b0659cfe75ee49b966dff4334394477fba24b2245045ad3ea"
+  },
+  "ood23__20230804_HTRC_iPhone12_WY_2.head.bin": {
+   "bytes": 4559,
+   "from": "cluster: downloads/3seasonweeddet10/data2023/20230804_HTRC_iPhone12_WY_2.jpg, its first 4,559 bytes (head -c 4559): every marker segment through the start-of-scan header (JFIF, EXIF with orientation 6, MPF, ICC, AROT, DQT, DRI, SOF0 4032x3024, DHT, SOS)",
+   "full_file_bytes": 10368508,
+   "full_file_sha256": "adc328fb98e351efe942027b093e7bdee3bf2efc57f41174d45c3f3d19a9f7e7",
+   "sha256": "d91abdda2173b300e96307208da2180f428f195f72aa5c987f6c856f7c039408",
+   "use": "with an end-of-image marker appended, PIL reads it as MPO, orientation 6, stored size 4032x3024 (W x H), and the loader (cv2) decodes it to the full file's frame, 4032 x 3024 (h x w), its pixels grey"
+  },
+  "ood23__20230804_HTRC_iPhone12_WY_2.txt": {
+   "bytes": 39,
+   "from": "cluster: results/framework/inc/splits/v1/labels/ood23/ood23__20230804_HTRC_iPhone12_WY_2.txt (the manifest's label_sha256)",
+   "sha256": "322981fda1c7ed1a9c4fdb2a8097751999e10cacfba0d4d06c0480dee86aaa0d"
+  },
+  "provenance_v3fam_score_d1.json": {
+   "bytes": 50810,
+   "from": "cluster: results/framework/inc/_campaign/provenance/v3fam_score_d1.json (four attempts: 49569308, 49569831, 49820090, 49821128)",
+   "sha256": "77554692b5d220ba3a8f73315cb2c4ddd9b3cf84ee0c714c9b623cd7d2602894"
+  },
+  "state_v3fam_2026-10-25.json": {
+   "bytes": 18862,
+   "from": "lab: results/framework/_brain/weed/inc/campaigns/weed_stream_v1/state.json, v3fam.items and failed_ids, read 2026-10-25T18:42:22Z",
+   "sha256": "b2a5d3e7891b9b103310ff1361aa33fc737c7ae571eac8fb3768da2f68258f79"
+  }
+ },
+ "format": "v3fam-dev6-fixtures/1",
+ "manifest_row": {
+  "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/downloads/3seasonweeddet10/data2023/20230804_HTRC_iPhone12_WY_2.jpg",
+  "key": "ood23__20230804_HTRC_iPhone12_WY_2",
+  "label_sha256": "322981fda1c7ed1a9c4fdb2a8097751999e10cacfba0d4d06c0480dee86aaa0d",
+  "sha256": "adc328fb98e351efe942027b093e7bdee3bf2efc57f41174d45c3f3d19a9f7e7",
+  "source": "3seasonweeddet10/data2023"
+ },
+ "read_utc": "2026-10-25"
+}

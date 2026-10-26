@@ -1707,7 +1707,7 @@ def stage_deploy():
     named = [f for f in [fam.get("amendment_file"), fam.get("revision_file")] + [
         b.get("file") for b in SRM.v3fam_reopen_blocks({"v3fam": fam})] if f]
     check("every file the weed domain's v3fam block names by sha256 (%s) is a git-root path the deploy ships"
-          % ", ".join(named), len(named) == 4 and all(f in roots for f in named), (named, roots))
+          % ", ".join(named), len(named) >= 5 and all(f in roots for f in named), (named, roots))   # deviation 6's too
     # deviation 5: the deploy-time checks (the code the reproduction records pin, every pinned file's sha256)
     roots_sh = script.read_text().split("ROOT_PATHS=(", 1)[1].split(")", 1)[0].split()
     ok5, lines5 = SRM.v3fam_deploy_check(LSM.load_domain("weed"), ROOT_PKG.parent, roots_sh)
