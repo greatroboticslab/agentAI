@@ -628,6 +628,7 @@ class Fam(object):
     _stream_quarantined = bind("_stream_quarantined")
     _resync_quarantines = bind("_resync_quarantines")
     _done = bind("_done")
+    _note_done = bind("_note_done")
 
     def __init__(self, root, st, arts=None, deploy=()):
         self.paths = Paths(root)

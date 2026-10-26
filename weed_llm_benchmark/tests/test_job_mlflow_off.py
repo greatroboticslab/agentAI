@@ -66,7 +66,9 @@ def run_block(tmp, env_extra, py):
     bindir = tmp / "bin"
     bindir.mkdir(exist_ok=True)
     if not (bindir / "python").exists():
-        os.symlink(py, str(bindir / "python"))
+        # a wrapper, never a symlink: a venv's python reached through a symlink in another directory loses its venv
+        (bindir / "python").write_text('#!/bin/bash\nexec "%s" "$@"\n' % py)
+        (bindir / "python").chmod(0o755)
     sh = tmp / "block.sh"
     sh.write_text("set -uo pipefail\n" + block(SCRIPTS[0]) + 'echo "EXPORTED=${YOLO_CONFIG_DIR:-}"\n')
     env = {k: v for k, v in os.environ.items() if not k.startswith(("YOLO_", "SLURM_", "LOCAL"))}
