@@ -1333,7 +1333,8 @@ def _audit_result(v, ev, exp, steps, share, expected=None):
                   "not_judged_reasons": dict(a.get("no_embedding_reasons") or {})
                   if isinstance(a.get("no_embedding_reasons"), dict) else {},
                   "without_baseline": dict(mix.get("species_without_baseline") or {})
-                  if isinstance(mix.get("species_without_baseline"), dict) else {}}
+                  if isinstance(mix.get("species_without_baseline"), dict) else {},
+                  "species_not_judged": _species_not_judged(a)}
         for ptr in (E.pointer("audits", s, "boxes"), E.pointer("audits", s, "species", "boxes_judged"),
                     E.pointer("audits", s, "species", "baseline_for_mix", "boxes"),
                     E.pointer("audits", s, "species", "above_baseline")):
@@ -1352,20 +1353,52 @@ def _audit_result(v, ev, exp, steps, share, expected=None):
             "verdict": "labels" if labels else "not_judged" if unjudged else "not_labels"}, cites
 
 
+# Why a species box gets no verdict, when that is a known limit of the audit rather than a defect of its inputs: a box
+# the intake left out (small, no_size), a crop whose embedding failed, a species the trusted probe never saw
+# (label_unseen), an image of the trusted set itself (in_trusted). The thresholds' audit_expected_coverage names them.
+KNOWN_LIMITS = ("small", "no_size", "failed", "label_unseen", "in_trusted")
+
+
+def _species_not_judged(a):
+    """{why: species boxes} of an audited step without a species verdict: the record's coverage block
+    (inc2.audit_stream), else its no_embedding reasons plus its in_trusted and label_unseen boxes (all labels)."""
+    cov = a.get("coverage") if isinstance(a.get("coverage"), dict) else {}
+    if isinstance(cov.get("species_not_judged"), dict):
+        return {str(k): int(_num(n) or 0) for k, n in cov["species_not_judged"].items() if int(_num(n) or 0)}
+    out = {str(k): int(_num(n) or 0) for k, n in (a.get("no_embedding_reasons") or {}).items()
+           if int(_num(n) or 0)} if isinstance(a.get("no_embedding_reasons"), dict) else {}
+    st = a.get("boxes_by_status") if isinstance(a.get("boxes_by_status"), dict) else {}
+    for k in ("in_trusted", "label_unseen"):
+        if int(_num(st.get(k)) or 0):
+            out[k] = out.get(k, 0) + int(_num(st.get(k)) or 0)
+    return out
+
+
 def _coverage_said(r):
-    """The coverage clause of a stream-lookup record with steps under the expected coverage, or ''."""
+    """The coverage clause of a stream-lookup record with steps under the expected coverage, or ''. The species
+    boxes not judged are split into the audit's known limits (KNOWN_LIMITS) and the rest; only the rest is called
+    a defect of the audit's inputs."""
     if not r.get("coverage_short"):
         return ""
     reasons = {}
     for s in r["coverage_short"]:
-        for k, n in r["steps"][s]["not_judged_reasons"].items():
+        for k, n in (r["steps"][s].get("species_not_judged") or r["steps"][s]["not_judged_reasons"]).items():
             reasons[k] = reasons.get(k, 0) + int(_num(n) or 0)
-    return ("; its coverage is short of the expected %s on %s (%s species boxes judged; not judged: %s): the audit "
-            "read Step 1's and the stream's crops, so this is a defect of its inputs to look into, not a known limit"
+    known = {k: n for k, n in reasons.items() if k in KNOWN_LIMITS}
+    defect = {k: n for k, n in reasons.items() if k not in KNOWN_LIMITS}
+    parts = []
+    if defect:
+        parts.append("%s: the audit read Step 1's and the stream's crops, so this is a defect of its inputs to look "
+                     "into" % ", ".join("%s %d" % kv for kv in sorted(defect.items())))
+    if known:
+        parts.append("%s: known limits of the audit (boxes the intake left out, failed crops, species the trusted "
+                     "probe never saw, trusted images), not a defect of its inputs"
+                     % ", ".join("%s %d" % kv for kv in sorted(known.items())))
+    return ("; its coverage is short of the expected %s on %s (%s species boxes judged; not judged: %s)"
             % (r.get("expected_coverage"), ", ".join(r["coverage_short"]),
                ", ".join("%s %d of %d" % (s, r["steps"][s]["judged"], r["steps"][s]["species_boxes"])
                          for s in r["coverage_short"]),
-               ", ".join("%s %d" % kv for kv in sorted(reasons.items())) or "no reason recorded"))
+               "; ".join(parts) or "no reason recorded: a defect of the audit's inputs to look into"))
 
 
 def _audit_said(exp, r):

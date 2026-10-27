@@ -35,6 +35,19 @@ once in its file), runs that mutant's test file against the copy and requires it
   AS25   audit_stream      no stream lookup, on s002's inc0005 (the cluster's records)
   AS26   audit_stream      keep ignored, on s002's inc0005 (its masked admissions)
   AS27   diagnose_stream   the judged share over all boxes, on s002's records
+  AS28   audit_stream      a rejoin row's original never followed (its batch has no crops.csv)
+  AS29   audit_stream      a backfill row (b0000, input v1) never routed to Step 1's crops
+  AS30   audit_stream      a rejoin row's crops looked up under its own key, not its original's
+  AS31   audit_stream      the Step 1 route ignores keep (label box j read as the original's box j)
+  AS32   audit_stream      the intake verdict and class of a row found through its original not its admission's
+  AS33   audit_stream      the admission record never checked against its queue row
+  AS34   audit_stream      the check ignores n_masked
+  AS35   audit_stream      the check ignores the kept species counts
+  AS36   audit_stream      the audited increments' stream.json ignored (always the default directory)
+  AS37   audit_stream      increments of streams naming different directories not refused
+  AS38   audit_stream      the batches read without the originals' keys
+  AS39   diagnose_stream   every unjudged reason called a defect (no known limits)
+  AS40   diagnose_stream   the record's own coverage reasons ignored (no_embedding reasons read instead)
 
 Run:  python3 tests/test_inc2_audit_stream_mutants.py [AS1 AS5 ...]
 """
@@ -59,8 +72,8 @@ MUTANTS = {
     "AS1": (AST, "            k = int(keep[j])\n", "            k = j\n", T1),
     "AS2": (AST, "            ok = [i for i, dl in zip(ids, deltas) if dl <= AU.GEOM_TOL]\n",
             "            ok = list(ids)\n", T1),
-    "AS3": (AST, "            return (i, None, dl) if b.finite(i) else (i, V.FAILED, dl)\n",
-            "            return (i, None, dl)\n", T1),
+    "AS3": (AST, "            return (i, None, dl, k) if src.finite(i) else (i, V.FAILED, dl, k)\n",
+            "            return (i, None, dl, k)\n", T1),
     "AS4": (AST, "    return img in trusted[0] or img in trusted[2] or sha in trusted[1]\n", "    return False\n", T1),
     "AS5": (AST, '                     if q.get("image") == r["image"] and q.get("sha256") == r["sha256"]]\n',
             '                     if q.get("image") == r["image"]]\n', T1),
@@ -73,11 +86,12 @@ MUTANTS = {
     "AS11": (AST, '            if not line.endswith(b"\\n"):\n                break\n',
              '            if False:\n                break\n', T1),
     "AS12": (AST, "        if rp == rr or rr in rp.parents:\n", "        if False:\n", T1),
-    "AS13": (AST, "    sindex = StreamIndex(root, need)\n", "    sindex = StreamIndex(root, [])\n", T1),
+    "AS13": (AST, "    sindex = StreamIndex(root, need, root_from)\n", "    sindex = StreamIndex(root, [], root_from)\n",
+             T1),
     "AS14": (AST, '        if not info or info.get("crops_sha256") != crops.sha:\n', "        if not info:\n", T1),
     "AS15": (AST, "                S_NO_CROPS: AU.IMAGE_NOT_IN_CROPS,", "                S_NO_CROPS: AU.NO_CROP_ROW,", T1),
     "AS16": (AST, '            return -1, (why if why in ("small", "no_size") else S_UNMAPPED if why == S_UNMAPPED else '
-                  'S_NO_CROP_ROW), None\n', "            return -1, S_NO_CROP_ROW, None\n", T1),
+                  'S_NO_CROP_ROW), None, k\n', "            return -1, S_NO_CROP_ROW, None, k\n", T1),
     "AS17": (AST, '        refuse = mine and mine[0]["status"] == AU.IN_TRUSTED or in_trusted_stream(q, trusted)\n',
              "        refuse = in_trusted_stream(q, trusted)\n", T1),
     "AS18": (DSM, '    short = [s for s in steps if stream and expected is not None and per[s]["species_boxes"] > 0\n',
@@ -89,9 +103,27 @@ MUTANTS = {
     "AS23": (JOB, 'python -u -m weed_optimizer_framework.tools.inc2.audit_stream "$@"',
              'python -u -m weed_optimizer_framework.tools.inc.audit "$@"', T1),
     "AS24": (DEP, "  run_inc_audit.sh\n", "\n", T1),
-    "AS25": (AST, "    sindex = StreamIndex(root, need)\n", "    sindex = StreamIndex(root, [])\n", T3),
+    "AS25": (AST, "    sindex = StreamIndex(root, need, root_from)\n", "    sindex = StreamIndex(root, [], root_from)\n",
+             T3),
     "AS26": (AST, "            k = int(keep[j])\n", "            k = j\n", T3),
     "AS27": (DSM, "        species_boxes = _species_boxes(a, boxes)\n", "        species_boxes = boxes\n", T3),
+    "AS28": (AST, '    if m and q.get("supersedes"):\n', "    if False:\n", T1),
+    "AS29": (AST, '    if batch.kind == KIND_BACKFILL and inp == "v1":\n', "    if False:\n", T1),
+    "AS30": (AST, '        return (q, b, sb, str(q["supersedes"])), None\n', '        return (q, b, sb, q["key"]), None\n', T1),
+    "AS31": (AST, "            i, why, dl = self.s1.box(ref, k, box)", "            i, why, dl = self.s1.box(ref, j, box)", T1),
+    "AS32": (AST, '        adm = b.admission.get(q["key"]) or {}\n', "        adm = {}\n", T1),
+    "AS33": (AST, "        if not admission_matches(adm, q):\n", "        if False:\n", T1),
+    "AS34": (AST, '    if q.get("n_masked") is not None and int(q["n_masked"]) != len(adm.get("mask") or []):\n',
+             "    if False:\n", T1),
+    "AS35": (AST, "        if got != [int(x) for x in sp]:\n", "        if False:\n", T1),
+    "AS36": (AST, '    root, root_from = (Path(stream_dir), "--stream-dir") if stream_dir else stream_root(audits)\n',
+             '    root, root_from = (Path(stream_dir), "--stream-dir") if stream_dir else (default_root(), "default")\n',
+             T1),
+    "AS37": (AST, "    if len(named) > 1:\n", "    if False:\n", T1),
+    "AS38": (AST, '        bkeys = keys | {str(q["supersedes"]) for q in self.match.values() if q.get("supersedes")}\n',
+             "        bkeys = keys\n", T1),
+    "AS39": (DSM, 'KNOWN_LIMITS = ("small", "no_size", "failed", "label_unseen", "in_trusted")\n', "KNOWN_LIMITS = ()\n", T2),
+    "AS40": (DSM, '    if isinstance(cov.get("species_not_judged"), dict):\n', "    if False:\n", T2),
 }
 
 

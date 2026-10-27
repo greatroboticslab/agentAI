@@ -6,7 +6,9 @@ audited box's crop and BioCLIP-2 embedding also looked up in the stream's commit
         --audit NAME=MANIFEST.jsonl [NAME=MANIFEST.jsonl ...] --out OUT.json [--nshards N] [--stream-dir DIR]
 
 run_inc_audit.sh, the job script of lever L4, runs this module. Its arguments are inc/audit.py's, plus
---stream-dir (default INC_DIR/step1_stream, which every L4 uses).
+--stream-dir. Without it the directory is the step1_stream that the audited increments' stream names
+(<stream>/stream.json, read for each audited manifest at <stream>/increments/<name>.jsonl), else INC_DIR/step1_stream
+(inc2.stream's default, which every stream so far uses).
 
 Why. inc/audit.py (pinned) finds a box's crop only among the images Step 1's crops.csv was cut from. The stream's
 increments are cut from step1_stream queue rows, whose boxes were cropped, embedded and judged at their own intake
@@ -32,8 +34,19 @@ What is added: the lookup of an audited image Step 1 does not hold (inc/audit.py
   * The batch's files, each refused unless it describes the batch's crops.csv (verify.Crops): crops_info.json
     (crops_sha256, and skipped_sha256 of crops_skipped.csv), emb.npz and verdicts.npz (their meta crops_sha256),
     and batch.json's own record of crops.csv, emb.npz and verdicts.npz (inputs.<file>.sha256). A batch that fails
-    one is an AuditError: no output, as inc/audit.py refuses stale Step 1 inputs. A batch without crops.csv (the
-    backfill b0000: its rows are v1 pool rows, which Step 1 holds) leaves its rows image_not_in_crops.
+    one is an AuditError: no output, as inc/audit.py refuses stale Step 1 inputs.
+  * The admission record. batch.json records no hash of admission.jsonl, so each record is checked against the
+    queue row it admitted instead: the same admission (whole / masked), as many masked boxes (n_masked), and per
+    class as many kept boxes as the row counts (species_boxes, other_boxes). A record that disagrees leaves the
+    row's boxes not judged (admission_mismatch, counted as no_crop_row); the rest of the audit runs.
+  * A batch without crops.csv. Its rows were cut where their unmasked original was: a rejoin row
+    (inc2.step1_stream.rejoin: key <original>__rjN, supersedes <original>, input rejoin_vN:<the original's input>)
+    in the original's intake batch (input bNNNN:...), under the original's key, or in Step 1 for a v1 row (input
+    v1); a backfill row (b0000, input v1, whole or masked) in Step 1. Step 1's crops of the unmasked original are
+    found as inc/audit.py finds an image (CropIndex: by path, else sha256). The keep list is the row's own batch's
+    admission record (a rejoin relabels in place: its boxes are the original's, in the original's order); the
+    intake verdict and class reported beside the audit's are that record's (the verdict under the label it
+    admitted). A row of a batch without crops.csv and without such an original stays image_not_in_crops.
   * The box. Label box j of a whole admission is the image's box j; of a masked admission it is box keep[j] of the
     batch's admission record (admission.jsonl; inc2.mask.decide keeps the label's boxes in that order). Its crop row
     (key, box) is used only when its (cx, cy, w, h) lie within inc/audit.py's GEOM_TOL of the label's
@@ -48,11 +61,12 @@ its canary against v1's features), so the probe judges it as it judges a Step 1 
 carry crop_set stream/<batch>, matched_by stream and the crop id local to that batch.
 
 Added to OUT.json, beside inc/audit.py's keys (none of which changes): "lookup" ("step1+step1_stream"; the trusted
-block's "lookup" is "step1"); inputs.step1_stream (the root, the queue's sha256 over the lines read, each batch's
-files and their sha256); per audited manifest images_in_stream, images_without_crops and a "stream" block (boxes
-located per batch, the stream's causes for the rest, the intake verdict of each located box against the audit's,
-labels that differ from the class at intake) and "coverage" (species-labelled boxes and those judged). OUT.md gets
-one more section.
+block's "lookup" is "step1"); inputs.step1_stream (the root and where it came from, the queue's sha256 over the
+lines read, each batch's files and their sha256); per audited manifest images_in_stream, images_without_crops and
+a "stream" block (boxes located per batch, the stream's causes for the rest, the intake verdict of each located
+box against the audit's, labels that differ from the class at intake, rows found through their original) and
+"coverage" (species-labelled boxes, those judged, and why the others were not). OUT.md gets one more section. A
+box found through its original has crop_set stream/<its batch>/via/<the original's batch or step1>.
 """
 from __future__ import annotations
 
@@ -96,11 +110,20 @@ S_NOT_ADMITTED = "not_whole_or_masked"           # the record admits the image n
 S_NOT_KEPT = "label_box_not_kept"                # the label holds more boxes than the admission kept
 S_NO_CROP_ROW = "no_crop_row"
 S_UNMAPPED = "unmapped"                          # crops_skipped.csv: an unmapped class id (never embedded)
+S_ADMISSION_MISMATCH = "admission_mismatch"      # the admission record does not describe the queue row
+S_SOURCE_MISSING = "original_not_found"          # a row of a batch without crops.csv: its original's crops not found
 AUDIT_REASON = {S_NOT_IN_QUEUE: AU.IMAGE_NOT_IN_CROPS, S_NOT_COMMITTED: AU.IMAGE_NOT_IN_CROPS,
                 S_NO_CROPS: AU.IMAGE_NOT_IN_CROPS, S_NO_ADMISSION: AU.NO_CROP_ROW, S_NOT_ADMITTED: AU.NO_CROP_ROW,
                 S_NOT_KEPT: AU.NO_CROP_ROW, S_NO_CROP_ROW: AU.NO_CROP_ROW, S_UNMAPPED: AU.NO_CROP_ROW,
+                S_ADMISSION_MISMATCH: AU.NO_CROP_ROW, S_SOURCE_MISSING: AU.IMAGE_NOT_IN_CROPS,
+                AU.IMAGE_CHANGED: AU.IMAGE_CHANGED,
                 AU.GEOMETRY_MISMATCH: AU.GEOMETRY_MISMATCH, V.FAILED: V.FAILED, "small": "small",
                 "no_size": "no_size"}
+# Where a row of a batch without crops.csv was cut (inc2.step1_stream: rejoin and backfill)
+VIA_STEP1 = "step1"
+KIND_BACKFILL = "backfill"                       # inc2.step1_stream.KIND_BACKFILL
+REJOIN_INPUT = re.compile(r"^rejoin_v\d+:(.*)$")  # a rejoin row's input: rejoin_v<N>:<the original's input>
+BATCH_INPUT = re.compile(r"^(b\d{4,}):")          # a stream row's input as a rejoin records it: <batch>:<input>
 
 
 def log(msg):
@@ -110,6 +133,33 @@ def log(msg):
 def default_root():
     """INC_DIR/step1_stream (inc2.step1_stream.Layout().root)."""
     return C.INC_DIR / "step1_stream"
+
+
+def stream_root(audits):
+    """(root, where it came from) of the stream's Step 1 directory for the audited manifests [(name, path)]: the
+    step1_stream that stream.json names for every audited manifest that is a stream increment
+    (<stream>/increments/<name>.jsonl beside <stream>/stream.json; inc2.stream writes the directory there, and a
+    fork inherits it), else default_root(). Increments of streams naming different directories are refused."""
+    named = {}
+    for _n, p in audits:
+        p = Path(p)
+        sj = p.parent.parent / "stream.json"
+        if p.parent.name != "increments" or not sj.is_file():
+            continue
+        try:
+            d = json.loads(sj.read_text())
+        except (OSError, ValueError) as e:
+            raise AU.AuditError("%s: unreadable (%s)" % (sj, e))
+        s1 = d.get("step1_stream") if isinstance(d, dict) else None
+        if s1:
+            named.setdefault(str(s1), str(sj))
+    if len(named) > 1:
+        raise AU.AuditError("the audited increments' streams name different Step 1 directories (%s): pass "
+                            "--stream-dir" % ", ".join("%s in %s" % kv for kv in sorted(named.items())))
+    if named:
+        s1, sj = next(iter(named.items()))
+        return Path(s1), "stream.json %s" % sj
+    return default_root(), "default"
 
 
 def _sha_file(path):
@@ -165,10 +215,19 @@ class StreamBatch:
         self.has_crops = (self.dir / "crops.csv").is_file()
         self.record = {"batch": bid, "committed": self.committed, "has_crops": self.has_crops}
         self.row_of, self.skipped, self.admission = {}, {}, {}
-        if not (self.committed and self.has_crops):
+        self.kind = None
+        if not self.committed:
             return
         d = self.dir
-        doc = V._read_json(d / "batch.json")
+        doc = V._read_json(d / "batch.json") or {}
+        self.kind = doc.get("kind")
+        if (d / "admission.jsonl").is_file():
+            got, asha, an, _ab = _jsonl_by_key(d / "admission.jsonl", keys, parse_all=True)
+            self.admission = {k: v[-1][1] for k, v in got.items()}
+            self.record["admission"] = {"sha256_of_lines_read": asha, "lines": an, "records_of_keys": len(got)}
+        if not self.has_crops:
+            self.record.update({"kind": self.kind, "input": doc.get("input")})
+            return
         try:
             crops = V.Crops(d / "crops.csv")
         except V.VerifyError as e:
@@ -214,9 +273,6 @@ class StreamBatch:
             for _st, key, box, reason in rd:
                 if key in keys:
                     self.skipped[(key, int(box))] = reason
-        if (d / "admission.jsonl").is_file():
-            got, _sha, _n, _b = _jsonl_by_key(d / "admission.jsonl", keys, parse_all=True)
-            self.admission = {k: v[-1][1] for k, v in got.items()}
         self.record.update({"kind": doc.get("kind"), "input": doc.get("input"),
                             "crops": {"sha256": crops.sha, "rows": int(crops.n)},
                             "emb": {"sha256": shas["emb"], "embedder": emeta.get("embedder"), "dim": emeta.get("dim")},
@@ -230,24 +286,78 @@ class StreamBatch:
         return self.X[self.pos[i]]
 
 
-class StreamIndex:
-    """Where, among the stream's committed batches, each audited row's queue row and crops are."""
+def admission_matches(adm, q):
+    """True when a batch's admission record of a key describes the queue row it admitted (inc2.step1_stream writes
+    both from one decision): the same admission, as many masked boxes as the row's n_masked, and per class as many
+    kept boxes (labels[keep]) as the row's species_boxes and other_boxes, each where the row records it.
+    admission.jsonl is not among the files batch.json hashes, so this is how a stale or foreign record is caught."""
+    if q.get("admission") is not None and q.get("admission") != adm.get("admission"):
+        return False
+    if q.get("n_masked") is not None and int(q["n_masked"]) != len(adm.get("mask") or []):
+        return False
+    sp, ob = q.get("species_boxes"), q.get("other_boxes")
+    if sp is None and ob is None:
+        return True
+    labels, keep = adm.get("labels"), adm.get("keep")
+    if not isinstance(labels, list) or not isinstance(keep, list):
+        return False
+    try:
+        kept = [int(labels[int(b)]) for b in keep]
+    except (IndexError, TypeError, ValueError):
+        return False
+    if sp is not None:
+        got = [0] * len(sp)
+        for lab in kept:
+            if 0 <= lab < len(sp):
+                got[lab] += 1
+        if got != [int(x) for x in sp]:
+            return False
+    return ob is None or sum(1 for lab in kept if lab == AU.OTHER) == int(ob)
 
-    def __init__(self, root, rows):
+
+def crop_source(q, batch):
+    """Where the crops of a queue row of a batch without crops.csv were cut: VIA_STEP1, a batch id, or None. A
+    rejoin row (input rejoin_vN:<the original's input>, supersedes <the original's key>) was cut where its original
+    was: Step 1 for a v1 row (input v1), its intake batch for a stream row (input bNNNN:...). A backfill row (b0000,
+    input v1) is a v1 pool row, its unmasked original cut by Step 1."""
+    inp = str(q.get("input") or "")
+    m = REJOIN_INPUT.match(inp)
+    if m and q.get("supersedes"):
+        rest = m.group(1)
+        if rest == "v1":
+            return VIA_STEP1
+        mb = BATCH_INPUT.match(rest)
+        return mb.group(1) if mb else None
+    if batch.kind == KIND_BACKFILL and inp == "v1":
+        return VIA_STEP1
+    return None
+
+
+def _unmasked(q):
+    """The pseudo manifest row of a queue row's unmasked original (CropIndex looks up image, then sha256)."""
+    return {"image": q.get("unmasked_image") or q.get("image"), "sha256": q.get("unmasked_sha256") or q.get("sha256")}
+
+
+class StreamIndex:
+    """Where, among the stream's committed batches, each audited row's queue row and crops are. An entry is
+    (queue row, its batch, the crops' source, the source's key): the source is the row's own batch, the batch of
+    its original (rejoin), or VIA_STEP1 with the Step 1 entry of its unmasked original (rejoin of a v1 row,
+    backfill)."""
+
+    def __init__(self, root, rows, root_from="--stream-dir"):
         self.root = Path(root)
         self.queue_path = self.root / QUEUE
         self.present = self.queue_path.is_file() and (self.root / BATCHES).is_dir()
-        self.batches, self.match = {}, {}
+        self.batches, self.match, self.via = {}, {}, {}
+        self.s1 = None
         self.queue = {"path": str(self.queue_path), "present": self.present}
+        self.root_from = root_from
         keys = {r["key"] for r in rows}
         if not self.present or not keys:
             return
         found, sha, n, size = _jsonl_by_key(self.queue_path, keys)
         self.queue.update({"sha256_of_lines_read": sha, "lines": n, "bytes": size,
                            "rows_of_audited_keys": sum(len(v) for v in found.values())})
-        bids = sorted({str(q.get("batch")) for v in found.values() for _n, q in v if q.get("batch")})
-        for bid in bids:
-            self.batches[bid] = StreamBatch(self.root, bid, keys)
         ambiguous = label_changed = 0
         for r in rows:
             cands = [(n, q) for n, q in found.get(r["key"], ())
@@ -260,58 +370,122 @@ class StreamIndex:
             pick.sort(key=lambda nq: (str(nq[1].get("batch")), nq[0]))
             ambiguous += 1 if len(pick) > 1 else 0
             self.match[(r["key"], r["image"], r["sha256"])] = pick[-1][1]
+        # a rejoin row's crops are its original's, under the original's key
+        bkeys = keys | {str(q["supersedes"]) for q in self.match.values() if q.get("supersedes")}
+        bids = sorted({str(q.get("batch")) for v in found.values() for _n, q in v if q.get("batch")})
+        for bid in bids:
+            self.batches[bid] = StreamBatch(self.root, bid, bkeys)
+        for mk, q in self.match.items():
+            b = self.batches.get(str(q.get("batch")))
+            if b is None or not b.committed or b.has_crops:
+                continue
+            src = crop_source(q, b)
+            if src is None:
+                continue
+            self.via[mk] = src
+            if src != VIA_STEP1 and src not in self.batches:
+                self.batches[src] = StreamBatch(self.root, src, bkeys)
         self.queue.update({"rows_matched": len(self.match), "matched_among_several": ambiguous,
-                           "matched_with_another_label": label_changed})
+                           "matched_with_another_label": label_changed,
+                           "rows_via_their_original": dict(sorted(collections.Counter(
+                               "step1" if v == VIA_STEP1 else "batch" for v in self.via.values()).items()))})
+
+    def attach_step1(self, crops, X):
+        """Step 1's crops of the unmasked originals of the rows cut there (inc/audit.py's CropIndex, unchanged)."""
+        need = [(_unmasked(self.match[mk]), ()) for mk, v in sorted(self.via.items()) if v == VIA_STEP1]
+        if need:
+            self.s1 = AU.CropIndex(crops, X, [need])
 
     def queue_row(self, row):
         return self.match.get((row["key"], row["image"], row["sha256"]))
 
     def entry(self, row):
-        """(queue row, batch) of row, or (None, the stream's cause)."""
+        """(queue row, batch, source, source key) of row, or (None, the stream's cause)."""
         q = self.queue_row(row)
         if q is None:
             return None, S_NOT_IN_QUEUE
         b = self.batches.get(str(q.get("batch")))
         if b is None or not b.committed:
             return None, S_NOT_COMMITTED
-        if not b.has_crops:
+        if b.has_crops:
+            return (q, b, b, q["key"]), None
+        src = self.via.get((row["key"], row["image"], row["sha256"]))
+        if src is None:
             return None, S_NO_CROPS
-        return (q, b), None
+        if src == VIA_STEP1:
+            if self.s1 is None:
+                return None, S_SOURCE_MISSING
+            e1, how = self.s1.image(_unmasked(q))
+            if e1 is None:
+                return None, AU.IMAGE_CHANGED if how == AU.IMAGE_CHANGED else S_SOURCE_MISSING
+            return (q, b, VIA_STEP1, e1), None
+        sb = self.batches.get(src)
+        if sb is None or not sb.committed or not sb.has_crops:
+            return None, S_SOURCE_MISSING
+        return (q, b, sb, str(q["supersedes"])), None
 
     def box(self, entry, j, box):
-        """(local crop id, the stream's cause or None, geometry delta) of label box j of the entry's image."""
-        q, b = entry
+        """(crop id in the source, the stream's cause or None, geometry delta, the original's box index) of label
+        box j of the entry's image."""
+        q, b, src, ref = entry
         adm = b.admission.get(q["key"])
         if adm is None:
-            return -1, S_NO_ADMISSION, None
+            return -1, S_NO_ADMISSION, None, None
+        if adm.get("admission") not in (WHOLE, MASKED):
+            return -1, S_NOT_ADMITTED, None, None
+        if not admission_matches(adm, q):
+            return -1, S_ADMISSION_MISMATCH, None, None
         if adm.get("admission") == MASKED:
             keep = list(adm.get("keep") or [])
             if j >= len(keep):
-                return -1, S_NOT_KEPT, None
+                return -1, S_NOT_KEPT, None, None
             k = int(keep[j])
-        elif adm.get("admission") == WHOLE:
-            k = j
         else:
-            return -1, S_NOT_ADMITTED, None
-        ids = b.row_of.get((q["key"], k), [])
+            k = j
+        if src == VIA_STEP1:
+            i, why, dl = self.s1.box(ref, k, box)       # inc/audit.py's lookup: geometry, finiteness, skipped
+            return i, why, dl, k
+        ids = src.row_of.get((ref, k), [])
         if ids:
-            cr = b.crops
+            cr = src.crops
             deltas = [max(abs(cr.cx[i] - box[1]), abs(cr.cy[i] - box[2]), abs(cr.w[i] - box[3]),
                           abs(cr.h[i] - box[4])) for i in ids]
             ok = [i for i, dl in zip(ids, deltas) if dl <= AU.GEOM_TOL]
             if not ok:
                 jj = int(np.argmin(deltas))
-                return ids[jj], AU.GEOMETRY_MISMATCH, float(deltas[jj])
+                return ids[jj], AU.GEOMETRY_MISMATCH, float(deltas[jj]), k
             i = ok[0]
             dl = float(deltas[ids.index(i)])
-            return (i, None, dl) if b.finite(i) else (i, V.FAILED, dl)
-        why = b.skipped.get((q["key"], k))
+            return (i, None, dl, k) if src.finite(i) else (i, V.FAILED, dl, k)
+        why = src.skipped.get((ref, k))
         if why is not None:
-            return -1, (why if why in ("small", "no_size") else S_UNMAPPED if why == S_UNMAPPED else S_NO_CROP_ROW), None
-        return -1, S_NO_CROP_ROW, None
+            return -1, (why if why in ("small", "no_size") else S_UNMAPPED if why == S_UNMAPPED else S_NO_CROP_ROW), None, k
+        return -1, S_NO_CROP_ROW, None, k
+
+    @staticmethod
+    def crop_set(entry):
+        """crop_set of a located box: stream/<batch>, or stream/<batch>/via/<the original's batch or step1>."""
+        q, b, src, _ref = entry
+        if src is b:
+            return "%s/%s" % (STREAM_SET, b.bid)
+        return "%s/%s/via/%s" % (STREAM_SET, b.bid, VIA_STEP1 if src == VIA_STEP1 else src.bid)
+
+    def intake(self, entry, k, i):
+        """(intake verdict, class at intake) of the crop: the batch's verdicts.npz for its own crops; for a row cut
+        through its original, its own admission record's (the verdict under the label it admitted)."""
+        q, b, src, _ref = entry
+        if src is b:
+            return b.intake[i], int(b.crops.label[i])
+        adm = b.admission.get(q["key"]) or {}
+        vs, labs = adm.get("verdicts") or [], adm.get("labels") or []
+        return (str(vs[k]) if k < len(vs) else "?"), (int(labs[k]) if k < len(labs) else -1)
+
+    def vector(self, entry, i):
+        _q, _b, src, _ref = entry
+        return self.s1.X[i] if src == VIA_STEP1 else src.vector(i)
 
     def record(self):
-        return {"root": str(self.root), "present": self.present, "queue": self.queue,
+        return {"root": str(self.root), "root_from": self.root_from, "present": self.present, "queue": self.queue,
                 "batches": {bid: b.record for bid, b in sorted(self.batches.items())}}
 
 
@@ -375,18 +549,19 @@ def resolve(index, sindex, rows, trusted, vectors):
                 rec.update(status=AU.NO_EMB, reason=AUDIT_REASON[cause])
                 rec["_stream"] = cause
                 continue
-            qrow, batch = entry
+            batch = entry[1]
             rec["matched_by"] = MATCHED_BY_STREAM
-            i, why, d = sindex.box(entry, k, b)
+            i, why, d, ko = sindex.box(entry, k, b)
             rec["geom_delta"] = d
             rec["_batch"] = batch.bid
+            if entry[2] is not batch:
+                rec["_via"] = VIA_STEP1 if entry[2] == VIA_STEP1 else entry[2].bid
             if i >= 0:
-                rec["crop_set"] = "%s/%s" % (STREAM_SET, batch.bid)
+                rec["crop_set"] = sindex.crop_set(entry)
                 rec["_local"] = int(i)
-                rec["_intake"] = batch.intake[i]
-                rec["_intake_label"] = int(batch.crops.label[i])
+                rec["_intake"], rec["_intake_label"] = sindex.intake(entry, ko, i)
             if why is not None:
-                rec.update(status=AU.NO_EMB, reason=AUDIT_REASON[why])
+                rec.update(status=AU.NO_EMB, reason=AUDIT_REASON.get(why, why))
                 rec["_stream"] = why
                 if i >= 0:
                     rec["crop_id"] = int(i)
@@ -394,7 +569,7 @@ def resolve(index, sindex, rows, trusted, vectors):
             rec.update(status=None, reason=None)
             rec["_stream"] = "located"
             rec["crop_id"] = len(vectors)
-            vectors.append(batch.vector(i))
+            vectors.append(sindex.vector(entry, i))
     return recs
 
 
@@ -407,21 +582,26 @@ def stream_block(recs):
     intake = collections.Counter(r["_intake"] for r in loc)
     pairs = collections.Counter("%s -> %s" % (r["_intake"], r["status"]) for r in loc)
     differs = sum(1 for r in loc if r["_intake_label"] != r["label"])
+    via = collections.Counter("%s via %s" % (r["_batch"], r["_via"]) for r in loc if r.get("_via"))
     return {"images": len({r["key"] for r in st}), "boxes_looked_up": len(st), "boxes_located": len(loc),
             "per_batch": dict(sorted(per_batch.items())), "not_located": dict(sorted(causes.items())),
             "intake_verdicts": dict(sorted(intake.items())),
             "intake_vs_audit": dict(sorted(pairs.items(), key=lambda kv: (-kv[1], kv[0]))),
-            "label_differs_from_intake": differs}
+            "label_differs_from_intake": differs, "located_via_original": dict(sorted(via.items()))}
 
 
 def coverage(recs):
-    """Species-labelled boxes and those the audit gave a species verdict (the share D31 reads)."""
+    """Species-labelled boxes, those the audit gave a species verdict (the share D31 reads), and why the others
+    were not (the no_embedding reason, else the status: in_trusted, label_unseen)."""
     sp = [r for r in recs if r["label"] < AU.OTHER]
     judged = sum(1 for r in sp if r["status"] in AU.SPECIES_VERDICTS)
     ot = [r for r in recs if r["label"] == AU.OTHER]
+    why = collections.Counter((r["reason"] if r["status"] == AU.NO_EMB else r["status"])
+                              for r in sp if r["status"] not in AU.SPECIES_VERDICTS)
     return {"boxes": len(recs), "species_boxes": len(sp), "species_judged": judged,
             "species_judged_share": AU._rate(judged, len(sp)), "otherplant_boxes": len(ot),
-            "otherplant_judged": sum(1 for r in ot if r["status"] in AU.JUDGED)}
+            "otherplant_judged": sum(1 for r in ot if r["status"] in AU.JUDGED),
+            "species_not_judged": dict(sorted(why.items()))}
 
 
 # ------------------------------------------------------------------ the run
@@ -439,7 +619,7 @@ def run_audit(trusted_path, audits, out, nshards=None, stream_dir=None):
     """inc/audit.py's run_audit with the stream lookup for audited boxes; writes OUT.json, OUT.md and
     OUT_boxes.csv. Returns the result."""
     t0 = time.time()
-    root = Path(stream_dir) if stream_dir else default_root()
+    root, root_from = (Path(stream_dir), "--stream-dir") if stream_dir else stream_root(audits)
     trusted_path = Path(trusted_path)
     out_json, out_md, out_csv = AU._paths(out)
     manifests = [trusted_path] + [Path(p) for _n, p in audits]
@@ -512,9 +692,10 @@ def run_audit(trusted_path, audits, out, nshards=None, stream_dir=None):
     # the stream: the audited rows whose image Step 1 does not hold
     need = [r for _n, _p, rows in a_rows for r, _b in rows
             if index.image(r) == (None, AU.IMAGE_NOT_IN_CROPS)]
-    sindex = StreamIndex(root, need)
-    log("stream %s: %d audited image(s) not in Step 1; queue %s; batches %s"
-        % (root, len({r["key"] for r in need}), {k: v for k, v in sindex.queue.items() if k != "path"},
+    sindex = StreamIndex(root, need, root_from)
+    sindex.attach_step1(crops, X)
+    log("stream %s (%s): %d audited image(s) not in Step 1; queue %s; batches %s"
+        % (root, root_from, len({r["key"] for r in need}), {k: v for k, v in sindex.queue.items() if k != "path"},
            sorted(sindex.batches)))
     check_out(out, inputs + [b.dir / f for b in sindex.batches.values()
                              for f in ("crops.csv", "emb.npz", "verdicts.npz", "admission.jsonl")], root)
@@ -559,7 +740,8 @@ def run_audit(trusted_path, audits, out, nshards=None, stream_dir=None):
             "rows_in_shared_sessions": sum(1 for r, _b in rows if r.get("session") in t_sessions),
             "images_in_stream": len({r["key"] for r in recs if r.get("_batch")}),
             "images_without_crops": len({r["key"] for r in recs if r.get("_stream") in
-                                         (S_NOT_IN_QUEUE, S_NOT_COMMITTED, S_NO_CROPS)}),
+                                         (S_NOT_IN_QUEUE, S_NOT_COMMITTED, S_NO_CROPS, S_SOURCE_MISSING,
+                                          AU.IMAGE_CHANGED)}),
             "stream": sblk, "coverage": coverage(recs)})
         results[name] = blk
         sp, cv = blk["species"], blk["coverage"]
@@ -648,6 +830,11 @@ def _append_md(path, res):
             ", ".join("%s %d" % kv for kv in s["not_located"].items()) or "-",
             ", ".join("%s %d" % kv for kv in list(s["intake_vs_audit"].items())[:6]) or "-",
             s["label_differs_from_intake"]))
+    via = {name: res["audits"][name]["stream"].get("located_via_original") for name in res["audit_order"]}
+    if any(via.values()):
+        L += ["", "Located through their original (a rejoin row in its original's batch, a backfill or v1 rejoin row "
+              "in Step 1): %s." % "; ".join("%s: %s" % (n, ", ".join("%s %d" % kv for kv in v.items()))
+                                           for n, v in via.items() if v)]
     L.append("")
     path = Path(path)
     text = path.read_text() + "\n".join(L)

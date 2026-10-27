@@ -9,14 +9,17 @@ reading stands: few judged boxes are no finding, L4 is never called for again):
             all its boxes: a step mostly of the non-target class, every species box judged and compared, is
             conclusive (the record's coverage block, else its per_species blocks);
           * a stream-lookup record that judged under D31.audit_expected_coverage (0.9) of a step's species boxes
-            names the step in coverage_short, whatever the verdict: under the share it is not judged and its
-            summary calls it a defect of the audit's inputs (never "Step 1's crops only"); over the share and
-            under 0.9 the verdict stands and the summary adds the shortfall;
+            names the step in coverage_short, whatever the verdict: under the share it is not judged; over the
+            share and under 0.9 the verdict stands and the summary adds the shortfall. The summary splits the
+            unjudged species boxes into the audit's known limits (small, no_size, failed, label_unseen,
+            in_trusted) and the rest, and calls only the rest a defect of the audit's inputs (never "Step 1's
+            crops only");
           * a stream-lookup record of full coverage: no shortfall;
           * the live record of 2026-10-05 (lookup absent: Step 1 only) keeps its not-judged reading, and its summary
             now says the record predates the stream lookup and that a re-audit is a person's decision.
   world   the s001 case (tests/test_stream_ap_stalls.py's l4_world): a stream-lookup audit judging 60 % of each step
-          raises D31's card naming the coverage, calls for no L4; one judging every box (not above its baseline)
+          (the rest no_crop_row) raises D31's card naming the coverage as a defect of the audit's inputs, calls for
+          no L4; one judging every box (not above its baseline)
           raises none and reads 'labels are not the cause'.
   real    the same with the record the lab run of 2026-10-27 wrote for s001 on full copies of the cluster's files
           (tests/fixtures/audit_stream_s002, sha256 in FIXTURE.json lab_files): every species box judged, labels are
@@ -40,8 +43,9 @@ DS = STL.DS
 STEPS = ["inc0001", "inc0003", "inc0004"]
 
 
-def stream_record(judged, compared=None, above=False, species=1364, other=0, coverage_block=True):
-    """The live record of 2026-10-05, as inc2.audit_stream would write it with `judged` species verdicts per step."""
+def stream_record(judged, compared=None, above=False, species=1364, other=0, coverage_block=True, why="no_crop_row"):
+    """The live record of 2026-10-05, as inc2.audit_stream would write it with `judged` species verdicts per step,
+    the others not judged for `why`."""
     aud = json.loads(STL.AUDIT_BYTES)
     aud["lookup"] = "step1+step1_stream"
     for s in STEPS:
@@ -50,11 +54,12 @@ def stream_record(judged, compared=None, above=False, species=1364, other=0, cov
         sp = a["species"]
         sp.update(boxes_judged=judged, above_baseline=above, conflict=0, conflict_rate=0.0)
         sp["baseline_for_mix"]["boxes"] = judged if compared is None else compared
-        a["no_embedding_reasons"] = {"small": species - judged} if species > judged else {}
+        a["no_embedding_reasons"] = {why: species - judged} if species > judged else {}
         if coverage_block:
             a["coverage"] = {"boxes": species + other, "species_boxes": species, "species_judged": judged,
                              "species_judged_share": round(judged / float(species), 4) if species else None,
-                             "otherplant_boxes": other, "otherplant_judged": other}
+                             "otherplant_boxes": other, "otherplant_judged": other,
+                             "species_not_judged": {why: species - judged} if species > judged else {}}
         else:
             a.pop("coverage", None)
         if other:
@@ -95,7 +100,32 @@ def t_units():
           few["verdict"] == "not_judged" and few["coverage_short"] == STEPS, few)
     check("  its summary: a defect of the audit's inputs, not 'Step 1's crops only', not 'predates'",
           "defect of its inputs" in said and "Step 1's crops only" not in said and "predates" not in said
-          and "inc0001 300 of 1364" in said, said)
+          and "inc0001 300 of 1364" in said and "no_crop_row 3192" in said and "known limits" not in said, said)
+    lim = read(stream_record(300, why="small"))
+    said = DS._audit_said("x", lim)
+    check("  short for boxes the intake left out (small): named, as the audit's known limits, not a defect",
+          lim["coverage_short"] == STEPS and "known limits of the audit" in said and "small 3192" in said
+          and "so this is a defect" not in said, said)
+    uns = read(stream_record(1000, why="label_unseen"))
+    said = DS._audit_said("x", uns)
+    check("  short for species the probe never saw (label_unseen): the verdict stands, known limits, not a defect",
+          uns["verdict"] == "not_labels" and uns["coverage_short"] == STEPS and "label_unseen 1092" in said
+          and "known limits of the audit" in said and "so this is a defect" not in said, said)
+    mix = stream_record(1000, why="small")
+    for s_ in STEPS:
+        mix["audits"][s_]["coverage"]["species_not_judged"] = {"small": 200, "image_not_in_crops": 164}
+    said = DS._audit_said("x", read(mix))
+    check("  short for both: the known limits and the defect each named for what they are",
+          "image_not_in_crops 492: the audit read Step 1's and the stream's crops, so this is a defect" in said
+          and "small 600: known limits" in said, said)
+    old_t = stream_record(1000, coverage_block=False, why="no_crop_row")
+    for s_ in STEPS:
+        old_t["audits"][s_]["no_embedding_reasons"] = {}
+        old_t["audits"][s_]["boxes_by_status"] = dict(old_t["audits"][s_].get("boxes_by_status") or {},
+                                                      in_trusted=364)
+    said = DS._audit_said("x", read(old_t))
+    check("  a record without a coverage block: the in_trusted boxes of its statuses read as a known limit",
+          "in_trusted 1092: known limits" in said and "so this is a defect" not in said, said)
     mid = read(stream_record(1000))
     said = DS._audit_said("x", mid)
     check("a stream-lookup record judging 1,000 of 1,364 (over the share, under 0.9): the verdict stands "

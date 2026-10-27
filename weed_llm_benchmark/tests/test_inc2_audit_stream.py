@@ -20,6 +20,15 @@ What is pinned, and why:
   * refusals, never guesses: a batch whose crops_info.json, emb.npz or verdicts.npz does not describe its
     crops.csv, whose files do not hash as batch.json recorded them, whose embedding misses a crop, or whose
     embedder is not Step 1's stops the audit; no output under the stream's directory;
+  * a row of a batch without crops.csv is judged through its original: a rejoin row (masked or whole) on its
+    original intake batch's crops under the original's key, a rejoin of a v1 row and a masked backfill row on
+    Step 1's crops of the unmasked original, label box j on kept box keep[j]; their intake verdict and class are
+    their own admission record's; an original that is not there, or an input that names none, leaves the row
+    not judged (original_not_found, batch_without_crops);
+  * an admission record that disagrees with its queue row (n_masked, the kept species counts) leaves that row
+    not judged (admission_mismatch) and the audit runs on; a consistent one is judged;
+  * the stream's directory is --stream-dir, else the step1_stream that the audited increments' stream.json
+    names, else the default; increments of streams naming different directories are refused;
   * the intake verdict of every located box is reported beside the audit's; reruns are deterministic; the CLI
     takes --stream-dir.
 
@@ -313,10 +322,124 @@ def build_stream(p0_rows, paths):
     q = dq("b0002", "slugD__othersha", sp(2), batch=b2)
     sdef[-1] = dict(sdef[-1], sha256="f" * 64)
     defects["slugD__othersha"] = AS.S_NOT_IN_QUEUE
+
+    # Sorig: rows of batches without crops.csv, found through their original (a rejoin batch b0004; the backfill)
+    b4 = Batch("b0004", "rejoin")
+    sorig, orig = [], {"via": {}, "defects": {}, "mismatch": {}}
+
+    def counts(labels, keep):
+        sp_ = [0] * C.OTHER_PLANT
+        for b_ in keep:
+            if labels[b_] < C.OTHER_PLANT:
+                sp_[labels[b_]] += 1
+        return sp_, sum(1 for b_ in keep if labels[b_] == C.OTHER_PLANT)
+
+    def adm_rec(batch, key, labels, keep, verdicts, admission, supersedes=None):
+        rec = {"admission": admission, "image_verdict": "admitted", "keep": list(keep), "key": key,
+               "labels": list(labels), "mask": [b_ for b_ in range(len(labels)) if b_ not in keep],
+               "mask_record": None, "overlaps": [], "refusal": None, "source": "slugR", "verdicts": list(verdicts)}
+        if supersedes:
+            rec.update(supersedes=supersedes, changed_boxes=[0])
+        batch.adm.append(rec)
+
+    def orow(bid, key, boxes, keep, admission, inp, unmasked, unmasked_sha, supersedes=None, batch=None,
+             verdicts=None, add_adm=True):
+        """A queue row of a batch without crops.csv, its label the kept boxes, and its admission record."""
+        labels = [int(b_[0]) for b_ in boxes]
+        kept = [boxes[b_] for b_ in keep]
+        lp = _wl(lab_dir / "slugR" / (key.replace("/", "_") + ".txt"), kept)
+        if admission == "masked":
+            image, sha = root() / "images_masked" / "slugR" / (key + ".png"), C.sha256_text("masked:" + key)
+        else:
+            image, sha = unmasked, unmasked_sha
+        q = queue_row(bid, key, image, lp, "slugR", admission=admission, unmasked=unmasked,
+                      unmasked_sha=unmasked_sha, sha=sha)
+        sp_, ot_ = counts(labels, keep)
+        q.update(input=inp, supersedes=supersedes, n_masked=len(boxes) - len(keep), species_boxes=sp_,
+                 other_boxes=ot_)
+        if add_adm:
+            adm_rec(batch, key, labels, keep, verdicts or ["verified"] * len(boxes), admission, supersedes)
+        queue.append(q)
+        sorig.append(manifest_row(q))
+        return q, labels
+
+    def relabel(boxes, b_=0):
+        out = [tuple(x) for x in boxes]
+        out[b_] = ((out[b_][0] + 1) % C.OTHER_PLANT if out[b_][0] < C.OTHER_PLANT else 3,) + tuple(out[b_][1:])
+        return out
+
+    # (1) a masked rejoin of a whole b0001 row: its crops are b0001's, under the original's key
+    k1 = "slugS__img_005"
+    o1 = next(x for x in queue if x["key"] == k1)
+    bx1 = relabel(C.read_yolo(o1["label"]), 1)
+    _q, labs = orow("b0004", k1 + "__rj1", bx1, [0, 2], "masked", "rejoin_v1:b0001:intake:x", o1["image"],
+                    o1["sha256"], supersedes=k1, batch=b4, verdicts=["verified", "conflict", "unknown"])
+    orig["via"][k1 + "__rj1"] = ("b0001", k1, [0, 2], ["verified", "conflict", "unknown"], labs)
+    # (2) a whole rejoin of a b0002 row: the same image and bytes as its original, another key
+    k2 = "slugT__img_004"
+    o2 = next(x for x in queue if x["key"] == k2)
+    bx2 = relabel(C.read_yolo(o2["label"]), 0)
+    _q, labs = orow("b0004", k2 + "__rj1", bx2, [0, 1], "whole", "rejoin_v1:b0002:intake:x", o2["image"],
+                    o2["sha256"], supersedes=k2, batch=b4, verdicts=["unknown", "verified"])
+    orig["via"][k2 + "__rj1"] = ("b0002", k2, [0, 1], ["unknown", "verified"], labs)
+    # (3) a masked rejoin of a v1 row: its crops are Step 1's, of its unmasked original
+    pr = paths["pool_rows"][4]
+    bx3 = relabel(C.read_yolo(pr["label"]), 0)
+    _q, labs = orow("b0004", pr["key"] + "__rj1", bx3, [0, 2, 3], "masked", "rejoin_v1:v1", pr["image"],
+                    pr["sha256"], supersedes=pr["key"], batch=b4, verdicts=["verified", "conflict", "verified",
+                                                                             "unknown"])
+    orig["via"][pr["key"] + "__rj1"] = ("step1", pr["image"], [0, 2, 3], ["verified", "conflict", "verified",
+                                                                           "unknown"], labs)
+    # (4) a masked backfill row (b0000, input v1): Step 1 cut its unmasked original
+    pb = paths["pool_rows"][7]
+    bxb = [tuple(x) for x in C.read_yolo(pb["label"])]
+    _q, labs = orow("b0000", pb["key"], bxb, [1, 2], "masked", "v1", pb["image"], pb["sha256"], batch=b0,
+                    verdicts=["conflict", "verified", "verified", "conflict"])
+    orig["via"][pb["key"]] = ("step1", pb["image"], [1, 2], ["conflict", "verified", "verified", "conflict"], labs)
+    # defects: an original's batch that is not there; an input naming no original; a backfill row whose original
+    # Step 1 does not hold
+    orow("b0004", "slugR__lost__rj1", sp(2), [0, 1], "whole", "rejoin_v1:b0099:intake:x",
+         TMP / "repo" / "slugR_lost.jpg", C.sha256_text("img:lost"), supersedes="slugR__lost", batch=b4)
+    orig["defects"]["slugR__lost__rj1"] = AS.S_SOURCE_MISSING
+    orow("b0004", "slugR__reg__rj1", sp(2), [0, 1], "whole", "rejoin_v1:registry_x", TMP / "repo" / "slugR_reg.jpg",
+         C.sha256_text("img:reg"), supersedes="slugR__reg", batch=b4)
+    orig["defects"]["slugR__reg__rj1"] = AS.S_NO_CROPS
+    orow("b0000", "slugR__bfmiss", sp(2), [0], "masked", "v1", TMP / "repo" / "slugR_bfmiss.jpg",
+         C.sha256_text("img:bfmiss"), batch=b0)
+    orig["defects"]["slugR__bfmiss"] = AS.S_SOURCE_MISSING
+    # admission records that do not describe their queue rows (b0002 has crops): n_masked, the species counts
+    for key, field in (("slugR__mm_masked", "n_masked"), ("slugR__mm_species", "species_boxes")):
+        img = TMP / "repo" / "datasets" / "slugR" / (key + ".jpg")
+        bx = sp(2)
+        b2.add(key, img, "slugR", bx, [feat(b_[0]) for b_ in bx])
+        lp = _wl(lab_dir / "slugR" / (key + ".txt"), bx)
+        q = queue_row("b0002", key, img, lp, "slugR")
+        sp_, ot_ = counts([int(b_[0]) for b_ in bx], [0, 1])
+        q.update(n_masked=0, species_boxes=sp_, other_boxes=ot_)
+        if field == "n_masked":
+            q["n_masked"] = 1
+        else:
+            q["species_boxes"] = [x + (1 if j_ == 0 else 0) for j_, x in enumerate(sp_)]
+        queue.append(q)
+        sorig.append(manifest_row(q))
+        orig["mismatch"][key] = field
+    # and one that does (the check passes a consistent row)
+    key = "slugR__mm_ok"
+    img = TMP / "repo" / "datasets" / "slugR" / (key + ".jpg")
+    bx = sp(2)
+    b2.add(key, img, "slugR", bx, [feat(b_[0]) for b_ in bx])
+    q = queue_row("b0002", key, img, _wl(lab_dir / "slugR" / (key + ".txt"), bx), "slugR")
+    sp_, ot_ = counts([int(b_[0]) for b_ in bx], [0, 1])
+    q.update(n_masked=0, species_boxes=sp_, other_boxes=ot_)
+    queue.append(q)
+    sorig.append(manifest_row(q))
+    orig["mismatch"][key] = None
+
     b1.write()
     b2.write()
     b0.write(crops=False)
     b3.write(committed=False)
+    b4.write(crops=False)
     qp = root() / "queue" / "queue.jsonl"
     qp.parent.mkdir(parents=True, exist_ok=True)
     partial = queue_row("b0002", "slugD__partial", TMP / "repo" / "slugD_partial.jpg",
@@ -329,9 +452,11 @@ def build_stream(p0_rows, paths):
 
     mdir = TMP / "inc" / "stream_t" / "manifests"
     out = {"S1": mdir / "S1.jsonl", "Sdef": mdir / "Sdef.jsonl", "S1swap": mdir / "S1swap.jsonl",
-           "P0s": mdir / "P0s.jsonl"}
+           "P0s": mdir / "P0s.jsonl", "Sorig": mdir / "Sorig.jsonl"}
     C.write_manifest(out["S1"], s1)
     C.write_manifest(out["Sdef"], sdef)
+    C.write_manifest(out["Sorig"], sorig)
+    truth["orig"] = orig
     # S1swap: the same images, 40 % of the species boxes given one uniform wrong species
     srng = np.random.default_rng(7)
     swapped = []
@@ -516,6 +641,108 @@ def t_defects(spaths, defects):
               (root() / "queue" / "queue.jsonl").read_bytes().split(b"\n")) - 1)
 
 
+def t_originals(spaths, truth):
+    print("rows of batches without crops.csv, found through their original (rejoin, backfill)")
+    o = TMP / "og" / "a.json"
+    res = AS.run_audit(TA_P0, [("Sorig", spaths["Sorig"])], o)
+    a = res["audits"]["Sorig"]
+    rows = {}
+    for r in boxes_rows(o):
+        rows.setdefault(r["key"], []).append(r)
+    orig = truth["orig"]
+    s1 = V.Crops()
+    s1_id = {(s1.image[i], int(s1.box[i])): i for i in range(s1.n)}
+    batch_id = {}
+    for bid in ("b0001", "b0002"):
+        cr = V.Crops(root() / "batches" / bid / "crops.csv")
+        batch_id[bid] = {(cr.key[i], int(cr.box[i])): i for i in range(cr.n)}
+    for key, (src, ref, keep, _verdicts, _labels) in sorted(orig["via"].items()):
+        rs = rows[key]
+        own = "b0000" if src == "step1" and "__rj" not in key else "b0004"
+        want_ids = [s1_id[(ref, k)] if src == "step1" else batch_id[src][(ref, k)] for k in keep]
+        check("%s: every label box judged on the crop of kept box keep[j] of its original (%s, crop_set "
+              "stream/%s/via/%s)" % (key, src, own, src),
+              len(rs) == len(keep) and all(r["status"] in A.JUDGED and r["matched_by"] == "stream"
+                                           and r["crop_set"] == "stream/%s/via/%s" % (own, src)
+                                           and int(r["crop_id"]) == w for r, w in zip(rs, want_ids)),
+              [(r["status"], r["reason"], r["crop_set"], r["crop_id"]) for r in rs] + [want_ids])
+    st = a["stream"]
+    n_via = sum(len(v[2]) for v in orig["via"].values())
+    check("the stream block counts the boxes found through their original (%d)" % n_via,
+          sum(st["located_via_original"].values()) == n_via and st["located_via_original"].get(
+              "b0004 via step1") == 3 and st["located_via_original"].get("b0000 via step1") == 2
+          and st["located_via_original"].get("b0004 via b0001") == 2, st["located_via_original"])
+    want_v = {}
+    for key, (_src, _ref, keep, verdicts, labels) in orig["via"].items():
+        for k in keep:
+            want_v[verdicts[k]] = want_v.get(verdicts[k], 0) + 1
+    got_v = dict(st["intake_verdicts"])
+    for v_ in ("verified",):
+        got_v[v_] = got_v.get(v_, 0) - 2            # slugR__mm_ok's two boxes (b0002's own crops, all verified)
+    check("their intake verdicts are their own admission records' (the verdict under the label each admitted)",
+          {k: v for k, v in got_v.items() if v} == want_v, (st["intake_verdicts"], want_v))
+    check("their class at intake is the relabelled one (no label differs from intake)",
+          st["label_differs_from_intake"] == 0, st["label_differs_from_intake"])
+    check("the queue record counts the rows found through their original (step1 3, batch 3)",
+          res["inputs"]["step1_stream"]["queue"]["rows_via_their_original"] == {"batch": 3, "step1": 3},
+          res["inputs"]["step1_stream"]["queue"]["rows_via_their_original"])
+    for key, cause in sorted(orig["defects"].items()):
+        rs = rows[key]
+        check("%s: %s -> %s" % (key, cause, AS.AUDIT_REASON[cause]),
+              all(r["status"] == "no_embedding" and r["reason"] == AS.AUDIT_REASON[cause] for r in rs),
+              [(r["status"], r["reason"]) for r in rs])
+    for key, field in sorted(orig["mismatch"].items()):
+        rs = rows[key]
+        if field is None:
+            check("%s: an admission record that describes its queue row: judged" % key,
+                  all(r["status"] in A.JUDGED for r in rs), [(r["status"], r["reason"]) for r in rs])
+        else:
+            check("%s: an admission record whose %s disagrees with the queue row: not judged (no_crop_row), the "
+                  "audit runs on" % (key, field), all(r["status"] == "no_embedding" and r["reason"] == "no_crop_row"
+                                                        for r in rs), [(r["status"], r["reason"]) for r in rs])
+    nl = st["not_located"]
+    check("the stream block counts each cause (original_not_found 3, batch_without_crops 2, admission_mismatch 4)",
+          nl.get(AS.S_SOURCE_MISSING) == 3 and nl.get(AS.S_NO_CROPS) == 2 and nl.get(AS.S_ADMISSION_MISMATCH) == 4,
+          nl)
+    check("coverage: why the species boxes were not judged",
+          sum(a["coverage"]["species_not_judged"].values()) == a["coverage"]["species_boxes"]
+          - a["coverage"]["species_judged"], a["coverage"])
+    check("the MD notes the boxes found through their original", "Located through their original" in
+          A._paths(o)[1].read_text())
+
+
+def t_stream_root(spaths):
+    print("the stream's Step 1 directory: --stream-dir, else the audited increments' stream.json, else the default")
+    sdir = TMP / "inc" / "stream" / "s_t"
+    (sdir / "increments").mkdir(parents=True, exist_ok=True)
+    m = sdir / "increments" / "inc0001.jsonl"
+    m.write_bytes(spaths["S1"].read_bytes())
+    alt = TMP / "inc" / "elsewhere" / "step1_stream"
+    shutil.copytree(str(root()), str(alt))
+    V._write_json(sdir / "stream.json", {"sid": "s_t", "step1_stream": str(alt)})
+    res = AS.run_audit(TA_P0, [("inc0001", m)], TMP / "sr" / "a.json")
+    rec = res["inputs"]["step1_stream"]
+    check("an increment of a stream naming its Step 1 directory: that directory, recorded with where it came from",
+          rec["root"] == str(alt) and rec["root_from"] == "stream.json %s" % (sdir / "stream.json")
+          and res["audits"]["inc0001"]["stream"]["boxes_located"] > 0, (rec["root"], rec["root_from"]))
+    res = AS.run_audit(TA_P0, [("inc0001", m)], TMP / "sr" / "b.json", stream_dir=str(root()))
+    check("--stream-dir wins over stream.json", res["inputs"]["step1_stream"]["root"] == str(root())
+          and res["inputs"]["step1_stream"]["root_from"] == "--stream-dir")
+    res = AS.run_audit(TA_P0, [("S1", spaths["S1"])], TMP / "sr" / "c.json")
+    check("a manifest that is not a stream increment: the default directory",
+          res["inputs"]["step1_stream"]["root"] == str(root())
+          and res["inputs"]["step1_stream"]["root_from"] == "default")
+    s2 = TMP / "inc" / "stream" / "s_u"
+    (s2 / "increments").mkdir(parents=True, exist_ok=True)
+    m2 = s2 / "increments" / "inc0002.jsonl"
+    m2.write_bytes(spaths["S1"].read_bytes())
+    V._write_json(s2 / "stream.json", {"sid": "s_u", "step1_stream": str(root())})
+    check("increments of streams naming different directories: refused",
+          refused(lambda: AS.run_audit(TA_P0, [("inc0001", m), ("inc0002", m2)], TMP / "sr" / "d.json"),
+                  "name different Step 1 directories"))
+    shutil.rmtree(str(alt), ignore_errors=True)
+
+
 def t_refusals(spaths):
     print("refusals: a batch whose files do not describe its crops.csv")
     d = root() / "batches" / "b0001"
@@ -631,6 +858,8 @@ def main():
         t_trusted_step1_only(paths, spaths, None)
         first = t_stream(spaths, truth)
         t_defects(spaths, defects)
+        t_originals(spaths, truth)
+        t_stream_root(spaths)
         t_refusals(spaths)
         t_determinism_cli(spaths, first)
     except Exception as e:                       # noqa: BLE001
