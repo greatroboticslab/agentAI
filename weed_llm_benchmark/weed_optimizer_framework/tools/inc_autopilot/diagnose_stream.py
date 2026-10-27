@@ -1267,19 +1267,41 @@ def d30(v, prior=None):
 
 
 AUDIT_ART = "%s/audit/label_audit.json"     # where L4 writes its record (levers.audit_args)
+STREAM_LOOKUP = "step1_stream"               # in a record's "lookup" (inc2.audit_stream.LOOKUP): the stream was read
+RERUN = "remote.py submit audit refuses a rerun over an existing audit"
 
 
-def _audit_result(v, ev, exp, steps, share):
+def _species_boxes(a, boxes):
+    """The species-labelled boxes of an audited step: the record's coverage block (inc2.audit_stream), else the sum
+    of its per_species blocks of species labels (the ones with a 'verified' count; the non-target class's block has
+    none), else all its boxes."""
+    cov = a.get("coverage") if isinstance(a.get("coverage"), dict) else {}
+    if _num(cov.get("species_boxes")) is not None:
+        return int(_num(cov.get("species_boxes")))
+    ps = a.get("per_species") if isinstance(a.get("per_species"), dict) else {}
+    blocks = [b for b in ps.values() if isinstance(b, dict) and "verified" in b]
+    if blocks:
+        return sum(int(_num(b.get("boxes")) or 0) for b in blocks)
+    return boxes
+
+
+def _audit_result(v, ev, exp, steps, share, expected=None):
     """(result, cites) of the label audit (L4) of `exp` over the blamed `steps`, read from its record
     (<exp>/audit/label_audit.json, else the pilot's INC_DIR/audit/<exp>_audit.json), or None when the evidence holds
     no record covering every step. A step is judged conclusively when the audit gave a species verdict on at least
-    D31.audit_min_judged_share of its boxes and compared at least that share of the judged boxes with its baseline
+    D31.audit_min_judged_share of its species-labelled boxes (the boxes it can judge: the non-target class gets no
+    species verdict) and compared at least that share of the judged boxes with its baseline
     (species.baseline_for_mix.boxes; a judged species without a baseline is compared with nothing); only then does
     an above_baseline false say anything (a record that judged or compared 0 boxes carries above_baseline false as
     an empty default, never a finding: 2026-10-05, s001's audit of inc0001, inc0003 and inc0004 judged 0 of 4,092
     boxes, every image image_not_in_crops). An above_baseline true is the audit's own test passed on the boxes it
     compared: a finding whatever the share. verdict: 'labels' (a step above its baseline), 'not_judged' (a step not
-    judged conclusively), else 'not_labels'."""
+    judged conclusively), else 'not_labels'.
+    Coverage (Amendment 2026-10-27): a record whose lookup read the stream's batches (inc2.audit_stream, "lookup"
+    step1+step1_stream) is expected to judge at least `expected` (D31.audit_expected_coverage) of each blamed step's
+    species-labelled boxes; a step under it is listed in coverage_short (a defect of the audit's inputs, never a
+    known limit), whatever the verdict. A record without that lookup (inc/audit.py's, Step 1's crops only) that left
+    a step not judged for image_not_in_crops predates the stream lookup (predates_stream)."""
     art, aud = None, None
     for name in (AUDIT_ART % exp, E.ROOT_AUDIT % exp):
         got = ev.json(name) if ev is not None else None
@@ -1291,17 +1313,22 @@ def _audit_result(v, ev, exp, steps, share):
     audits = aud.get("audits") if isinstance(aud.get("audits"), dict) else {}
     if not steps or any(s not in audits for s in steps):
         return None                        # an audit of other steps (the old record of a re-audited experiment)
+    lookup = str(aud.get("lookup") or "step1")
+    stream = STREAM_LOOKUP in lookup.split("+")
     per, cites = {}, []
     for s in steps:
         a = audits.get(s) if isinstance(audits.get(s), dict) else {}
         sp = a.get("species") if isinstance(a.get("species"), dict) else {}
         boxes = int(_num(a.get("boxes")) or 0)
+        species_boxes = _species_boxes(a, boxes)
         judged = int(_num(sp.get("boxes_judged")) or 0)
         mix = sp.get("baseline_for_mix") if isinstance(sp.get("baseline_for_mix"), dict) else {}
         compared = int(_num(mix.get("boxes")) or 0)
         above = sp.get("above_baseline") is True and compared > 0
-        conclusive = boxes > 0 and judged >= share * boxes - EPS and compared >= share * judged - EPS
-        per[s] = {"boxes": boxes, "judged": judged, "compared": compared, "conclusive": conclusive,
+        conclusive = species_boxes > 0 and judged >= share * species_boxes - EPS and compared >= share * judged - EPS
+        per[s] = {"boxes": boxes, "species_boxes": species_boxes, "judged": judged, "compared": compared,
+                  "coverage": round(judged / float(species_boxes), 4) if species_boxes else None,
+                  "conclusive": conclusive,
                   "above_baseline": True if above else (bool(sp.get("above_baseline")) if conclusive else None),
                   "not_judged_reasons": dict(a.get("no_embedding_reasons") or {})
                   if isinstance(a.get("no_embedding_reasons"), dict) else {},
@@ -1316,20 +1343,42 @@ def _audit_result(v, ev, exp, steps, share):
                 pass
     labels = [s for s in steps if per[s]["above_baseline"]]
     unjudged = [s for s in steps if not per[s]["conclusive"] and s not in labels]
-    return {"artifact": art, "built_utc": aud.get("built_utc"), "steps": per, "labels": labels,
-            "unjudged": unjudged, "verdict": "labels" if labels else "not_judged" if unjudged else "not_labels"}, cites
+    short = [s for s in steps if stream and expected is not None and per[s]["species_boxes"] > 0
+             and per[s]["judged"] < float(expected) * per[s]["species_boxes"] - EPS]
+    predates = (not stream) and any("image_not_in_crops" in per[s]["not_judged_reasons"] for s in unjudged)
+    return {"artifact": art, "built_utc": aud.get("built_utc"), "lookup": lookup, "stream_lookup": stream,
+            "steps": per, "labels": labels, "unjudged": unjudged, "coverage_short": short,
+            "expected_coverage": expected, "predates_stream": predates,
+            "verdict": "labels" if labels else "not_judged" if unjudged else "not_labels"}, cites
+
+
+def _coverage_said(r):
+    """The coverage clause of a stream-lookup record with steps under the expected coverage, or ''."""
+    if not r.get("coverage_short"):
+        return ""
+    reasons = {}
+    for s in r["coverage_short"]:
+        for k, n in r["steps"][s]["not_judged_reasons"].items():
+            reasons[k] = reasons.get(k, 0) + int(_num(n) or 0)
+    return ("; its coverage is short of the expected %s on %s (%s species boxes judged; not judged: %s): the audit "
+            "read Step 1's and the stream's crops, so this is a defect of its inputs to look into, not a known limit"
+            % (r.get("expected_coverage"), ", ".join(r["coverage_short"]),
+               ", ".join("%s %d of %d" % (s, r["steps"][s]["judged"], r["steps"][s]["species_boxes"])
+                         for s in r["coverage_short"]),
+               ", ".join("%s %d" % kv for kv in sorted(reasons.items())) or "no reason recorded"))
 
 
 def _audit_said(exp, r):
     """One clause of D31's summary for an audit result."""
+    cov = _coverage_said(r)
     if r["verdict"] == "labels":
         part = [s for s in r["labels"] if not r["steps"][s]["conclusive"]]
-        return "the label audit of %s finds the labels above its baseline on %s%s -> X3" % (
+        return "the label audit of %s finds the labels above its baseline on %s%s -> X3%s" % (
             exp, ", ".join(r["labels"]), (" (on the boxes it compared: %s judged on under the share)" % ", ".join(part))
-            if part else "")
+            if part else "", cov)
     if r["verdict"] == "not_labels":
         return "the label audit of %s judged its steps and finds no label noise above its baseline: labels are " \
-               "not the cause" % exp
+               "not the cause%s" % (exp, cov)
     reasons = {}
     for s in r["unjudged"]:
         for k, n in r["steps"][s]["not_judged_reasons"].items():
@@ -1339,18 +1388,22 @@ def _audit_said(exp, r):
         for k, n in r["steps"][s]["without_baseline"].items():
             nob[k] = nob.get(k, 0) + int(_num(n) or 0)
     why = []
-    if "image_not_in_crops" in reasons:
-        why.append("it reads Step 1's crops only; the stream's increments are cropped and verified at their own intake")
+    if "image_not_in_crops" in reasons and not r.get("stream_lookup"):
+        why.append("it reads Step 1's crops only; the stream's increments are cropped and verified at their own "
+                   "intake. The audit reads the stream's batches since 2026-10-27 (lookup step1+step1_stream); "
+                   "this record predates it, and a re-audit is a person's decision: %s" % RERUN)
     if nob:
         why.append("judged species without a baseline: %s" % ", ".join("%s %d" % kv for kv in sorted(nob.items())))
-    return ("the label audit of %s ran (%s) and did not judge %s: %d of %d boxes judged, %d compared with a baseline "
-            "(%s), so it is no finding on their labels%s; not run again: the rejections stand and a person decides "
-            "any re-admission" % (
+    return ("the label audit of %s ran (%s) and did not judge %s: %d of %d species boxes judged (%d boxes), %d "
+            "compared with a baseline (%s), so it is no finding on their labels%s; not run again: the rejections "
+            "stand and a person decides any re-admission%s" % (
                 exp, r.get("built_utc") or "?", ", ".join(r["unjudged"]),
-                sum(r["steps"][s]["judged"] for s in r["unjudged"]), sum(r["steps"][s]["boxes"] for s in r["unjudged"]),
+                sum(r["steps"][s]["judged"] for s in r["unjudged"]),
+                sum(r["steps"][s]["species_boxes"] for s in r["unjudged"]),
+                sum(r["steps"][s]["boxes"] for s in r["unjudged"]),
                 sum(r["steps"][s]["compared"] for s in r["unjudged"]),
                 ", ".join("%s %d" % kv for kv in sorted(reasons.items())) or "no reason recorded",
-                (" (%s)" % "; ".join(why)) if why else ""))
+                (" (%s)" % "; ".join(why)) if why else "", cov))
 
 
 def d31(v, prior=None, include_prior=False):
@@ -1391,6 +1444,7 @@ def d31(v, prior=None, include_prior=False):
     n = int(_t(v.th, "D31", "blames_to_quarantine"))
     q = sorted(s for s, k in counted.items() if k >= n)
     share = float(_t(v.th, "D31", "audit_min_judged_share"))
+    expected = float(_t(v.th, "D31", "audit_expected_coverage"))
     ran = v.c("/audits") or {}
     ran = ran if isinstance(ran, dict) else {}
     audits = {}
@@ -1399,7 +1453,7 @@ def d31(v, prior=None, include_prior=False):
     props, results, waiting = [], {}, {}
     for e, ss in sorted(audits.items()):
         ss = sorted(set(ss))
-        got = _audit_result(v, evs.get(e), e, ss, share)
+        got = _audit_result(v, evs.get(e), e, ss, share, expected)
         if got is not None:
             results[e] = got[0]
             cites += got[1]
@@ -1418,6 +1472,7 @@ def d31(v, prior=None, include_prior=False):
     props += [{"lever": "L24", "source": s, "cite": "D31"} for s in l24]
     labels = sorted(e for e, r in results.items() if r["verdict"] == "labels")
     unjudged = sorted(e for e, r in results.items() if r["verdict"] == "not_judged")
+    short = sorted(e for e, r in results.items() if r.get("coverage_short"))
     said = []
     if props and props[0]["lever"] == "L4":
         said.append("L4 label audit first")
@@ -1435,13 +1490,13 @@ def d31(v, prior=None, include_prior=False):
     if lifts:
         said.append("blames before a person's lift of %s not counted" % ", ".join(lifts))
     levers = (["L4"] if any(p["lever"] == "L4" for p in props) else []) + (["L24"] if l24 else []) \
-        + (["X3"] if labels else []) + (["OP_CARD"] if unjudged else [])
+        + (["X3"] if labels else []) + (["OP_CARD"] if unjudged or short else [])
     return _diag("D31", True, "warn", "data blamed on %s -> %s" % (
         ", ".join("%s/%s (%s%s)" % (b["exp"], b["step"], b["disposition"],
                                      ", truth hurts" if b["truth"] == "hurts" else "") for b in blamed),
         "; ".join(said) or "nothing more to run"), cites, levers, blamed[-1]["exp"],
         {"blamed": blamed, "per_source": per_source, "counted": counted, "quarantine": q, "propose": props,
-         "audits": results,
+         "audits": results, "coverage_short": short,
          "audit_waiting": waiting, "kept": kept, "lifted": {s: lifted[str(s)] for s in lifts}})
 
 

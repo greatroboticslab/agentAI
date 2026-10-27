@@ -90,6 +90,8 @@ PKG_PATHS=(
   weed_optimizer_framework/tools/brain/policy_actions.json
   weed_optimizer_framework/tools/brain/approvals.py
   run_inc_funnel.sh run_inc_plan.sh run_inc_job.sh run_inc_build.sh run_inc_verify.sh
+  # 2026-10-27: lever L4's job script runs inc2.audit_stream (the label audit with the stream's lookup)
+  run_inc_audit.sh
   results/framework/inc/funnel/prereg_v1.json
   results/framework/inc/funnel/census_v0.json
   tests/fixtures/funnel tests/fixtures/inc_replay
@@ -107,6 +109,8 @@ PKG_PATHS=(
   tests/fixtures/v3fam_dev5
   # 2026-10-26: the lab's records the shipped test_stream_ap_stalls.py replays (D31's L4, the DATA lane's hold)
   tests/fixtures/platform_stalls
+  # 2026-10-27: the cluster's records of s002's inc0005 the shipped test_inc2_audit_stream_s002.py rebuilds
+  tests/fixtures/audit_stream_s002
   # 2026-10-26: the check of the job scripts' mlflow-off block (MLFLOW_OFF_REAL=1 on the cluster's bench env)
   tests/test_job_mlflow_off.py
   # shared libraries the stream job scripts hash (SHARED_RE: never changed by this deploy)

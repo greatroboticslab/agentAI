@@ -11144,3 +11144,27 @@ Every result sat near test 0.85, against the 0.90 goal.
   - `docs/CONTINUOUS_LOOP.md`: Amendment 2026-10-26 items 4, 6-8 revised, 9-11 new; the release check, the data's next step and the verification.
 - **Verified.** Lab scratch copies (platform Python, Ultralytics 8.4.37): base e875e61 149 of 166 test files pass, the branch 152 of 169, the same 17 environment failures with the same failure lines; replay gate pass (56 of 58, R2 and R4b skipped); mutation runs 42 of 42 (SG1-SG42), SM1-SM18, deviations 4-6 28/53/39; on the base's code `test_stream_ap_stalls.py` fails 31 checks by behaviour and `test_job_mlflow_off.py` 3. A copy of the live state: the first tick ends MAINT's stall with no L4; after a release DATA proposes L16S for weedai_0935d5a0, palmer (2 failed attempts) after the ready sources. Cluster bench env (Ultralytics 8.4.37, mlflow 3.12.0): `test_job_mlflow_off.py` with `MLFLOW_OFF_REAL=1` 0 failures (the chained parent and child of both scripts among them), the shared settings unchanged (sha256 50c1f126…, mtime). Workstation: `deploy_funnel.sh --dry-run` with no `--allow-*` flag.
 - **Deploy.** One commit: `deploy/deploy_funnel.sh` (no `--allow-*` flag; no code_shas, pinned or shared module changes), dashboard restart, `executor.run_replay_tests`; then `stream release` for lane DATA.
+
+## 2026-10-27 — The label audit (L4) reads the stream's own crops; D31 expects real coverage
+
+- **Why.** L4 judged 0 of s001's 4,092 increment boxes (2026-10-05) and 8 of s002's 1,784 species boxes (2026-10-27): `tools/inc/audit.py` finds crops in Step 1's `crops.csv` only, and a stream increment's crops live in its intake batch (`step1_stream/batches/bNNNN`). D31 counted a step as judged on all its boxes, so a step mostly of OtherPlant could never be judged.
+- **Change.**
+  - `inc2/audit_stream.py` (new): inc/audit.py's audit unchanged, plus the lookup of an audited image Step 1 does not hold in the stream's committed batches. It finds the queue row by key, image and sha256 (the same label preferred); the batch's `crops.csv`, `emb.npz`, `verdicts.npz`, `crops_skipped.csv` and `admission.jsonl` must describe its `crops.csv` and hash as `batch.json` recorded them; a masked admission's `keep` is followed; geometry within `GEOM_TOL` and a finite embedding are required; the unmasked original of a trusted image is refused. OUT.json gains `lookup`, `inputs.step1_stream`, and per manifest `stream` and `coverage`.
+  - `run_inc_audit.sh`: runs `inc2.audit_stream` and hashes it with `inc/audit.py` (lines 30-36, the policy row's command, unchanged).
+  - `inc_autopilot/diagnose_stream.py`: `_species_boxes`, `_audit_result` (species-labelled share; `coverage_short`; `predates_stream`), `_coverage_said`, `_audit_said`; `d31` raises its card on a shortfall too. `stream_thresholds.json`: `D31.audit_expected_coverage` 0.9 (new); `audit_min_judged_share` amended to species-labelled boxes.
+  - `deploy/deploy_funnel.sh` ships `run_inc_audit.sh` and `tests/fixtures/audit_stream_s002`.
+  - Tests:
+    - `test_inc2_audit_stream.py` (new): equivalence with inc/audit.py on its own world; the stream lookup's cases and refusals.
+    - `test_inc2_audit_stream_s002.py` (new): the cluster's records of inc0005, `tests/fixtures/audit_stream_s002/`, 776 KB, sha256 in `FIXTURE.json`.
+    - `test_stream_ap_audit_coverage.py` (new).
+    - `test_inc2_audit_stream_mutants.py` (new; AS1-AS27).
+    - `test_inc_audit.py`: the sbatch check names the new module.
+    - `test_stream_ap_stalls_mutants.py`: SG8 and SG10 follow the moved code.
+  - `docs/CONTINUOUS_LOOP.md`: Amendment 2026-10-27; items 10 and 19 and the 2026-10-26 open item answered. `docs/INCREMENTAL_PROTOCOL.md`: one note.
+- **Found.** Lab run on copies of the cluster's files:
+  - **inc0001, inc0003, inc0004:** 1,364 of 1,364 species boxes judged each (was 0), 0 conflicts.
+  - **inc0005:** 1,784 of 1,784 (was 8), 1 conflict (PalmerAmaranth called Waterhemp).
+  - **Against the baseline:** every step and every species is at or below the trusted baseline, and the noise estimate is 0.0. Labels are not what the data blames point to.
+  - **Caveat:** every audited box had been admitted as verified by an intake verifier fitted on the same train_core crops, so this is not an independent check.
+- **Verified.** On copies of the cluster's files the new module judges every species box of the four increments, and inc.audit reproduces the cluster's s002 record (8 species boxes) with the same baseline; `test_inc2_audit_stream_s002.py` holds the coverage to the cluster's records of inc0005 (fixture 776 KB, sha256-verified).
+- **Deploy.** One commit: `deploy/deploy_funnel.sh` (no `--allow-*` flag; no code_shas, pinned or shared module changes; `inc/audit.py` unchanged), dashboard restart, `executor.run_replay_tests`.

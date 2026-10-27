@@ -13,6 +13,23 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-27 — The label audit now judges stream increments: the four data-blamed increments' labels are at or below the trusted baseline
+
+- **Where the data stands.** Unchanged: the stream's pool P_1 holds 7,493 images, and the target stays tens to hundreds of thousands of verified images. Accuracy unchanged: E3-B 0.8859 dev species mAP50-95, 0.0141 under 0.90 (sealed test 0.8950).
+- **Why.**
+  - The label audit (lever L4) had judged none of the stream's increments. It read Step 1's crops only: 0 of 4,092 boxes for s001, 8 of 1,784 species boxes for s002's inc0005.
+  - D31 therefore had no evidence whether labels caused the rejections.
+- **Change.** `inc2/audit_stream.py` runs the pinned audit unchanged and also finds each box's crop and BioCLIP-2 embedding in the stream's own intake batches; `run_inc_audit.sh` runs it. D31 now judges a step on its species-labelled boxes, expects at least 0.9 of them judged when the audit read the stream, and names a shortfall as a defect. A record made before the stream lookup is read as predating it.
+- **Found (lab run on copies of the cluster's files, trusted P_1, the same probe and baseline as the cluster's records).**
+  - **inc0001, inc0003, inc0004 (zenodo_15808623):** 1,364 of 1,364 species boxes judged each. 0 conflicts each, 95 % interval up to 0.0028. Baseline for each mix: 0.0036, 0.0041, 0.0033.
+  - **inc0005:** 1,784 of 1,784 judged. 1 conflict: one PalmerAmaranth box from weedai_0935d5a0 called Waterhemp, 0.0006 [0.0001, 0.0032]. Its baseline: 0.0011.
+  - **Per species:** PalmerAmaranth, PricklySida, Waterhemp, Purslane, MorningGlory, Carpetweed and Ragweed are all at or below the trusted baseline. No step is above it, and the noise estimate is 0.0 for each.
+  - **Caveat:** every audited box had been admitted as verified by the intake verifier, which was fitted on the same train_core crops as the audit's probe, so this is not an independent label check.
+- **Verified.** On copies of the cluster's files the new module judges every species box of the four increments, and inc.audit reproduces the cluster's s002 record (8 species boxes) with the same baseline; `test_inc2_audit_stream_s002.py` holds the coverage to the cluster's records of inc0005 (fixture 776 KB, sha256-verified).
+- **Next.**
+  - A re-audit of s001 and s002 on the cluster is a person's decision.
+  - Labels ruled out as far as this audit can see, the redundant-frames hypothesis for zenodo_15808623 is the next thing to test (a per-clip cap is a new pre-registered rule).
+
 ## 2026-10-26 — Platform stalls completed before deploy: one bad source never stops collection, and a refusal every source meets still does
 
 - **Where the data stands.** Unchanged until the release: no image has entered the stream since 2026-10-07. D20's ready queue after the release: weedai_0935d5a0 (1.32 GB), mendeley_fcf7brsfm6, zenodo_22033986, weedai_84fd3c3f, zenodo_10762138; the target stays tens to hundreds of thousands of verified images. Accuracy unchanged: E3-B 0.8859 dev species mAP50-95, 0.0141 under 0.90.

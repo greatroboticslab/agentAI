@@ -688,8 +688,11 @@ def test_cli(paths):
     sh = ROOT / "run_inc_audit.sh"
     r = subprocess.run(["bash", "-n", str(sh)], capture_output=True, text=True)
     body = sh.read_text()
-    check("run_inc_audit.sh parses and passes its arguments to the module",
-          r.returncode == 0 and '-m weed_optimizer_framework.tools.inc.audit "$@"' in body
+    # since 2026-10-27 the job script runs inc2.audit_stream: this module's audit, unchanged, plus the stream's
+    # lookup (tests/test_inc2_audit_stream.py holds the two to the same outputs on Step 1's boxes)
+    check("run_inc_audit.sh parses and passes its arguments to the module (inc2.audit_stream, which runs this one)",
+          r.returncode == 0 and '-m weed_optimizer_framework.tools.inc2.audit_stream "$@"' in body
+          and "tools/inc/audit.py" in body.split("MODULES=(", 1)[1].split(")", 1)[0]
           and "--gres=gpu:v100-32:1" in body and "--time=02:00:00" in body, r.stderr)
 
 

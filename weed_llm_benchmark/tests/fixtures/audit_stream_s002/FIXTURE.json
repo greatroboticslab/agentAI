@@ -1,0 +1,566 @@
+{
+ "batches": {
+  "b0000": {
+   "admission.jsonl": "e11cf9e9f9899a8210d65ee7aecc257f402e8e0e0ca3a11ed9a86506c2ad0289",
+   "batch.json": "3c8182fd3c703eccd97066ac695a4769dba548b0cd3eccc9a2adb777a23f4f8d",
+   "crops.csv": null,
+   "crops_info.json": null,
+   "crops_skipped.csv": null,
+   "dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0000",
+   "emb.npz": null,
+   "verdicts.npz": null
+  },
+  "b0002": {
+   "admission.jsonl": "ffb373620fb309aa4456fba05eb75c9f75a344a2fccb3d64ce342f37e5eadfcb",
+   "batch.json": "63a43f0d1b45fd0c7c2ce2f4d1db8726d760610fa514fd1ca700e2db1490683e",
+   "batch_json": {
+    "input": "intake:i0001_kg_yuzhenlu__cottonweeddet3",
+    "inputs": {
+     "crops": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0002/crops.csv",
+      "sha256": "118a65b01fed6ca20cc628e0eb147a927f5525eeb9017df3860cbda0f946c20d"
+     },
+     "emb": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0002/emb.npz",
+      "sha256": "38b37f05d52ac819b7ce8279650c943284040603a24fd5556dd9133d9d260b9b"
+     },
+     "ingest": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0002/ingest.jsonl",
+      "sha256": "565a14936734003d370998d6f18761279cbc16201021645f5c63c818bcbba19f"
+     },
+     "plan_items": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0002/plan_items.jsonl",
+      "sha256": "72d4e11a964d1b198c2241204883c92242d8c546ead707a32bb032ff65367dc8"
+     },
+     "reference": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/reference_v1.npz",
+      "sha256": "d87e41c436f58cdd6a6f7ab39e5bcec60bf7420f65484e73cfaf65f39c4373ba"
+     },
+     "verdicts": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0002/verdicts.npz",
+      "sha256": "973e3428586a3db64a41e87d18332efe8c0775e461a6a0c9ddab36c9a3f2eae5"
+     }
+    },
+    "kind": "intake"
+   },
+   "crops.csv": "118a65b01fed6ca20cc628e0eb147a927f5525eeb9017df3860cbda0f946c20d",
+   "crops_info.json": "f5e87c789ead92023e38a317bd2daa964f90a2d5bdc3009564e82385024dc2a8",
+   "crops_rows": 1432,
+   "crops_rows_copied": 80,
+   "crops_skipped.csv": "8934134f2a5639957b8c8e15cb023d59bf1abcdb8a00a8402bcf2e31f8dc8c2e",
+   "dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0002",
+   "emb.npz": "38b37f05d52ac819b7ce8279650c943284040603a24fd5556dd9133d9d260b9b",
+   "emb_meta": {
+    "crops": 1432,
+    "crops_sha256": "118a65b01fed6ca20cc628e0eb147a927f5525eeb9017df3860cbda0f946c20d",
+    "dim": 768,
+    "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+    "seconds": 67.4,
+    "stats": {
+     "failed_crops": 0
+    }
+   },
+   "verdicts.npz": "973e3428586a3db64a41e87d18332efe8c0775e461a6a0c9ddab36c9a3f2eae5",
+   "verdicts_meta": {
+    "crops_sha256": "118a65b01fed6ca20cc628e0eb147a927f5525eeb9017df3860cbda0f946c20d",
+    "oof_judged": 0,
+    "verdict_codes": [
+     "verified",
+     "conflict",
+     "unknown",
+     "other_ok",
+     "small",
+     "failed",
+     "unmapped"
+    ],
+    "verifier": "v1"
+   }
+  },
+  "b0003": {
+   "admission.jsonl": "1c60d6a57a9cb65919a795a6db9b3f22ca61c0a60405f1f43a9abae8c731c01c",
+   "batch.json": "4b101bbcdcf19cda3800ce3bfba6fa2e02c6cfbf544d56329552928ad85fdbd0",
+   "batch_json": {
+    "input": "intake:i0002_mediatum_1717366",
+    "inputs": {
+     "crops": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0003/crops.csv",
+      "sha256": "88ee43f5c48bbeab57915a30a775703040fac56066b253a5d0a3e533905ad212"
+     },
+     "emb": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0003/emb.npz",
+      "sha256": "8f295814695c5d9eba1c1f536f9e4d7dea363becb05bc21c134795f89ba08217"
+     },
+     "ingest": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0003/ingest.jsonl",
+      "sha256": "29ec1071dfe910046fa2ad3cd96b674b308f97c1ce2f9000e77cbe26e081c191"
+     },
+     "plan_items": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0003/plan_items.jsonl",
+      "sha256": "4ef366969fdb16a21ba474c5c6856df6b19197f37339b193b1299029cf6c595a"
+     },
+     "reference": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/reference_v1.npz",
+      "sha256": "d87e41c436f58cdd6a6f7ab39e5bcec60bf7420f65484e73cfaf65f39c4373ba"
+     },
+     "verdicts": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0003/verdicts.npz",
+      "sha256": "4e7d5ab0f833a8fc36111945cabd7b49d8f8c117ade7152145a84e0bc9954d24"
+     }
+    },
+    "kind": "intake"
+   },
+   "crops.csv": "88ee43f5c48bbeab57915a30a775703040fac56066b253a5d0a3e533905ad212",
+   "crops_info.json": "3631f1952eb87bf20adf461007d370f341a804ab89981c745509326d0bdd5440",
+   "crops_rows": 8374,
+   "crops_rows_copied": 803,
+   "crops_skipped.csv": "10bb99e3bf4e503e5fa40f42640a10263282d97cab3db01c6c50dfc41ff47ef5",
+   "dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0003",
+   "emb.npz": "8f295814695c5d9eba1c1f536f9e4d7dea363becb05bc21c134795f89ba08217",
+   "emb_meta": {
+    "crops": 8374,
+    "crops_sha256": "88ee43f5c48bbeab57915a30a775703040fac56066b253a5d0a3e533905ad212",
+    "dim": 768,
+    "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+    "seconds": 83.0,
+    "stats": {
+     "failed_crops": 0
+    }
+   },
+   "verdicts.npz": "4e7d5ab0f833a8fc36111945cabd7b49d8f8c117ade7152145a84e0bc9954d24",
+   "verdicts_meta": {
+    "crops_sha256": "88ee43f5c48bbeab57915a30a775703040fac56066b253a5d0a3e533905ad212",
+    "oof_judged": 0,
+    "verdict_codes": [
+     "verified",
+     "conflict",
+     "unknown",
+     "other_ok",
+     "small",
+     "failed",
+     "unmapped"
+    ],
+    "verifier": "v1"
+   }
+  },
+  "b0013": {
+   "admission.jsonl": "c3ea215ee888a6d86f0dcfe47897680e0e99548ae46dae86ec6a34d67be05b8e",
+   "batch.json": "9303be1437e2844f024d8fe0cb76f0d74d3b3f72f32584ed5af12bd7e23ec77f",
+   "batch_json": {
+    "input": "intake:i0013_rf_palmer-amaranth-id__palmer-amaranth-id",
+    "inputs": {
+     "crops": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0013/crops.csv",
+      "sha256": "4265f3101d3ed4966546af936b76083c567e89b880c139d46fc8d4b246356291"
+     },
+     "emb": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0013/emb.npz",
+      "sha256": "b70063c95649d9143256d0c438c11716980bbe072e6c8f1da0e59675bb482b19"
+     },
+     "ingest": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0013/ingest.jsonl",
+      "sha256": "29cf724af33ccafac408f03243eb44de9ab2524612d65997e5f9c61c39569226"
+     },
+     "plan_items": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0013/plan_items.jsonl",
+      "sha256": "c628b6cd71b0bc787be345f28571cf3f8bae87c22e4b3bc33d9abbac88c5408c"
+     },
+     "reference": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/reference_v1.npz",
+      "sha256": "d87e41c436f58cdd6a6f7ab39e5bcec60bf7420f65484e73cfaf65f39c4373ba"
+     },
+     "verdicts": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0013/verdicts.npz",
+      "sha256": "947e759d893f573c788a2b0acb8f3f9d411658bc86ee00e292466f6726333366"
+     }
+    },
+    "kind": "intake"
+   },
+   "crops.csv": "4265f3101d3ed4966546af936b76083c567e89b880c139d46fc8d4b246356291",
+   "crops_info.json": "d686fcb1a001a212e686d1876caf16818318acea5fc09ec3fd653a31c70f6f96",
+   "crops_rows": 11928,
+   "crops_rows_copied": 152,
+   "crops_skipped.csv": "49a9789c83240ea341ef4e84af87192e4f9b0e779fd4d5489d59fb94c79d2e07",
+   "dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0013",
+   "emb.npz": "b70063c95649d9143256d0c438c11716980bbe072e6c8f1da0e59675bb482b19",
+   "emb_meta": {
+    "crops": 11928,
+    "crops_sha256": "4265f3101d3ed4966546af936b76083c567e89b880c139d46fc8d4b246356291",
+    "dim": 768,
+    "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+    "seconds": 56.7,
+    "stats": {
+     "failed_crops": 0
+    }
+   },
+   "verdicts.npz": "947e759d893f573c788a2b0acb8f3f9d411658bc86ee00e292466f6726333366",
+   "verdicts_meta": {
+    "crops_sha256": "4265f3101d3ed4966546af936b76083c567e89b880c139d46fc8d4b246356291",
+    "oof_judged": 0,
+    "verdict_codes": [
+     "verified",
+     "conflict",
+     "unknown",
+     "other_ok",
+     "small",
+     "failed",
+     "unmapped"
+    ],
+    "verifier": "v1"
+   }
+  },
+  "b0016": {
+   "admission.jsonl": "c82924a74e040c2f4739d64785047d54394c098f0b4d16fc23d6c60d088d6d42",
+   "batch.json": "8f019ea4383dfb94595dcd29a0615c42d67a5e0aea4fea42e2de66582e2943a5",
+   "batch_json": {
+    "input": "intake:i0016_rf_myworkdrive__mlmodel2",
+    "inputs": {
+     "crops": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0016/crops.csv",
+      "sha256": "56839688499e9417ec272ed502ba6a5d51d582e95b390d9178c4ef09dba4bec6"
+     },
+     "emb": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0016/emb.npz",
+      "sha256": "2e8098a1bbfb534531a9581633b1139d77ff02f0e947c2c60ebc5a84ad2d2199"
+     },
+     "ingest": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0016/ingest.jsonl",
+      "sha256": "8a14b6688396f317bab9db0bd2d7c1eac31cd0554df1d5591a1ed50c66b4680a"
+     },
+     "plan_items": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0016/plan_items.jsonl",
+      "sha256": "aa3639608651102d26f604bf6a590fa33f8e6cecfe900c2153568d401214b80c"
+     },
+     "reference": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/reference_v1.npz",
+      "sha256": "d87e41c436f58cdd6a6f7ab39e5bcec60bf7420f65484e73cfaf65f39c4373ba"
+     },
+     "verdicts": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0016/verdicts.npz",
+      "sha256": "9d1d3407d269f4b6cc08db7499bca7ab0af16ad220588f1ac7e0f6a8999168d5"
+     }
+    },
+    "kind": "intake"
+   },
+   "crops.csv": "56839688499e9417ec272ed502ba6a5d51d582e95b390d9178c4ef09dba4bec6",
+   "crops_info.json": "608fb1688ab60b280a02da4c0d04354b8df1e2029bc242b50010b2b9cfda48d1",
+   "crops_rows": 110,
+   "crops_rows_copied": 62,
+   "crops_skipped.csv": "8934134f2a5639957b8c8e15cb023d59bf1abcdb8a00a8402bcf2e31f8dc8c2e",
+   "dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0016",
+   "emb.npz": "2e8098a1bbfb534531a9581633b1139d77ff02f0e947c2c60ebc5a84ad2d2199",
+   "emb_meta": {
+    "crops": 110,
+    "crops_sha256": "56839688499e9417ec272ed502ba6a5d51d582e95b390d9178c4ef09dba4bec6",
+    "dim": 768,
+    "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+    "seconds": 0.9,
+    "stats": {
+     "failed_crops": 0
+    }
+   },
+   "verdicts.npz": "9d1d3407d269f4b6cc08db7499bca7ab0af16ad220588f1ac7e0f6a8999168d5",
+   "verdicts_meta": {
+    "crops_sha256": "56839688499e9417ec272ed502ba6a5d51d582e95b390d9178c4ef09dba4bec6",
+    "oof_judged": 0,
+    "verdict_codes": [
+     "verified",
+     "conflict",
+     "unknown",
+     "other_ok",
+     "small",
+     "failed",
+     "unmapped"
+    ],
+    "verifier": "v1"
+   }
+  },
+  "b0017": {
+   "admission.jsonl": "385142f3f897288888ecf874c195e15d3a7bbf1030769d6ce73bf06b3ea7f29c",
+   "batch.json": "e8effec206367272775714e85e398c894c39479e5606c9124218f40f2083b2c1",
+   "batch_json": {
+    "input": "intake:i0017_weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b",
+    "inputs": {
+     "crops": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0017/crops.csv",
+      "sha256": "277954916a40628f411a856685a35e7866c6c175f6288b12a741afe6e40cb013"
+     },
+     "emb": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0017/emb.npz",
+      "sha256": "f8f4d5f46caab8e6c55d5ccf5d7cc56d29e330545bf4c12d3daa8a1c65c7dd1b"
+     },
+     "ingest": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0017/ingest.jsonl",
+      "sha256": "abfc5fa6205653f02199c74e8d8d7d501140ddadfe2701acc3fd77e78f67d749"
+     },
+     "plan_items": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0017/plan_items.jsonl",
+      "sha256": "9c6fc2a19e07a105b1003dfff5ad297e4c2ab30222aeda0abac328eae3316194"
+     },
+     "reference": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/reference_v1.npz",
+      "sha256": "d87e41c436f58cdd6a6f7ab39e5bcec60bf7420f65484e73cfaf65f39c4373ba"
+     },
+     "verdicts": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0017/verdicts.npz",
+      "sha256": "b469fc06b53cddc71a342f4a5a608812e9238de865e23df5bf26346e0ec0fae1"
+     }
+    },
+    "kind": "intake"
+   },
+   "crops.csv": "277954916a40628f411a856685a35e7866c6c175f6288b12a741afe6e40cb013",
+   "crops_info.json": "4dc5523a1ee5c004c54aab5e4a51de68114d676dde72522b6b4e23fb29b8c392",
+   "crops_rows": 155,
+   "crops_rows_copied": 123,
+   "crops_skipped.csv": "8934134f2a5639957b8c8e15cb023d59bf1abcdb8a00a8402bcf2e31f8dc8c2e",
+   "dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0017",
+   "emb.npz": "f8f4d5f46caab8e6c55d5ccf5d7cc56d29e330545bf4c12d3daa8a1c65c7dd1b",
+   "emb_meta": {
+    "crops": 155,
+    "crops_sha256": "277954916a40628f411a856685a35e7866c6c175f6288b12a741afe6e40cb013",
+    "dim": 768,
+    "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+    "seconds": 1.3,
+    "stats": {
+     "failed_crops": 0
+    }
+   },
+   "verdicts.npz": "b469fc06b53cddc71a342f4a5a608812e9238de865e23df5bf26346e0ec0fae1",
+   "verdicts_meta": {
+    "crops_sha256": "277954916a40628f411a856685a35e7866c6c175f6288b12a741afe6e40cb013",
+    "oof_judged": 0,
+    "verdict_codes": [
+     "verified",
+     "conflict",
+     "unknown",
+     "other_ok",
+     "small",
+     "failed",
+     "unmapped"
+    ],
+    "verifier": "v1"
+   }
+  },
+  "b0018": {
+   "admission.jsonl": "97013df536334a6b46b97e45789bd0f22f77684ab3fc7968872bb9e0ff3a683c",
+   "batch.json": "1e99b64c516e44e0a2ad0702d85888456a43340dcecba97fa6ffd89506f89dc2",
+   "batch_json": {
+    "input": "intake:i0018_weedai_0935d5a0-1270-4e6b-9618-2224240b5a03",
+    "inputs": {
+     "crops": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0018/crops.csv",
+      "sha256": "cae7787effc02aa102b29530efee9031cca3d157d8251ec5bb1db5a7f7588540"
+     },
+     "emb": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0018/emb.npz",
+      "sha256": "3d4f9e41f24b598fb667419f4a843c2c3007eab694fbe9fd3ba08a4b730978a7"
+     },
+     "ingest": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0018/ingest.jsonl",
+      "sha256": "d88166929e3149851e6bd4c693e639839c61656117c2be334ef0ae26b71ee14f"
+     },
+     "plan_items": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0018/plan_items.jsonl",
+      "sha256": "774bc75ad2967c20ff38283c7c196cd13a6c814fdb691a852809f216c83de227"
+     },
+     "reference": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/reference_v1.npz",
+      "sha256": "d87e41c436f58cdd6a6f7ab39e5bcec60bf7420f65484e73cfaf65f39c4373ba"
+     },
+     "verdicts": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0018/verdicts.npz",
+      "sha256": "302a1c6842c227f93669dbf44327c3821542750fdf1966f55430bcff63ad0560"
+     }
+    },
+    "kind": "intake"
+   },
+   "crops.csv": "cae7787effc02aa102b29530efee9031cca3d157d8251ec5bb1db5a7f7588540",
+   "crops_info.json": "31d3953cf807657e6ac7976b877070bb214122e350a836fa1489922bb43ffd7b",
+   "crops_rows": 1402,
+   "crops_rows_copied": 1316,
+   "crops_skipped.csv": "36ea1ae59590dfcd7867a8e119f560a7374cfc97404154a69d68597f9c858820",
+   "dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0018",
+   "emb.npz": "3d4f9e41f24b598fb667419f4a843c2c3007eab694fbe9fd3ba08a4b730978a7",
+   "emb_meta": {
+    "crops": 1402,
+    "crops_sha256": "cae7787effc02aa102b29530efee9031cca3d157d8251ec5bb1db5a7f7588540",
+    "dim": 768,
+    "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+    "seconds": 27.6,
+    "stats": {
+     "failed_crops": 0
+    }
+   },
+   "verdicts.npz": "302a1c6842c227f93669dbf44327c3821542750fdf1966f55430bcff63ad0560",
+   "verdicts_meta": {
+    "crops_sha256": "cae7787effc02aa102b29530efee9031cca3d157d8251ec5bb1db5a7f7588540",
+    "oof_judged": 0,
+    "verdict_codes": [
+     "verified",
+     "conflict",
+     "unknown",
+     "other_ok",
+     "small",
+     "failed",
+     "unmapped"
+    ],
+    "verifier": "v1"
+   }
+  },
+  "b0021": {
+   "admission.jsonl": "57d4c5c577a9307e79efa5de547e6b3861df3d868982d8dfe485f7ab0f8fea21",
+   "batch.json": "63dd83cc2588a8f083bbda40d9e61a325a706d88f533b5622a113b4a03a5a5f3",
+   "batch_json": {
+    "input": "intake:i0021_weedai_84fd3c3f-dd3e-400b-ac5a-d18ca712c3d0",
+    "inputs": {
+     "crops": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0021/crops.csv",
+      "sha256": "41bd5d62b760e89283383085595c82a1af563e7c6d7fba06328595ff9b4176e9"
+     },
+     "emb": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0021/emb.npz",
+      "sha256": "d5ff215b8acaca04f745f8c0bb96c8d4dc92c3ee04ff774f8988a3730579276e"
+     },
+     "ingest": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0021/ingest.jsonl",
+      "sha256": "fa2de0a79651256b0ae716a36b90e36e27e57444bc8ca1d181e83f4b082dce06"
+     },
+     "plan_items": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0021/plan_items.jsonl",
+      "sha256": "16093f80b3e58896792e75b53eb129ffaa3f571207f88d6c16a8f66c5f989839"
+     },
+     "reference": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/reference_v1.npz",
+      "sha256": "d87e41c436f58cdd6a6f7ab39e5bcec60bf7420f65484e73cfaf65f39c4373ba"
+     },
+     "verdicts": {
+      "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0021/verdicts.npz",
+      "sha256": "9f36e8252cfd62312965acd6c870411ac523b9b7cfd0ac57d15964e41fbb6de0"
+     }
+    },
+    "kind": "intake"
+   },
+   "crops.csv": "41bd5d62b760e89283383085595c82a1af563e7c6d7fba06328595ff9b4176e9",
+   "crops_info.json": "d0b8bc65c89c440b7e3b692ec36a43e2c1c6e7c30a51066a9f69e5f5a9c15642",
+   "crops_rows": 1098,
+   "crops_rows_copied": 182,
+   "crops_skipped.csv": "d3f733a0441e1071eaf80a2ebc0a5565bd1b8cbfc093bc9d3361c840493a18e9",
+   "dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/batches/b0021",
+   "emb.npz": "d5ff215b8acaca04f745f8c0bb96c8d4dc92c3ee04ff774f8988a3730579276e",
+   "emb_meta": {
+    "crops": 1098,
+    "crops_sha256": "41bd5d62b760e89283383085595c82a1af563e7c6d7fba06328595ff9b4176e9",
+    "dim": 768,
+    "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+    "seconds": 25.8,
+    "stats": {
+     "failed_crops": 0
+    }
+   },
+   "verdicts.npz": "9f36e8252cfd62312965acd6c870411ac523b9b7cfd0ac57d15964e41fbb6de0",
+   "verdicts_meta": {
+    "crops_sha256": "41bd5d62b760e89283383085595c82a1af563e7c6d7fba06328595ff9b4176e9",
+    "oof_judged": 0,
+    "verdict_codes": [
+     "verified",
+     "conflict",
+     "unknown",
+     "other_ok",
+     "small",
+     "failed",
+     "unmapped"
+    ],
+    "verifier": "v1"
+   }
+  }
+ },
+ "extracted_utc": "2026-10-27T18:36:32Z",
+ "files": {
+  "batches/b0002/admission_rows.jsonl.gz": "17f77a2e6adfc637cdca00cb39920e41ffe3cf5bd7ea30ab49869b891cb075b8",
+  "batches/b0002/crops_rows.csv.gz": "e28fdb814c108f60636f881687f5fe45e8276a5bbef1256a8f4fd91fa5cf7772",
+  "batches/b0002/intake.json.gz": "6f52e51257198a9be54e8ba58638d3f0b406b9312fd3d4ea9a61de6c79fef9bd",
+  "batches/b0002/skipped_rows.csv.gz": "6ed1ffb93a677e312f17cffe35e80770bb83bdd95b4b6a41edd2e044c77a20f5",
+  "batches/b0003/admission_rows.jsonl.gz": "e6dfdf4363ef5f1aeeb041b79f5bf03067e93e35a5c6d6b630f8a4f17a369dd6",
+  "batches/b0003/crops_rows.csv.gz": "e5b6b499ce115a57d79c3997b3b4ecc5d694265519daaafcac890b0ad90d2601",
+  "batches/b0003/intake.json.gz": "c820a102e4ecf717697febd628eac0adc07bb8916686689f416c387356ff00b3",
+  "batches/b0003/skipped_rows.csv.gz": "6ed1ffb93a677e312f17cffe35e80770bb83bdd95b4b6a41edd2e044c77a20f5",
+  "batches/b0013/admission_rows.jsonl.gz": "3b90a725657c70342a8bb204e8dcba1f182207b489b3df9c68c32365bcf8e323",
+  "batches/b0013/crops_rows.csv.gz": "2055c56e0effe221d35e90753cf6a08f4db4b48ab796179f9b548c537dbee3c6",
+  "batches/b0013/intake.json.gz": "f3443a7f8bc16e90fac8554341167eba33b9434665c4c4523ae8eff32fcc00fe",
+  "batches/b0013/skipped_rows.csv.gz": "6ed1ffb93a677e312f17cffe35e80770bb83bdd95b4b6a41edd2e044c77a20f5",
+  "batches/b0016/admission_rows.jsonl.gz": "a61419fc5322cb17db1a15b19735c2e8b35568c6351951ad0c0f06ee3202d935",
+  "batches/b0016/crops_rows.csv.gz": "95b038d3d945c8b7d8b0589bc7daa12cd3b26c1cfb50f8d3ce271b4ed506f3bb",
+  "batches/b0016/intake.json.gz": "3a46c10c68588544f51167582f16d9e981f6180ca2ad4dbe0b26affbbe38114f",
+  "batches/b0016/skipped_rows.csv.gz": "6ed1ffb93a677e312f17cffe35e80770bb83bdd95b4b6a41edd2e044c77a20f5",
+  "batches/b0017/admission_rows.jsonl.gz": "c0bf70b86e5d0c71af3ca87fae0c2c4e4aa9a5ff85b997a94a1fe46ffde0539c",
+  "batches/b0017/crops_rows.csv.gz": "3f66bbebb0ec13975e11185eb8c25ee68d9df37bd1bad6b976a58e6bb8c6c913",
+  "batches/b0017/intake.json.gz": "f105c8e68de0a1f301f1a47a3cfd096867e79c7bff192b28110eb70aaa02c891",
+  "batches/b0017/skipped_rows.csv.gz": "6ed1ffb93a677e312f17cffe35e80770bb83bdd95b4b6a41edd2e044c77a20f5",
+  "batches/b0018/admission_rows.jsonl.gz": "b7512d8b77ee588eb04759bba47eb47208344dc41e263005d27caeee227233db",
+  "batches/b0018/crops_rows.csv.gz": "cd08f66562c159e9c61fca671e71f0eb526f2390def6193d3d43e5bf55e0a751",
+  "batches/b0018/intake.json.gz": "f6bb64b32c02b3bd2241ac38f2b40412570e08f06802d959828d9556dd1fd030",
+  "batches/b0018/skipped_rows.csv.gz": "e3d242dec4f29a96c8f0af7712699e65ec3c783c15cffdfe43466f568916c654",
+  "batches/b0021/admission_rows.jsonl.gz": "81a2a13d89287643a41f3225bbbca26a1bffe0768d607de2e3251c13acd2418e",
+  "batches/b0021/crops_rows.csv.gz": "da3ba9e8d7fc04eb1244141be9f1b08c1e9a8a95e02ac782dd266963f294d633",
+  "batches/b0021/intake.json.gz": "a6d185d48c0abe18ec7e5d48ecdebd26f39d351885b811803d4a717cdb024803",
+  "batches/b0021/skipped_rows.csv.gz": "f74acc40c5f91948845fe3cba158da46d669f437e7f5db0213e2487652866725",
+  "inc0005.jsonl.gz": "0ea26a7b68a77d142aa99461e79cb57a0e516df80b36b6c06fe26a4203f3e032",
+  "label_audit_s002_2026-10-27.json.gz": "f3c153242c398bc7bd0a1f4de4ca1a4b373f7a311622311dcb3f0da0409152af",
+  "labels.json.gz": "9e861961068ae387ffa61c425196718a329c508b05adf357659b0d12e607f0fd",
+  "queue_rows.jsonl.gz": "c322204579221cc1a25e6baee6330c916403feae9a0837ebfb60410a9625ee82",
+  "step1/crops_rows.csv.gz": "e1e59dcf40b62c52488559496c9f46a0ce2ecd881ae5482ffe791b17491b6712",
+  "step1/pool_rows.jsonl.gz": "a5d14e88e8dff8e7fe5db75aeae4d7507762cf83b4e6fece653ef2bb74135da1",
+  "step1/skipped_rows.csv.gz": "6ed1ffb93a677e312f17cffe35e80770bb83bdd95b4b6a41edd2e044c77a20f5"
+ },
+ "lab_files": {
+  "label_audit_s001_lab_2026-10-27.json": {
+   "sha256": "d93793185859ece576a698ae9762572ec1ea0cfe6b75e4484e15e984414d3a01",
+   "what": "s001's label audit (inc0001, inc0003, inc0004) by inc2.audit_stream on the lab, on full copies of the cluster's Step 1 and step1_stream files; manifests are the cluster's with label paths moved under the lab copy"
+  }
+ },
+ "lab_run": {
+  "boxes_judged": 1867,
+  "no_embedding_reasons": {},
+  "not_located": {},
+  "per_batch": {
+   "b0002": 73,
+   "b0003": 273,
+   "b0013": 16,
+   "b0016": 49,
+   "b0017": 15,
+   "b0018": 1204,
+   "b0021": 146
+  },
+  "run": "lab, 2026-10-27, inc2.audit_stream on full copies of the cluster's Step 1 and step1_stream files (built 2026-10-27T18:35:58Z)",
+  "species_boxes": 1784,
+  "species_judged": 1784
+ },
+ "sources": {
+  "inc0005": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0005.jsonl",
+   "sha256": "2efe2311b3d54fbee5586f9bd1954ab0545e6bb9f56547e5b34375439e7ebc60"
+  },
+  "old_audit": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/weed_stream_v1_fork1364_s002/audit/label_audit.json",
+   "sha256": "1069d465c4785f63d4adbe92373a477892bbc59692d4da087a156f9a3d65bee4"
+  },
+  "queue": {
+   "lines": 229666,
+   "lines_copied": 1364,
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/queue/queue.jsonl",
+   "sha256_of_lines_read": "89762fc2d8dbf8439dc32c16e2802f4e44ddda5c935e7973b8c61c8b64c3a48a"
+  }
+ },
+ "step1": {
+  "crops": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/crops.csv",
+   "rows_copied": 91,
+   "sha256": "d8188b16fad47c34b6a771fb806ab2c1b607d6b99126fc134ada34f299164485"
+  },
+  "crops_skipped_rows_copied": 0,
+  "pool": {
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/pool.jsonl",
+   "rows_copied": 7,
+   "sha256": "a9c7a3c05e64aa9cc9cbe2bd59dad5e5bdd2a8b53c99033a22ddf00ea13013bc"
+  }
+ }
+}

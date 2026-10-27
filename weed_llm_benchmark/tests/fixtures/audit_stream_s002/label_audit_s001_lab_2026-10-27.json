@@ -1,0 +1,1421 @@
+{
+ "audit_order": [
+  "inc0001",
+  "inc0003",
+  "inc0004"
+ ],
+ "audits": {
+  "inc0001": {
+   "boxes": 1364,
+   "boxes_by_status": {
+    "conflict": 0,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 7,
+    "verified": 1357
+   },
+   "boxes_per_class": {
+    "Carpetweed": 0,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 0,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 747,
+    "PricklySida": 388,
+    "Purslane": 0,
+    "Ragweed": 0,
+    "Sicklepod": 0,
+    "SpottedSpurge": 0,
+    "Waterhemp": 229
+   },
+   "conflict_pairs": {},
+   "coverage": {
+    "boxes": 1364,
+    "otherplant_boxes": 0,
+    "otherplant_judged": 0,
+    "species_boxes": 1364,
+    "species_judged": 1364,
+    "species_judged_share": 1.0
+   },
+   "geometry_mismatch_examples": [],
+   "images": 1364,
+   "images_in_stream": 1364,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_crops": 0,
+   "images_without_step1_image": 1364,
+   "known_truth": null,
+   "manifest": "/home/lab/audit_stream_ci/manifests/inc0001.jsonl",
+   "manifest_sha256": "6fbb93b65bddfeb5496958a90a787bcbb23b9a5f719cf1cc710d0a73bd296a07",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "zenodo_15808623": {
+     "boxes": 1364,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 1364,
+      "conflict": 0,
+      "conflict_rate": 0.0,
+      "conflict_rate_ci95": [
+       0.0,
+       0.0028
+      ],
+      "unknown": 7,
+      "unknown_rate": 0.0051,
+      "verified": 1357,
+      "verified_rate": 0.9949
+     }
+    }
+   },
+   "per_species": {
+    "PalmerAmaranth": {
+     "boxes": 747,
+     "boxes_judged": 747,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0051
+     ],
+     "not_judged": 0,
+     "unknown": 5,
+     "unknown_rate": 0.0067,
+     "verified": 742,
+     "verified_rate": 0.9933
+    },
+    "PricklySida": {
+     "boxes": 388,
+     "boxes_judged": 388,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0098
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 388,
+     "verified_rate": 1.0
+    },
+    "Waterhemp": {
+     "boxes": 229,
+     "boxes_judged": 229,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0165
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0087,
+     "verified": 227,
+     "verified_rate": 0.9913
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "zenodo_15808623": 1364
+   },
+   "species": {
+    "above_baseline": false,
+    "above_pooled_baseline": false,
+    "baseline_for_mix": {
+     "boxes": 1364,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0028
+     ],
+     "conflict_recall_on_wrong": 0.963,
+     "false_conflict_rate": 0.0036,
+     "false_conflict_rate_ci95": [
+      0.0021,
+      0.0118
+     ],
+     "per_species": {
+      "PalmerAmaranth": {
+       "baseline_boxes": 205,
+       "baseline_wrong_boxes": 205,
+       "boxes": 747,
+       "conflict_recall_on_wrong": 0.961,
+       "false_conflict_rate": 0.0,
+       "weight": 0.5477
+      },
+      "PricklySida": {
+       "baseline_boxes": 263,
+       "baseline_wrong_boxes": 263,
+       "boxes": 388,
+       "conflict_recall_on_wrong": 0.9696,
+       "false_conflict_rate": 0.0076,
+       "weight": 0.2845
+      },
+      "Waterhemp": {
+       "baseline_boxes": 1180,
+       "baseline_wrong_boxes": 1180,
+       "boxes": 229,
+       "conflict_recall_on_wrong": 0.9585,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.1679
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 1364,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0028
+    ],
+    "noise_estimate_corrected": 0.0,
+    "noise_estimate_pooled_baseline": 0.0,
+    "unknown": 7,
+    "unknown_rate": 0.0051,
+    "verified": 1357,
+    "verified_rate": 0.9949
+   },
+   "stream": {
+    "boxes_located": 1364,
+    "boxes_looked_up": 1364,
+    "images": 1364,
+    "intake_verdicts": {
+     "verified": 1364
+    },
+    "intake_vs_audit": {
+     "verified -> unknown": 7,
+     "verified -> verified": 1357
+    },
+    "label_differs_from_intake": 0,
+    "not_located": {},
+    "per_batch": {
+     "b0005": 290,
+     "b0006": 265,
+     "b0007": 274,
+     "b0008": 211,
+     "b0009": 324
+    }
+   }
+  },
+  "inc0003": {
+   "boxes": 1364,
+   "boxes_by_status": {
+    "conflict": 0,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 3,
+    "verified": 1361
+   },
+   "boxes_per_class": {
+    "Carpetweed": 0,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 0,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 633,
+    "PricklySida": 618,
+    "Purslane": 0,
+    "Ragweed": 0,
+    "Sicklepod": 0,
+    "SpottedSpurge": 0,
+    "Waterhemp": 113
+   },
+   "conflict_pairs": {},
+   "coverage": {
+    "boxes": 1364,
+    "otherplant_boxes": 0,
+    "otherplant_judged": 0,
+    "species_boxes": 1364,
+    "species_judged": 1364,
+    "species_judged_share": 1.0
+   },
+   "geometry_mismatch_examples": [],
+   "images": 1364,
+   "images_in_stream": 1364,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_crops": 0,
+   "images_without_step1_image": 1364,
+   "known_truth": null,
+   "manifest": "/home/lab/audit_stream_ci/manifests/inc0003.jsonl",
+   "manifest_sha256": "19d18a5e8b7e7d08a723e1cccdb5451032fff5852981c0c56f960621ec9f332d",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "zenodo_15808623": {
+     "boxes": 1364,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 1364,
+      "conflict": 0,
+      "conflict_rate": 0.0,
+      "conflict_rate_ci95": [
+       0.0,
+       0.0028
+      ],
+      "unknown": 3,
+      "unknown_rate": 0.0022,
+      "verified": 1361,
+      "verified_rate": 0.9978
+     }
+    }
+   },
+   "per_species": {
+    "PalmerAmaranth": {
+     "boxes": 633,
+     "boxes_judged": 633,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.006
+     ],
+     "not_judged": 0,
+     "unknown": 3,
+     "unknown_rate": 0.0047,
+     "verified": 630,
+     "verified_rate": 0.9953
+    },
+    "PricklySida": {
+     "boxes": 618,
+     "boxes_judged": 618,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0062
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 618,
+     "verified_rate": 1.0
+    },
+    "Waterhemp": {
+     "boxes": 113,
+     "boxes_judged": 113,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0329
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 113,
+     "verified_rate": 1.0
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "zenodo_15808623": 1364
+   },
+   "species": {
+    "above_baseline": false,
+    "above_pooled_baseline": false,
+    "baseline_for_mix": {
+     "boxes": 1364,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0028
+     ],
+     "conflict_recall_on_wrong": 0.9647,
+     "false_conflict_rate": 0.0041,
+     "false_conflict_rate_ci95": [
+      0.0019,
+      0.0137
+     ],
+     "per_species": {
+      "PalmerAmaranth": {
+       "baseline_boxes": 205,
+       "baseline_wrong_boxes": 205,
+       "boxes": 633,
+       "conflict_recall_on_wrong": 0.961,
+       "false_conflict_rate": 0.0,
+       "weight": 0.4641
+      },
+      "PricklySida": {
+       "baseline_boxes": 263,
+       "baseline_wrong_boxes": 263,
+       "boxes": 618,
+       "conflict_recall_on_wrong": 0.9696,
+       "false_conflict_rate": 0.0076,
+       "weight": 0.4531
+      },
+      "Waterhemp": {
+       "baseline_boxes": 1180,
+       "baseline_wrong_boxes": 1180,
+       "boxes": 113,
+       "conflict_recall_on_wrong": 0.9585,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.0828
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 1364,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0028
+    ],
+    "noise_estimate_corrected": 0.0,
+    "noise_estimate_pooled_baseline": 0.0,
+    "unknown": 3,
+    "unknown_rate": 0.0022,
+    "verified": 1361,
+    "verified_rate": 0.9978
+   },
+   "stream": {
+    "boxes_located": 1364,
+    "boxes_looked_up": 1364,
+    "images": 1364,
+    "intake_verdicts": {
+     "verified": 1364
+    },
+    "intake_vs_audit": {
+     "verified -> unknown": 3,
+     "verified -> verified": 1361
+    },
+    "label_differs_from_intake": 0,
+    "not_located": {},
+    "per_batch": {
+     "b0005": 377,
+     "b0006": 405,
+     "b0007": 397,
+     "b0008": 156,
+     "b0009": 29
+    }
+   }
+  },
+  "inc0004": {
+   "boxes": 1364,
+   "boxes_by_status": {
+    "conflict": 0,
+    "in_trusted": 0,
+    "label_unseen": 0,
+    "no_embedding": 0,
+    "other_ok": 0,
+    "unknown": 25,
+    "verified": 1339
+   },
+   "boxes_per_class": {
+    "Carpetweed": 0,
+    "CutleafGroundcherry": 0,
+    "Eclipta": 0,
+    "Goosegrass": 0,
+    "MorningGlory": 0,
+    "OtherPlant": 0,
+    "PalmerAmaranth": 807,
+    "PricklySida": 323,
+    "Purslane": 0,
+    "Ragweed": 0,
+    "Sicklepod": 0,
+    "SpottedSpurge": 0,
+    "Waterhemp": 234
+   },
+   "conflict_pairs": {},
+   "coverage": {
+    "boxes": 1364,
+    "otherplant_boxes": 0,
+    "otherplant_judged": 0,
+    "species_boxes": 1364,
+    "species_judged": 1364,
+    "species_judged_share": 1.0
+   },
+   "geometry_mismatch_examples": [],
+   "images": 1364,
+   "images_in_stream": 1364,
+   "images_matched_by_sha256": 0,
+   "images_refused_in_trusted": 0,
+   "images_without_crops": 0,
+   "images_without_step1_image": 1364,
+   "known_truth": null,
+   "manifest": "/home/lab/audit_stream_ci/manifests/inc0004.jsonl",
+   "manifest_sha256": "cec7546244ab4de2dd95224d8910cb457ea407956a648a922988bc48278eb20f",
+   "no_embedding_reasons": {},
+   "otherplant": {
+    "boxes_judged": 0,
+    "conflict": 0,
+    "conflict_rate": null,
+    "conflict_rate_ci95": null,
+    "other_ok": 0
+   },
+   "per_source": {
+    "zenodo_15808623": {
+     "boxes": 1364,
+     "otherplant": {
+      "boxes_judged": 0,
+      "conflict": 0,
+      "conflict_rate": null,
+      "conflict_rate_ci95": null,
+      "other_ok": 0
+     },
+     "species": {
+      "boxes_judged": 1364,
+      "conflict": 0,
+      "conflict_rate": 0.0,
+      "conflict_rate_ci95": [
+       0.0,
+       0.0028
+      ],
+      "unknown": 25,
+      "unknown_rate": 0.0183,
+      "verified": 1339,
+      "verified_rate": 0.9817
+     }
+    }
+   },
+   "per_species": {
+    "PalmerAmaranth": {
+     "boxes": 807,
+     "boxes_judged": 807,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0047
+     ],
+     "not_judged": 0,
+     "unknown": 23,
+     "unknown_rate": 0.0285,
+     "verified": 784,
+     "verified_rate": 0.9715
+    },
+    "PricklySida": {
+     "boxes": 323,
+     "boxes_judged": 323,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0118
+     ],
+     "not_judged": 0,
+     "unknown": 0,
+     "unknown_rate": 0.0,
+     "verified": 323,
+     "verified_rate": 1.0
+    },
+    "Waterhemp": {
+     "boxes": 234,
+     "boxes_judged": 234,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0162
+     ],
+     "not_judged": 0,
+     "unknown": 2,
+     "unknown_rate": 0.0085,
+     "verified": 232,
+     "verified_rate": 0.9915
+    }
+   },
+   "rows_in_shared_sessions": 0,
+   "sessions_shared_with_trusted": [],
+   "sources": {
+    "zenodo_15808623": 1364
+   },
+   "species": {
+    "above_baseline": false,
+    "above_pooled_baseline": false,
+    "baseline_for_mix": {
+     "boxes": 1364,
+     "conflict": 0,
+     "conflict_rate": 0.0,
+     "conflict_rate_ci95": [
+      0.0,
+      0.0028
+     ],
+     "conflict_recall_on_wrong": 0.9626,
+     "false_conflict_rate": 0.0033,
+     "false_conflict_rate_ci95": [
+      0.002,
+      0.0115
+     ],
+     "per_species": {
+      "PalmerAmaranth": {
+       "baseline_boxes": 205,
+       "baseline_wrong_boxes": 205,
+       "boxes": 807,
+       "conflict_recall_on_wrong": 0.961,
+       "false_conflict_rate": 0.0,
+       "weight": 0.5916
+      },
+      "PricklySida": {
+       "baseline_boxes": 263,
+       "baseline_wrong_boxes": 263,
+       "boxes": 323,
+       "conflict_recall_on_wrong": 0.9696,
+       "false_conflict_rate": 0.0076,
+       "weight": 0.2368
+      },
+      "Waterhemp": {
+       "baseline_boxes": 1180,
+       "baseline_wrong_boxes": 1180,
+       "boxes": 234,
+       "conflict_recall_on_wrong": 0.9585,
+       "false_conflict_rate": 0.0085,
+       "weight": 0.1716
+      }
+     },
+     "rule": "f and r of each species (baseline_cv.per_species) weighted by this set's judged species-labelled boxes per label; the interval of f: 2.5/97.5 percentiles of 20000 seeded draws, each species' f from its Jeffreys Beta(k + 0.5, n - k + 0.5), widened to contain f",
+     "species_without_baseline": {}
+    },
+    "boxes_judged": 1364,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0028
+    ],
+    "noise_estimate_corrected": 0.0,
+    "noise_estimate_pooled_baseline": 0.0,
+    "unknown": 25,
+    "unknown_rate": 0.0183,
+    "verified": 1339,
+    "verified_rate": 0.9817
+   },
+   "stream": {
+    "boxes_located": 1364,
+    "boxes_looked_up": 1364,
+    "images": 1364,
+    "intake_verdicts": {
+     "verified": 1364
+    },
+    "intake_vs_audit": {
+     "verified -> unknown": 25,
+     "verified -> verified": 1339
+    },
+    "label_differs_from_intake": 0,
+    "not_located": {},
+    "per_batch": {
+     "b0005": 347,
+     "b0006": 288,
+     "b0007": 289,
+     "b0008": 203,
+     "b0009": 237
+    }
+   }
+  }
+ },
+ "baseline_cv": {
+  "folds": 5,
+  "per_fold": [
+   {
+    "boxes": 1029,
+    "conflict_recall_on_wrong": 0.9495,
+    "false_conflict_rate": 0.0029,
+    "fold": 0,
+    "groups": 8,
+    "unseen_label": 0
+   },
+   {
+    "boxes": 1028,
+    "conflict_recall_on_wrong": 0.8979,
+    "false_conflict_rate": 0.0029,
+    "fold": 1,
+    "groups": 4,
+    "unseen_label": 0
+   },
+   {
+    "boxes": 1035,
+    "conflict_recall_on_wrong": 0.9826,
+    "false_conflict_rate": 0.0145,
+    "fold": 2,
+    "groups": 6,
+    "unseen_label": 0
+   },
+   {
+    "boxes": 1029,
+    "conflict_recall_on_wrong": 0.9572,
+    "false_conflict_rate": 0.0068,
+    "fold": 3,
+    "groups": 6,
+    "unseen_label": 0
+   },
+   {
+    "boxes": 1030,
+    "conflict_recall_on_wrong": 0.9757,
+    "false_conflict_rate": 0.0029,
+    "fold": 4,
+    "groups": 5,
+    "unseen_label": 0
+   }
+  ],
+  "per_species": {
+   "Carpetweed": {
+    "boxes_judged": 530,
+    "conflict": 3,
+    "conflict_rate": 0.0057,
+    "conflict_rate_ci95": [
+     0.0019,
+     0.0165
+    ],
+    "conflict_recall_on_wrong": 0.9604,
+    "unknown": 21,
+    "unknown_rate": 0.0396,
+    "verified": 506,
+    "verified_rate": 0.9547,
+    "wrong_boxes_judged": 530
+   },
+   "CutleafGroundcherry": {
+    "boxes_judged": 50,
+    "conflict": 5,
+    "conflict_rate": 0.1,
+    "conflict_rate_ci95": [
+     0.0435,
+     0.2136
+    ],
+    "conflict_recall_on_wrong": 0.92,
+    "unknown": 4,
+    "unknown_rate": 0.08,
+    "verified": 41,
+    "verified_rate": 0.82,
+    "wrong_boxes_judged": 50
+   },
+   "Eclipta": {
+    "boxes_judged": 512,
+    "conflict": 2,
+    "conflict_rate": 0.0039,
+    "conflict_rate_ci95": [
+     0.0011,
+     0.0141
+    ],
+    "conflict_recall_on_wrong": 0.957,
+    "unknown": 22,
+    "unknown_rate": 0.043,
+    "verified": 488,
+    "verified_rate": 0.9531,
+    "wrong_boxes_judged": 512
+   },
+   "Goosegrass": {
+    "boxes_judged": 107,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0347
+    ],
+    "conflict_recall_on_wrong": 0.9813,
+    "unknown": 2,
+    "unknown_rate": 0.0187,
+    "verified": 105,
+    "verified_rate": 0.9813,
+    "wrong_boxes_judged": 107
+   },
+   "MorningGlory": {
+    "boxes_judged": 792,
+    "conflict": 2,
+    "conflict_rate": 0.0025,
+    "conflict_rate_ci95": [
+     0.0007,
+     0.0092
+    ],
+    "conflict_recall_on_wrong": 0.9394,
+    "unknown": 48,
+    "unknown_rate": 0.0606,
+    "verified": 742,
+    "verified_rate": 0.9369,
+    "wrong_boxes_judged": 792
+   },
+   "PalmerAmaranth": {
+    "boxes_judged": 205,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0184
+    ],
+    "conflict_recall_on_wrong": 0.961,
+    "unknown": 8,
+    "unknown_rate": 0.039,
+    "verified": 197,
+    "verified_rate": 0.961,
+    "wrong_boxes_judged": 205
+   },
+   "PricklySida": {
+    "boxes_judged": 263,
+    "conflict": 2,
+    "conflict_rate": 0.0076,
+    "conflict_rate_ci95": [
+     0.0021,
+     0.0273
+    ],
+    "conflict_recall_on_wrong": 0.9696,
+    "unknown": 8,
+    "unknown_rate": 0.0304,
+    "verified": 253,
+    "verified_rate": 0.962,
+    "wrong_boxes_judged": 263
+   },
+   "Purslane": {
+    "boxes_judged": 440,
+    "conflict": 2,
+    "conflict_rate": 0.0045,
+    "conflict_rate_ci95": [
+     0.0012,
+     0.0164
+    ],
+    "conflict_recall_on_wrong": 0.9114,
+    "unknown": 38,
+    "unknown_rate": 0.0864,
+    "verified": 400,
+    "verified_rate": 0.9091,
+    "wrong_boxes_judged": 440
+   },
+   "Ragweed": {
+    "boxes_judged": 401,
+    "conflict": 0,
+    "conflict_rate": 0.0,
+    "conflict_rate_ci95": [
+     0.0,
+     0.0095
+    ],
+    "conflict_recall_on_wrong": 0.9327,
+    "unknown": 27,
+    "unknown_rate": 0.0673,
+    "verified": 374,
+    "verified_rate": 0.9327,
+    "wrong_boxes_judged": 401
+   },
+   "Sicklepod": {
+    "boxes_judged": 121,
+    "conflict": 2,
+    "conflict_rate": 0.0165,
+    "conflict_rate_ci95": [
+     0.0045,
+     0.0583
+    ],
+    "conflict_recall_on_wrong": 1.0,
+    "unknown": 0,
+    "unknown_rate": 0.0,
+    "verified": 119,
+    "verified_rate": 0.9835,
+    "wrong_boxes_judged": 121
+   },
+   "SpottedSpurge": {
+    "boxes_judged": 550,
+    "conflict": 3,
+    "conflict_rate": 0.0055,
+    "conflict_rate_ci95": [
+     0.0019,
+     0.0159
+    ],
+    "conflict_recall_on_wrong": 0.9709,
+    "unknown": 16,
+    "unknown_rate": 0.0291,
+    "verified": 531,
+    "verified_rate": 0.9655,
+    "wrong_boxes_judged": 550
+   },
+   "Waterhemp": {
+    "boxes_judged": 1180,
+    "conflict": 10,
+    "conflict_rate": 0.0085,
+    "conflict_rate_ci95": [
+     0.0046,
+     0.0155
+    ],
+    "conflict_recall_on_wrong": 0.9585,
+    "unknown": 46,
+    "unknown_rate": 0.039,
+    "verified": 1124,
+    "verified_rate": 0.9525,
+    "wrong_boxes_judged": 1180
+   }
+  },
+  "species": {
+   "boxes_judged": 5151,
+   "conflict": 31,
+   "conflict_rate": 0.006,
+   "conflict_rate_ci95": [
+    0.0042,
+    0.0085
+   ],
+   "false_conflict_rate": 0.006,
+   "unknown": 240,
+   "unknown_rate": 0.0466,
+   "verified": 4880,
+   "verified_rate": 0.9474
+  },
+  "swapped": {
+   "boxes_judged": 5151,
+   "conflict_recall_on_wrong": 0.9526,
+   "rule": "each held-out box given one wrong species, uniform over the other 11, seeded by stable_int('inc/audit/swap/%d' % fold)",
+   "verified_on_wrong": 0.0008
+  },
+  "unseen_label_boxes": 0
+ },
+ "built_utc": "2026-10-27T18:36:18Z",
+ "inputs": {
+  "crops": {
+   "path": "/home/lab/audit_stream_ci/mirror/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/crops.csv",
+   "rows": 564686,
+   "sha256": "d8188b16fad47c34b6a771fb806ab2c1b607d6b99126fc134ada34f299164485"
+  },
+  "crops_made_from": {
+   "copies_sha256": "21f7af1fec8870167a9a68b27ef2395bb8b85d80a287dfc337b6c8a0e61f8f63",
+   "pool_meta_sha256": "196027ca6e9ef77a55d266614a775e2f36e0ebbe85525ae5d0fc430041c2a3b7",
+   "pool_sha256": "a9c7a3c05e64aa9cc9cbe2bd59dad5e5bdd2a8b53c99033a22ddf00ea13013bc",
+   "train_core_sha256": "242ef6b93a5261473ef7a809c1cc7d8e55dbbed46bb42b5639ca7b36b69c8640"
+  },
+  "embeddings": {
+   "dim": 768,
+   "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+   "failed_crops": 0,
+   "nan_rows": 0,
+   "nshards": 4
+  },
+  "geom_tol": 0.0001,
+  "step1_stream": {
+   "batches": {
+    "b0005": {
+     "batch": "b0005",
+     "batch_json_sha256": "f7976da442795df5f31906f4ff3e8f6ea1124aaa8ee3e606e72d72f63caadf64",
+     "committed": true,
+     "crops": {
+      "rows": 33611,
+      "sha256": "7eeb07c9c80d81fe188d42a4b87c34374add926611d4d36eed433083eb208397"
+     },
+     "emb": {
+      "dim": 768,
+      "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+      "sha256": "3e480079c5b313b77efe4aa4f51e9db069cfed88e391aaab8a98bca084c6e6e4"
+     },
+     "has_crops": true,
+     "input": "intake:i0004_zenodo_15808623",
+     "kind": "intake",
+     "verdicts": {
+      "sha256": "eca01c1412d06cf52eaabc612382d7ed4aada8c2ea4dba8e8fda491be4110f7f",
+      "verifier": "v1"
+     }
+    },
+    "b0006": {
+     "batch": "b0006",
+     "batch_json_sha256": "328c1e2dfc0d31bc9aed6ea954541acd6d1b60c4b5f3ba398975d7b07c533949",
+     "committed": true,
+     "crops": {
+      "rows": 38303,
+      "sha256": "af2a69db1b0039cddcbdfe6254697449264548c8d1619574a1cabdc91eff9656"
+     },
+     "emb": {
+      "dim": 768,
+      "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+      "sha256": "6509e9f5f65b1ca7e13552e74f95bc78fcf862db96d15bc7c50f190e31d66d85"
+     },
+     "has_crops": true,
+     "input": "intake:i0005_zenodo_15808623",
+     "kind": "intake",
+     "verdicts": {
+      "sha256": "884db17b8182ba5828ab96c14a6ed070d2c8bdc8a60946b3c4891375008d405c",
+      "verifier": "v1"
+     }
+    },
+    "b0007": {
+     "batch": "b0007",
+     "batch_json_sha256": "5cffdb8578d7a119aa465f7789ccd56309f083c5f6ee71ca24e859a8ed041f9e",
+     "committed": true,
+     "crops": {
+      "rows": 35325,
+      "sha256": "4c733fc0093c804cef0b550894c01cd0c224c88016aa507c6b5d15913e459bba"
+     },
+     "emb": {
+      "dim": 768,
+      "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+      "sha256": "59a0b60c795a00faf6539569d3bdda725097cc2d5812658dfcf8bed1ce942879"
+     },
+     "has_crops": true,
+     "input": "intake:i0006_zenodo_15808623",
+     "kind": "intake",
+     "verdicts": {
+      "sha256": "19c268fe426daccbe435d111f7417129999a90311424a813f33fa719c72eeee0",
+      "verifier": "v1"
+     }
+    },
+    "b0008": {
+     "batch": "b0008",
+     "batch_json_sha256": "d918687e98d8ef529ad05eaaf33b915db52f0b28506a5b385e8c6dcd2bf06d3e",
+     "committed": true,
+     "crops": {
+      "rows": 32472,
+      "sha256": "f2c876b6f7a45ff13cfb22cc9b30f8d49898d45561bca9f58293996df9d3023a"
+     },
+     "emb": {
+      "dim": 768,
+      "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+      "sha256": "571ff417a437c979a58e85089dda96854bcae6da196131eeb5f389f16219e551"
+     },
+     "has_crops": true,
+     "input": "intake:i0007_zenodo_15808623",
+     "kind": "intake",
+     "verdicts": {
+      "sha256": "864fb5cb2eab6d408b89c4f367ea3992e7cfce72ec6a79c191deca7b1fb5f441",
+      "verifier": "v1"
+     }
+    },
+    "b0009": {
+     "batch": "b0009",
+     "batch_json_sha256": "48abb4d9166fc83bb043537f505e7fab530070078acaeead965e9d48721a6651",
+     "committed": true,
+     "crops": {
+      "rows": 26189,
+      "sha256": "0349cdefb8f5da12f848d9ad0c5a14856ecfa2cac863eb31e5580ce0f3a50ac9"
+     },
+     "emb": {
+      "dim": 768,
+      "embedder": "hf-hub:imageomics/bioclip-2+fp16",
+      "sha256": "05baf636c03b8173e24456dce0db1745dc265d6747e8299239fe7aac4383fbd4"
+     },
+     "has_crops": true,
+     "input": "intake:i0008_zenodo_15808623",
+     "kind": "intake",
+     "verdicts": {
+      "sha256": "3609db09068cd7efbd546128f27610f31b33f3c2a7c1a19bf1d7ec3ddf8ce70b",
+      "verifier": "v1"
+     }
+    }
+   },
+   "present": true,
+   "queue": {
+    "bytes": 429534480,
+    "lines": 229666,
+    "matched_among_several": 0,
+    "matched_with_another_label": 0,
+    "path": "/home/lab/audit_stream_ci/mirror/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/queue/queue.jsonl",
+    "present": true,
+    "rows_matched": 4092,
+    "rows_of_audited_keys": 4092,
+    "sha256_of_lines_read": "89762fc2d8dbf8439dc32c16e2802f4e44ddda5c935e7973b8c61c8b64c3a48a"
+   },
+   "root": "/home/lab/audit_stream_ci/mirror/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream"
+  },
+  "versions": {
+   "numpy": "2.4.6",
+   "sklearn": "1.9.0"
+  }
+ },
+ "lookup": "step1+step1_stream",
+ "notes": [
+  "conflict_rate: conflicts / species-labelled boxes with a verdict (verified, conflict, unknown); the label-noise estimate. Boxes not judged (no_embedding, in_trusted, label_unseen) are counted, never guessed.",
+  "baseline_cv: held-out trusted boxes judged by a verifier fitted, thresholds included, on the other folds (grouped by capture session, else source): the false-conflict rate f on true labels, and the conflict recall r under one uniform wrong species per box.",
+  "baseline_for_mix: f and r of each species (baseline_cv.per_species) weighted by the audited set's judged species-labelled boxes per label; f's 95 % interval from seeded draws of each species' f from its Jeffreys posterior. Species without a baseline entry are listed and left out, with their boxes.",
+  "noise_estimate_corrected = (c - f) / (r - f) with f and r of baseline_for_mix, clipped to [0, 1]; it assumes in-domain labels and uniform swaps, so it is indicative only for another domain.",
+  "above_baseline: the conflict rate's Wilson 95 % interval lies wholly above baseline_for_mix's interval of f.",
+  "noise_estimate_pooled_baseline, above_pooled_baseline: the same against the baseline pooled over the trusted set's own species mix; context only, since per-species f and r differ and an audited set's mix need not be the trusted set's.",
+  "known_truth: boxes judged on a train_core crop, whose true label is the crop's train_core label.",
+  "lookup step1+step1_stream: an audited box whose image Step 1 does not hold is looked up in the stream's committed batches (its queue row by key, image and sha256; the batch's crops.csv, emb.npz and verdicts.npz, checked against its crops.csv); the trusted boxes, the probe and the baseline are Step 1's only, as inc/audit.py fits them."
+ ],
+ "outputs": {
+  "boxes_csv": "/home/lab/audit_stream_ci/out/s001/label_audit_boxes.csv",
+  "json": "/home/lab/audit_stream_ci/out/s001/label_audit.json",
+  "md": "/home/lab/audit_stream_ci/out/s001/label_audit.md"
+ },
+ "probe": {
+  "classes": [
+   "Waterhemp",
+   "MorningGlory",
+   "Purslane",
+   "SpottedSpurge",
+   "Carpetweed",
+   "Ragweed",
+   "Eclipta",
+   "PricklySida",
+   "PalmerAmaranth",
+   "Sicklepod",
+   "Goosegrass",
+   "CutleafGroundcherry"
+  ],
+  "cv_recall_species_mean": 0.946259,
+  "cv_recall_species_min": 0.88,
+  "cv_top1_species": 0.986799,
+  "folds": 5,
+  "max_cond_pass": 0.99,
+  "n_species_crops": 5151,
+  "note": "verify.fit_verifier on the trusted species boxes only (no OtherPlant sample): the probe never predicts OtherPlant",
+  "otherplant_class": false,
+  "per_class": {
+   "Carpetweed": {
+    "calibration": 530,
+    "cv_confirmed": 0.95283,
+    "cv_conflict": 0.00566,
+    "cv_top1": 0.977358,
+    "held_out_unseen": 0,
+    "sigma": 0.80347,
+    "tau_p": 0.455228,
+    "thresholds": {
+     "cond_pass_target": 0.972008,
+     "n": 530,
+     "n_top": 518,
+     "rank": 9,
+     "recall_cv": 0.95283,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 530
+   },
+   "CutleafGroundcherry": {
+    "calibration": 50,
+    "cv_confirmed": 0.88,
+    "cv_conflict": 0.1,
+    "cv_top1": 0.88,
+    "held_out_unseen": 0,
+    "sigma": 0.86792,
+    "tau_p": 0.518575,
+    "thresholds": {
+     "cond_pass_target": 0.99,
+     "n": 50,
+     "n_top": 44,
+     "rank": 0,
+     "recall_cv": 0.88,
+     "rule": "joint",
+     "target_reachable": false
+    },
+    "train": 50
+   },
+   "Eclipta": {
+    "calibration": 512,
+    "cv_confirmed": 0.951172,
+    "cv_conflict": 0.003906,
+    "cv_top1": 0.990234,
+    "held_out_unseen": 0,
+    "sigma": 0.860733,
+    "tau_p": 0.608249,
+    "thresholds": {
+     "cond_pass_target": 0.959369,
+     "n": 512,
+     "n_top": 507,
+     "rank": 14,
+     "recall_cv": 0.951172,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 512
+   },
+   "Goosegrass": {
+    "calibration": 107,
+    "cv_confirmed": 0.953271,
+    "cv_conflict": 0.0,
+    "cv_top1": 1.0,
+    "held_out_unseen": 0,
+    "sigma": 0.831907,
+    "tau_p": 0.612926,
+    "thresholds": {
+     "cond_pass_target": 0.95,
+     "n": 107,
+     "n_top": 107,
+     "rank": 3,
+     "recall_cv": 0.953271,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 107
+   },
+   "MorningGlory": {
+    "calibration": 792,
+    "cv_confirmed": 0.950758,
+    "cv_conflict": 0.002525,
+    "cv_top1": 0.994949,
+    "held_out_unseen": 0,
+    "sigma": 0.813094,
+    "tau_p": 0.629421,
+    "thresholds": {
+     "cond_pass_target": 0.954822,
+     "n": 792,
+     "n_top": 788,
+     "rank": 26,
+     "recall_cv": 0.950758,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 792
+   },
+   "OtherPlant": {
+    "calibration": 0,
+    "cv_confirmed": null,
+    "cv_conflict": null,
+    "cv_top1": null,
+    "held_out_unseen": 0,
+    "sigma": null,
+    "tau_p": null,
+    "thresholds": {
+     "n": 0,
+     "n_top": 0,
+     "recall_cv": null,
+     "rule": "too_few",
+     "target_reachable": false
+    },
+    "train": 0
+   },
+   "PalmerAmaranth": {
+    "calibration": 205,
+    "cv_confirmed": 0.956098,
+    "cv_conflict": 0.0,
+    "cv_top1": 0.985366,
+    "held_out_unseen": 0,
+    "sigma": 0.861407,
+    "tau_p": 0.463867,
+    "thresholds": {
+     "cond_pass_target": 0.964109,
+     "n": 205,
+     "n_top": 202,
+     "rank": 4,
+     "recall_cv": 0.956098,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 205
+   },
+   "PricklySida": {
+    "calibration": 263,
+    "cv_confirmed": 0.954373,
+    "cv_conflict": 0.003802,
+    "cv_top1": 0.992395,
+    "held_out_unseen": 0,
+    "sigma": 0.852298,
+    "tau_p": 0.63447,
+    "thresholds": {
+     "cond_pass_target": 0.95728,
+     "n": 263,
+     "n_top": 261,
+     "rank": 9,
+     "recall_cv": 0.954373,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 263
+   },
+   "Purslane": {
+    "calibration": 440,
+    "cv_confirmed": 0.95,
+    "cv_conflict": 0.004545,
+    "cv_top1": 0.984091,
+    "held_out_unseen": 0,
+    "sigma": 0.887451,
+    "tau_p": 0.53521,
+    "thresholds": {
+     "cond_pass_target": 0.965358,
+     "n": 440,
+     "n_top": 433,
+     "rank": 10,
+     "recall_cv": 0.95,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 440
+   },
+   "Ragweed": {
+    "calibration": 401,
+    "cv_confirmed": 0.952618,
+    "cv_conflict": 0.0,
+    "cv_top1": 1.0,
+    "held_out_unseen": 0,
+    "sigma": 0.849026,
+    "tau_p": 0.679308,
+    "thresholds": {
+     "cond_pass_target": 0.95,
+     "n": 401,
+     "n_top": 401,
+     "rank": 15,
+     "recall_cv": 0.952618,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 401
+   },
+   "Sicklepod": {
+    "calibration": 121,
+    "cv_confirmed": 0.950413,
+    "cv_conflict": 0.016529,
+    "cv_top1": 0.983471,
+    "held_out_unseen": 0,
+    "sigma": 0.880239,
+    "tau_p": 0.755636,
+    "thresholds": {
+     "cond_pass_target": 0.965966,
+     "n": 121,
+     "n_top": 119,
+     "rank": 2,
+     "recall_cv": 0.950413,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 121
+   },
+   "SpottedSpurge": {
+    "calibration": 550,
+    "cv_confirmed": 0.952727,
+    "cv_conflict": 0.005455,
+    "cv_top1": 0.989091,
+    "held_out_unseen": 0,
+    "sigma": 0.817137,
+    "tau_p": 0.624679,
+    "thresholds": {
+     "cond_pass_target": 0.960478,
+     "n": 550,
+     "n_top": 544,
+     "rank": 13,
+     "recall_cv": 0.952727,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 550
+   },
+   "Waterhemp": {
+    "calibration": 1180,
+    "cv_confirmed": 0.950847,
+    "cv_conflict": 0.007627,
+    "cv_top1": 0.982203,
+    "held_out_unseen": 0,
+    "sigma": 0.813268,
+    "tau_p": 0.378849,
+    "thresholds": {
+     "cond_pass_target": 0.967213,
+     "n": 1180,
+     "n_top": 1159,
+     "rank": 22,
+     "recall_cv": 0.950847,
+     "rule": "joint",
+     "target_reachable": true
+    },
+    "train": 1180
+   }
+  },
+  "recall_target": 0.95,
+  "species_never_verified": [],
+  "species_not_in_trusted": [],
+  "threshold_rule": "joint: tau_p and sigma at one rank of the held-out top-1 true-k crops, the highest with verified rate >= recall_target",
+  "thresholds": {
+   "Carpetweed": {
+    "sigma": 0.80347,
+    "tau_p": 0.455228
+   },
+   "CutleafGroundcherry": {
+    "sigma": 0.86792,
+    "tau_p": 0.518575
+   },
+   "Eclipta": {
+    "sigma": 0.860733,
+    "tau_p": 0.608249
+   },
+   "Goosegrass": {
+    "sigma": 0.831907,
+    "tau_p": 0.612926
+   },
+   "MorningGlory": {
+    "sigma": 0.813094,
+    "tau_p": 0.629421
+   },
+   "OtherPlant": {
+    "sigma": null,
+    "tau_p": null
+   },
+   "PalmerAmaranth": {
+    "sigma": 0.861407,
+    "tau_p": 0.463867
+   },
+   "PricklySida": {
+    "sigma": 0.852298,
+    "tau_p": 0.63447
+   },
+   "Purslane": {
+    "sigma": 0.887451,
+    "tau_p": 0.53521
+   },
+   "Ragweed": {
+    "sigma": 0.849026,
+    "tau_p": 0.679308
+   },
+   "Sicklepod": {
+    "sigma": 0.880239,
+    "tau_p": 0.755636
+   },
+   "SpottedSpurge": {
+    "sigma": 0.817137,
+    "tau_p": 0.624679
+   },
+   "Waterhemp": {
+    "sigma": 0.813268,
+    "tau_p": 0.378849
+   }
+  }
+ },
+ "seconds": 11.4,
+ "trusted": {
+  "boxes": 26854,
+  "grouped_by": {
+   "session": 5028,
+   "source": 123
+  },
+  "groups": 29,
+  "images": 7493,
+  "images_matched_by_sha256": 0,
+  "lookup": "step1",
+  "manifest": "/home/lab/audit_stream_ci/manifests/P_1.jsonl",
+  "manifest_sha256": "3091dcd75b9057f69f53a48fd077d3f2d6ffd4fcb09335ea839b2d011907e702",
+  "no_embedding": 21180,
+  "no_embedding_reasons": {
+   "image_not_in_crops": 21180
+  },
+  "otherplant_boxes_left_out": 13221,
+  "species_boxes_used": 5151,
+  "used_per_species": {
+   "Carpetweed": 530,
+   "CutleafGroundcherry": 50,
+   "Eclipta": 512,
+   "Goosegrass": 107,
+   "MorningGlory": 792,
+   "PalmerAmaranth": 205,
+   "PricklySida": 263,
+   "Purslane": 440,
+   "Ragweed": 401,
+   "Sicklepod": 121,
+   "SpottedSpurge": 550,
+   "Waterhemp": 1180
+  }
+ },
+ "what": "INC attribution item 4, the BioCLIP-2 label audit (docs/INCREMENTAL_PROTOCOL.md, Gate)"
+}
