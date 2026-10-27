@@ -1,0 +1,734 @@
+{
+ "audit": {
+  "built_utc": "2026-10-05T05:01:53Z",
+  "file": "label_audit_s001_2026-10-05.json",
+  "job": "47429146",
+  "sha256": "a4683d6ef3d8df2ce93e8952a202f365cecccee4c62c91183773f9aa412f4698"
+ },
+ "audits_run_present": false,
+ "commit_dispositions": {
+  "inc0001": "data",
+  "inc0002": "hold",
+  "inc0003": "data",
+  "inc0004": "data"
+ },
+ "declined": [
+  "4f028d0cb1090ef00bd046e6e670759b",
+  "28ec81f22755cb05408f91b445106fbf",
+  "71a73e12951978ad52618445470ad8f5",
+  "9271898127ba7e539b5298f4de7e5ee0",
+  "a92f2f5e7a865560bc4fef524cf3b5db",
+  "2497f2f532fa31e8203cf0761b65a246",
+  "22b59a187f1c00415b9c2d70a0858c3f",
+  "befef2c88ba29b1313e5cfcd2cc5178e",
+  "197824f6458e84f8424d6901f26a11c3",
+  "4466467dba8e57ef3b98ed00f786c6f4",
+  "8f7d7d4f022a1fa6c80d19c408ddf66d",
+  "3311d265fa7f1bd3d601608c7dce818f",
+  "669bc97b17bfc538aebf22ca53b4e4d7",
+  "5d9648974f559b5a54bf3ade9abb10ed",
+  "3d767d9ebb444e30a5263e982e67ee9c",
+  "6e782a424ae5077fc7ede348e68b5fe4",
+  "5f98133609330c21a83ed305d2603ce1",
+  "59a6a52876f3b3f6203893caab88acbc",
+  "85c081b778ded112d6954de86c126e12",
+  "f6ba1f35efd7a9f6c1e20375310f5c1a"
+ ],
+ "done_ids_present": false,
+ "exp": "weed_stream_v1_fork1364_s001",
+ "format": "test-fixture/platform-stalls-l4/1",
+ "frozen": {
+  "files": {
+   "weed_stream_v1_fork1364_s001/exp.json": {
+    "bytes": 5527,
+    "sha256": "4412e0d46173dfe4c2be40ba69d368b1f6340320e0436b9633f6d4b04775c588",
+    "shipped": true
+   },
+   "weed_stream_v1_fork1364_s001/ledger.jsonl": {
+    "bytes": 59859,
+    "sha256": "515d943eeabd227f18336e38338be729eab9fb6c36eaf0c4b26418b1771ed8e0",
+    "shipped": true
+   },
+   "weed_stream_v1_fork1364_s001/report.json": {
+    "bytes": 13909,
+    "sha256": "0653f63e048f36fcf13c1de56837859df276433f58e418e2242e50b1119bc149",
+    "shipped": true
+   },
+   "weed_stream_v1_fork1364_s001/state.json": {
+    "bytes": 52767,
+    "sha256": "a2bf37e4c1435c4a48a5e0f83d6809e26a6094deebc9551eec43b32b4a4a76db",
+    "shipped": true
+   }
+  },
+  "missing": [
+   "weed_stream_v1_fork1364_s001/build_summary.json",
+   "weed_stream_v1_fork1364_s001/manifests/increments_summary.json",
+   "_campaign/provenance/weed_stream_v1_fork1364_s001.json"
+  ],
+  "utc": "2026-10-05T04:23:46Z"
+ },
+ "ledger_lines": [
+  {
+   "line": 866,
+   "row": {
+    "action": "inc_label_audit",
+    "argv": [
+     "sbatch",
+     "run_inc_audit.sh",
+     "--trusted",
+     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/pool/P_0.78fd299a3c3a1c51.jsonl",
+     "--audit",
+     "inc0001=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0001.jsonl",
+     "inc0003=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0003.jsonl",
+     "inc0004=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0004.jsonl",
+     "--out",
+     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/weed_stream_v1_fork1364_s001/audit/label_audit.json"
+    ],
+    "campaign": "weed_stream_v1",
+    "child_exp": "weed_stream_v1_fork1364_s001",
+    "cites": [
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/0/v3/verdict",
+      "value": "REJECT"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/0/disposition",
+      "value": "data"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/0/v3/p_data",
+      "value": 0.0
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/0/v3/guards",
+      "value": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      }
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/2/v3/verdict",
+      "value": "REJECT"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/2/disposition",
+      "value": "data"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/2/v3/p_data",
+      "value": 0.0
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/2/v3/guards",
+      "value": {
+       "flips": true,
+       "regression": false,
+       "species": true
+      }
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/3/v3/verdict",
+      "value": "REJECT"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/3/disposition",
+      "value": "data"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/3/v3/p_data",
+      "value": 0.2222222222222222
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/3/v3/guards",
+      "value": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      }
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/base/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/pool/P_0.78fd299a3c3a1c51.jsonl"
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/steps/0/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0001.jsonl"
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/steps/1/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0002.jsonl"
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/steps/2/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0003.jsonl"
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/steps/3/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0004.jsonl"
+     }
+    ],
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_gpu_hours": 0.0,
+    "event": "proposed",
+    "lane": "MAINT",
+    "lever": "L4",
+    "mode": "stream",
+    "proposal_id": "befef2c88ba29b1313e5cfcd2cc5178e",
+    "risk": "R2",
+    "tick": 870,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-05T04:53:46Z"
+   }
+  },
+  {
+   "line": 873,
+   "row": {
+    "action": "inc_label_audit",
+    "approval_id": null,
+    "basis": "direct",
+    "campaign": "weed_stream_v1",
+    "child_exp": "weed_stream_v1_fork1364_s001",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_su": 2.0,
+    "event": "executed",
+    "job_ids": [
+     "47429146"
+    ],
+    "lane": "MAINT",
+    "lever": "L4",
+    "mode": "stream",
+    "proposal_id": "befef2c88ba29b1313e5cfcd2cc5178e",
+    "tick": 870,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-05T04:53:46Z"
+   }
+  },
+  {
+   "line": 876,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "child_exp": "weed_stream_v1_fork1364_s001",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "item_done",
+    "lane": "MAINT",
+    "lever": "L4",
+    "mode": "stream",
+    "proposal_id": "befef2c88ba29b1313e5cfcd2cc5178e",
+    "tick": 871,
+    "utc": "2026-10-05T05:03:46Z"
+   }
+  },
+  {
+   "line": 879,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "not_taken",
+    "lever": "L4",
+    "mode": "stream",
+    "reasons": [
+     "L4 ran at 2026-10-05T05:03:46Z, after the last snapshot: waiting for a snapshot that shows it"
+    ],
+    "tick": 872,
+    "utc": "2026-10-05T05:15:05Z"
+   }
+  },
+  {
+   "line": 887,
+   "row": {
+    "action": "inc_label_audit",
+    "argv": [
+     "sbatch",
+     "run_inc_audit.sh",
+     "--trusted",
+     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/pool/P_0.78fd299a3c3a1c51.jsonl",
+     "--audit",
+     "inc0001=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0001.jsonl",
+     "inc0003=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0003.jsonl",
+     "inc0004=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0004.jsonl",
+     "--out",
+     "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/weed_stream_v1_fork1364_s001/audit/label_audit.json"
+    ],
+    "campaign": "weed_stream_v1",
+    "child_exp": "weed_stream_v1_fork1364_s001",
+    "cites": [
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/0/v3/verdict",
+      "value": "REJECT"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/0/disposition",
+      "value": "data"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/0/v3/p_data",
+      "value": 0.0
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/0/v3/guards",
+      "value": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      }
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/2/v3/verdict",
+      "value": "REJECT"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/2/disposition",
+      "value": "data"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/2/v3/p_data",
+      "value": 0.0
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/2/v3/guards",
+      "value": {
+       "flips": true,
+       "regression": false,
+       "species": true
+      }
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/3/v3/verdict",
+      "value": "REJECT"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/3/disposition",
+      "value": "data"
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/3/v3/p_data",
+      "value": 0.2222222222222222
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/ledger.jsonl",
+      "line": null,
+      "pointer": "/9/steps/r0/3/v3/guards",
+      "value": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      }
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/base/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/pool/P_0.78fd299a3c3a1c51.jsonl"
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/steps/0/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0001.jsonl"
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/steps/1/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0002.jsonl"
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/steps/2/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0003.jsonl"
+     },
+     {
+      "artifact": "weed_stream_v1_fork1364_s001/exp.json",
+      "line": null,
+      "pointer": "/steps/3/manifest",
+      "value": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/increments/inc0004.jsonl"
+     }
+    ],
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_gpu_hours": 0.0,
+    "event": "proposed",
+    "lane": "MAINT",
+    "lever": "L4",
+    "mode": "stream",
+    "proposal_id": "befef2c88ba29b1313e5cfcd2cc5178e",
+    "risk": "R2",
+    "tick": 876,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-05T05:55:05Z"
+   }
+  },
+  {
+   "line": 888,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "recovered",
+    "lane": "MAINT",
+    "lever": "L4",
+    "mode": "stream",
+    "reasons": [
+     "proposal befef2c88ba29b1313e5cfcd2cc5178e already ran (executed at 2026-10-05T04:53:46Z); a proposal runs once"
+    ],
+    "tick": 876,
+    "utc": "2026-10-05T05:55:05Z"
+   }
+  },
+  {
+   "line": 1045,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "not_taken",
+    "lane": "MAINT",
+    "lever": "L4",
+    "mode": "stream",
+    "proposal_id": "befef2c88ba29b1313e5cfcd2cc5178e",
+    "reasons": [
+     "L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick"
+    ],
+    "tick": 961,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-05T20:19:56Z"
+   }
+  },
+  {
+   "line": 1111,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "detail": "Since 2026-10-05T20:29:56Z every tick a fired diagnosis called for L4 on lane MAINT, nothing held the lane (no stop-loss, no diagnosis hold) and no item took it. The last reason: L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick. A person reads it: a declined proposal is never proposed again (stream ledger: not_taken, recovered, refused); a render error or a wait that does not end is a defect.",
+    "event": "card",
+    "kind": "stall",
+    "lever": "L4",
+    "mode": "stream",
+    "tick": 973,
+    "title": "Lane MAINT stalled: D31 called for L4 on 12 ticks and nothing took the lane",
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-05T22:19:56Z"
+   }
+  },
+  {
+   "line": 1112,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lane_stalled",
+    "lane": "MAINT",
+    "levers": [
+     "L4"
+    ],
+    "mode": "stream",
+    "reasons": [
+     "L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick"
+    ],
+    "since_utc": "2026-10-05T20:29:56Z",
+    "tick": 973,
+    "ticks": 12,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-05T22:19:56Z"
+   }
+  },
+  {
+   "line": 1967,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "detail": "Since 2026-10-13T13:14:58Z every tick a fired diagnosis called for L4 on lane MAINT, nothing held the lane (no stop-loss, no diagnosis hold) and no item took it. The last reason: L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick. A person reads it: a declined proposal is never proposed again (stream ledger: not_taken, recovered, refused); a render error or a wait that does not end is a defect.",
+    "event": "card",
+    "kind": "stall",
+    "lever": "L4",
+    "mode": "stream",
+    "tick": 2044,
+    "title": "Lane MAINT stalled: D31 called for L4 on 12 ticks and nothing took the lane",
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-13T15:04:58Z"
+   }
+  },
+  {
+   "line": 1968,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lane_stalled",
+    "lane": "MAINT",
+    "levers": [
+     "L4"
+    ],
+    "mode": "stream",
+    "reasons": [
+     "L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick"
+    ],
+    "since_utc": "2026-10-13T13:14:58Z",
+    "tick": 2044,
+    "ticks": 12,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-13T15:04:58Z"
+   }
+  },
+  {
+   "line": 2605,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "detail": "Since 2026-10-22T01:30:34Z every tick a fired diagnosis called for L4 on lane MAINT, nothing held the lane (no stop-loss, no diagnosis hold) and no item took it. The last reason: L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick. A person reads it: a declined proposal is never proposed again (stream ledger: not_taken, recovered, refused); a render error or a wait that does not end is a defect.",
+    "event": "card",
+    "kind": "stall",
+    "lever": "L4",
+    "mode": "stream",
+    "tick": 2862,
+    "title": "Lane MAINT stalled: D31 called for L4 on 12 ticks and nothing took the lane",
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-22T03:40:34Z"
+   }
+  },
+  {
+   "line": 2606,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lane_stalled",
+    "lane": "MAINT",
+    "levers": [
+     "L4"
+    ],
+    "mode": "stream",
+    "reasons": [
+     "L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick"
+    ],
+    "since_utc": "2026-10-22T01:30:34Z",
+    "tick": 2862,
+    "ticks": 12,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-22T03:40:34Z"
+   }
+  },
+  {
+   "line": 2695,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "detail": "Since 2026-10-25T17:19:35Z every tick a fired diagnosis called for L4 on lane MAINT, nothing held the lane (no stop-loss, no diagnosis hold) and no item took it. The last reason: L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick. A person reads it: a declined proposal is never proposed again (stream ledger: not_taken, recovered, refused); a render error or a wait that does not end is a defect.",
+    "event": "card",
+    "kind": "stall",
+    "lever": "L4",
+    "mode": "stream",
+    "tick": 3337,
+    "title": "Lane MAINT stalled: D31 called for L4 on 12 ticks and nothing took the lane",
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-25T19:09:35Z"
+   }
+  },
+  {
+   "line": 2696,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lane_stalled",
+    "lane": "MAINT",
+    "levers": [
+     "L4"
+    ],
+    "mode": "stream",
+    "reasons": [
+     "L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick"
+    ],
+    "since_utc": "2026-10-25T17:19:35Z",
+    "tick": 3337,
+    "ticks": 12,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-25T19:09:35Z"
+   }
+  },
+  {
+   "line": 2709,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "detail": "Since 2026-10-26T05:40:31Z every tick a fired diagnosis called for L4 on lane MAINT, nothing held the lane (no stop-loss, no diagnosis hold) and no item took it. The last reason: L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick. A person reads it: a declined proposal is never proposed again (stream ledger: not_taken, recovered, refused); a render error or a wait that does not end is a defect.",
+    "event": "card",
+    "kind": "stall",
+    "lever": "L4",
+    "mode": "stream",
+    "tick": 3411,
+    "title": "Lane MAINT stalled: D31 called for L4 on 12 ticks and nothing took the lane",
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-26T07:30:32Z"
+   }
+  },
+  {
+   "line": 2710,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lane_stalled",
+    "lane": "MAINT",
+    "levers": [
+     "L4"
+    ],
+    "mode": "stream",
+    "reasons": [
+     "L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick"
+    ],
+    "since_utc": "2026-10-26T05:40:31Z",
+    "tick": 3411,
+    "ticks": 12,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-26T07:30:32Z"
+   }
+  },
+  {
+   "line": 2724,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "detail": "Since 2026-10-26T13:40:32Z every tick a fired diagnosis called for L4 on lane MAINT, nothing held the lane (no stop-loss, no diagnosis hold) and no item took it. The last reason: L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick. A person reads it: a declined proposal is never proposed again (stream ledger: not_taken, recovered, refused); a render error or a wait that does not end is a defect.",
+    "event": "card",
+    "kind": "stall",
+    "lever": "L4",
+    "mode": "stream",
+    "tick": 3459,
+    "title": "Lane MAINT stalled: D31 called for L4 on 12 ticks and nothing took the lane",
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-26T15:30:32Z"
+   }
+  },
+  {
+   "line": 2725,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lane_stalled",
+    "lane": "MAINT",
+    "levers": [
+     "L4"
+    ],
+    "mode": "stream",
+    "reasons": [
+     "L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick"
+    ],
+    "since_utc": "2026-10-26T13:40:32Z",
+    "tick": 3459,
+    "ticks": 12,
+    "trigger": [
+     "D31"
+    ],
+    "utc": "2026-10-26T15:30:32Z"
+   }
+  }
+ ],
+ "proposal_id": "befef2c88ba29b1313e5cfcd2cc5178e",
+ "sid": "weed_stream_v1_fork1364",
+ "source": {
+  "admitted_target_boxes": 12500,
+  "blames": 3,
+  "cite": "D31",
+  "fetch_remaining": 0,
+  "images": 40859,
+  "intake_deferred": 0,
+  "quarantined_utc": "2026-10-05T04:53:46Z",
+  "status": "quarantined"
+ },
+ "stalls": {
+  "MAINT": {
+   "carded": "2026-10-26T15:30:32Z",
+   "last": "L4 (proposal befef2c88ba29b1313e5cfcd2cc5178e) was declined earlier and is never proposed again; D31 calls for it on every tick",
+   "levers": [
+    "L4"
+   ],
+   "since_utc": "2026-10-26T13:40:32Z",
+   "ticks": 28,
+   "triggers": [
+    "D31"
+   ]
+  }
+ },
+ "what": "The lab's records of 2026-10-26 (state.json at tick 3475, inc_campaign.jsonl) for D31's label audit L4 of weed_stream_v1_fork1364_s001: its campaign-ledger lines, the stall record of lane MAINT, the declined ids, the frozen record's time and files, and the audit's record (label_audit_s001_2026-10-05.json, byte for byte from the cluster)."
+}

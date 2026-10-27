@@ -73,6 +73,80 @@ fi
 
 source "$CONDA_SH" || exit 1
 conda activate bench || { echo "FATAL: conda activate bench failed" >&2; exit 1; }
+# >>> mlflow-off (the same block in run_inc_job.sh and run_inc2_job.sh; tests/test_job_mlflow_off.py)
+# Ultralytics' MLflow callback registers itself whenever its settings say "mlflow": true (the shared
+# ~/.config/Ultralytics/settings.json does), and at the end of every training run it copies the weights directory
+# into runs/mlflow: about 0.08 GB per run, 337 GB by 2026-10-26, byte-identical to the run folders' epoch files. No
+# MLFLOW_* variable turns it off, and pointing YOLO_CONFIG_DIR at a bare directory makes Ultralytics write fresh
+# default settings there (datasets_dir becomes ~/datasets). So the job reads its own copy of the shared settings with
+# only "mlflow" set false: YOLO_CONFIG_DIR is exported only after Ultralytics, imported under it, reads every other
+# key equal to the shared file's, rewrites nothing and registers no MLflow hook. Otherwise the job runs as before,
+# MLflow on, with a WARNING. The shared settings.json, datasets_dir and runs/mlflow are never touched.
+# A chained array inherits this job's environment (the in-job advance submits it from inside the job, and
+# inc.driver.submission_env keeps every variable but SLURM_*/SBATCH_*). A YOLO_CONFIG_DIR that is a job's own
+# copy (ultralytics_cfg_*, on node-local disk that ends with that job) is never read as the shared settings:
+# Ultralytics would fall back to a fresh default config (another datasets_dir, MLflow on). The caller's own
+# value is kept (UL_CALLER) and the advance below hands it, never the job's copy, to the next array.
+case "${YOLO_CONFIG_DIR:-}" in */ultralytics_cfg_*) unset YOLO_CONFIG_DIR ;; esac
+UL_CALLER_SET="${YOLO_CONFIG_DIR+1}"
+UL_CALLER="${YOLO_CONFIG_DIR:-}"
+UL_SHARED="${YOLO_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}}/Ultralytics"
+UL_JOB="${LOCAL:-${TMPDIR:-/tmp}}/ultralytics_cfg_${SLURM_JOB_ID:-$$}${SLURM_ARRAY_TASK_ID:+_$SLURM_ARRAY_TASK_ID}"
+if mkdir -p "$UL_JOB/Ultralytics" 2>/dev/null && python - "$UL_SHARED" "$UL_JOB/Ultralytics" <<'PYEOF'
+import json, os, shutil, sys
+src, dst = sys.argv[1], sys.argv[2]
+with open(os.path.join(src, "settings.json")) as fh:
+    s = json.load(fh)
+if not isinstance(s, dict) or not isinstance(s.get("mlflow"), bool):
+    sys.exit("the shared settings carry no boolean 'mlflow'")
+s["mlflow"] = False
+with open(os.path.join(dst, "settings.json"), "w") as fh:
+    json.dump(s, fh, indent=2)
+for f in sorted(os.listdir(src)):
+    p = os.path.join(src, f)
+    if f.endswith(".ttf") and os.path.isfile(p) and not os.path.lexists(os.path.join(dst, f)):
+        os.symlink(p, os.path.join(dst, f))
+if os.path.isfile(os.path.join(src, "persistent_cache.json")):
+    shutil.copyfile(os.path.join(src, "persistent_cache.json"), os.path.join(dst, "persistent_cache.json"))
+PYEOF
+then
+    UL_CHECK="$(YOLO_CONFIG_DIR="$UL_JOB" python - "$UL_SHARED" "$UL_JOB/Ultralytics" 2>&1 <<'PYEOF'
+import hashlib, json, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+f = os.path.join(dst, "settings.json")
+before = hashlib.sha256(open(f, "rb").read()).hexdigest()
+from ultralytics.utils import SETTINGS, USER_CONFIG_DIR
+from ultralytics.utils.callbacks import mlflow as ul_mlflow
+shared = json.load(open(os.path.join(src, "settings.json")))
+mine = dict(SETTINGS)
+off = sorted(k for k in set(shared) | set(mine) if k != "mlflow" and shared.get(k) != mine.get(k))
+why = []
+if os.path.realpath(str(USER_CONFIG_DIR)) != os.path.realpath(dst):
+    why.append("the user config dir is %s" % USER_CONFIG_DIR)
+if mine.get("mlflow") is not False:
+    why.append("mlflow is %r" % mine.get("mlflow"))
+if off:
+    why.append("keys differ from the shared settings: %s" % ", ".join(off))
+if hashlib.sha256(open(f, "rb").read()).hexdigest() != before:
+    why.append("Ultralytics rewrote the job's settings")
+if ul_mlflow.callbacks:
+    why.append("MLflow hooks registered: %s" % ", ".join(sorted(ul_mlflow.callbacks)))
+if why:
+    sys.exit("; ".join(why))
+print("datasets_dir %s, runs_dir %s, weights_dir %s" % (mine.get("datasets_dir"), mine.get("runs_dir"),
+                                                       mine.get("weights_dir")))
+PYEOF
+)"
+    if [ $? -eq 0 ]; then
+        export YOLO_CONFIG_DIR="$UL_JOB"
+        echo "MLflow logging off: YOLO_CONFIG_DIR=$UL_JOB (a copy of $UL_SHARED/settings.json, mlflow false; $UL_CHECK)"
+    else
+        echo "WARNING: MLflow logging stays on for this job: the job's settings did not check ($(echo "$UL_CHECK" | tail -1))" >&2
+    fi
+else
+    echo "WARNING: MLflow logging stays on for this job: no copy of $UL_SHARED/settings.json in $UL_JOB" >&2
+fi
+# <<< mlflow-off
 echo "=== inc.train $SPEC  $(date)  job ${SLURM_JOB_ID:-none}${SLURM_ARRAY_TASK_ID:+ task $SLURM_ARRAY_TASK_ID} on $(hostname) ==="
 echo "python: $(which python)  $(python -V 2>&1)"
 echo "GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null)"
@@ -83,7 +157,9 @@ rc=$?
 echo "=== executor exit $rc after $(( $(date +%s) - t0 ))s  $(date) ==="
 
 advance() {
-    python -u -m weed_optimizer_framework.tools.inc.driver advance --exp "$EXP" --quiet \
+    # the next array takes the caller's YOLO_CONFIG_DIR (or none), never this job's settings copy (mlflow-off)
+    (if [ -n "${UL_CALLER_SET:-}" ]; then export YOLO_CONFIG_DIR="$UL_CALLER"; else unset YOLO_CONFIG_DIR; fi
+     python -u -m weed_optimizer_framework.tools.inc.driver advance --exp "$EXP" --quiet) \
         || echo "WARNING: driver advance --exp $EXP failed (ignored; the next advance collects this run)" >&2
 }
 

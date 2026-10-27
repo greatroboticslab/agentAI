@@ -1288,7 +1288,8 @@ def test_job_script(done_spec, bad_spec):
     job.write_text("\n".join(lines) + "\n")
     lst = stub / "list.txt"
     lst.write_text("%s\n  %s  \n" % (done_spec, bad_spec))
-    base_env = dict(os.environ, PATH="%s:%s" % (stub / "bin", os.environ["PATH"]))
+    (stub / "local").mkdir()
+    base_env = dict(os.environ, PATH="%s:%s" % (stub / "bin", os.environ["PATH"]), LOCAL=str(stub / "local"))
 
     def job_run(task, *args, **extra):
         if calls.exists():

@@ -287,6 +287,59 @@ PERSON_LEVERS = ("LH",)
 # the lanes already followed (_adopt_lost_runs).
 ADOPTED_KEEP = 200
 ENDED_KEEP = 200
+# The proposal ids of lane items that ended done ({id: {utc, lever, exp}}, state done_ids; older ones are read from
+# the campaign ledger's item_done lines). A done id that a diagnosis calls for again is never run again (the executor
+# runs an id once), never declined and never a stall: one done_recalled event and one card name the diagnosis that
+# does not read its lever's result (2026-10-26: D31 called for the label audit L4 of 2026-10-05 on every tick, its id
+# was filed as declined after the executor refused it as already run, and lane MAINT was carded stalled 6 times).
+DONE_IDS_KEEP = 400
+# The collector's refusals that are the source's own outcome, not the lane's failure (2026-10-07: two identical lab
+# fetches of gh_geezacoleman__palmer_detection refused over_byte_plan held the DATA lane on its stop-loss for 19
+# days). On a fetch or an intake of the source (SOURCE_REFUSAL_LEVERS) that exits 2 with one of these codes:
+#   close   the collector closed the source (its action close; for a cluster job, whose log carries no action, the
+#           codes the collector always closes on): the source is closed with the code and detail as its reason;
+#   replan  over_byte_plan at the plan: proposed once more at a bounded larger plan (REPLAN_*; a new id), then
+#           closed with its reason;
+#   person  a decision the collector holds for a person (R3): the source held for a person's review (one card);
+#   retry   the source's own failure (no data file in its listing): counted against the source (closed after its 3
+#           attempts), never the lane's, and the source ranked after the others (D20).
+# A close, a person's hold and a source closed after its retries are in the zero-yield run (S20: 3 sources in a row
+# hold the lane), and REFUSAL_RUN_HOLD sources in a row refused with the same code hold the lane: a refusal that
+# meets every source is the machine's, not the sources'. A refusal whose detail names the machine (ENVIRONMENT_RE: a
+# missing module, a full or unwritable disk) and every other refusal (a transport, listing, describe or download
+# error, missing credentials, the byte envelope, an unknown source, a crash, a killed run) stays the lane's ordinary
+# failure, where a repeat on one source counts against that source only (_failed: the lane's stop-loss counts
+# distinct sources).
+SOURCE_REFUSAL_LEVERS = ("L16", "L16L", "L16R", "L16RL", "L16I")
+# the DATA lane's steps of one source whose denial by a person closes the source (_person_denied)
+DENIED_CLOSES = ("L16", "L16L", "L16I", "L16S", "L26")
+SOURCE_REFUSAL_CLOSE = ("never_train", "quarantined", "superseded", "licence_refused", "copy_candidate",
+                        "attempts_exhausted", "archive_escape", "registered_outside_intake", "closed")
+SOURCE_REFUSAL_REPLAN = ("over_byte_plan",)
+SOURCE_REFUSAL_PERSON = ("licence_unresolved", "image_level_only", "normalise_failed", "no_target_class",
+                         "not_fetchable", "archive_unreadable", "copy_scan_pending", "over_source_cap")
+SOURCE_REFUSAL_RETRY = ("no_data_files",)
+ENVIRONMENT_RE = re.compile(r"ImportError|ModuleNotFoundError|No module named|not installed|Permission denied|"
+                            r"No space left|Read-only file system|\[Errno|MemoryError")
+REFUSAL_RUN_HOLD = 3
+# The replanned fetch of a source refused over_byte_plan at its plan: the source's size when the provider stated it
+# (Content-Length, a listed size) plus 10 %, else REPLAN_MULT times the refused plan, at least REPLAN_FLOOR_BYTES;
+# never over what the per-source limit or the collect envelope leaves (a larger plan would be filed for a person and
+# hold the DATA lane on one source; a killed attempt counts its whole plan)
+REPLAN_MULT = 4
+REPLAN_FLOOR_BYTES = 10 ** 9
+# the collector's over_byte_plan details (collect.transport, collect.fetch): (pattern, the group of the source's
+# stated size or None, the group of the byte cap the download met)
+BYTE_CAP_FORMS = ((re.compile(r"(\d+) bytes listed, over the (\d+)-byte cap"), 1, 2),
+                  (re.compile(r"Content-Length (\d+) over the (\d+)-byte cap"), 1, 2),
+                  (re.compile(r"Content-Range total (\d+) over the (\d+)-byte cap"), 1, 2),
+                  (re.compile(r"more than the (\d+)-byte cap"), None, 1),
+                  (re.compile(r"more than (\d+) bytes"), None, 1))
+BYTE_CAP_GB_RE = re.compile(r"fits in ([0-9]+\.[0-9]+) GB")
+# the collector's refusal line in a job's log (collect.__main__: "[collect] <verb> refused: <code>: <detail>")
+COLLECT_REFUSAL_RE = re.compile(r"\[collect\] [a-z]+ refused: ([a-z_]+): ([^\n]*)")
+# The label audit's frozen experiment, snapshotted again until its record carries the audit (_refreeze_pending)
+AUDIT_ARTIFACT = "%s/audit/label_audit.json"
 # A segment build the cutter refused for want of eligible images (inc2.stream
 # build: "nothing cut for <exp>: short", or short_after_guard once the guard
 # excluded rows): no failure while the queue holds fewer than M (_cut_short).
@@ -813,6 +866,20 @@ def lab_sync(lab_inc, source, target, data_target=None, runner=None, cluster_inc
             "error": "" if c.returncode == 0 else "the arrival check failed: %s" % ((c.stdout or "") + (c.stderr or ""))[-300:]}
 
 
+def _byte_cap_of(detail):
+    """(cap, size, exact) of a collector over_byte_plan detail (BYTE_CAP_FORMS, BYTE_CAP_GB_RE): the byte cap the
+    refused download met, the source's size when the provider stated it (else None), and whether the cap is exact
+    (False: 'no selected file fits in X GB', X to 0.01 GB). (None, None, False) for a detail of no known form."""
+    for rx, gs, gc in BYTE_CAP_FORMS:
+        m = rx.search(str(detail or ""))
+        if m:
+            return int(m.group(gc)), (int(m.group(gs)) if gs else None), True
+    m = BYTE_CAP_GB_RE.search(str(detail or ""))
+    if m:
+        return int(round(float(m.group(1)) * 1e9)), None, False
+    return None, None, False
+
+
 # ------------------------------------------------------------------ the ticker
 class StreamRun(object):
     """One stream campaign's step in one tick (campaign._tick_all dispatches here)."""
@@ -836,6 +903,7 @@ class StreamRun(object):
         self.preamble = preamble
         self._execs = None                       # this campaign's execution records, read once a tick (_executions)
         self._ended = None                       # the items the campaign ledger records ended (_ledger_ended)
+        self._ended_done = None                  # of those, the ones that ended done ({id: {utc, lever, exp}})
         self._ctx = self._payload = None
         self.xctx = X.Context(slurm_sh=ssh, resources=resources, domain_budget=domain_budget, clock=clock,
                               lab_repo=paths.lab_repo, preamble=preamble, domain=self.domain,
@@ -947,6 +1015,17 @@ class StreamRun(object):
                 self._ledger("source_reopened", source=src, decided_by=rec.get("by") or "human",
                              reasons=[_short(rec.get("why") or "", 300)], before=prev)
                 continue
+            if s and s.get("status") == "held" and s.get("held_by") == "stream" and rec.get("utc") \
+                    and not (s.get("reopened_utc") and str(s["reopened_utc"]) >= str(rec["utc"])) \
+                    and not (s.get("held_utc") and str(rec["utc"]) < str(s["held_utc"])):
+                # held by the stream for a person on a collector refusal (_source_refused): a person's review
+                # releases it to be collected again
+                prev = {k: s.get(k) for k in ("status", "held_by", "held_reason", "held_utc")}
+                s.update(status="shard_pending" if DS.mid_shards(s) else "candidate", held_by=None,
+                         held_reason=None, reopened_utc=rec["utc"], reopened_by=rec.get("by"))
+                self._ledger("source_reopened", source=src, decided_by=rec.get("by") or "human",
+                             reasons=[_short(rec.get("why") or "", 300)], before=prev)
+                continue
             if not s or s.get("status") != "closed" or not rec.get("utc"):
                 continue
             if s.get("reopened_utc") and str(s["reopened_utc"]) >= str(rec["utc"]):
@@ -978,9 +1057,11 @@ class StreamRun(object):
                     self._ledger("lane_released", lane=ln, hold=lane["hold"],
                                  decided_by=self.cfg.get("updated_by") or "human")
                     lane["hold"], lane["fails"], lane["hold_utc"] = None, 0, None
+                    lane["fail_sources"] = []
                     self._release_steps(ln)
                     if ln == "DATA":
                         st["zero_run"] = []
+                        st["refusal_run"] = []
         if not p or not self.cfg.get("enabled") or self.cfg.get("paused_reason"):
             return
         if not ((r and str(r) >= str(p.get("utc") or "")) or p.get("config_written")):
@@ -993,7 +1074,9 @@ class StreamRun(object):
                 self._ledger("lane_released", lane=ln, hold=lane["hold"])
                 self._release_steps(ln)
             lane["hold"], lane["fails"] = None, 0
+            lane["fail_sources"] = []
         st["zero_run"] = []
+        st["refusal_run"] = []
         if (st.get("card") or {}).get("kind") == "paused":
             st["card"] = None
         self._ledger("resumed", decided_by=self.cfg.get("updated_by") or "human")
@@ -1302,7 +1385,7 @@ class StreamRun(object):
                         "never_train": (nt is None) or cid in (nt or set()), "known_item": r["known_item"],
                         "status": s.get("status"), "partial": bool(s.get("partial")), "placement": pl,
                         "in_shards": DS.mid_shards(s),
-                        "attempts": int(s.get("attempts") or 0),
+                        "attempts": int(s.get("attempts") or 0), "failures": int(s.get("failures") or 0),
                         "names_unresolved": (bool(r.get("names_unresolved")) or names_pending)
                         and not s.get("names_resolved"),
                         "names_resolved": bool(s.get("names_resolved")),
@@ -1507,6 +1590,11 @@ class StreamRun(object):
                 # some R0 items cite whole
                 "lift_wait": copy.deepcopy(((st.get("stage") or {}).get("r0") or {}).get("lift_wait")),
                 "rollbacks": copy.deepcopy(st.get("rollbacks") or []),
+                # the label audits (L4) that ran, by experiment: D31 reads their records and never calls for L4 on
+                # an experiment again ({exp: {utc, proposal_id, refreeze}}; refreeze: the frozen record's re-take)
+                "audits": {e: {"utc": a.get("utc"), "proposal_id": a.get("proposal_id"),
+                               "refreeze": ((st.get("refreeze") or {}).get(e) or {}).get("state")}
+                           for e, a in sorted(self._audits_run().items())},
                 "limits": {"gb_per_source": (LS.limits("L16") or {}).get("gb_per_source"),
                            "attempts_per_source": (LS.limits("L16") or {}).get("attempts_per_source")}}
 
@@ -1612,8 +1700,12 @@ class StreamRun(object):
                 s.update(status="closed", closed_reason=c.get("why"), closed_utc=self.utc)
                 self._ledger("source_closed", source=c["source"], reasons=[c.get("why")], trigger=["D21"])
         d31 = by.get("D31") or {}
-        for src, n in (((d31.get("detail") or {}).get("per_source") or {}).items() if d31.get("fired") else []):
-            st["sources"].setdefault(src, {})["blames"] = int(n)
+        # the blames D21 closes on and L24 quarantines on: those committed after a person's last lift of the
+        # source's quarantine (D31 counted; per_source, every blame, for a record without it)
+        d31d = d31.get("detail") or {}
+        counted = d31d.get("counted") if isinstance(d31d.get("counted"), dict) else None
+        for src, n in ((d31d.get("per_source") or {}).items() if d31.get("fired") else []):
+            st["sources"].setdefault(src, {})["blames"] = int(n if counted is None else counted.get(src) or 0)
         d27 = by.get("D27") or {}
         st["want_largest"] = bool(d27.get("fired") and (d27.get("detail") or {}).get("hold") == "DATA")
         if st["want_largest"] and (d27.get("detail") or {}).get("largest"):
@@ -1893,7 +1985,9 @@ class StreamRun(object):
         if st.get("drift"):
             return
         self._adopt_person_items()
-        self._stalls, wanted = {}, set()
+        # the lanes a diagnosis wants this tick, counted per intent: an intent whose proposal already ran and ended
+        # done takes its count back (_done_recalled), so a lane wanted only for such work ends its stall
+        self._stalls, want = {}, {}
         for lane_name, lever, pr, did, d in self._intents():
             if lever in PERSON_LEVERS:
                 self._file_person(lane_name, lever, pr, did, d)
@@ -1901,7 +1995,7 @@ class StreamRun(object):
             lane = st["lanes"][lane_name]
             if lane.get("item") is not None or lane.get("hold") or lane.get("diag_hold"):
                 continue
-            wanted.add(lane_name)
+            want[lane_name] = want.get(lane_name, 0) + 1
             if lane_name == "DATA" and lane.get("half") and st["ticks"] % 2:
                 continue
             if lane_name == "DATA" and lane["phase"] == "WAIT_DATA":
@@ -1930,7 +2024,12 @@ class StreamRun(object):
                 continue
             if p is None:
                 continue
-            if p["id"] in (st.get("declined") or []):
+            declined = p["id"] in (st.get("declined") or [])
+            # an item that ran and ended done (state done_ids; for an id filed as declined before done_ids existed,
+            # the campaign ledger's item_done). A lab item keeps its own path: its step may be wanted again and runs
+            # under a new id (_adopt_declined, _recover_lab -> _renew)
+            ran_at = self._done_at(p["id"], ledger=declined) if p.get("follow") != "lab" else None
+            if declined and not ran_at:
                 # a lab item declined after a restart lost its run: the run is taken back (its effect lives only
                 # in this state); any other declined id is never proposed again, recorded once, never silently
                 if p.get("follow") == "lab" and self._adopt_declined(lane_name, lever, p, did, d):
@@ -1953,6 +2052,12 @@ class StreamRun(object):
                                     % (lever, done_at)])
                 self._stall(lane_name, lever, did, "%s ran at %s, after the last snapshot" % (lever, done_at))
                 continue
+            if ran_at:
+                # the same id ran and ended done, and the snapshot since shows its effect: never run again, never a
+                # stall (2026-10-05..26: D31's L4)
+                self._done_recalled(lane_name, p.get("lever") or lever, p, did, ran_at)
+                want[lane_name] -= 1
+                continue
             lever = p.get("lever") or lever           # the sub-lever the proposal took (L16 -> L16L on the lab)
             lane["item"] = {"proposal": p, "lever": lever, "status": "proposed", "since_utc": self.utc,
                             "attempt": p.get("attempt", 0), "trigger": did, "diagnoses": [d]}
@@ -1961,7 +2066,7 @@ class StreamRun(object):
                          argv=p["argv"], est_gpu_hours=p.get("est_gpu_hours"), trigger=[did],
                          cites=p.get("cites"), proposal_id=p["id"], child_exp=p.get("child_exp"))
         self._file_reviews()
-        self._watchdog(wanted)
+        self._watchdog({ln for ln, n in want.items() if n > 0})
 
     def _stall(self, ln, lever, did, why):
         """A diagnosis's lever on an idle, unheld lane not taken this tick for
@@ -2097,6 +2202,7 @@ class StreamRun(object):
         info = {"pool_images": (self.ev.json(E.CONTEXT) or {}).get("pool", {}).get("images"), "M": q.get("M"),
                 "arm": arm.get("name")}
         params, child, parent, lid = {}, None, None, lever
+        floor_attempt = 0                         # a step's attempt starts here at least (L24 after a person's lift)
         pkg = self.pkg
         lab = str(self.paths.lab_inc)
         if lever == "L15":
@@ -2113,9 +2219,7 @@ class StreamRun(object):
                 # a 4th attempt on one source is a loop, not a retry (S15)
                 self._pause("stop-loss: a 4th collection attempt on source %s was about to be proposed" % src)
                 return None
-            cap = int(float((LS.limits("L16") or {}).get("gb_per_source") or 50) * 1e9)
-            want = int(_num(pr.get("bytes")) or (dom.get("collect") or {}).get("max_bytes_default") or cap)
-            params = {"source": src, "max_bytes": max(1, min(want, cap))}
+            params = {"source": src, "max_bytes": self._byte_plan(src, pr.get("bytes"))}
             if pr.get("placement") == "lab":
                 lid = "L16L"
                 params["out"] = str(self.paths.staging()) + "/"
@@ -2165,12 +2269,18 @@ class StreamRun(object):
         elif lever == "L24":
             params = {"pkg": pkg, "source": pr["source"], "cite": pr.get("cite") or did}
             src_st = st["sources"].get(pr["source"]) or {}
-            if src_st.get("status") == "quarantined" or src_st.get("leak_kept_by"):
+            if src_st.get("status") == "quarantined" or src_st.get("leak_kept_by") \
+                    or (src_st.get("blame_kept_by") and params["cite"] == "D31"):
                 return None
             if str(pr["source"]) in self._stream_quarantined():
                 # the stream's ledger already quarantines it: nothing to run; this state follows the ledger
                 self._resync_quarantines()
                 return None
+            # a quarantine a person lifted (inc2.stream unquarantine) and the diagnosis calls for again (D31: blames
+            # committed after the lift) is new work: each lift starts a new id, so the one that ran is never recalled
+            floor_attempt = len([e for e in self._artifact("stream/%s/ledger.jsonl" % self.sid) or []
+                                 if isinstance(e, dict) and e.get("event") == "unquarantine"
+                                 and str(e.get("source")) == str(pr["source"])])
         elif lever == "LH":
             params = {"pkg": pkg, "stream": self.sid, "hold": pr.get("hold") or "funnel_F9"}
         elif lever == "L18":
@@ -2317,7 +2427,7 @@ class StreamRun(object):
         if lid in V3FAM_LEVERS and not self._v3fam_cap_ok(lid, params, est):
             return None
         akey = step_key(lid, LS.policy_params(lid, params))
-        attempt = int((st.get("attempts") or {}).get(akey) or 0)
+        attempt = max(int((st.get("attempts") or {}).get(akey) or 0), floor_attempt)
         failed_ids = set(self._failed_ids())
         for _ in range(64):
             p = LS.proposal(self.name, lid, params, trigger=[did], cites=cites, lane=LANE_OF.get(lever),
@@ -2354,6 +2464,21 @@ class StreamRun(object):
             if isinstance(e, dict) and e.get("event") == "bisect" and e.get("phase") == "build":
                 n += len(e.get("arms") or {})
         return "%s_b%03d" % (self.sid, n + 1)
+
+    def _byte_plan(self, src, est):
+        """The max_bytes of a fetch of source `src` (L16 and its forms, L16R): the candidate's size estimate (the
+        domain's collect.max_bytes_default, one 10 GiB shard, when it has none), or the larger plan a refusal raised
+        it to (sources.<src>.byte_plan, _source_refused), never over the per-source cap (L16's gb_per_source). An
+        estimate can be short of what is fetched: a GitHub repository's API size is its git object store, while the
+        provider downloads the branch's zip, whose size is not listed (2026-10-07: gh_geezacoleman__palmer_detection
+        was planned at its 64,145,408-byte estimate, its zip was 84,379,800 bytes, and both attempts were refused
+        over_byte_plan). Such a refusal raises the plan once (_source_refused); the estimate stays the first plan, so
+        what an attempt reserves, and what an attempt whose bytes are unknown counts (executor.fetched_bytes), is
+        not inflated for every source."""
+        cap = int(float((LS.limits("L16") or {}).get("gb_per_source") or 50) * 1e9)
+        default = int(_num(((self.dom or {}).get("collect") or {}).get("max_bytes_default")) or cap)
+        raised = int(_num(((self.st.get("sources") or {}).get(str(src)) or {}).get("byte_plan")) or 0)
+        return max(1, min(cap, max(int(_num(est) or default), raised)))
 
     def _audit_proposal(self, pr, did, d):
         """L4 (the existing label audit) on a segment's data-blamed increments."""
@@ -2403,8 +2528,7 @@ class StreamRun(object):
             superseded = isinstance(prev, dict) and prev.get("status") == "superseded"
             if prev is not None and not superseded:
                 continue
-            cap = int(float((LS.limits("L16") or {}).get("gb_per_source") or 50) * 1e9)
-            params = {"source": src, "max_bytes": max(1, min(int(_num(cand.get("bytes")) or cap), cap))}
+            params = {"source": src, "max_bytes": self._byte_plan(src, cand.get("bytes"))}
             lid = "L16R"
             if cand.get("placement") == "lab":
                 lid = "L16RL"
@@ -2559,11 +2683,14 @@ class StreamRun(object):
                          rc=res.get("rc"), seconds=res.get("seconds"))
             if res.get("ok"):
                 self._done(ln, it, res)
+                continue
+            why = "the lab process %s ended %s: %s" % (it["lab_job"], res.get("rc"),
+                                                       _short(res.get("stderr_tail") or res.get("error") or "", 300))
+            ref = None if res.get("lost") else self._collector_refusal(it, res.get("rc"), self._collect_result(res))
+            if ref is not None:
+                self._source_refused(ln, it, ref, why)
             else:
-                self._failed(ln, it, "the lab process %s ended %s: %s" % (it["lab_job"], res.get("rc"),
-                                                                           _short(res.get("stderr_tail") or res.get("error")
-                                                                                  or "", 300)),
-                             lost=bool(res.get("lost")))
+                self._failed(ln, it, why, lost=bool(res.get("lost")))
 
     # ---- runs a lane lost (a tick that ran them and did not write its state)
     def _executions(self):
@@ -2658,7 +2785,7 @@ class StreamRun(object):
         lab_job_finished the lab job; the latest utc of each), read once a
         tick; None when the ledger cannot be read."""
         if self._ended is None:
-            pids, jobs = {}, {}
+            pids, jobs, done = {}, {}, {}
             try:
                 with open(str(self.paths.ledger), "r", encoding="utf-8") as fh:
                     for line in fh:
@@ -2672,6 +2799,12 @@ class StreamRun(object):
                             continue
                         if r.get("event") in ENDED_EVENTS and r.get("proposal_id"):
                             pids[str(r["proposal_id"])] = str(r.get("utc") or "")
+                            if r.get("event") == "item_done":
+                                done[str(r["proposal_id"])] = {"utc": str(r.get("utc") or ""), "lever": r.get("lever"),
+                                                               "exp": r.get("child_exp")}
+                            else:
+                                # a later end that is not done (an id is run once, so this is a record's repair)
+                                done.pop(str(r["proposal_id"]), None)
                         elif r.get("event") == "lab_job_finished" and r.get("lab_job"):
                             jobs[str(r["lab_job"])] = str(r.get("utc") or "")
             except FileNotFoundError:
@@ -2679,7 +2812,46 @@ class StreamRun(object):
             except OSError:
                 return None
             self._ended = (pids, jobs)
+            self._ended_done = done
         return self._ended
+
+    def _done_at(self, pid, ledger=False):
+        """The utc at which the lane item of proposal `pid` ended done (state done_ids; with `ledger`, else the
+        campaign ledger's item_done line, for an item done before done_ids existed, which is then recorded in
+        done_ids), or None. A ledger that cannot be read: None (the caller keeps its old path)."""
+        rec = (self.st.get("done_ids") or {}).get(str(pid)) if isinstance(self.st.get("done_ids"), dict) else None
+        if isinstance(rec, dict) and rec.get("utc"):
+            return str(rec["utc"])
+        if not ledger or self._ledger_ended() is None:
+            return None
+        rec = (self._ended_done or {}).get(str(pid))
+        if not rec:
+            return None
+        self._note_done(str(pid), rec)
+        return rec["utc"]
+
+    def _note_done(self, pid, rec):
+        """Record proposal `pid` as ended done ({utc, lever, exp}) in done_ids, the oldest dropped past
+        DONE_IDS_KEEP."""
+        dn = self.st.get("done_ids") if isinstance(self.st.get("done_ids"), dict) else {}
+        dn.pop(pid, None)
+        dn[pid] = {"utc": rec.get("utc"), "lever": rec.get("lever"), "exp": rec.get("exp")}
+        while len(dn) > DONE_IDS_KEEP:
+            dn.pop(next(iter(dn)))
+        self.st["done_ids"] = dn
+
+    def _done_recalled(self, ln, lever, p, did, done_at):
+        """A diagnosis calls for proposal p, whose item already ran and ended done at `done_at`: not run again (an id
+        runs once), not declined, not a stall, and the lane is not wanted for it. One not_taken event and one card
+        per id name the diagnosis that keeps calling for a lever after it ran: it does not read that lever's result
+        (a rule to fix), or the same work is wanted again under the same id (a lever whose id must change)."""
+        why = ("%s (proposal %s) ran and ended done at %s; %s still calls for it on every tick: it is not run again "
+               "(an id runs once) and the lane does not wait for it. %s does not read %s's result, or the same work is "
+               "wanted again under the same id: a rule to fix, not a stall" % (lever, p["id"], done_at, did, did, lever))
+        if self._once("done_recalled:%s" % p["id"], done_at, "not_taken", lane=ln, lever=lever, proposal_id=p["id"],
+                      trigger=[did], done_recalled=True, done_utc=done_at, reasons=[why]) is not None:
+            self._card("platform", "%s %s ran at %s and %s still calls for it: not run again" % (
+                lever, p["id"][:12], done_at, did), why, lever=lever, trigger=[did])
 
     def _seed_ended(self):
         """A state written before ended_ids existed (the first tick after the
@@ -3097,6 +3269,26 @@ class StreamRun(object):
             self.st["sources"].setdefault(str(src), {})["leak_kept_by"] = a.get("decided_by") or "human"
             self._ledger("leak_kept", source=src, decided_by=a.get("decided_by") or "human",
                          approval_id=it.get("approval_id"))
+        elif it.get("lever") == "L24" and src and params.get("cite") == "D31":
+            # a denied data-blame quarantine keeps the source: D31 does not call for L24 on it again (its blames
+            # are permanent; before 2026-10-26 the same id came back on every tick and stalled lane STOP)
+            self.st["sources"].setdefault(str(src), {})["blame_kept_by"] = a.get("decided_by") or "human"
+            self._ledger("blame_kept", source=src, decided_by=a.get("decided_by") or "human",
+                         approval_id=it.get("approval_id"))
+        elif it.get("lever") in DENIED_CLOSES and src and it.get("lever") not in REVIEW_LEVERS:
+            # a person denied a step of one source on the DATA lane (a fetch, an intake, a sync, its names): the
+            # source is closed with the person's decision as its reason, so D20 goes on with the next source
+            # (2026-10-26: a denied L16L stayed the top candidate, its declined id came back on every tick and the
+            # lane was carded stalled); stream reopen --source brings it back
+            s = self.st["sources"].setdefault(str(src), {})
+            if s.get("status") not in ("closed", "quarantined"):
+                why = "a person (%s) denied %s %s (approval %s)" % (a.get("decided_by") or "human", it.get("lever"),
+                                                                    p.get("id"), it.get("approval_id"))
+                s.update(status="closed", closed_reason=_short(why, 300), closed_utc=self.utc,
+                         closed_by=a.get("decided_by") or "human")
+                self._ledger("source_closed", source=src, lever=it.get("lever"), proposal_id=p.get("id"),
+                             decided_by=a.get("decided_by") or "human", approval_id=it.get("approval_id"),
+                             reasons=[why])
         if it.get("lever") in REVIEW_LEVERS and src:
             rv = (self.st.get("source_reviews") or {}).get(src)
             if isinstance(rv, dict):
@@ -3312,6 +3504,13 @@ class StreamRun(object):
             # a job or verb that already ran has no job id to follow here: its
             # effect shows in the snapshots; following it would fail it as a
             # job that "ended unknown" and count toward the lane's stop-loss
+            ran_at = self._done_at(p["id"], ledger=True)
+            if ran_at:
+                # its item ended done (2026-10-05: D31's L4 was refused as already run and filed as declined, and
+                # lane MAINT stalled on it for three weeks): done, never declined, never a stall
+                self._done_recalled(ln, it["lever"], p, (p.get("trigger") or [it.get("trigger")])[0], ran_at)
+                self._clear(ln)
+                return
             st["declined"] = (list(st.get("declined") or []) + [p["id"]])[-200:]
             self._clear(ln)
             return
@@ -3413,8 +3612,18 @@ class StreamRun(object):
         lever, params = it["lever"], p.get("params") or {}
         lane = st["lanes"][ln]
         lane["fails"] = 0
+        lane["fail_sources"] = []
+        if lever in SOURCE_REFUSAL_LEVERS:
+            st["refusal_run"] = []                 # a fetch or an intake that ran: the collector works (_refusal_run)
         (st.get("lost_runs") or {}).pop(step_key(lever, params), None)
         self._ledger("item_done", lane=ln, lever=lever, proposal_id=p["id"], child_exp=p.get("child_exp"))
+        # an id that ended done is never declined or stalled on when a diagnosis calls for it again (_done_recalled)
+        self._note_done(str(p["id"]), {"utc": self.utc, "lever": lever, "exp": p.get("child_exp")})
+        if lever == "L4" and p.get("child_exp"):
+            # the label audit's result is read by D31 (context /audits); a frozen experiment is snapshotted again
+            # until its record carries the audit (_refreeze_pending)
+            self._audits_run()[str(p["child_exp"])] = {"utc": self.utc, "proposal_id": p["id"],
+                                                       "audit": (p.get("params") or {}).get("audit")}
         # what a later tick diagnoses before the next snapshot still shows the
         # state before this item: the same work is not proposed again on it
         dk = st.setdefault("done_keys", {})
@@ -3709,7 +3918,21 @@ class StreamRun(object):
                          reasons=["refused with a refusal the identical request meets again: %s" % _short(why, 300)])
             self._clear(ln)
             return
-        lane["fails"] = int(lane.get("fails") or 0) + 1
+        # one source's repeated failure counts against that source (closed after its 3 failures, below), never twice
+        # against the lane: the lane's stop-loss counts consecutive failures of distinct sources (a fetch that fails
+        # on every source is the machine's), and D20 ranks a failed source after the others (2026-10-26: a dead
+        # link proposed again under a new id held lane DATA on its second failure, as the oversized palmer did)
+        src = None
+        if lever in FETCH_LEVERS + ("L16I", "L17") and params.get("source") or lever in FETCH_LEVERS:
+            src = params.get("source") or next((k for k, v in st["sources"].items()
+                                                if v.get("batch") == params.get("intake")), None)
+        run = list(lane.get("fail_sources") or []) if int(lane.get("fails") or 0) else []
+        repeat = bool(src) and ln == "DATA" and str(src) in run
+        if not repeat:
+            lane["fails"] = int(lane.get("fails") or 0) + 1
+            if src and ln == "DATA":
+                run.append(str(src))
+        lane["fail_sources"] = run[-8:]
         key = step_key(lever, params)             # the proposal's params: its policy params and price
         att = st.setdefault("attempts", {})
         att[key] = int(att.get(key) or 0) + 1
@@ -3720,27 +3943,24 @@ class StreamRun(object):
         st["refusals"] = (list(st.get("refusals") or []) + [{"builder": p.get("policy_action"),
                                                               "message": _short(why, 1000)}])[-REFUSALS_KEEP:]
         self._ledger("failed", lane=ln, lever=lever, reasons=[_short(why, 1000)], proposal_id=p["id"],
-                     charged=charged, fails=lane["fails"])
-        if lever in FETCH_LEVERS + ("L16I", "L17") and params.get("source") or lever in FETCH_LEVERS:
-            src = params.get("source") or next((k for k, v in st["sources"].items()
-                                                if v.get("batch") == params.get("intake")), None)
-            if src:
-                s = st["sources"].setdefault(src, {})
-                s["failures"] = int(s.get("failures") or 0) + 1
-                # a source part-way through its intake shards whose next shard failed waits for that shard again
-                # (D20 never fetches it anew: a new fetch record would start the source over); a hold the
-                # collector's ledger brought this tick stays until the collector releases it; others are
-                # candidates again. Its failures count per shard (reset when a shard is admitted, _next_shard)
-                held = s.get("status") == "held" and s.get("held_by") == "collector"
-                s["status"] = ("held" if held else "shard_pending" if DS.mid_shards(s) else "candidate") \
-                    if s["failures"] < 3 else "closed"
-                if s["status"] == "closed":
-                    s["closed_reason"] = "3 failed attempts (7.5)"
-                    s["closed_utc"] = self.utc
-                    self._ledger("source_closed", source=src, reasons=["3 failed attempts"])
-                    if not (s.get("admitted_batches") and int(_num(s.get("admitted_target_boxes")) or 0) > 0):
-                        # a source whose admitted shards gave target boxes did not end with zero yield
-                        self._zero_yield(src, "failed")
+                     charged=charged, fails=lane["fails"], **({"source_repeat": src} if repeat else {}))
+        if src:
+            s = st["sources"].setdefault(src, {})
+            s["failures"] = int(s.get("failures") or 0) + 1
+            # a source part-way through its intake shards whose next shard failed waits for that shard again
+            # (D20 never fetches it anew: a new fetch record would start the source over); a hold the
+            # collector's ledger brought this tick stays until the collector releases it; others are
+            # candidates again. Its failures count per shard (reset when a shard is admitted, _next_shard)
+            held = s.get("status") == "held" and s.get("held_by") == "collector"
+            s["status"] = ("held" if held else "shard_pending" if DS.mid_shards(s) else "candidate") \
+                if s["failures"] < 3 else "closed"
+            if s["status"] == "closed":
+                s["closed_reason"] = "3 failed attempts (7.5)"
+                s["closed_utc"] = self.utc
+                self._ledger("source_closed", source=src, reasons=["3 failed attempts"])
+                if not (s.get("admitted_batches") and int(_num(s.get("admitted_target_boxes")) or 0) > 0):
+                    # a source whose admitted shards gave target boxes did not end with zero yield
+                    self._zero_yield(src, "failed")
         self._clear(ln)
         if lane["fails"] >= int(LS.t(self.th, "stop_loss", "lane_fails")):
             lane["hold"] = "stop-loss: %d consecutive failed steps (last: %s)" % (lane["fails"], _short(why, 200))
@@ -3748,16 +3968,225 @@ class StreamRun(object):
             self._card("stop_loss", "Lane %s held" % ln, lane["hold"])
             self._ledger("lane_held", lane=ln, hold=lane["hold"])
 
-    def _zero_yield(self, src, how, boxes=None):
+    def _collector_refusal(self, it, rc, got):
+        """The collector's refusal of item `it` when it is the source's own outcome (SOURCE_REFUSAL_*), else None:
+        {"code", "detail", "action", "risk", "kind": close | replan | person | retry, "size"}. `got` is the
+        collector's closing JSON (a lab process) or the code and detail of its refusal line (a cluster job, whose
+        action is unknown: the code's). Only a fetch or an intake of one source that exited 2. A byte cap below the
+        plan (the lab's free disk, the collector's byte envelope or its per-source budget, read from any of the
+        collector's over_byte_plan forms, _byte_cap_of) is not the source's size, and a detail naming the machine
+        (ENVIRONMENT_RE) is not the source's: the lane's ordinary failure."""
+        if it.get("lever") not in SOURCE_REFUSAL_LEVERS or str(rc) != "2" or not isinstance(got, dict):
+            return None
+        params = (it.get("proposal") or {}).get("params") or {}
+        code, detail = str(got.get("code") or ""), str(got.get("detail") or got.get("error") or "")
+        action, risk = got.get("action"), got.get("risk")
+        if not params.get("source") or not code or got.get("status") not in (None, "held", "closed", "refused"):
+            return None
+        size = None
+        if code in SOURCE_REFUSAL_REPLAN:
+            cap, size, exact = _byte_cap_of(detail)
+            plan = int(_num(params.get("max_bytes")) or 0)
+            if cap is not None and plan:
+                if exact and cap < 0.99 * plan:
+                    return None                # another cap bound it (disk, envelope, budget): not the plan
+                if not exact and cap < float("%.2f" % (plan / 1e9)) * 1e9 - 1:
+                    return None                # 'no selected file fits in X GB' (X to 0.01 GB) below the plan's X
+            kind = "replan"
+        elif ENVIRONMENT_RE.search(detail):
+            return None                        # the machine's (a missing module, a full disk), not the source's
+        elif action == "close" or (action is None and code in SOURCE_REFUSAL_CLOSE):
+            kind = "close"
+        elif code in SOURCE_REFUSAL_PERSON:
+            kind = "person"
+        elif code in SOURCE_REFUSAL_RETRY:
+            kind = "retry"
+        else:
+            return None
+        return {"code": code, "detail": _short(detail, 400), "action": action, "risk": risk, "kind": kind,
+                "size": size}
+
+    def _source_refused(self, ln, it, ref, why):
+        """A fetch or an intake the collector refused for a reason of the source's own (_collector_refusal): the
+        source's outcome, never the lane's failure. Neither the lane's failure count nor the step's is touched, no
+        refusal is recorded against a builder, the run's id is retired and the lane is freed, so the next source
+        is proposed (2026-10-07: two identical refusals of one oversized source held the DATA lane on its
+        stop-loss for 19 days). The source:
+          replan  (over_byte_plan, its attempts not used up) -> a candidate again, planned once at a bounded larger
+                  plan (_replan_bytes; a new id); with no larger plan to give, or refused again, closed;
+          close   closed with the code and detail, in the zero-yield run (S20);
+          person  held for a person's review (one data card; stream reopen --source releases it), in the zero-yield
+                  run;
+          retry   one failed attempt of the source (closed after its 3, as _failed counts them), ranked after the
+                  other candidates.
+        REFUSAL_RUN_HOLD sources in a row refused with the same code (close, person or retry) hold the lane: a
+        refusal every source meets is no source's own (a licence policy, a normaliser or a listing that changed)."""
+        st = self.st
+        p = it["proposal"]
+        lever, params = it["lever"], p.get("params") or {}
+        src = str(params.get("source"))
+        lane = st["lanes"][ln]
+        if lever in FETCH_LEVERS:
+            self._fetch_ends()[p["id"]] = self.utc     # its bytes count from the collector's ledger, not max_bytes
+        st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+        s = st["sources"].setdefault(src, {})
+        lim = int((LS.limits("L16") or {}).get("attempts_per_source") or 3)
+        plan = int(_num(params.get("max_bytes")) or 0)
+        kind = ref["kind"]
+        reason = "%s: %s" % (ref["code"], ref["detail"])
+        new, why_not = None, None
+        if kind == "replan":
+            if _num(s.get("byte_plan")):
+                why_not = "it was planned once already at a larger plan (%.3f GB)" % (_num(s["byte_plan"]) / 1e9)
+            elif int(s.get("attempts") or 0) >= lim:
+                why_not = "its %d attempts (attempts_per_source %d) are used" % (int(s.get("attempts") or 0), lim)
+            else:
+                new, why_not = self._replan_bytes(src, plan, ref.get("size"))
+            if new is None:
+                kind = "close"
+        if kind == "replan":
+            s.update(status="shard_pending" if DS.mid_shards(s) else "candidate", byte_plan=new,
+                     byte_plan_why=_short(reason, 300), byte_plan_utc=self.utc)
+            self._ledger("source_replanned", lane=ln, lever=lever, source=src, proposal_id=p["id"],
+                         max_bytes=plan, byte_plan=new, size=ref.get("size"), reasons=[_short(reason, 500)],
+                         next="proposed once more at %d bytes under a new id" % new)
+        elif kind == "close":
+            if ref["code"] in SOURCE_REFUSAL_REPLAN:
+                reason = ("over_byte_plan: refused at a plan of %.3f GB (%s); not planned again: %s. Collecting it "
+                          "with more bytes is a person's decision: the collect config's budgets.approved_bytes[%s], "
+                          "then stream reopen --source %s; its next fetch is then filed for that person's approval "
+                          "(the executor's attempts_per_source counts its %d earlier fetches)"
+                          % (plan / 1e9, ref["detail"], why_not or "refused at its larger plan", src, src,
+                             int(s.get("attempts") or 0)))
+            if s.get("status") not in ("closed", "quarantined"):
+                s.update(status="closed", closed_reason=_short(reason, 500), closed_utc=self.utc)
+                self._ledger("source_closed", source=src, lever=lever, proposal_id=p["id"], code=ref["code"],
+                             reasons=[_short(reason, 500)], by="collector")
+                if not (s.get("admitted_batches") and int(_num(s.get("admitted_target_boxes")) or 0) > 0):
+                    self._zero_yield(src, "refused", reasons={ref["code"]: 1})
+        elif kind == "person":
+            s.update(status="held", held_by="stream", held_reason=_short(reason, 300), held_utc=self.utc)
+            self._ledger("source_held", source=src, lever=lever, proposal_id=p["id"], code=ref["code"],
+                         reasons=[_short(reason, 500)], by="collector")
+            self._card("data", "Source %s held for a person: %s" % (src, ref["code"]),
+                       "%s refused %s: %s. The DATA lane goes on with the next source; a person reviews this one "
+                       "(the collect config, then stream reopen --name %s --source %s --by human:<email> --why ...)"
+                       % (lever, src, _short(reason, 400), self.name, src),
+                       lever=lever, trigger=list(p.get("trigger") or []))
+            self._zero_yield(src, "held", reasons={ref["code"]: 1})
+        else:
+            # retry: the source's own failed attempt; the lane's count is not touched
+            s["failures"] = int(s.get("failures") or 0) + 1
+            if s["failures"] < lim:
+                s["status"] = "shard_pending" if DS.mid_shards(s) else "candidate"
+            elif s.get("status") not in ("closed", "quarantined"):
+                s.update(status="closed", closed_reason=_short("%d failed attempts, the last %s" % (s["failures"],
+                                                                                                 reason), 500),
+                         closed_utc=self.utc)
+                self._ledger("source_closed", source=src, lever=lever, proposal_id=p["id"], code=ref["code"],
+                             reasons=[_short(s["closed_reason"], 500)], by="collector")
+                if not (s.get("admitted_batches") and int(_num(s.get("admitted_target_boxes")) or 0) > 0):
+                    self._zero_yield(src, "failed", reasons={ref["code"]: s["failures"]})
+        self._ledger("not_taken", lane=ln, lever=lever, proposal_id=p["id"], source=src, source_refusal=ref["code"],
+                     outcome={"replan": "replanned", "close": "closed", "person": "held", "retry": "failed"}[kind],
+                     fails=int(lane.get("fails") or 0),
+                     reasons=["%s; the collector's refusal is the source's outcome, not the lane's failure"
+                              % _short(why, 600)])
+        self._clear(ln)
+        if kind != "replan":
+            self._refusal_run(src, ref["code"])
+
+    def _refusal_run(self, src, code):
+        """The run of sources refused in a row with the source's own refusals (state refusal_run; a fetch or an
+        intake that ends done, a person's release or resume clears it): REFUSAL_RUN_HOLD sources in a row refused
+        with the same code hold the DATA lane (one card)."""
+        st = self.st
+        run = [r for r in st.get("refusal_run") or [] if r.get("source") != src] + [
+            {"source": src, "code": code, "utc": self.utc}]
+        st["refusal_run"] = run[-REFUSAL_RUN_HOLD:]
+        last = st["refusal_run"]
+        if len(last) >= REFUSAL_RUN_HOLD and len({r["code"] for r in last}) == 1:
+            lane = st["lanes"]["DATA"]
+            if lane.get("hold"):
+                return
+            lane["hold"] = ("stop-loss: %d sources in a row refused %s (%s): a refusal every source meets is the "
+                            "machine's or the config's, not the sources'" % (len(last), code,
+                                                                              ", ".join(r["source"] for r in last)))
+            lane["hold_utc"] = self.utc
+            self._card("stop_loss", "DATA lane held: %d sources in a row refused %s" % (len(last), code),
+                       lane["hold"] + "; a person checks the collector (stream release --name %s --by "
+                                      "human:<email> once fixed)" % self.name)
+            self._ledger("lane_held", lane="DATA", hold=lane["hold"], sources=last)
+
+    def _replan_bytes(self, src, plan, size):
+        """(bytes, None) of the replanned fetch of a source refused over_byte_plan at `plan`, or (None, why not):
+        the source's stated size plus 10 % when the provider stated it, else REPLAN_MULT times the plan, at least
+        REPLAN_FLOOR_BYTES; never over what the per-source limit (_source_room) or the collect envelope
+        (_collect_left) leaves. None when that leaves less than the stated size plus 10 % (or, with no stated size,
+        less than twice the refused plan or the per-source room, whichever is smaller): a fetch that cannot be
+        larger by that much is not tried again."""
+        room = self._source_room(src)
+        left = self._collect_left()
+        need = int(size * 1.1) + 1 if size else min(2 * plan, room)
+        want = max(need, REPLAN_MULT * plan, REPLAN_FLOOR_BYTES)
+        got = min(want, room) if left is None else min(want, room, left)
+        if got < need or got <= plan:
+            if left is not None and left < min(want, room):
+                return None, ("the collect envelope leaves %.3f GB (collect_gb_envelope, collect_gb_daily; a person "
+                              "may grant more)" % (left / 1e9))
+            return None, "the per-source limit leaves %.3f GB" % (room / 1e9)
+        return int(got), None
+
+    def _source_room(self, src):
+        """The bytes a next fetch of source `src` may still plan under L16's per-source limit, counted as the
+        executor's byte limit counts them (executor.fetched_bytes over this campaign's fetch runs: what each ended
+        attempt fetched, by its machine's collector ledger; its requested max_bytes when that is unknown)."""
+        cap = int(float((LS.limits("L16") or {}).get("gb_per_source") or 50) * 1e9)
+        try:
+            got = sum(x[2] for x in X.fetched_bytes(self.camp, self._fetch_recs(), self.now) if x[0] == src)
+        except Exception:                        # unknown is never room
+            return 0
+        return max(0, int(cap - got))
+
+    def _collect_left(self):
+        """The bytes the campaign's collect envelope (collect_gb_envelope; collect_gb_daily and L16's gb_per_day
+        when declared) leaves a next fetch, counted as executor.stream_limits counts them; None when none is
+        declared; 0 when the count cannot be taken."""
+        c = self.camp
+        lim = LS.limits("L16") or {}
+        daily = [float(x) for x in (lim.get("gb_per_day"), c.get("collect_gb_daily")) if x is not None]
+        if c.get("collect_gb_envelope") is None and not daily:
+            return None
+        try:
+            rows = X.fetched_bytes(c, self._fetch_recs(), self.now)
+        except Exception:                        # unknown is never room
+            return 0
+        caps = []
+        if c.get("collect_gb_envelope") is not None:
+            caps.append(float(c["collect_gb_envelope"]) * 1e9 - sum(x[2] for x in rows))
+        if daily:
+            caps.append(min(daily) * 1e9 - sum(x[2] for x in rows if x[1] >= self.now - 86400.0))
+        return max(0, int(min(caps)))
+
+    def _fetch_recs(self):
+        """This campaign's fetch runs the executor's byte limits count (executed, or charged)."""
+        return [r for r in self._executions() if r.get("action") in X.FETCH_ACTIONS
+                and (r.get("status") == "executed" or r.get("charged"))]
+
+    def _zero_yield(self, src, how, boxes=None, reasons=None):
         """The DATA lane's zero-yield stop-loss (6.6, S20): 3 consecutive sources
-        ending failed or with zero admitted target boxes hold the lane, with a
-        card listing each source's decision reasons."""
+        ending failed, refused, held for a person or with zero admitted target
+        boxes hold the lane, with a card listing each source's decision reasons
+        (its intake's, and the collector's refusal code when one ended it)."""
         st = self.st
         if how == "yield" and boxes:
             st["zero_run"] = []
             return
+        why = self._decision_reasons(src)
+        for k, v in (reasons or {}).items():
+            why[k] = why.get(k, 0) + int(v or 0)
         run = [r for r in st.get("zero_run") or [] if r.get("source") != src]
-        run.append({"source": src, "how": how, "reasons": self._decision_reasons(src), "utc": self.utc})
+        run.append({"source": src, "how": how, "reasons": why, "utc": self.utc})
         st["zero_run"] = run
         n = int(LS.t(self.th, "stop_loss", "zero_yield_sources"))
         if len(run) >= n:
@@ -4027,7 +4456,92 @@ class StreamRun(object):
     def _live_exps(self):
         st = self.st
         names = list(dict.fromkeys(list(st.get("exps") or []) + self._r0_exps()))
-        return [e for e in names if e not in (st.get("frozen") or {})]
+        return [e for e in names if e not in (st.get("frozen") or {})] + self._refreeze_pending()
+
+    def _audits_run(self):
+        """{exp: {utc, proposal_id, audit}} of the label audits (L4) whose item ended done (state audits_run,
+        written by _done). A state written before the record existed takes them once from the campaign ledger's
+        item_done lines of L4 (2026-10-05: segment s001's audit of the first fork, job 47429146)."""
+        st = self.st
+        if not isinstance(st.get("audits_run"), dict):
+            if self._ledger_ended() is None:
+                return {}                        # read again on the next tick
+            got = {}
+            for pid, rec in sorted((self._ended_done or {}).items(), key=lambda kv: kv[1].get("utc") or ""):
+                if rec.get("lever") == "L4" and rec.get("exp"):
+                    got[str(rec["exp"])] = {"utc": rec.get("utc"), "proposal_id": pid, "audit": None}
+            st["audits_run"] = got
+        return st["audits_run"]
+
+    def _refreeze_pending(self):
+        """The frozen experiments snapshotted again so that their record carries the label audit run on them after
+        they were frozen (an L4 done after the freeze): the audit is written into the experiment's own directory,
+        which the frozen record never saw (2026-10-05: the first fork's segment s001 frozen at 04:23:46Z, its audit
+        written at 05:01:53Z, so D31 never read it and called for L4 on every tick). Each is followed in
+        st.refreeze until a snapshot of it carries <exp>/audit/label_audit.json (the record is then replaced, the old
+        one moved aside, _settle_refreeze), or for BUILD_LOST_SNAPSHOTS snapshots without it (one card)."""
+        st = self.st
+        rf = st.setdefault("refreeze", {})
+        frozen = st.get("frozen") or {}
+        for exp, a in sorted(self._audits_run().items()):
+            if exp in rf or exp not in frozen:
+                continue
+            fz = (frozen.get(exp) or {}).get("utc")
+            if fz and a.get("utc") and str(a["utc"]) <= str(fz):
+                continue                     # frozen after the audit ended: its record was taken with it
+            rf[exp] = {"since_utc": self.utc, "audit_utc": a.get("utc"), "proposal_id": a.get("proposal_id"),
+                       "snapshots": 0, "state": "pending"}
+            self._ledger("refreeze_wanted", exp=exp, audit_utc=a.get("utc"), proposal_id=a.get("proposal_id"),
+                         frozen_utc=fz, reasons=["the label audit (L4) on %s ended at %s, after the experiment was "
+                                                 "frozen at %s: it is snapshotted again until its record carries "
+                                                 "the audit" % (exp, a.get("utc"), fz)])
+        return sorted(e for e, r in rf.items() if isinstance(r, dict) and r.get("state") == "pending")
+
+    def _settle_refreeze(self, payload):
+        """Each pending refreeze (_refreeze_pending) against this snapshot: a snapshot of the experiment that carries
+        its label audit replaces the frozen record (the old one moved aside to frozen/superseded/, never deleted);
+        one without it counts, and after BUILD_LOST_SNAPSHOTS such snapshots the refreeze ends with one card."""
+        st = self.st
+        rf = st.get("refreeze") or {}
+        for exp in sorted(e for e, r in rf.items() if isinstance(r, dict) and r.get("state") == "pending"):
+            rec = rf[exp]
+            snap = (((payload.get("experiments") or {}).get(exp) or {}).get("snapshot")) or {}
+            arts = ((snap.get("decision") or {}).get("artifacts")) or {}
+            if snap.get("built") and isinstance(arts.get(AUDIT_ARTIFACT % exp), dict):
+                path = self.paths.frozen(self.name, exp)
+                old = _read_json(path) if path.is_file() else None
+                aside = None
+                if path.is_file():
+                    stamp = re.sub(r"[^0-9A-Za-z]", "", str((old or {}).get("frozen_utc") or self.utc))
+                    aside = path.parent / "superseded" / ("%s.%s.json" % (exp, stamp))
+                    aside.parent.mkdir(parents=True, exist_ok=True)
+                    n = 1
+                    while aside.exists():
+                        aside = path.parent / "superseded" / ("%s.%s.%d.json" % (exp, stamp, n))
+                        n += 1
+                    os.replace(str(path), str(aside))
+                _write_json(path, {"exp": exp, "frozen_utc": self.utc, "refrozen_from": (old or {}).get("frozen_utc"),
+                                   "why": "the label audit (L4) ended at %s, after the first freeze" % rec.get(
+                                       "audit_utc"),
+                                   "snapshot": {k: v for k, v in snap.items() if k != "display_only"}})
+                st.setdefault("frozen", {})[exp] = {"utc": self.utc, "refrozen_from": (old or {}).get("frozen_utc")}
+                rec.update(state="done", refrozen_utc=self.utc, moved_aside=str(aside) if aside else None)
+                self._ledger("refrozen", exp=exp, audit_utc=rec.get("audit_utc"), moved_aside=rec["moved_aside"],
+                             reasons=["the snapshot of %s carries %s: the frozen record is replaced (the old one "
+                                      "moved aside)" % (exp, AUDIT_ARTIFACT % exp)])
+                continue
+            rec["snapshots"] = int(rec.get("snapshots") or 0) + 1
+            if rec["snapshots"] >= BUILD_LOST_SNAPSHOTS:
+                rec.update(state="gave_up", gave_up_utc=self.utc)
+                self._ledger("refreeze_ended", exp=exp, snapshots=rec["snapshots"],
+                             reasons=["%d snapshots of %s carried no %s" % (rec["snapshots"], exp,
+                                                                            AUDIT_ARTIFACT % exp)])
+                self._card("platform", "The label audit of %s does not reach the evidence" % exp,
+                           "L4 (proposal %s) ended at %s, but %d snapshots of %s carried no %s (the audit job wrote "
+                           "elsewhere, or its file is over INCAP_MAX_FILE_BYTES). D31 does not call for L4 on it again "
+                           "(context /audits); a person checks the audit's output." % (
+                               rec.get("proposal_id"), rec.get("audit_utc"), rec["snapshots"], exp,
+                               AUDIT_ARTIFACT % exp), lever="L4", trigger=["D31"])
 
     def _observe(self):
         st = self.st
@@ -4293,11 +4807,17 @@ class StreamRun(object):
                     continue
                 if ok:
                     self._done(ln, it)
+                    continue
+                why = "job(s) %s ended %s%s" % (",".join(ids), ",".join(states) or "unknown",
+                                                ("; refused: %s" % refusal) if refusal else "")
+                m = COLLECT_REFUSAL_RE.search(refusal or "")
+                ref = self._collector_refusal(it, 2, {"code": m.group(1), "detail": m.group(2)}) if m and all(
+                    str(x).startswith("FAILED") for x in states) else None
+                if ref is not None:
+                    self._source_refused(ln, it, ref, why)
                 else:
-                    self._failed(ln, it, "job(s) %s ended %s%s" % (",".join(ids), ",".join(states) or "unknown",
-                                                                   ("; refused: %s" % refusal) if refusal else ""),
-                                 charged=True, retry=not (p["policy_action"] == "inc_stream_admit"
-                                                          and RETRY_FALSE_RE.search(refusal)))
+                    self._failed(ln, it, why, charged=True, retry=not (p["policy_action"] == "inc_stream_admit"
+                                                                      and RETRY_FALSE_RE.search(refusal)))
         # a fork (L22) whose job this very snapshot shows ended: its summary
         # already names the new stream, so it is adopted now, not one tick
         # later on evidence that still reads the old stream's last commit
@@ -4314,6 +4834,8 @@ class StreamRun(object):
                                 {"exp": exp, "frozen_utc": self.utc,
                                  "snapshot": {k: v for k, v in snap.items() if k != "display_only"}})
                     st.setdefault("frozen", {})[exp] = {"utc": self.utc}
+        # a frozen experiment snapshotted again for the label audit run on it after its freeze
+        self._settle_refreeze(payload)
         self._health(payload)
 
     def _build_prov(self, payload, it, child):
@@ -4550,8 +5072,8 @@ class StreamRun(object):
         names = [j.get("name") for j in sq.get("jobs") or [] if isinstance(j, dict)] if sq.get("ok") else None
         for exp, sub in sorted((payload.get("experiments") or {}).items()):
             snap = (sub or {}).get("snapshot") or {}
-            if not snap.get("built"):
-                continue
+            if not snap.get("built") or exp in (st.get("refreeze") or {}):
+                continue                         # a frozen experiment snapshotted again for its audit only
             hist = st.setdefault("history", {}).setdefault(exp, [])
             gen = (((snap.get("decision") or {}).get("artifacts") or {}).get("%s/state.json" % exp) or {}).get("generation")
             if gen is not None:
@@ -5368,7 +5890,37 @@ class StreamRun(object):
                          previous=prev, reasons=["the stream ledger quarantines %s (seq %s, %s, %s); this state said %r"
                                                  % (src, rec.get("seq"), rec.get("cite"), rec.get("utc"), prev)])
             out.append(src)
+        self._resync_lifts()
         return out
+
+    def _resync_lifts(self):
+        """A quarantine a person lifted (inc2.stream unquarantine, by human:): once the stream's queue summary,
+        read whole, no longer lists the source, this state's 'quarantined' record of an admitted source, taken
+        before that lift, becomes 'admitted' again (one event), so that blames committed after the lift can quarantine it again (D31 counts
+        only those; L24 under a new id). A summary that cannot be read, or a source with nothing admitted, is left
+        as it is."""
+        q = self._artifact("stream/%s/queue_summary.json" % self.sid)
+        if not isinstance(q, dict) or not isinstance(q.get("quarantined_sources"), (dict, list)):
+            return
+        qs = self._stream_quarantined()
+        lifts = {}
+        for e in self._artifact("stream/%s/ledger.jsonl" % self.sid) or []:
+            if isinstance(e, dict) and e.get("event") == "unquarantine" and e.get("source") \
+                    and str(e.get("by") or "").startswith("human:"):
+                lifts[str(e["source"])] = e
+        for src, e in sorted(lifts.items()):
+            s = (self.st.get("sources") or {}).get(src)
+            if src in qs or not isinstance(s, dict) or s.get("status") != "quarantined" \
+                    or not (s.get("admitted_batches") or s.get("admit_done_utc")):
+                continue
+            if not e.get("utc") or str(e["utc"]) <= str(s.get("quarantined_utc") or ""):
+                continue                          # a quarantine this state took after that lift (an L24 that ran
+                #                                   since the snapshot): the next snapshot lists it
+            s.update(status="admitted", lifted_by=e.get("by"), lifted_utc=e.get("utc"), lifted_seq=e.get("seq"))
+            self._ledger("source_lift_resynced", source=src, decided_by=e.get("by"), seq=e.get("seq"),
+                         reasons=["a person lifted the quarantine of %s (stream ledger seq %s, %s): admitted again; "
+                                  "blames committed after the lift may quarantine it again" % (src, e.get("seq"),
+                                                                                              e.get("utc"))])
 
     def _v3fam_prov_refusal(self, payload, it, ids):
         """The refusal line of a family job's provenance (the snapshot's builds, remote.status): its last attempt's,

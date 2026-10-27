@@ -627,7 +627,9 @@ class Fam(object):
     _failed_ids = bind("_failed_ids")
     _stream_quarantined = bind("_stream_quarantined")
     _resync_quarantines = bind("_resync_quarantines")
+    _resync_lifts = bind("_resync_lifts")
     _done = bind("_done")
+    _note_done = bind("_note_done")
 
     def __init__(self, root, st, arts=None, deploy=()):
         self.paths = Paths(root)
@@ -1127,7 +1129,8 @@ def t_d28():
     import inspect
     d28src = inspect.getsource(DS.d28)
     check("D28 proposes L24 only for a leak the stream's queue summary does not already quarantine (D31 likewise)",
-          'for h in hits if str(h["source"]) not in qs' in d28src and "if s not in qs]" in inspect.getsource(DS.d31))
+          'for h in hits if str(h["source"]) not in qs' in d28src
+          and any(t in inspect.getsource(DS.d31) for t in ("if s not in qs]", "if s not in qs and s not in kept]")))
 
 
 def main():

@@ -1,0 +1,423 @@
+{
+ "format": "test-fixture/platform-stalls-data/1",
+ "lab_jobs": [
+  {
+   "result": {
+    "finished_utc": "2026-10-07T16:30:04Z",
+    "job": "fetch_gh_geezacoleman__palmer_detection_1b5d5691a9",
+    "ok": false,
+    "rc": 2,
+    "seconds": 5.249,
+    "stderr_tail": "[collect] fetch refused: over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\n",
+    "tail": "[collect] fetch: {\"action\": \"hold\", \"code\": \"over_byte_plan\", \"detail\": \"github Palmer-detection-main.zip: more than the 64145408-byte cap\", \"error\": \"over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\", \"failures\": [{\"action\": \"hold\", \"code\": \"over_byte_plan\", \"detail\": \"github Palmer-detection-main.zip: more than the 64145408-byte cap\"}], \"format\": \"collect-result/1\", \"risk\": \"R3\", \"status\": \"held\", \"utc\": \"2026-10-07T16:30:04Z\", \"verb\": \"fetch\"}\n"
+   },
+   "spec": {
+    "argv": [
+     "/home/lab/weed_llm_benchmark/.venv/bin/python3",
+     "-m",
+     "weed_optimizer_framework.tools.collect",
+     "fetch",
+     "--inc-dir",
+     "/home/lab/weed_llm_benchmark/results/framework/inc",
+     "--source",
+     "gh_geezacoleman__palmer_detection",
+     "--max-bytes",
+     "64145408",
+     "--out",
+     "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/"
+    ],
+    "cwd": "/home/lab/weed_llm_benchmark",
+    "job": "fetch_gh_geezacoleman__palmer_detection_1b5d5691a9",
+    "pid": 3792828,
+    "result": "/home/lab/weed_llm_benchmark/results/framework/_brain/weed/inc/campaigns/weed_stream_v1/lab_jobs/fetch_gh_geezacoleman__palmer_detection_1b5d5691a9.result.json",
+    "timeout": 21600
+   }
+  },
+  {
+   "result": {
+    "finished_utc": "2026-10-07T16:40:04Z",
+    "job": "fetch_gh_geezacoleman__palmer_detection_0d576a9e67",
+    "ok": false,
+    "rc": 2,
+    "seconds": 4.921,
+    "stderr_tail": "[collect] fetch refused: over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\n",
+    "tail": "[collect] fetch: {\"action\": \"hold\", \"code\": \"over_byte_plan\", \"detail\": \"github Palmer-detection-main.zip: more than the 64145408-byte cap\", \"error\": \"over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\", \"failures\": [{\"action\": \"hold\", \"code\": \"over_byte_plan\", \"detail\": \"github Palmer-detection-main.zip: more than the 64145408-byte cap\"}], \"format\": \"collect-result/1\", \"risk\": \"R3\", \"status\": \"held\", \"utc\": \"2026-10-07T16:40:04Z\", \"verb\": \"fetch\"}\n"
+   },
+   "spec": {
+    "argv": [
+     "/home/lab/weed_llm_benchmark/.venv/bin/python3",
+     "-m",
+     "weed_optimizer_framework.tools.collect",
+     "fetch",
+     "--inc-dir",
+     "/home/lab/weed_llm_benchmark/results/framework/inc",
+     "--source",
+     "gh_geezacoleman__palmer_detection",
+     "--max-bytes",
+     "64145408",
+     "--out",
+     "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/"
+    ],
+    "cwd": "/home/lab/weed_llm_benchmark",
+    "job": "fetch_gh_geezacoleman__palmer_detection_0d576a9e67",
+    "pid": 3796895,
+    "result": "/home/lab/weed_llm_benchmark/results/framework/_brain/weed/inc/campaigns/weed_stream_v1/lab_jobs/fetch_gh_geezacoleman__palmer_detection_0d576a9e67.result.json",
+    "timeout": 21600
+   }
+  }
+ ],
+ "lane_DATA": {
+  "diag_hold": null,
+  "fails": 2,
+  "half": false,
+  "hold": "stop-loss: 2 consecutive failed steps (last: the lab process fetch_gh_geezacoleman__palmer_detection_0d576a9e67 ended 2: [collect] fetch refused: over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\n)",
+  "hold_utc": "2026-10-07T16:49:58Z",
+  "phase": "IDLE",
+  "until_utc": null
+ },
+ "ledger_lines": [
+  {
+   "line": 1823,
+   "row": {
+    "action": "inc_stream_collect_lab",
+    "argv": [
+     "python",
+     "-m",
+     "weed_optimizer_framework.tools.collect",
+     "fetch",
+     "--source",
+     "gh_geezacoleman__palmer_detection",
+     "--max-bytes",
+     "64145408",
+     "--out",
+     "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/"
+    ],
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "cites": [
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/eligible/images",
+      "value": 385
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/M",
+      "value": 1364
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/lanes/DATA",
+      "value": {
+       "busy": false,
+       "half_cadence": false,
+       "hold": null,
+       "phase": "IDLE"
+      }
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/PalmerAmaranth",
+      "value": 2980
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/PricklySida",
+      "value": 1810
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/Waterhemp",
+      "value": 666
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/candidates/3/id",
+      "value": "gh_geezacoleman__palmer_detection"
+     }
+    ],
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_gpu_hours": 0.0,
+    "event": "proposed",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "eef2b32ef1aeca437548c15b40be5c2c",
+    "risk": "R2",
+    "tick": 1226,
+    "trigger": [
+     "D20"
+    ],
+    "utc": "2026-10-07T16:29:58Z"
+   }
+  },
+  {
+   "line": 1824,
+   "row": {
+    "action": "inc_stream_collect_lab",
+    "approval_id": null,
+    "basis": "direct",
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_su": 0.0,
+    "event": "executed",
+    "job_ids": [],
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "eef2b32ef1aeca437548c15b40be5c2c",
+    "tick": 1226,
+    "trigger": [
+     "D20"
+    ],
+    "utc": "2026-10-07T16:29:58Z"
+   }
+  },
+  {
+   "line": 1825,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lab_job_finished",
+    "lab_job": "fetch_gh_geezacoleman__palmer_detection_1b5d5691a9",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "ok": false,
+    "rc": 2,
+    "seconds": 5.249,
+    "tick": 1227,
+    "utc": "2026-10-07T16:39:58Z"
+   }
+  },
+  {
+   "line": 1826,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "charged": false,
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "failed",
+    "fails": 1,
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "eef2b32ef1aeca437548c15b40be5c2c",
+    "reasons": [
+     "the lab process fetch_gh_geezacoleman__palmer_detection_1b5d5691a9 ended 2: [collect] fetch refused: over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\n"
+    ],
+    "tick": 1227,
+    "utc": "2026-10-07T16:39:58Z"
+   }
+  },
+  {
+   "line": 1827,
+   "row": {
+    "action": "inc_stream_collect_lab",
+    "argv": [
+     "python",
+     "-m",
+     "weed_optimizer_framework.tools.collect",
+     "fetch",
+     "--source",
+     "gh_geezacoleman__palmer_detection",
+     "--max-bytes",
+     "64145408",
+     "--out",
+     "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/"
+    ],
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "cites": [
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/eligible/images",
+      "value": 385
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/M",
+      "value": 1364
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/lanes/DATA",
+      "value": {
+       "busy": false,
+       "half_cadence": false,
+       "hold": null,
+       "phase": "IDLE"
+      }
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/PalmerAmaranth",
+      "value": 2980
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/PricklySida",
+      "value": 1810
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/Waterhemp",
+      "value": 666
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/candidates/3/id",
+      "value": "gh_geezacoleman__palmer_detection"
+     }
+    ],
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_gpu_hours": 0.0,
+    "event": "proposed",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "97a7b5147b4f7c4c42a94923d38a358f",
+    "risk": "R2",
+    "tick": 1227,
+    "trigger": [
+     "D20"
+    ],
+    "utc": "2026-10-07T16:39:58Z"
+   }
+  },
+  {
+   "line": 1828,
+   "row": {
+    "action": "inc_stream_collect_lab",
+    "approval_id": null,
+    "basis": "direct",
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_su": 0.0,
+    "event": "executed",
+    "job_ids": [],
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "97a7b5147b4f7c4c42a94923d38a358f",
+    "tick": 1227,
+    "trigger": [
+     "D20"
+    ],
+    "utc": "2026-10-07T16:39:58Z"
+   }
+  },
+  {
+   "line": 1829,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lab_job_finished",
+    "lab_job": "fetch_gh_geezacoleman__palmer_detection_0d576a9e67",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "ok": false,
+    "rc": 2,
+    "seconds": 4.921,
+    "tick": 1228,
+    "utc": "2026-10-07T16:49:58Z"
+   }
+  },
+  {
+   "line": 1830,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "charged": false,
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "failed",
+    "fails": 2,
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "97a7b5147b4f7c4c42a94923d38a358f",
+    "reasons": [
+     "the lab process fetch_gh_geezacoleman__palmer_detection_0d576a9e67 ended 2: [collect] fetch refused: over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\n"
+    ],
+    "tick": 1228,
+    "utc": "2026-10-07T16:49:58Z"
+   }
+  },
+  {
+   "line": 1831,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "detail": "stop-loss: 2 consecutive failed steps (last: the lab process fetch_gh_geezacoleman__palmer_detection_0d576a9e67 ended 2: [collect] fetch refused: over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\n)",
+    "event": "card",
+    "kind": "stop_loss",
+    "lever": null,
+    "mode": "stream",
+    "tick": 1228,
+    "title": "Lane DATA held",
+    "trigger": [],
+    "utc": "2026-10-07T16:49:58Z"
+   }
+  },
+  {
+   "line": 1832,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lane_held",
+    "hold": "stop-loss: 2 consecutive failed steps (last: the lab process fetch_gh_geezacoleman__palmer_detection_0d576a9e67 ended 2: [collect] fetch refused: over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\n)",
+    "lane": "DATA",
+    "mode": "stream",
+    "tick": 1228,
+    "utc": "2026-10-07T16:49:58Z"
+   }
+  }
+ ],
+ "measured": {
+  "codeload_zip_bytes": 84379800,
+  "github_api_size_kib": 62642,
+  "measured_utc": "2026-10-26"
+ },
+ "source": {
+  "attempts": 2,
+  "failures": 2,
+  "max_bytes": 64145408,
+  "placement": "lab",
+  "status": "candidate"
+ },
+ "step_failures": {
+  "L16L:01d67f6e8755": {
+   "lane": "DATA",
+   "last": "the lab process fetch_gh_geezacoleman__palmer_detection_0d576a9e67 ended 2: [collect] fetch refused: over_byte_plan: github Palmer-detection-main.zip: more than the 64145408-byte cap\n",
+   "lever": "L16L",
+   "n": 2,
+   "proposal_id": "97a7b5147b4f7c4c42a94923d38a358f",
+   "utc": "2026-10-07T16:49:58Z"
+  },
+  "L16L:18faa1394a48": {
+   "lane": "DATA",
+   "last": "the lab process fetch_zenodo_15808623_1936e25df1 ended None: the lab process of fetch_zenodo_15808623_1936e25df1 is gone and wrote no result (killed from outside: a restart, an OOM kill or a reboot)",
+   "lever": "L16L",
+   "n": 1,
+   "proposal_id": "e341251282d18872d3d6cc0c6c6cb2ba",
+   "utc": "2026-10-03T07:24:44Z"
+  }
+ },
+ "what": "The lab's records of the DATA lane's hold (2026-10-07) as they stood on 2026-10-26: the two lab fetches of gh_geezacoleman__palmer_detection (spec and result, byte for byte), their campaign-ledger lines, lane DATA and the source's state record, the release path.",
+ "zero_run": []
+}

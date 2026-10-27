@@ -940,16 +940,19 @@ def test_job_script(spec_path):
     py.write_text("#!/bin/bash\n"
                   "if [ \"${1:-}\" = -V ]; then echo 'Python stub'; exit 0; fi\n"
                   "if [ \"${1:-}\" = -c ]; then exec %s \"$@\"; fi\n"
+                  # the mlflow-off block's own helpers (python - <<heredoc): the real python, not a recorded call
+                  "if [ \"${1:-}\" = - ]; then exec %s \"$@\"; fi\n"
                   "echo \"$* | INC_JOB_SCRIPT=${INC_JOB_SCRIPT:-}\" >> %s\n"
                   "for a in \"$@\"; do\n"
                   "  if [ \"$a\" = --flock-check ]; then exit ${STUB_FLOCK_RC:-1}; fi\n"
                   "  if [ \"$a\" = weed_optimizer_framework.tools.inc.driver ]; then exit 7; fi\n"
-                  "done\nexit ${STUB_TRAIN_RC:-0}\n" % (sys.executable, calls))
+                  "done\nexit ${STUB_TRAIN_RC:-0}\n" % (sys.executable, sys.executable, calls))
     py.chmod(0o755)
     lst = stub / "list.txt"
     lst.write_text("%s\n" % spec_path)
+    (stub / "local").mkdir()
     base_env = dict(os.environ, PATH="%s:%s" % (stub / "bin", os.environ["PATH"]), INC2_JOB_REPO=str(repo),
-                    INC2_JOB_CONDA_SH=str(stub / "conda.sh"))
+                    INC2_JOB_CONDA_SH=str(stub / "conda.sh"), LOCAL=str(stub / "local"))
     base_env.pop("INC_JOB_SCRIPT", None)
     job = repo / "weed_llm_benchmark" / "run_inc2_job.sh"
 
