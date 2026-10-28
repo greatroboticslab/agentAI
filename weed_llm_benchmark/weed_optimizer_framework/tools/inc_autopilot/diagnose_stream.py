@@ -391,6 +391,26 @@ def mid_shards(s):
     return int(_num(s.get("intake_deferred")) or 0) > 0 or any(b not in ab for b in s.get("batches") or [])
 
 
+def fetch_on_cluster(s):
+    """A source whose last fetch is complete and whose staging is on the
+    cluster: fetched (fetched_utc), recorded complete (partial false, no file
+    remaining), and, when the lab fetched it, synced to the cluster since
+    (L16S; a sync recorded before that fetch, synced_utc, does not count).
+    Its intake reads that staging again (L16I), never a new fetch
+    (2026-10-28: zenodo_10762138's intake crashed, the source was made a
+    candidate again and D20 filed a second 35.8 GB fetch for a person)."""
+    if not isinstance(s, dict) or not s.get("fetched_utc"):
+        return False
+    if s.get("partial") is not False or int(_num(s.get("fetch_remaining")) or 0) > 0:
+        return False
+    if s.get("staging_lost_utc") and str(s["staging_lost_utc"]) >= str(s["fetched_utc"]):
+        return False                     # an intake found the staging gone or changed (stream._intake_again)
+    if s.get("placement") == "lab":
+        su = s.get("synced_utc")
+        return bool(s.get("synced")) and (su is None or str(su) >= str(s["fetched_utc"]))
+    return True
+
+
 def precheck(v, cand):
     """(refuse, review): refuse [] or the reasons the source is never fetched
     (never-train, quarantined, closed); review [] or the reasons a person
@@ -409,6 +429,9 @@ def precheck(v, cand):
         refuse.append("source status %s" % cand.get("status"))
     elif cand.get("in_shards"):
         refuse.append("part-way through its intake shards (the next shard, never a new fetch)")
+    elif cand.get("intake_retry"):
+        refuse.append("its fetch is complete and on the cluster and its intake failed: the intake runs again "
+                      "(L16I), never a new fetch")
     lic = str(cand.get("licence") or "").strip().lower()
     if lic in ("", "unknown", "unresolved", "none"):
         review.append("licence unknown")

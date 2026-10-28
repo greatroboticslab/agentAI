@@ -111,6 +111,11 @@ PKG_PATHS=(
   tests/fixtures/platform_stalls
   # 2026-10-27: the cluster's records of s002's inc0005 the shipped test_inc2_audit_stream_s002.py rebuilds
   tests/fixtures/audit_stream_s002
+  # 2026-10-28: 2SeasonWeedDet8's real VIA files (test_collect_normalize_via.py) and the lab's records of its failed
+  # intake and filed second fetch (test_stream_ap_intake_retry.py)
+  tests/fixtures/via_2swd8 tests/fixtures/intake_via
+  # 2026-10-28: the approvals log's withdrawal kind (brain/approvals.py, shipped above) and its checks
+  tests/test_approvals.py
   # 2026-10-26: the check of the job scripts' mlflow-off block (MLFLOW_OFF_REAL=1 on the cluster's bench env)
   tests/test_job_mlflow_off.py
   # shared libraries the stream job scripts hash (SHARED_RE: never changed by this deploy)

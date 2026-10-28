@@ -13,9 +13,17 @@ first format that recognises it (or the format a known item pins):
              box); several split files are merged by category name.
   weedcoco   coco whose categories carry a taxon (a "taxon" field, or names
              "<role>: <taxon> (<qualifier>)"): the taxon is the class map's hint.
-  via        VGG Image Annotator JSON (rect or polygon regions; the class is
-             the region attribute named by the options, else the first
-             string attribute).
+  via        VGG Image Annotator JSON, VIA 1.x and 2.x projects and exports
+             (regions as a list, an indexed object or a columnar object of
+             parallel lists; rect, polygon, circle or ellipse shapes, an
+             ellipse's rotation applied, a polyline no box; the class is the
+             region attribute named by the options, else among a project's
+             typed choice attributes first, the first string attribute, else
+             the first checkbox with one name checked, an option id read as
+             its description; via_regions, via_label). An image described
+             both by a file beside it and by one that found it by name
+             elsewhere keeps the description beside it. Any other layout
+             refuses with what it found.
   voc        Pascal VOC XML (object/name, bndbox, size).
   yolo       label .txt files beside or parallel to the images (images/ ->
              labels/), classes from data.yaml names, classes.txt, obj.names
@@ -43,6 +51,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 import os
 import re
 import xml.etree.ElementTree as ET
@@ -423,6 +432,33 @@ def read_coco(tree, opts=None):
 
 
 # ------------------------------------------------------------------ via
+# VGG Image Annotator files, in every layout VIA 1.x and 2.x write (read_via):
+#   a project               {"_via_img_metadata": {key: entry}, "_via_attributes": ..., ...}
+#   an annotations export   {key: entry}, every value an entry
+# and an entry {"filename", "size", "regions", "file_attributes"} whose regions are
+#   a list                  [{"shape_attributes": {...}, "region_attributes": {...}}, ...]   (VIA 2.x)
+#   an indexed dict         {"0": {"shape_attributes": ..., "region_attributes": ...}, ...}   (VIA 1.x)
+#   a columnar dict         {"shape_attributes": {...} | [{...}, ...],
+#                            "region_attributes": {...} | [{...}, ...]}
+#                           (one region, or parallel lists paired by position: the per-image
+#                            files of a source whose intake crashed on this layout, 2026-10-28)
+# with a list nested once more ([[{...}, ...]]) flattened in order. Anything else (a VIA 3.x
+# project, regions of another type, parallel lists of different lengths) refuses with the
+# file, the entry and what was found (NormaliseError), never a crash and never a guess.
+# A project's region attribute definitions (_via_attributes.region: {name: {"type", "options":
+# {id: description}}}) are read too: an attribute they type as a choice (dropdown, radio,
+# checkbox) names the class before any other, and a value that is one of its option ids reads
+# as that option's description when it has one (VIA stores the id and shows the description).
+VIA_REGION_KEYS = ("shape_attributes", "region_attributes")
+VIA_CHOICE_TYPES = ("dropdown", "radio", "checkbox")
+
+
+def _via3(d):
+    """A VIA 3.x project (its own layout, not read here)."""
+    return isinstance(d, dict) and isinstance(d.get("project"), dict) and all(k in d for k in ("file", "metadata",
+                                                                                              "view", "attribute"))
+
+
 def _via_files(tree):
     out = []
     for f in tree.ext(".json"):
@@ -432,40 +468,282 @@ def _via_files(tree):
         except (OSError, ValueError):
             continue
         if isinstance(d, dict) and isinstance(d.get("_via_img_metadata"), dict):
-            out.append((f, d["_via_img_metadata"]))
+            defs = d.get("_via_attributes") if isinstance(d.get("_via_attributes"), dict) else {}
+            region = defs.get("region") if isinstance(defs.get("region"), dict) else {}
+            out.append((f, d["_via_img_metadata"], {k: v for k, v in region.items() if isinstance(v, dict)}))
         elif isinstance(d, dict) and d and all(isinstance(v, dict) and "filename" in v and "regions" in v
                                                for v in d.values()):
-            out.append((f, d))
+            out.append((f, d, {}))
+        elif _via3(d):
+            out.append((f, d, {}))
     return out
+
+
+def _via_kind(v):
+    if isinstance(v, dict):
+        return "an object with keys %s" % sorted(v)[:6]
+    if isinstance(v, list):
+        return "a list of %d" % len(v)
+    return "a %s" % type(v).__name__
+
+
+def _via_flat(seq, where, what):
+    """seq with lists nested once flattened, in order; any element that is not
+    an object refuses."""
+    out = []
+    for i, x in enumerate(seq):
+        for y in (x if isinstance(x, list) else [x]):
+            if not isinstance(y, dict) and y is not None:
+                raise NormaliseError("VIA %s: %s element %d is %s, not an object" % (where, what, i, _via_kind(y)))
+            out.append(y or {})
+    return out
+
+
+def via_regions(regs, where="entry"):
+    """[(shape_attributes, region_attributes)] of one VIA entry's regions in
+    any layout the module comment lists, in file order; NormaliseError for
+    anything else."""
+    if regs in (None, "", [], {}):
+        return []
+    if isinstance(regs, list):
+        out = []
+        for r in _via_flat(regs, where, "region"):
+            if not any(k in r for k in VIA_REGION_KEYS) and r:
+                raise NormaliseError("VIA %s: a region is %s, without shape_attributes or region_attributes"
+                                     % (where, _via_kind(r)))
+            out.append((r.get("shape_attributes") or {}, r.get("region_attributes") or {}))
+        return out
+    if not isinstance(regs, dict):
+        raise NormaliseError("VIA %s: regions is %s (known: a list, an indexed object or a columnar object)"
+                             % (where, _via_kind(regs)))
+    if any(k in regs for k in VIA_REGION_KEYS):
+        extra = sorted(k for k in regs if k not in VIA_REGION_KEYS)
+        if extra:
+            raise NormaliseError("VIA %s: columnar regions with other keys %s" % (where, extra[:6]))
+        sa, ra = regs.get("shape_attributes"), regs.get("region_attributes")
+        if isinstance(sa, dict) or sa is None:
+            if isinstance(ra, list):
+                raise NormaliseError("VIA %s: one shape and a list of %d region attribute sets" % (where, len(ra)))
+            if ra is not None and not isinstance(ra, dict):
+                raise NormaliseError("VIA %s: region_attributes is %s" % (where, _via_kind(ra)))
+            return [(sa or {}, ra or {})] if (sa or ra) else []
+        if not isinstance(sa, list):
+            raise NormaliseError("VIA %s: shape_attributes is %s" % (where, _via_kind(sa)))
+        sa = _via_flat(sa, where, "shape_attributes")
+        if ra in (None, {}, []):
+            ra = [{}] * len(sa)
+        elif isinstance(ra, list):
+            ra = _via_flat(ra, where, "region_attributes")
+        else:
+            raise NormaliseError("VIA %s: %d shapes and region_attributes %s" % (where, len(sa), _via_kind(ra)))
+        if len(ra) != len(sa):
+            raise NormaliseError("VIA %s: %d shapes and %d region attribute sets cannot be paired"
+                                 % (where, len(sa), len(ra)))
+        return list(zip(sa, ra))
+    # VIA 1.x: regions indexed by their number
+    keys = sorted(regs, key=lambda k: (0, int(k), "") if str(k).isdigit() else (1, 0, str(k)))
+    vals = [regs[k] for k in keys]
+    if not all(isinstance(v, dict) for v in vals):
+        raise NormaliseError("VIA %s: indexed regions hold %s" % (where, ", ".join(sorted({_via_kind(v) for v in vals
+                                                                                         if not isinstance(v, dict)}))))
+    return via_regions(vals, where)
+
+
+def _via_option(name, d):
+    """An attribute value as the annotator saw it: the description of the
+    option whose id it is (a project's attribute definition d), else itself."""
+    opts = d.get("options") if isinstance(d, dict) and isinstance(d.get("options"), dict) else {}
+    desc = opts.get(name)
+    return desc.strip() if isinstance(desc, str) and desc.strip() else name
+
+
+def via_attr_class(v, d=None):
+    """(class name or None, several): the class one region attribute value
+    names: a non-empty string (a text, dropdown or radio value), a number, or
+    a checkbox ({name: true}, or a list of names) with exactly one name
+    checked; several names checked name none (several True). An option id
+    reads as its description (_via_option)."""
+    if isinstance(v, bool) or v is None:
+        return None, False
+    if isinstance(v, str):
+        return (_via_option(v.strip(), d) if v.strip() else None), False
+    if isinstance(v, (int, float)):
+        return _via_option(str(v), d), False
+    if isinstance(v, dict):
+        on = [str(n).strip() for n, t in v.items() if t and str(n).strip()]
+    elif isinstance(v, list):
+        on = [str(n).strip() for n in v if isinstance(n, (str, int)) and not isinstance(n, bool) and str(n).strip()]
+    else:
+        return None, False
+    if len(on) == 1:
+        return _via_option(on[0], d), False
+    return None, len(on) > 1
+
+
+def via_label(ra, attr=None, defs=None):
+    """(class name or None, how): the class a region's attributes give. The
+    attribute named by the options (via_class_attribute); else, among the
+    attributes the project's definitions (defs, _via_attributes.region) type
+    as a choice first and then among the others: the first attribute, in the
+    file's order, whose value is a non-empty string (a text, dropdown or radio
+    value: the rule before 2026-10-28), else the first that names one
+    otherwise (via_attr_class: a number, a checkbox with exactly one name
+    checked). With no definitions (an export), the rule before is unchanged.
+    A checkbox with several names checked names no class (None, "several
+    checked"; the box keeps its place as NO_CLASS), as does a region with
+    none ("unnamed")."""
+    if not isinstance(ra, dict):
+        return None, "no attributes"
+    defs = defs if isinstance(defs, dict) else {}
+    if attr:
+        groups = [[(attr, ra.get(attr))]]
+    else:
+        items = list(ra.items())
+        choice = [kv for kv in items if (defs.get(kv[0]) or {}).get("type") in VIA_CHOICE_TYPES]
+        groups = [choice, [kv for kv in items if kv[0] not in {k for k, _v in choice}]] if choice else [items]
+    several = False
+    for items in groups:
+        for k, v in items:
+            if isinstance(v, str) and v.strip():
+                return via_attr_class(v, defs.get(k))[0], k
+        for k, v in items:
+            if isinstance(v, str):
+                continue
+            name, sev = via_attr_class(v, defs.get(k))
+            if name is not None:
+                return name, k
+            several = several or sev
+    return None, "several checked" if several else "unnamed"
+
+
+def via_offers(ra, defs=None):
+    """The attributes of a region that would each name a class on their own
+    (via_attr_class), in the file's order: more than one, with no
+    via_class_attribute, is recorded (read_via) since which one is the class
+    is then a reading rule's guess."""
+    if not isinstance(ra, dict):
+        return []
+    defs = defs if isinstance(defs, dict) else {}
+    return [k for k, v in ra.items() if via_attr_class(v, defs.get(k))[0] is not None]
+
+
+def _via_beside(ref, near, rel):
+    """True when the image found for an entry's filename (rel) is the one the
+    file names: that path, or that path beside the VIA file (with or without
+    its extension), not a same-named image elsewhere in the tree (Tree.find_image's
+    base-name fallback)."""
+    ref = str(ref or "").replace("\\", "/").lstrip("./")
+    want = {ref, "%s/%s" % (near.rstrip("/"), ref) if near not in (".", "") else ref}
+    base = {os.path.splitext(w)[0] for w in want}
+    return rel in want or os.path.splitext(rel)[0] in base
+
+
+def _via_box(sa):
+    """(x0, y0, x1, y1) of one VIA shape, else None: a rect; a polygon (its
+    points' extent); a circle or an ellipse (VIA 2.x's theta, the rotation in
+    radians, widens the box to the rotated ellipse's extent). A polyline (a
+    line drawn along a plant, no outline), a point and any other shape name
+    no box."""
+    name = sa.get("name")
+    if name == "rect":
+        x0, y0 = float(sa["x"]), float(sa["y"])
+        return x0, y0, x0 + float(sa["width"]), y0 + float(sa["height"])
+    if name in ("polyline", "point"):
+        return None
+    if sa.get("all_points_x"):
+        xs, ys = [float(v) for v in sa["all_points_x"]], [float(v) for v in sa["all_points_y"]]
+        return min(xs), min(ys), max(xs), max(ys)
+    if name in ("circle", "ellipse"):
+        rx = float(sa.get("r") or sa.get("rx"))
+        ry = float(sa.get("r") or sa.get("ry"))
+        t = float(sa.get("theta") or 0.0)
+        hx = math.sqrt((rx * math.cos(t)) ** 2 + (ry * math.sin(t)) ** 2)
+        hy = math.sqrt((rx * math.sin(t)) ** 2 + (ry * math.cos(t)) ** 2)
+        cx, cy = float(sa["cx"]), float(sa["cy"])
+        return cx - hx, cy - hy, cx + hx, cy + hy
+    return None
 
 
 def read_via(tree, opts=None):
     files = _via_files(tree)
     if not files:
         raise NormaliseError("no VIA project in the tree")
+    v3 = [f for f, d, _defs in files if _via3(d)]
+    if v3:
+        raise NormaliseError("VIA 3.x project(s) %s: their layout (project, file, metadata, view) is not read; "
+                             "export them as VIA 2.x annotations" % v3[:3])
     res = Result("via")
     sizes = _Sizes(tree)
     attr = (opts or {}).get("via_class_attribute")
     per, names = {}, []
-    for f, meta in files:
+    attrs_used = {}
+    several = twice = 0
+    offers = {}                        # regions where more than one attribute names a class: {attributes: n}
+    elsewhere = []                     # entries found elsewhere, of an image another file describes beside it
+    # every entry first: an image may be described by several files (a project and its export side by side, or an
+    # entry whose own image is absent while a same-named photograph elsewhere has its own file), and the file whose
+    # folder holds the image wins over one that found it by name elsewhere (Tree.find_image's base-name fallback),
+    # whatever their sort order; among files of equal standing the first keeps the image
+    found = []                         # (rel, beside, f, k, regs, defs, filename)
+    for f, meta, defs in files:
         near = f.rpartition("/")[0]
-        for _k, e in sorted(meta.items()):
+        for k, e in sorted(meta.items()):
+            if not isinstance(e, dict):
+                raise NormaliseError("VIA %s: entry %r is %s, not an object" % (f, k, _via_kind(e)))
             rel = tree.find_image(e.get("filename"), near)
             if rel is None:
                 res.labels_without_images.append(str(e.get("filename")))
                 continue
-            regs = e.get("regions") or []
-            regs = list(regs.values()) if isinstance(regs, dict) else regs
-            ent = per.setdefault(rel, [])
-            for r in regs:
-                ra = r.get("region_attributes") or {}
-                lab = ra.get(attr) if attr else next((v for v in ra.values() if isinstance(v, str) and v.strip()), None)
-                if isinstance(lab, dict):
-                    lab = next((k for k, v in lab.items() if v), None)
-                sa = r.get("shape_attributes") or {}
-                ent.append((None if lab is None else str(lab).strip(), sa))
-                if lab is not None and str(lab).strip() not in names:
-                    names.append(str(lab).strip())
+            regs = via_regions(e.get("regions"), "%s entry %r" % (f, k))
+            found.append((rel, _via_beside(e.get("filename"), near, rel), f, k, regs, defs, e.get("filename")))
+    owner = {}                         # rel -> (file, beside) of the file that keeps its description
+    for rel, beside, f, _k, _r, _d, _n in found:
+        cur = owner.get(rel)
+        if cur is None or (beside and not cur[1]):
+            owner[rel] = (f, beside)
+        elif cur[0] == f and beside:
+            owner[rel] = (f, True)
+    lost = set()
+    for rel, beside, f, _k, regs, defs, fname in found:
+        win_f, win_beside = owner[rel]
+        if f != win_f:
+            if win_beside and not beside:
+                elsewhere.append("%s (%s) -> %s, described beside it by %s" % (fname, f, rel, win_f))
+                res.labels_without_images.append(str(fname))
+            elif (f, rel) not in lost:
+                twice += 1
+            lost.add((f, rel))
+            continue
+        ent = per.setdefault(rel, [])
+        for sa, ra in regs:
+            lab, how = via_label(ra, attr, defs)
+            if lab is None and how == "several checked":
+                several += 1
+            elif lab is not None:
+                attrs_used[how] = attrs_used.get(how, 0) + 1
+            if not attr:
+                off = via_offers(ra, defs)
+                if len(off) > 1:
+                    offers[tuple(off)] = offers.get(tuple(off), 0) + 1
+            ent.append((lab, sa))
+            if lab is not None and lab not in names:
+                names.append(lab)
+    if len(attrs_used) > 1:
+        res.problems.append("the class was read from several region attributes %s; via_class_attribute names one"
+                            % dict(sorted(attrs_used.items())))
+    if several:
+        res.problems.append("%d region(s) check several classes: kept in place with no class (NO_CLASS)" % several)
+    if twice:
+        res.problems.append("%d image(s) described by more than one VIA file: the first file's regions kept" % twice)
+    if offers:
+        res.problems.append("%d region(s) name a class in more than one attribute (%s): the first by the reading "
+                            "rule was taken; via_class_attribute names one"
+                            % (sum(offers.values()), "; ".join("%s x%d" % ("/".join(k), n)
+                                                               for k, n in sorted(offers.items())[:5])))
+    if elsewhere:
+        res.problems.append("%d VIA entr%s name an image absent beside the file, found by name elsewhere, where "
+                            "another VIA file describes it: that file's regions kept (e.g. %s)"
+                            % (len(elsewhere), "y" if len(elsewhere) == 1 else "ies", "; ".join(elsewhere[:3])))
     order = sorted(names)
     res.classes = [{"id": i, "name": n, "hints": []} for i, n in enumerate(order)]
     idx = {n: i for i, n in enumerate(order)}
@@ -477,23 +755,13 @@ def read_via(tree, opts=None):
                 bad += 1
                 continue
             try:
-                if sa.get("name") == "rect":
-                    x0, y0 = float(sa["x"]), float(sa["y"])
-                    x1, y1 = x0 + float(sa["width"]), y0 + float(sa["height"])
-                elif sa.get("all_points_x"):
-                    xs, ys = [float(v) for v in sa["all_points_x"]], [float(v) for v in sa["all_points_y"]]
-                    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
-                elif sa.get("name") in ("circle", "ellipse"):
-                    rx = float(sa.get("r") or sa.get("rx"))
-                    ry = float(sa.get("r") or sa.get("ry"))
-                    x0, x1 = float(sa["cx"]) - rx, float(sa["cx"]) + rx
-                    y0, y1 = float(sa["cy"]) - ry, float(sa["cy"]) + ry
-                else:
-                    bad += 1
-                    continue
+                xyxy = _via_box(sa)
             except (KeyError, TypeError, ValueError):
+                xyxy = None
+            if xyxy is None:
                 bad += 1
                 continue
+            x0, y0, x1, y1 = xyxy
             b, c = _clip_xyxy(x0, y0, x1, y1, wh[0], wh[1])
             clipped += int(c)
             if b is None:

@@ -338,6 +338,10 @@ BYTE_CAP_FORMS = ((re.compile(r"(\d+) bytes listed, over the (\d+)-byte cap"), 1
 BYTE_CAP_GB_RE = re.compile(r"fits in ([0-9]+\.[0-9]+) GB")
 # the collector's refusal line in a job's log (collect.__main__: "[collect] <verb> refused: <code>: <detail>")
 COLLECT_REFUSAL_RE = re.compile(r"\[collect\] [a-z]+ refused: ([a-z_]+): ([^\n]*)")
+# An intake's failure that says the fetch's staging is gone or changed (collect.intake: read_fetch's not_fetched,
+# check_blobs' StaleInput): the fetch is no longer on the cluster, so the source may be fetched anew (_intake_again)
+STAGING_GONE_RE = re.compile(r"\bnot_fetched\b|StaleInput|no fetch record at|staging blob of .* (is missing|has \d+ "
+                             r"bytes|changed in transit)|now holds another fetch")
 # The label audit's frozen experiment, snapshotted again until its record carries the audit (_refreeze_pending)
 AUDIT_ARTIFACT = "%s/audit/label_audit.json"
 # A segment build the cutter refused for want of eligible images (inc2.stream
@@ -1266,6 +1270,7 @@ class StreamRun(object):
         # 1. lab work on the cached evidence (no ssh)
         self._poll_lab()
         self._adopt_lost_runs()
+        self._intake_retry_sweep()
         self._build_evidence()
         self._diagnose()
         if self._paused_reason():
@@ -1385,6 +1390,9 @@ class StreamRun(object):
                         "never_train": (nt is None) or cid in (nt or set()), "known_item": r["known_item"],
                         "status": s.get("status"), "partial": bool(s.get("partial")), "placement": pl,
                         "in_shards": DS.mid_shards(s),
+                        # its fetch is complete on the cluster and its intake failed since: L16I again, never a
+                        # new fetch (_intake_retry_sweep)
+                        "intake_retry": bool(DS.fetch_on_cluster(s) and self._intake_failed_after_fetch(cid, s)),
                         "attempts": int(s.get("attempts") or 0), "failures": int(s.get("failures") or 0),
                         "names_unresolved": (bool(r.get("names_unresolved")) or names_pending)
                         and not s.get("names_resolved"),
@@ -2663,6 +2671,9 @@ class StreamRun(object):
                     self._person_denied(it, a)
                     self._clear(ln)
                     continue
+                elif a.get("status") == "withdrawn":
+                    self._approval_withdrawn(ln, it, a)
+                    continue
                 elif p["policy_action"] in X.GATED_R2_ACTIONS and self.cfg.get("data_autonomy") == "on":
                     res = X.submit(p, actor=AUTO, campaign=self.camp, ctx=self.xctx)
                 else:
@@ -3050,6 +3061,8 @@ class StreamRun(object):
                     self.st["declined"] = (list(self.st.get("declined") or []) + [p["id"]])[-200:]
                     self._person_denied(it, a)
                     self._clear(ln)
+                elif a.get("status") == "withdrawn":
+                    self._approval_withdrawn(ln, it, a)
                 elif self.cfg.get("autonomy") == "envelope" and p.get("risk") == "R3" \
                         and it["lever"] in LS.envelope_levers():
                     out.append((ln, it, None))          # re-checked against the envelope each tick
@@ -3257,6 +3270,18 @@ class StreamRun(object):
                        approval_id=it["approval_id"],
                        reasons=["approval %s is being run by %s (started %s); the lane waits for its outcome"
                                 % (it["approval_id"], ex.get("executed_by"), ex.get("started_at"))])
+
+    def _approval_withdrawn(self, ln, it, a):
+        """A filed item whose approval its requester withdrew (approvals.withdraw,
+        _withdraw_refetch) and that still holds its lane (a tick that withdrew
+        it and did not write its state): it leaves the lane as withdrawn, its id
+        in failed_ids; never a denial, so no source is closed."""
+        p = it["proposal"]
+        self._ledger("withdrawn", lane=ln, lever=it.get("lever"), approval_id=it.get("approval_id"),
+                     proposal_id=p["id"], withdrawn_by=a.get("withdrawn_by"),
+                     reasons=[_short(a.get("withdrawal_reason") or "its approval was withdrawn", 600)])
+        self.st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+        self._clear(ln)
 
     def _person_denied(self, it, a):
         """What a person's denial means beyond the declined proposal: a denied
@@ -3546,6 +3571,11 @@ class StreamRun(object):
             s["attempts"] = int(s.get("attempts") or 0) + 1
             s.update(status="fetching", placement="lab" if lever in LAB_FETCH_LEVERS else "cluster",
                      max_bytes=params.get("max_bytes"))
+            # a new fetch record: what an earlier fetch synced, or an intake of it that failed, is not this one's
+            s.pop("synced", None)
+            s.pop("synced_utc", None)
+            s.pop("intake_failed_utc", None)
+            s.pop("staging_lost_utc", None)
         child = p.get("child_exp")
         if child and child not in st["exps"] and p.get("follow") in ("build", "experiment"):
             st["exps"].append(child)
@@ -3664,7 +3694,9 @@ class StreamRun(object):
             st["sources"].setdefault(params["source"], {})["candidate_synced"] = LS.inc_path(
                 self.paths.cand_rel(params["source"]))
         elif lever == "L16S":
-            st["sources"].setdefault(params["source"], {})["synced"] = True
+            s = st["sources"].setdefault(params["source"], {})
+            s["synced"] = True
+            s["synced_utc"] = self.utc
         elif lever == "L16I":
             s = st["sources"].setdefault(params["source"], {})
             s["status"] = "intaken"
@@ -3949,11 +3981,17 @@ class StreamRun(object):
             s["failures"] = int(s.get("failures") or 0) + 1
             # a source part-way through its intake shards whose next shard failed waits for that shard again
             # (D20 never fetches it anew: a new fetch record would start the source over); a hold the
-            # collector's ledger brought this tick stays until the collector releases it; others are
-            # candidates again. Its failures count per shard (reset when a shard is admitted, _next_shard)
+            # collector's ledger brought this tick stays until the collector releases it; a source whose intake
+            # failed on a fetch complete on the cluster is intaken again (fetched: DPIPE's L16I under a new id,
+            # never a new fetch, _intake_again); others are candidates again. Its failures count per shard (reset
+            # when a shard is admitted, _next_shard)
             held = s.get("status") == "held" and s.get("held_by") == "collector"
-            s["status"] = ("held" if held else "shard_pending" if DS.mid_shards(s) else "candidate") \
-                if s["failures"] < 3 else "closed"
+            # only a source that is not closed by this failure is intaken again (its third closes it: no event says
+            # the intake runs again, and the L16I attempts are not bumped)
+            again = lever == "L16I" and s["failures"] < 3 and not held and not DS.mid_shards(s) \
+                and self._intake_again(src, s, why)
+            s["status"] = ("held" if held else "shard_pending" if DS.mid_shards(s) else "fetched" if again
+                           else "candidate") if s["failures"] < 3 else "closed"
             if s["status"] == "closed":
                 s["closed_reason"] = "3 failed attempts (7.5)"
                 s["closed_utc"] = self.utc
@@ -4078,7 +4116,8 @@ class StreamRun(object):
             # retry: the source's own failed attempt; the lane's count is not touched
             s["failures"] = int(s.get("failures") or 0) + 1
             if s["failures"] < lim:
-                s["status"] = "shard_pending" if DS.mid_shards(s) else "candidate"
+                again = lever == "L16I" and not DS.mid_shards(s) and self._intake_again(src, s, reason)
+                s["status"] = "shard_pending" if DS.mid_shards(s) else "fetched" if again else "candidate"
             elif s.get("status") not in ("closed", "quarantined"):
                 s.update(status="closed", closed_reason=_short("%d failed attempts, the last %s" % (s["failures"],
                                                                                                  reason), 500),
@@ -4215,6 +4254,120 @@ class StreamRun(object):
         if s["partial"] != was:
             self._ledger("source_partial" if s["partial"] else "source_complete", source=src,
                          remaining=remaining, basis=basis)
+
+    def _intake_failed_after_fetch(self, src, s):
+        """The utc of the source's last failed intake (L16I) after its last
+        fetch, else None: intake_failed_utc (_intake_again), or, for a failure
+        recorded before that field existed (the lab's zenodo_10762138 of
+        2026-10-28), the L16I step failure of the source (step_failures)."""
+        t = s.get("intake_failed_utc")
+        if not t:
+            key = step_key("L16I", LS.policy_params("L16I", {"source": src}))
+            t = ((self.st.get("step_failures") or {}).get(key) or {}).get("utc")
+        return t if t and str(t) >= str(s.get("fetched_utc") or "") else None
+
+    def _intake_again(self, src, s, why):
+        """Called when an intake (L16I) of `src` failed: True when the source is
+        intaken again on the fetch it has (DS.fetch_on_cluster: complete and on
+        the cluster), so it is 'fetched' and DPIPE proposes L16I under a new
+        id, never a new fetch; its failures still count (closed after 3). A
+        failure that says the staging is gone or changed (STAGING_GONE_RE:
+        the collector's not_fetched or StaleInput) takes the fetch off the
+        cluster (staging_lost_utc) and returns False: the source is a candidate
+        again and D20 may fetch it anew, as before."""
+        if STAGING_GONE_RE.search(str(why or "")):
+            s["staging_lost_utc"] = self.utc
+            return False
+        if not DS.fetch_on_cluster(s):
+            return False
+        s["intake_failed_utc"] = self.utc
+        self._ledger("source_status", source=src, status="fetched", by="stream",
+                     failures=int(s.get("failures") or 0),
+                     reasons=["its intake failed (%s); its fetch is complete and on the cluster (fetched %s, "
+                              "fetch_remaining %s%s): the intake runs again (L16I under a new id), never a new "
+                              "fetch; closed after 3 failures" % (_short(why, 300), s.get("fetched_utc"),
+                                                                  s.get("fetch_remaining"),
+                                                                  ", synced" if s.get("placement") == "lab" else "")])
+        self._bump_attempts("L16I", {"source": src})
+        return True
+
+    def _intake_retry_sweep(self):
+        """Every tick, before the diagnoses: a source made a candidate after a
+        failed intake (L16I) although its fetch is complete and on the cluster
+        (the lab's zenodo_10762138 of 2026-10-28, recorded before _intake_again
+        existed) is made 'fetched' again, so DPIPE intakes it, and a fetch of
+        it the DATA lane holds (proposed, or filed for a person) is withdrawn
+        with its reason (_withdraw_refetch): no source is closed, no card is
+        written, nothing waits on a person."""
+        st = self.st
+        lim = int((LS.limits("L16") or {}).get("attempts_per_source") or 3)
+        for src in sorted(st.get("sources") or {}):
+            s = st["sources"][src]
+            if not isinstance(s, dict) or s.get("status") != "candidate" or int(s.get("failures") or 0) >= lim:
+                continue
+            if DS.mid_shards(s) or not DS.fetch_on_cluster(s):
+                continue
+            t = self._intake_failed_after_fetch(src, s)
+            if not t:
+                continue
+            s["status"] = "fetched"
+            s["intake_failed_utc"] = t
+            self._bump_attempts("L16I", {"source": src})
+            self._ledger("source_status", source=src, status="fetched", by="stream", failures=int(s.get("failures")
+                                                                                                 or 0),
+                         reasons=["made a candidate after its intake failed (%s), although its fetch is complete and "
+                                  "on the cluster (fetched %s, fetch_remaining %s%s): the intake runs again (L16I "
+                                  "under a new id), never a new fetch" % (t, s.get("fetched_utc"),
+                                                                          s.get("fetch_remaining"),
+                                                                          ", synced" if s.get("placement") == "lab"
+                                                                          else "")])
+        lane = st["lanes"]["DATA"]
+        it = lane.get("item") or {}
+        src = ((it.get("proposal") or {}).get("params") or {}).get("source")
+        if it.get("lever") in FETCH_LEVERS and src and it.get("status") in ("proposed", "filed") \
+                and (st["sources"].get(src) or {}).get("status") == "fetched" \
+                and DS.fetch_on_cluster(st["sources"][src]):
+            self._withdraw_refetch("DATA", it, src)
+
+    def _withdraw_refetch(self, ln, it, src):
+        """A fetch of `src` (L16, L16L, L16R or L16RL) proposed or filed while
+        the source's fetch is complete on the cluster: withdrawn. A pending
+        approval is withdrawn by its requester (approvals.withdraw: not a
+        denial, so the source is not closed, DENIED_CLOSES); an approved one
+        not yet run is closed unsubmitted (_close_unsubmitted); one a person
+        is running or ran is followed as any run (the lane keeps it). The id
+        goes to failed_ids, the lane is freed; no card."""
+        p = it["proposal"]
+        aid = it.get("approval_id")
+        s = self.st["sources"].get(src) or {}
+        why = ("withdrawn: %s's fetch is complete and on the cluster (fetched %s, fetch_remaining %s%s) and its "
+               "intake failed (%s); the intake runs again (L16I), and a second fetch of %s would only stage the "
+               "same files again" % (src, s.get("fetched_utc"), s.get("fetch_remaining"),
+                                     ", synced" if s.get("placement") == "lab" else "",
+                                     s.get("intake_failed_utc"), src))
+        closed, cwhy = None, ""
+        if aid:
+            a = AP.state(self.domain, root=self.xctx.approvals_root).get(aid) or {}
+            if a.get("status") == "pending":
+                got = AP.withdraw(self.domain, aid, AUTO, why, self.xctx.clock(), root=self.xctx.approvals_root)
+                closed, cwhy = bool(got.get("ok")), (got.get("reason") or "")
+            elif a.get("status") == "approved" and a.get("execution") is None:
+                closed, cwhy = self._close_unsubmitted(aid, why)
+            elif a.get("status") == "withdrawn":
+                closed = True
+            else:
+                # denied (the lane's own path closes the source as a person decided), or a run a person started:
+                # left to the lane's own handling
+                return
+            if not closed:
+                self._once("refetch_kept:%s" % p["id"], [aid, cwhy], "waiting", lane=ln, lever=it.get("lever"),
+                           proposal_id=p["id"], approval_id=aid,
+                           reasons=[why, "kept filed: its approval %s could not be withdrawn (%s)" % (aid, cwhy)])
+                return
+        self._ledger("withdrawn", lane=ln, lever=it.get("lever"), approval_id=aid, proposal_id=p["id"], source=src,
+                     reasons=[why], approval_withdrawn=closed, withdraw_error=cwhy or None)
+        self.st["failed_ids"] = (self._failed_ids() + [p["id"]])[-FAILED_IDS_KEEP:]
+        self._clear(ln)
 
     def _names_pending(self, src, s, row):
         """The collector held `src` for class names the offline resolver lacks

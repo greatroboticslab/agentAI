@@ -292,6 +292,13 @@ def validate(raw):
             for k in ("decided_utc", "reason"):
                 if not isinstance(ov.get(k), str) or not ov[k].strip():
                     p.append("licence_overrides.%s: %s is required" % (src, k))
+    gd = raw.get("guard")
+    if gd is not None and not isinstance(gd, dict):
+        p.append("guard: an object ({lock, v1_exams, ...})")
+    elif gd and gd.get("v1_exams") is not None:
+        ve = gd["v1_exams"]
+        if not isinstance(ve, list) or not all(isinstance(x, str) and x.strip() for x in ve) or len(set(ve)) != len(ve):
+            p.append("guard.v1_exams: a list of distinct LOCK v1 split names (the season exams intake refuses copies of)")
     return p
 
 

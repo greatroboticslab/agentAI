@@ -1,0 +1,234 @@
+{
+ "files": [
+  {
+   "fixture": "Year2021_Part1/20210628_iPhoneSE_YL_1",
+   "height": 4032,
+   "json_sha256": "fdc8389f17137fd5f921b3de765d1ccaaa0d4debfca33a0948bb416f8b97ca60",
+   "source_rel": "Year2021_Part1/Year2021_Part1/20210628_iPhoneSE_YL_1",
+   "why": [
+    "first single-region file of Year2021_Part1/Year2021_Part1"
+   ],
+   "width": 3024,
+   "xml_sha256": "0c83c18bbcc9d1eaa2cb0c28dca2271c48a0c3daafbf111bf35e99b9662027eb"
+  },
+  {
+   "fixture": "Year2021_Part1/20210628_iPhoneSE_YL_116",
+   "height": 4032,
+   "json_sha256": "a86294ea416dd2f5cf63b039ee387d1ce214be3ea876488c042f19ffe712563b",
+   "source_rel": "Year2021_Part1/Year2021_Part1/20210628_iPhoneSE_YL_116",
+   "why": [
+    "first multi-region file of Year2021_Part1/Year2021_Part1"
+   ],
+   "width": 3024,
+   "xml_sha256": "975482e1dc42e5a95d4fc99bfcc76723aff672c7c1bcb4572e99d1e2f437a783"
+  },
+  {
+   "fixture": "Year2021_Part1/20210827_NIKOND3300_YL_64",
+   "height": 6000,
+   "json_sha256": "bf13fcfc827abf2866e5543c4242711ebdddc4e4572c88336285bab4c399c9a6",
+   "source_rel": "Year2021_Part1/Year2021_Part1/20210827_NIKOND3300_YL_64",
+   "why": [
+    "label(s) ['CutleafGroundcherry']"
+   ],
+   "width": 4000,
+   "xml_sha256": "57bfce58541b30d3301f521dbe3270ab3c7de17ce933aa8053b48a66b2302c87"
+  },
+  {
+   "fixture": "Year2021_Part2/20210903_CanonEOS4000D_EO_1",
+   "height": 3042,
+   "json_sha256": "6bd3701da4e6e5170f794cede1153b667d2aa377294f3eed659cbef766892b97",
+   "source_rel": "Year2021_Part2/Year2021_Part2/20210903_CanonEOS4000D_EO_1",
+   "why": [
+    "first single-region file of Year2021_Part2/Year2021_Part2"
+   ],
+   "width": 2596,
+   "xml_sha256": "e995269eb312d15068a08a97931922cead73a4d461622bbf213bc7fafc3e5dd3"
+  },
+  {
+   "fixture": "Year2021_Part2/20210903_NIKOND3300_YL_108",
+   "height": 6000,
+   "json_sha256": "510049e7c0e44ec28bd1d8685ec87ad3f347780da086b91cec9a8e04e46cde29",
+   "source_rel": "Year2021_Part2/Year2021_Part2/20210903_NIKOND3300_YL_108",
+   "why": [
+    "first multi-region file of Year2021_Part2/Year2021_Part2"
+   ],
+   "width": 4000,
+   "xml_sha256": "2baa4c3001355fa56de75ebe93652e861cc89b893a797a17ff77d9b821cef7f1"
+  },
+  {
+   "fixture": "Year2022/20220618_IphoneSE_YL_1",
+   "height": 4032,
+   "json_sha256": "746a6ff0d650269469544482811afb285c18d7ea291cae0df24f353e106311a7",
+   "source_rel": "Year2022/Year2022/20220618_IphoneSE_YL_1",
+   "why": [
+    "first single-region file of Year2022/Year2022"
+   ],
+   "width": 3024,
+   "xml_sha256": "dcf883c076f630c2c1e5556df05b9c1df1fe5b878063cd16db3dde0586a0d7a7"
+  },
+  {
+   "fixture": "Year2022/20220618_IphoneSE_YL_10",
+   "height": 4032,
+   "json_sha256": "c0007a836db8a2cd2f97c92a473cdb1056117644c88dfa830c08dcef135efb99",
+   "source_rel": "Year2022/Year2022/20220618_IphoneSE_YL_10",
+   "why": [
+    "first multi-region file of Year2022/Year2022"
+   ],
+   "width": 3024,
+   "xml_sha256": "12e1e896aed5d5f02bf24807546891d51828ff5698a6c38a68a98707327f7d28"
+  },
+  {
+   "fixture": "Year2022/20220711_220401542_iOS",
+   "height": 4032,
+   "json_sha256": "6b5022c573a4742541f2d6eab7b543c07e9bc1efb3e4354e6b746166203443f5",
+   "source_rel": "Year2022/Year2022/20220711_220401542_iOS",
+   "why": [
+    "label(s) ['Unknown']"
+   ],
+   "width": 3024,
+   "xml_sha256": "a1b464c5a2f10be5c57dc99e1a359d61b3d53648790dc6077a1b143197e19d58"
+  },
+  {
+   "fixture": "Year2022/20220711_NikonD330_YL_42",
+   "height": 6000,
+   "json_sha256": "fe061e336b97d2c1d3fcad6e46bfb9a92b6cb5678de3e514bd3097f68e66aaf2",
+   "source_rel": "Year2022/Year2022/20220711_NikonD330_YL_42",
+   "why": [
+    "label(s) ['15']"
+   ],
+   "width": 4000,
+   "xml_sha256": "9d7b07afd75e51fac0c439aa8e6f55ca9ba1d0e79521a967ebbf563760a6b6d7"
+  },
+  {
+   "fixture": "Year2022/20220711_NikonD330_YL_45",
+   "height": 6000,
+   "json_sha256": "5f334c35b045d6dcb340ebaba9c40378808b160e739cb7740cdb8ccdc86e4f54",
+   "source_rel": "Year2022/Year2022/20220711_NikonD330_YL_45",
+   "why": [
+    "label(s) ['21']"
+   ],
+   "width": 4000,
+   "xml_sha256": "a689f600c7c1a807de89cf6471c4052fa64cdb5639ea42e1bcd34e5f239592f7"
+  },
+  {
+   "fixture": "Year2022/20220916_iPhoneSE_YL_58",
+   "height": 3024,
+   "json_sha256": "b627991340d1576a17827a1b6b0e95a8d76714f3f05138392435138933b7aa6d",
+   "source_rel": "Year2022/Year2022/20220916_iPhoneSE_YL_58",
+   "why": [
+    "label(s) ['PurpleAmmania']"
+   ],
+   "width": 4032,
+   "xml_sha256": "58e70ba02508ba4bd3d2e4fc5716bac1755aac3a9ee520477637a025db566f95"
+  },
+  {
+   "fixture": "Year2022/20221008_iPhoneSE_YL_2",
+   "height": 4032,
+   "json_sha256": "e697990400c0872508c2e1a2ed2cc8457796cf29160f994101a0f0700c18553d",
+   "source_rel": "Year2022/Year2022/20221008_iPhoneSE_YL_2",
+   "why": [
+    "label(s) ['10']"
+   ],
+   "width": 3024,
+   "xml_sha256": "bc6eae17bb3f3368e8d2910a27ae663adfa83289017cb6389a892dad0b51520e"
+  },
+  {
+   "fixture": "Year2022/IMG_8132",
+   "height": 4032,
+   "json_sha256": "1954894e8f347dc4b89b1d48d67327cf5e3445831a6c1b529ee99b12ab52aeb9",
+   "source_rel": "Year2022/Year2022/IMG_8132",
+   "why": [
+    "label(s) ['11']"
+   ],
+   "width": 3024,
+   "xml_sha256": "c6f16e9742494275aded5537f269c67de9222b72b91aaac1a209bb3a72b5310d"
+  },
+  {
+   "fixture": "Year2022/IMG_8539",
+   "height": 4032,
+   "json_sha256": "e8384e0a870bcd01bf088f1dda5925ec8334210e6ea348841c22c6ced469be89",
+   "source_rel": "Year2022/Year2022/IMG_8539",
+   "why": [
+    "label(s) ['12']"
+   ],
+   "width": 3024,
+   "xml_sha256": "063ce1c25cdc04de5418298ad711f787167134694b5c8866e6007b58f5cef358"
+  },
+  {
+   "fixture": "Year2021_Part2/20210903_iPhone11Pro_BT_140",
+   "height": 3024,
+   "json_sha256": "3542802a4672c240e3b0a5ad5b13955d171976eaf7eb539ade5b58bc5b1ccfb7",
+   "source_rel": "Year2021_Part2/Year2021_Part2/20210903_iPhone11Pro_BT_140",
+   "why": [
+    "most regions (32)"
+   ],
+   "width": 4032,
+   "xml_sha256": "59ddf0bfe2939c3ae85a3cf77819ae2061efca4ce8e148a888bc629fd83d1d7b"
+  }
+ ],
+ "selection": "the first single-region and the first multi-region file of each of the three folders, the first file carrying each of the labels CutleafGroundcherry, Unknown, PurpleAmmania, 10, 11, 12, 15, 21, and the file with the most regions (32); files in name order",
+ "source": {
+  "copied_utc": "2026-10-28",
+  "fetch_sha256": "079bc2638fdf041e89ef59bf426f96a131858ce0d02df445fb5dacf358b1dff2",
+  "id": "zenodo_10762138",
+  "licence": "CC-BY-NC-4.0",
+  "record": "https://zenodo.org/records/10762138",
+  "tree": "results/framework/inc/intake/work/zenodo_10762138/079bc2638fdf/x (cluster; extracted by intake job 49959269)"
+ },
+ "survey_of_all_files": {
+  "class_names": {
+   "10": 14,
+   "11": 1,
+   "12": 5,
+   "15": 1,
+   "21": 6,
+   "Carpetweed": 1636,
+   "Cocklebur": 21,
+   "CutleafGroundcherry": 56,
+   "Eclipta": 294,
+   "Goosegrass": 590,
+   "GroundIvy": 20,
+   "HophornbeamCopperleaf": 17,
+   "MorningGlory": 1789,
+   "Nutsedge": 11,
+   "PalmerAmaranth": 518,
+   "PricklySida": 163,
+   "PurpleAmmania": 1,
+   "Purslane": 1122,
+   "Ragweed": 1016,
+   "Sicklepod": 15,
+   "SpottedSpurge": 1316,
+   "Swinecress": 20,
+   "Unknown": 44,
+   "VirginiaButtonweed": 3,
+   "Waterhemp": 2861
+  },
+  "entries_per_file": {
+   "1": 6664
+  },
+  "jpg_files": 6664,
+  "json_files": 6664,
+  "per_folder": {
+   "Year2021_Part1": 2290,
+   "Year2021_Part2": 2444,
+   "Year2022": 1930
+  },
+  "ran_utc": "2026-10-28",
+  "region_attributes": {
+   "Weed (checkbox object, exactly one name true)": 11540
+  },
+  "regions": 11540,
+  "regions_layout": {
+   "columnar object, one shape and one attribute object": 4031,
+   "columnar object, parallel lists of shapes and attribute objects": 2633
+  },
+  "script": "survey_via_layouts.py",
+  "script_sha256": "9b2ac87fba1b2d0012fff06d4a660d960e26547a5589a16a0cd8946a69d24567",
+  "shapes": {
+   "rect": 11540
+  },
+  "via_boxes_equal_voc_boxes": "6664 of 6664 images (names and pixel corners)",
+  "xml_files": 6664
+ },
+ "what": "Real VIA annotation files of 2SeasonWeedDet8 (Zenodo record 10762138, CC-BY-NC-4.0), byte for byte, with their Pascal VOC twins; no image is included (the test writes stand-in images of each photo's recorded size)."
+}
