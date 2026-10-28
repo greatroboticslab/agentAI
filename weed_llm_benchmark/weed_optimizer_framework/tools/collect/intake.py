@@ -52,22 +52,22 @@ guard loads:
      threshold is bound to every held row (copy_scan_calibration) and
      recorded in guard.json and summary.json; inc2.step1_stream's copy
      scan judges the rows by it. Then the exams beyond GuardV2's evaluation
-     splits (amendment 2026-10-28, load_exam_guard): the season hold-out
-     exams ood22 and ood23 (LOCK v1's never-train index, reached through the
-     v1 LOCK LOCK v2 names, its entries exactly LOCK v1's ood22/ood23
-     manifests) and the funnel's H10d hold-out (step1_r1's domain dev, once
-     F9 has written a complete recovery record), one 6-bit dHash index. An
-     image within 6 bits of one of them under any of its eight variants is
-     refused near_exam_season or near_h10d when nothing else refused it,
-     and named on its refusal otherwise (most ood22/ood23 copies are
-     base_copy: base_v2's tsw rows are those images); guard.json and
-     summary.json count the copies of each exam (exam_copies), and D28's
-     base-copy share counts the two reasons. A photograph held by both
-     season exams (one is) is named by the first and counted for both
-     (ExamIndex). A production LOCK v2 that
-     names no v1 LOCK, a v1 index or manifest that does not hash as
-     recorded, an index that misses an exam image, or a complete recovery
-     record whose hold-out cannot be read refuses the intake (fail closed);
+     splits (amendment 2026-10-28, load_exam_guard): the season exams the
+     domain config names (guard.v1_exams: splits of LOCK v1, read from its
+     never-train index, reached through the v1 LOCK that LOCK v2 names, its
+     entries exactly those splits' manifests) and the funnel's H10d hold-out
+     (step1_r1's domain dev, once F9 has written a complete recovery
+     record), one 6-bit dHash index. An image within 6 bits of one of them
+     under any of its eight variants is refused near_exam_season or
+     near_h10d when nothing else refused it, and named on its refusal
+     otherwise (most copies of a season exam are base_copy when base_v2
+     holds its images); guard.json and summary.json count the copies of
+     each exam (exam_copies), and D28's base-copy share counts the two
+     reasons. A photograph held by two exams is named by the first and
+     counted for both (ExamIndex). A production LOCK v2 that names no v1
+     LOCK, a v1 index or manifest that does not hash as recorded, an index
+     that misses an exam image, or a complete recovery record whose
+     hold-out cannot be read refuses the intake (fail closed);
   4. archives extracted (zip, tar; no path escapes the work directory) into
      intake/work/<source>/<fetch sha12>/x/, other files linked in;
   5. normalise (normalize.read, the known item's format options) and the
@@ -246,14 +246,12 @@ def l5_hit(l5, sha, variants):
 
 
 # ------------------------------------------------------------------ the exams beyond GuardV2's
-# GuardV2 holds the v2 evaluation splits (dev, test, ImageWeeds) as never-train. Two more image sets are exams that
-# no intake image may copy (amendment 2026-10-28): the season hold-out exams ood22 and ood23 (3SeasonWeedDet10's 2022
-# and 2023 seasons; LOCK v1's exams, the deciding exams of the registered V3F family's D1, whose season guard drops
-# every row within 6 bits of them under the 8 variants, docs/CONTINUOUS_LOOP.md V3F.3.7 item 2), and the funnel's
-# H10d hold-out (INC_DIR/step1_r1/domain_dev.jsonl, once F9 has written it). Under splits v2 the ood22/ood23 images
-# are also base_v2's tsw22/tsw23 rows, so GuardV2 refuses most copies of them as base_copy; this guard refuses the
-# rest (the ood23 images base_v2 does not hold) and names the exam on every copy.
-SEASON_EXAMS = ("ood22", "ood23")
+# GuardV2 holds the v2 evaluation splits as never-train. Two more kinds of image set are exams that no intake image
+# may copy (amendment 2026-10-28): the season hold-out exams, splits of LOCK v1 the domain config names
+# (guard.v1_exams; the deciding exams of a registered family whose own season guard drops every row within 6 bits of
+# them under the 8 variants, docs/CONTINUOUS_LOOP.md V3F.3.7 item 2), and the funnel's H10d hold-out
+# (INC_DIR/step1_r1/domain_dev.jsonl, once F9 has written it). When base_v2 holds a season exam's images GuardV2
+# refuses most copies of them as base_copy; this guard refuses the rest and names the exam on every copy.
 SEASON_REASON = "near_exam_season"
 H10D_REASON = "near_h10d"
 EXAM_REASONS = (SEASON_REASON, H10D_REASON)
@@ -263,10 +261,9 @@ V1_NEVERTRAIN_NAME = "nevertrain_dhash.json"
 
 class ExamIndex(object):
     """The exams' 6-bit dHash index (near_dup.NearHashIndex, which keeps the
-    first owner of a hash) and every owner of each hash: one photograph is in
-    both season exams (ood22__20221008_iPhoneSE_YL_2 and
-    ood23__20230810_HTRC_iPhone13_BD_29 hold one dHash in LOCK v1's index), so
-    a copy of it is a copy of both exams and is counted for both."""
+    first owner of a hash) and every owner of each hash: one photograph can be
+    in two exams (two season exams of the reference domain share one, amendment
+    2026-10-28), and a copy of it is then a copy of both and counted for both."""
 
     def __init__(self):
         from ..near_dup import NearHashIndex
@@ -292,15 +289,19 @@ class ExamIndex(object):
         return len(self.idx)
 
 
-def _exam_season(lock_path, idx):
-    """The season exams ood22 and ood23 into idx, from LOCK v1's never-train
-    index: the v1 LOCK LOCK v2 names (derived_from.v1_lock_path, hashing to
-    derived_from.v1_lock_sha256), the index beside it hashing to LOCK v1's
-    nevertrain_sha256 (complete, 6 bits), its ood22/ood23 entries exactly the
-    keys of LOCK v1's ood22/ood23 manifests (each hashing as LOCK v1 records):
-    an index that missed an exam image would clear copies of it. Returns the
-    record; GuardUnavailable for anything else, except a testing LOCK v2 that
-    names no v1 LOCK (recorded, nothing checked)."""
+def _exam_season(lock_path, idx, splits):
+    """The season exams `splits` (the domain config's guard.v1_exams) into
+    idx, from LOCK v1's never-train index: the v1 LOCK that LOCK v2 names
+    (derived_from.v1_lock_path, hashing to derived_from.v1_lock_sha256), the
+    index beside it hashing to LOCK v1's nevertrain_sha256 (complete, 6
+    bits), its entries of each split exactly the keys of that split's LOCK
+    v1 manifest (hashing as LOCK v1 records): an index that missed an exam
+    image would clear copies of it. Returns the record; GuardUnavailable for
+    anything else, except a testing LOCK v2 that names no v1 LOCK, or a
+    domain that names no season exam (recorded, nothing checked)."""
+    splits = tuple(str(x) for x in (splits or ()))
+    if not splits:
+        return {"checked": False, "why": "the domain config names no season exam (guard.v1_exams)"}
     try:
         lock = read_json(lock_path, "LOCK v2")
     except CollectError as e:
@@ -310,7 +311,7 @@ def _exam_season(lock_path, idx):
     if not v1p or not v1s:
         if not lock.get("testing"):
             raise GuardUnavailable("LOCK v2 %s names no v1 LOCK (derived_from.v1_lock_path and v1_lock_sha256): the "
-                                   "season exams ood22 and ood23 cannot be checked (fail closed)" % lock_path)
+                                   "season exams %s cannot be checked (fail closed)" % (lock_path, ", ".join(splits)))
         return {"checked": False, "why": "a testing LOCK v2 names no v1 LOCK"}
     v1p = Path(v1p)
     if not v1p.is_file() or sha256_file(v1p) != v1s:
@@ -331,11 +332,11 @@ def _exam_season(lock_path, idx):
                                % (ntp, EXAM_BITS))
     held = {}
     for e in nt.get("entries") or ():
-        if isinstance(e, (list, tuple)) and len(e) == 3 and e[1] in SEASON_EXAMS:
+        if isinstance(e, (list, tuple)) and len(e) == 3 and e[1] in splits:
             idx.add(int(e[0]), (str(e[1]), str(e[2])))
             held.setdefault(e[1], set()).add(str(e[2]))
     images = {}
-    for split in SEASON_EXAMS:
+    for split in splits:
         mp = v1p.parent / ("%s.jsonl" % split)
         msha = (lock1.get("manifests") or {}).get(split)
         if not msha or not mp.is_file() or sha256_file(mp) != msha:
@@ -392,20 +393,20 @@ def _exam_h10d(inc, idx):
             "domain_dev": dd}
 
 
-def load_exam_guard(lock_path=None, inc=None):
-    """(index, record): the season exams (_exam_season) and the H10d hold-out
-    (_exam_h10d) in one 6-bit dHash index whose owners are (split, key),
-    split one of ood22, ood23, h10d (ExamIndex: every owner of a hash). Fails
-    closed (GuardUnavailable)."""
+def load_exam_guard(lock_path=None, inc=None, season=()):
+    """(index, record): the season exams `season` (the domain config's
+    guard.v1_exams, _exam_season) and the H10d hold-out (_exam_h10d) in one
+    6-bit dHash index whose owners are (split, key), split a season exam or
+    h10d (ExamIndex: every owner of a hash). Fails closed (GuardUnavailable)."""
     try:
         from ..inc2 import common as C2
     except ImportError as e:
         raise GuardUnavailable("inc2.common is not installed (%s): intake refuses (fail closed)" % e)
     idx = ExamIndex()
-    season = _exam_season(Path(lock_path or C2.LOCK_PATH), idx)
+    rec = _exam_season(Path(lock_path or C2.LOCK_PATH), idx, season)
     h10d = _exam_h10d(inc, idx)
-    return idx, {"season": season, "h10d": h10d, "reasons": {"ood22": SEASON_REASON, "ood23": SEASON_REASON,
-                                                             "h10d": H10D_REASON}}
+    reasons = dict({sp: SEASON_REASON for sp in (season or ())}, h10d=H10D_REASON)
+    return idx, {"season": rec, "h10d": h10d, "reasons": reasons}
 
 
 def exam_hit(idx, variants):
@@ -428,7 +429,7 @@ def exam_hit(idx, variants):
 # An image whose EXIF orientation is not the identity (tags 2-8: a flip, a rotation, or both) is shown, and read by
 # the trainer (Ultralytics, cv2, twostage's exif_transpose), in another frame than its stored pixels; normalize reads
 # the stored size, and nothing in a VIA, YOLO or most COCO files says in which frame the boxes were drawn. inc.splits
-# drops such images from the base for that reason (annotation_frame_rotated: two ood22 photographs annotated on the
+# drops such images from the base for that reason (annotation_frame_rotated: two exam photographs annotated on the
 # stored pixels). Intake refuses them (exif_orientation) after the guard, so a copy is still named as a copy.
 EXIF_REASON = "exif_orientation"
 EXIF_ORIENTATION_TAG = 0x0112
@@ -958,9 +959,9 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
             copy_scan, copy_scan_rec = load_copy_scan(lock_path)
         else:
             copy_scan, copy_scan_rec = None, {"checked": False, "why": "a stand-in guard was given without a LOCK"}
-        # the exams beyond GuardV2's (the season exams ood22/ood23 and the H10d hold-out, amendment 2026-10-28)
+        # the exams beyond GuardV2's (the season exams of guard.v1_exams and the H10d hold-out, amendment 2026-10-28)
         if guard is None or lock_path is not None:
-            exams, exam_rec = load_exam_guard(lock_path, inc)
+            exams, exam_rec = load_exam_guard(lock_path, inc, (cfg.section("guard", {}) or {}).get("v1_exams") or ())
         else:
             exams, exam_rec = None, {"checked": False, "why": "a stand-in guard was given without a LOCK"}
         exam_copies = {}
@@ -1159,7 +1160,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
                         reason, match = L5_REASON, {"key": hit[0], "bits": hit[1], "why": "decision L-5 drops these "
                                                     "images from training outright"}
                 # an exam beyond GuardV2's: refused when nothing else refused it (near_exam_season, near_h10d), else
-                # named on the refusal (most ood22/ood23 copies are base_copy: base_v2's tsw rows are those images);
+                # named on the refusal (most season-exam copies are base_copy where base_v2 holds the exam's images);
                 # every copy is counted per exam (guard.json, summary.json exam_copies)
                 ex = exam_hit(exams, _var) if exams is not None else None
                 if ex is not None:
@@ -1281,7 +1282,7 @@ def intake(cfg, source_id, inc=None, guard=None, names=None, targets=None, testi
         cm_changed = {"from": cm_prev, "to": cm_sha} if cm_prev and cm_prev != cm_sha else None
         seen_imgs = len(items) - time_deferred + len(no_label)
         eval_hits = sum(reasons.get(k, 0) for k in EVAL_REASONS)
-        # a copy of a season exam or of the H10d hold-out counts with the base copies (most ood22/ood23 copies are
+        # a copy of a season exam or of the H10d hold-out counts with the base copies (most season-exam copies are
         # base_copy, base_v2's tsw rows being those images), so D28's base-copy share keeps its meaning
         base_hits = reasons.get("base_copy", 0) + reasons.get(L5_REASON, 0) + sum(reasons.get(k, 0)
                                                                                   for k in EXAM_REASONS)

@@ -1407,7 +1407,12 @@
  ],
  "guard": {
   "lock": null,
-  "why": "None: inc2.common.LOCK_PATH (LOCK v2)"
+  "why": "None: inc2.common.LOCK_PATH (LOCK v2)",
+  "v1_exams": [
+   "ood22",
+   "ood23"
+  ],
+  "v1_exams_why": "amendment 2026-10-28: the season hold-out exams (3SeasonWeedDet10's 2022 and 2023 seasons, LOCK v1's never-train splits and the deciding exams of the registered V3F family's D1); intake refuses every image within 6 bits of one under the 8 variants (near_exam_season), read from LOCK v1's never-train index"
  },
  "normalise": {
   "keep_work": false

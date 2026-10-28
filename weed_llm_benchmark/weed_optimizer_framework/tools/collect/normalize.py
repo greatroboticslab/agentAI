@@ -441,7 +441,7 @@ def read_coco(tree, opts=None):
 #   a columnar dict         {"shape_attributes": {...} | [{...}, ...],
 #                            "region_attributes": {...} | [{...}, ...]}
 #                           (one region, or parallel lists paired by position: the per-image
-#                            files of 2SeasonWeedDet8, Zenodo 10762138)
+#                            files of a source whose intake crashed on this layout, 2026-10-28)
 # with a list nested once more ([[{...}, ...]]) flattened in order. Anything else (a VIA 3.x
 # project, regions of another type, parallel lists of different lengths) refuses with the
 # file, the entry and what was found (NormaliseError), never a crash and never a guess.

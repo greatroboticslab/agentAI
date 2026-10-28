@@ -55,6 +55,7 @@ import test_collect_intake as TI  # noqa: E402  (W.setup ran on import: TMP, INC
 
 W = TI.W
 TMP = TI.TMP
+SEASON = ("ood22", "ood23")             # the domain config's guard.v1_exams (checked below)
 check, raises = W.check, W.raises
 
 
@@ -132,7 +133,12 @@ def test_exams(cfg):
     link_v1(lock2, lock1)
     import os
     inc = pathlib.Path(os.environ["INC_DIR"])
-    _idx, rec = I.load_exam_guard(lock2, inc)
+    check("the domain config names the season exams intake checks (guard.v1_exams)",
+          tuple((cfg.section("guard", {}) or {}).get("v1_exams") or ()) == SEASON, cfg.section("guard"))
+    _i, rec0 = I.load_exam_guard(lock2, inc, ())
+    check("a domain that names no season exam checks none, and says so", rec0["season"]["checked"] is False
+          and "names no season exam" in rec0["season"]["why"], rec0)
+    _idx, rec = I.load_exam_guard(lock2, inc, SEASON)
     check("no recovery record (F9 not run): the H10d hold-out is not checked, and says so; the season exams are",
           rec["season"]["checked"] and rec["season"]["images"] == {"ood22": 2, "ood23": 3}
           and rec["h10d"]["checked"] is False and "F9 has not written" in rec["h10d"]["why"], rec)
@@ -214,7 +220,7 @@ def test_exams(cfg):
     lk = json.loads(lock2.read_text())
     prod = lock2.parent / "LOCK_prod.json"
     prod.write_text(json.dumps(dict({k: v for k, v in lk.items() if k != "derived_from"}, testing=False)))
-    e = raises(lambda: I.load_exam_guard(prod, inc), GuardUnavailable)
+    e = raises(lambda: I.load_exam_guard(prod, inc, SEASON), GuardUnavailable)
     check("a production LOCK v2 naming no v1 LOCK refuses", e is not None and "names no v1 LOCK" in str(e), e)
     for what, path, edit, msg in (
             ("LOCK v1", lock1, lambda b: b.replace(b'"v1"', b'"v1 "'), "LOCK v1"),
@@ -222,7 +228,7 @@ def test_exams(cfg):
             ("the ood23 manifest", lock1.parent / "ood23.jsonl", lambda b: b + b"\n", "ood23 manifest")):
         keep = path.read_bytes()
         path.write_bytes(edit(keep))
-        e = raises(lambda: I.load_exam_guard(lock2, inc), GuardUnavailable)
+        e = raises(lambda: I.load_exam_guard(lock2, inc, SEASON), GuardUnavailable)
         path.write_bytes(keep)
         check("%s that no longer hashes as recorded refuses" % what, e is not None and msg in str(e), e)
     # an index that misses an exam image (recorded consistently: the LOCKs re-signed over it)
@@ -235,7 +241,7 @@ def test_exams(cfg):
     l1["nevertrain_sha256"] = C.sha256_file(ntp)
     lock1.write_text(json.dumps(l1))
     link_v1(lock2, lock1)
-    e = raises(lambda: I.load_exam_guard(lock2, inc), GuardUnavailable)
+    e = raises(lambda: I.load_exam_guard(lock2, inc, SEASON), GuardUnavailable)
     check("a v1 index that misses an ood23 image refuses (its copies would be cleared)",
           e is not None and "does not hold exactly" in str(e) and "ood23__1" in str(e), e)
     ntp.write_bytes(keep_nt)
@@ -244,18 +250,18 @@ def test_exams(cfg):
     ddj = inc / "step1_r1" / "domain_dev.jsonl"
     keep_dd = ddj.read_bytes()
     ddj.write_bytes(keep_dd + b"\n")
-    e = raises(lambda: I.load_exam_guard(lock2, inc), GuardUnavailable)
+    e = raises(lambda: I.load_exam_guard(lock2, inc, SEASON), GuardUnavailable)
     ddj.write_bytes(keep_dd)
     check("a complete recovery record whose domain dev does not hash as recorded refuses",
           e is not None and "H10d" in str(e), e)
     dd.rename(dd.with_suffix(".gone"))
-    e = raises(lambda: I.load_exam_guard(lock2, inc), GuardUnavailable)
+    e = raises(lambda: I.load_exam_guard(lock2, inc, SEASON), GuardUnavailable)
     dd.with_suffix(".gone").rename(dd)
     check("a domain-dev image that cannot be read refuses", e is not None and "cannot be hashed" in str(e), e)
     rj = inc / "step1_r1" / "recovery.json"
     keep_rj = rj.read_bytes()
     rj.write_text(json.dumps(dict(json.loads(keep_rj), status="refused")))
-    _i, rec2 = I.load_exam_guard(lock2, inc)
+    _i, rec2 = I.load_exam_guard(lock2, inc, SEASON)
     rj.write_bytes(keep_rj)
     check("a recovery record that is not complete holds no hold-out (recorded, not checked)",
           rec2["h10d"]["checked"] is False and "not complete" in rec2["h10d"]["why"], rec2["h10d"])

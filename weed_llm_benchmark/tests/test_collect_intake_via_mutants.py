@@ -47,6 +47,8 @@ its file), runs the test file against the copy and requires it to fail.
   IV39  diagnose_stream   a sync recorded before the fetch counts
   IV40  stream            a new fetch keeps the sync of the fetch before it
   IV41  stream            a failure recorded before intake_failed_utc existed (the lab's) not read
+  IV42  intake            the season exams the domain names never checked
+  IV43  weed.json         the domain config names no season exam
 
 Run:  python3 tests/test_collect_intake_via_mutants.py [IV1 IV5 ...]
 """
@@ -81,12 +83,12 @@ MUTANTS = {
     "IV7": (NZ, "    return desc.strip() if isinstance(desc, str) and desc.strip() else name\n", "    return name\n", NV),
     "IV8": (NZ, "        groups = [choice, [kv for kv in items if kv[0] not in {k for k, _v in choice}]] if choice else "
                 "[items]\n", "        groups = [items]\n", NV),
-    "IV9": (NZ, "                    if len(off) > 1:\n", "                    if False:\n", NV),
+    "IV9": (NZ, "                if len(off) > 1:\n", "                if False:\n", NV),
     "IV10": (NZ, '        t = float(sa.get("theta") or 0.0)\n', "        t = 0.0\n", NV),
     "IV11": (NZ, '    if name in ("polyline", "point"):\n', '    if name in ("point",):\n', NV),
     "IV12": (NZ, "        if cur is None or (beside and not cur[1]):\n", "        if cur is None:\n", NV),
-    "IV13": (IN, "            exams, exam_rec = load_exam_guard(lock_path, inc)\n",
-             '            exams, exam_rec = None, {"checked": False}\n', EX),
+    "IV13": (IN, "            exams, exam_rec = load_exam_guard(lock_path, inc, ",
+             '            exams, exam_rec = None, {"checked": False}\n            _x = (', EX),
     "IV14": (IN, "                        reason, match = (H10D_REASON if esplit == \"h10d\" else SEASON_REASON), em\n",
              "                        pass\n", EX),
     "IV15": (IN, "        if not keys or keys != got:\n", "        if False:\n", EX),
@@ -126,6 +128,9 @@ MUTANTS = {
     "IV39": (DSM, '        return bool(s.get("synced")) and (su is None or str(su) >= str(s["fetched_utc"]))\n',
              '        return bool(s.get("synced"))\n', RT),
     "IV40": (ST, '            s.pop("synced", None)\n', "            pass\n", RT),
+    "IV42": (IN, "    rec = _exam_season(Path(lock_path or C2.LOCK_PATH), idx, season)\n",
+             "    rec = _exam_season(Path(lock_path or C2.LOCK_PATH), idx, ())\n", EX),
+    "IV43": (CF, '  "v1_exams": [\n   "ood22",\n   "ood23"\n  ],\n', '  "v1_exams": [],\n', EX),
     "IV41": (ST, '            t = ((self.st.get("step_failures") or {}).get(key) or {}).get("utc")\n',
              "            t = None\n", RT),
 }
