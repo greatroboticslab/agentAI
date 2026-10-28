@@ -13,6 +13,16 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-28 — 2SeasonWeedDet8 is a repackage of our own test and exam images; the collector no longer refetches after a failed intake, and intake now refuses copies of every exam
+
+- **Where the data stands.** Unchanged: the stream's pool P_1 holds 7,493 images, and the target stays tens to hundreds of thousands of verified images. Accuracy unchanged: E3-B 0.8859 dev species mAP50-95, 0.0141 under 0.90 (sealed test 0.8950).
+- **What blocked collection.** The intake of zenodo_10762138 (2SeasonWeedDet8, 35.8 GB, fetched in 9.2 h) crashed in the VIA reader on 2026-10-28 (job 49959269, after 467 s). The ticker then asked a person to approve a second 35.8 GB fetch of the same files, and lane DATA waited on that request.
+- **What the dataset is.** All 6,664 images were hashed against splits v1 and v2. 6,662 are copies of protected or base images: cwd12 test 1,647, dev 511, train_core 2,576, every one of ood22's 1,915 images (plus one re-encoded), and 13 ood23 images. The other 2 are EXIF-rotated photographs the base builder had already dropped. It adds no training image.
+- **Change.** A failed intake of a fetch already on the cluster runs again and is never fetched again; the held second fetch is withdrawn by its requester, not denied. The VIA reader reads every VIA 1.x/2.x layout. Intake now also refuses copies of ood22, ood23 and the H10d hold-out, and EXIF-rotated images. 2SeasonWeedDet8 is listed as never fetched. Contract: `docs/CONTINUOUS_LOOP.md`, Amendment 2026-10-28.
+- **Also found.** One photograph is in both season exams (ood22__20221008_iPhoneSE_YL_2, ood23__20230810_HTRC_iPhone13_BD_29), and 13 ood23 images appear in the lab's 2022 data; 2 sampled ood22 images lack boxes (PricklySida, CutleafGroundcherry) that the lab's later annotation has. These bear on how the season hold-out claims are read. The 264,430 committed intake rows carry no EXIF rotation and copy no ood22/ood23 image.
+- **Verified.** ⟨VERIFIED_RL⟩
+- **Next.** After the deploy the ticker withdraws the second fetch, re-runs the intake, which closes the source before reading any image, and moves lane DATA to the next ranked source.
+
 ## 2026-10-27 — The label audit now judges stream increments: the four data-blamed increments' labels are at or below the trusted baseline
 
 - **Where the data stands.** Unchanged: the stream's pool P_1 holds 7,493 images, and the target stays tens to hundreds of thousands of verified images. Accuracy unchanged: E3-B 0.8859 dev species mAP50-95, 0.0141 under 0.90 (sealed test 0.8950).

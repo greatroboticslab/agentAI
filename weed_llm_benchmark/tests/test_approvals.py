@@ -143,6 +143,60 @@ class TestTheRecord(Base):
         self.assertEqual(A.pending("weed", root=self.root), [])
 
 
+class TestWithdrawal(Base):
+    """A requester takes back its own pending request (2026-10-28); it is no
+    decision, so nothing is approved or denied."""
+
+    def test_the_requester_withdraws_its_pending_request(self):
+        item = self.propose()["item"]
+        r = A.withdraw("weed", item["id"], "tier1:deepseek-v4-flash", "no longer wanted", self.t + 1,
+                       root=self.root)
+        self.assertTrue(r["ok"], r.get("reason"))
+        got = A.state("weed", root=self.root)[item["id"]]
+        self.assertEqual(got["status"], "withdrawn")
+        self.assertEqual(got["withdrawn_by"], "tier1:deepseek-v4-flash")
+        self.assertEqual(got["withdrawal_reason"], "no longer wanted")
+        self.assertIsNone(got.get("decided_by"))
+        self.assertEqual(A.pending("weed", root=self.root), [])
+        self.assertEqual(A.awaiting_execution("weed", root=self.root), [])
+
+    def test_only_the_requester_and_only_with_a_reason(self):
+        item = self.propose()["item"]
+        for actor in ("tier0:gemma4", "human:harry", "", None):
+            self.assertFalse(A.withdraw("weed", item["id"], actor, "why", self.t + 1, root=self.root)["ok"], actor)
+        self.assertFalse(A.withdraw("weed", item["id"], "tier1:deepseek-v4-flash", " ", self.t + 1,
+                                    root=self.root)["ok"])
+        self.assertEqual(A.state("weed", root=self.root)[item["id"]]["status"], "pending")
+        self.assertEqual(len(A.read("weed", root=self.root)), 1)
+
+    def test_a_settled_item_is_never_withdrawn(self):
+        item = self.propose()["item"]
+        A.decide("weed", item["id"], "deny", "human:harry", "no", self.t + 1, root=self.root)
+        r = A.withdraw("weed", item["id"], "tier1:deepseek-v4-flash", "late", self.t + 2, root=self.root)
+        self.assertFalse(r["ok"])
+        self.assertEqual(A.state("weed", root=self.root)[item["id"]]["status"], "denied")
+        self.assertEqual(len(A.read("weed", root=self.root)), 2)
+
+    def test_a_ruling_after_a_withdrawal_is_an_attempt(self):
+        item = self.propose()["item"]
+        A.withdraw("weed", item["id"], "tier1:deepseek-v4-flash", "no longer wanted", self.t + 1, root=self.root)
+        r = A.decide("weed", item["id"], "approve", "human:harry", "go", self.t + 2, root=self.root)
+        self.assertFalse(r["ok"])
+        self.assertIn("withdrawn", r["reason"])
+        got = A.state("weed", root=self.root)[item["id"]]
+        self.assertEqual(got["status"], "withdrawn")
+        self.assertEqual(len(got["attempts"]), 1)
+
+    def test_a_withdrawal_line_by_another_actor_is_an_attempt(self):
+        """A line written by hand for another actor does not withdraw anything."""
+        item = self.propose()["item"]
+        A._append(A.path("weed", root=self.root), {"kind": "withdrawal", "id": item["id"], "ts": self.t + 1,
+                                                   "withdrawn_by": "tier0:gemma4", "reason": "x"})
+        got = A.state("weed", root=self.root)[item["id"]]
+        self.assertEqual(got["status"], "pending")
+        self.assertEqual(len(got["attempts"]), 1)
+
+
 class TestAgainstThePolicyTable(Base):
 
     def test_every_risk_the_queue_accepts_is_one_policy_declares(self):

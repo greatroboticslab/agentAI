@@ -52,6 +52,17 @@ section d); neither changes what `propose` or `decide` do.
 
 `decide()` takes the same lock for its read-check-append, so a person's
 ruling and a grant on the same item cannot both be told they won.
+
+A third record kind was added on 2026-10-28:
+
+* **withdrawal** -- a requester takes back its own request while it is still
+  pending, because what it asked for is no longer wanted (the INC stream filed
+  a second fetch of a source whose first fetch was complete on the cluster; the
+  next step is that fetch's intake). It is not a decision: nothing is approved
+  or denied, so a denial's consequences (the stream closes a source whose
+  fetch a person denied) do not follow. Only the item's own requester may
+  withdraw it, only while it is pending, and with a reason; a person's later
+  ruling on a withdrawn item is recorded as an attempt, as on any settled item.
 """
 
 import json
@@ -65,8 +76,8 @@ except ImportError:                     # not on the lab or the cluster; no lock
     fcntl = None
 
 DEFAULT_BASE_DIR = "results/framework/_brain"
-STATUSES = ("pending", "approved", "denied")
-TERMINAL = ("approved", "denied")
+STATUSES = ("pending", "approved", "denied", "withdrawn")
+TERMINAL = ("approved", "denied", "withdrawn")
 
 # Actors that may record an approve-within-envelope grant. Code, not data: a
 # config that could add a name here could grant itself R3 authority.
@@ -150,7 +161,7 @@ def envelope_scope(item):
     if not isinstance(item, dict):
         return "no such approval item"
     if item.get("status") != "pending":
-        return "already %s by %s" % (item.get("status"), item.get("decided_by"))
+        return "already %s by %s" % (item.get("status"), item.get("decided_by") or item.get("withdrawn_by"))
     if str(item.get("risk") or "").upper() != "R3":
         return "the envelope covers R3 builds only; this item is %s" % item.get("risk")
     if item.get("action") not in ENVELOPE_ACTIONS:
@@ -229,6 +240,15 @@ def state(domain, base_dir=None, root=None):
             item = items.get(rid)
             if item is not None:
                 _fold_grant(item, rec)
+        elif kind == "withdrawal":
+            item = items.get(rid)
+            if item is None:
+                continue
+            if item.get("status") != "pending" or rec.get("withdrawn_by") != item.get("requested_by"):
+                item.setdefault("attempts", []).append(rec)
+                continue
+            item.update(status="withdrawn", withdrawn_by=rec.get("withdrawn_by"), withdrawn_at=rec.get("ts"),
+                        withdrawal_reason=rec.get("reason"))
         elif kind == "executed":
             item = items.get(rid)
             if item is not None:
@@ -305,10 +325,41 @@ def decide(domain, item_id, decision, decided_by, reason, ts,
                        "decided_by": actor, "reason": reason, "superseded": True}
                 _append(p, rec)
                 return {"ok": False, "reason": "already %s by %s; the attempt is recorded"
-                                               % (item["status"], item.get("decided_by"))}
+                                               % (item["status"], item.get("decided_by") or item.get("withdrawn_by"))}
             rec = {"kind": "decision", "id": item_id, "ts": ts,
                    "decision": "approved" if decision == "approve" else "denied",
                    "decided_by": actor, "reason": reason}
+            if not _append(p, rec):
+                return {"ok": False, "reason": "the approval log could not be written"}
+    except OSError as e:
+        return {"ok": False, "reason": "the approval log could not be locked: %s" % e}
+    return {"ok": True, "item": state(domain, base_dir, root).get(item_id)}
+
+
+def withdraw(domain, item_id, withdrawn_by, reason, ts, base_dir=None, root=None):
+    """Take back a pending request: only its own requester may, only while
+    it is pending, and with a reason (module docstring, "withdrawal"). Not a
+    decision; a settled or withdrawn item refuses, nothing written."""
+    actor = str(withdrawn_by or "")
+    if not actor.strip():
+        return {"ok": False, "reason": "a withdrawal with no actor cannot be audited"}
+    if not str(reason or "").strip():
+        return {"ok": False, "reason": "a withdrawal with no reason is not a record"}
+    p = path(domain, base_dir, root)
+    if not os.path.exists(p):
+        return {"ok": False, "reason": "no such approval item"}
+    try:
+        with _LogLock(p):
+            item = state(domain, base_dir, root).get(item_id)
+            if item is None:
+                return {"ok": False, "reason": "no such approval item"}
+            if item.get("status") != "pending":
+                return {"ok": False, "reason": "item is %s, not pending; only a pending request is withdrawn"
+                                               % item.get("status")}
+            if item.get("requested_by") != actor:
+                return {"ok": False, "reason": "only the requester (%r) withdraws its request, not %r"
+                                               % (item.get("requested_by"), actor)}
+            rec = {"kind": "withdrawal", "id": item_id, "ts": ts, "withdrawn_by": actor, "reason": reason}
             if not _append(p, rec):
                 return {"ok": False, "reason": "the approval log could not be written"}
     except OSError as e:

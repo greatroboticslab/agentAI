@@ -1,0 +1,4763 @@
+{
+ "approval_rows": [
+  {
+   "action": "inc_stream_collect_lab",
+   "context": {
+    "argv": [
+     "python",
+     "-m",
+     "weed_optimizer_framework.tools.collect",
+     "fetch",
+     "--source",
+     "zenodo_10762138",
+     "--max-bytes",
+     "35829729400",
+     "--out",
+     "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/"
+    ],
+    "budget_at_filing": {
+     "committed_su": 0.0,
+     "daily_remaining_su": null,
+     "envelope_su": 1000.0,
+     "remaining_su": 388.730662,
+     "spent_su": 611.269338
+    },
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "cites": [
+     {
+      "artifact": "stream/weed_stream_v1_fork1364_fork2728/queue_summary.json",
+      "line": null,
+      "pointer": "/eligible/images",
+      "value": 1487
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/M",
+      "value": 2728
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/lanes/DATA",
+      "value": {
+       "busy": false,
+       "half_cadence": false,
+       "hold": null,
+       "phase": "IDLE"
+      }
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/candidates/373/id",
+      "value": "zenodo_10762138"
+     }
+    ],
+    "est_su": 0.0,
+    "lever": "L16L",
+    "meta_params": {
+     "est_gpu_hours": 0.0
+    },
+    "parent_exp": null,
+    "proposal_id": "443791333d0fd1138b8d95ee40d4dfc1",
+    "proposed_by": "round-scheduler:inc-autopilot",
+    "trigger": [
+     "D20"
+    ]
+   },
+   "domain": "weed",
+   "est_su": 0.0,
+   "id": "ap-1793187344-83572915",
+   "kind": "request",
+   "params": {
+    "max_bytes": 35829729400,
+    "out": "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/",
+    "source": "zenodo_10762138"
+   },
+   "reason": "success: As L16, then a verified sync to the cluster. (lever L16L; trigger D20; est 0 SU of 388.7 SU left in the campaign envelope)",
+   "requested_by": "round-scheduler:inc-autopilot",
+   "review_id": null,
+   "risk": "R2",
+   "ts": 1793187344.0121827
+  }
+ ],
+ "attempts": {
+  "L16I:02a8ed6176ea": 1
+ },
+ "format": "test-fixture/intake-via-live/1",
+ "lane_DATA": {
+  "diag_hold": null,
+  "fail_sources": [],
+  "fails": 0,
+  "half": false,
+  "hold": null,
+  "hold_utc": null,
+  "item": {
+   "approval_id": "ap-1793187344-83572915",
+   "attempt": 0,
+   "diagnoses": [
+    {
+     "cites": [
+      {
+       "artifact": "stream/weed_stream_v1_fork1364_fork2728/queue_summary.json",
+       "line": null,
+       "pointer": "/eligible/images",
+       "value": 1487
+      },
+      {
+       "artifact": "campaign/context.json",
+       "line": null,
+       "pointer": "/M",
+       "value": 2728
+      },
+      {
+       "artifact": "campaign/context.json",
+       "line": null,
+       "pointer": "/lanes/DATA",
+       "value": {
+        "busy": false,
+        "half_cadence": false,
+        "hold": null,
+        "phase": "IDLE"
+       }
+      },
+      {
+       "artifact": "campaign/context.json",
+       "line": null,
+       "pointer": "/candidates/373/id",
+       "value": "zenodo_10762138"
+      }
+     ],
+     "detail": {
+      "Q": 1487,
+      "classes": [
+       "CutleafGroundcherry",
+       "PricklySida",
+       "Sicklepod"
+      ],
+      "deficit": [],
+      "low_water": 5456,
+      "propose": {
+       "bytes": 35829729400,
+       "known_item": false,
+       "lever": "L16",
+       "placement": "lab",
+       "source": "zenodo_10762138"
+      },
+      "ranked": [
+       {
+        "score": 13.954891884,
+        "source": "zenodo_10762138"
+       },
+       {
+        "score": 7794.790236582,
+        "source": "gh_geezacoleman__palmer_detection"
+       }
+      ],
+      "review": [
+       {
+        "index": 0,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_billygrahamram__palmprescriptionmap"
+       },
+       {
+        "index": 1,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_cesarticonabr__trichoderma"
+       },
+       {
+        "index": 2,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_emantzoo__palmer_amaranth_analysis"
+       },
+       {
+        "index": 4,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_hbrackenridge__amaranthus"
+       },
+       {
+        "index": 5,
+        "reasons": [
+         "licence unknown",
+         "collector: licence_unresolved"
+        ],
+        "source": "gh_ikajdan__palmer_amaranth_detection"
+       },
+       {
+        "index": 6,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_jkreinz__amaranthus_tuberculatus_pnas2019"
+       },
+       {
+        "index": 7,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_kadir_cimen__amaranthus_model"
+       },
+       {
+        "index": 8,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_knolan07__amaranthus_rnaseq_viability"
+       },
+       {
+        "index": 9,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_maxwelco__ppo_palmer_ne"
+       },
+       {
+        "index": 10,
+        "reasons": [
+         "licence unknown",
+         "collector: licence_unresolved"
+        ],
+        "source": "gh_mrj65__yolov8m_on_pags8_dataset"
+       },
+       {
+        "index": 11,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "gh_rishabhsingh1_ksu__rna_seq_palmer_amaranth"
+       },
+       {
+        "index": 12,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "gh_scominelli__amaranthus_transpiration_greenhouse"
+       },
+       {
+        "index": 14,
+        "reasons": [
+         "licence unknown",
+         "image-level labels only",
+         "missing credentials (card X16)",
+         "collector: credentials_missing",
+         "collector: image_level_only",
+         "collector: licence_unresolved"
+        ],
+        "source": "kg_yuzhenlu__cottonweedid15"
+       },
+       {
+        "index": 16,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_28jgtynrb4"
+       },
+       {
+        "index": 17,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_2kp6thjtd5"
+       },
+       {
+        "index": 18,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_2pdwp5xnmv"
+       },
+       {
+        "index": 19,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_2pxsc4f5kb"
+       },
+       {
+        "index": 20,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_2stvd55h44"
+       },
+       {
+        "index": 21,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_344hxx5rkf"
+       },
+       {
+        "index": 22,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_369cky7n39"
+       },
+       {
+        "index": 23,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_3cgnr5h839"
+       },
+       {
+        "index": 24,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_3pn2rnv2wg"
+       },
+       {
+        "index": 25,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_3xd9n7jpc8"
+       },
+       {
+        "index": 26,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_462s4m8w8k"
+       },
+       {
+        "index": 27,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_59ns8h28rr"
+       },
+       {
+        "index": 28,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_5p4ygjwnd6"
+       },
+       {
+        "index": 29,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_5s6n6tp2g9"
+       },
+       {
+        "index": 30,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_6572d94szh"
+       },
+       {
+        "index": 31,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_6g9zhgknn2"
+       },
+       {
+        "index": 32,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_6j5pxgf437"
+       },
+       {
+        "index": 33,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_6nc2sbsphs"
+       },
+       {
+        "index": 34,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_787mkh2kjc"
+       },
+       {
+        "index": 35,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_7sk25cpjz6"
+       },
+       {
+        "index": 36,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_7w7j84x77s"
+       },
+       {
+        "index": 37,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_7wpcv7kp6f"
+       },
+       {
+        "index": 38,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_8h3s6jkyff"
+       },
+       {
+        "index": 39,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_9c7crxrvmf"
+       },
+       {
+        "index": 40,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_9m2mnnkk42"
+       },
+       {
+        "index": 41,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_9r73y2rmyp"
+       },
+       {
+        "index": 42,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_9vcctz2yp8"
+       },
+       {
+        "index": 43,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_b37bbk6vyj"
+       },
+       {
+        "index": 44,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_b6cyxcgkv6"
+       },
+       {
+        "index": 45,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_bpfd9cns5g"
+       },
+       {
+        "index": 46,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_bt4mp7jvx3"
+       },
+       {
+        "index": 47,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_bw7jvhhd35"
+       },
+       {
+        "index": 48,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "image-level labels only",
+         "collector: image_level_only",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_c7dj4pwhcv"
+       },
+       {
+        "index": 49,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_ch7b5gkvmc"
+       },
+       {
+        "index": 50,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_cjkffgtnyk"
+       },
+       {
+        "index": 51,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_cjvxwdzsh7"
+       },
+       {
+        "index": 52,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_cvh7574hwj"
+       },
+       {
+        "index": 55,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_djd85rr6z9"
+       },
+       {
+        "index": 56,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_dkg3b6vz65"
+       },
+       {
+        "index": 57,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_dmhhfw2yzt"
+       },
+       {
+        "index": 58,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_dyjchjbrh7"
+       },
+       {
+        "index": 59,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_f47pm7rwt3"
+       },
+       {
+        "index": 61,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_frmpk6nkxf"
+       },
+       {
+        "index": 62,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_g3vxppc8k4"
+       },
+       {
+        "index": 63,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_gnwy7nzpnt"
+       },
+       {
+        "index": 64,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_gt7xdbs3kt"
+       },
+       {
+        "index": 65,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_h7bvnhz28x"
+       },
+       {
+        "index": 66,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_h85rr49y6s"
+       },
+       {
+        "index": 67,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_h99rgc5nk7"
+       },
+       {
+        "index": 68,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_hm88jzvsvn"
+       },
+       {
+        "index": 69,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_ht4x2j7ry9"
+       },
+       {
+        "index": 70,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_hxh8kd3snj"
+       },
+       {
+        "index": 71,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_hxrvf9cpkx"
+       },
+       {
+        "index": 72,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_hxtcntz9jr"
+       },
+       {
+        "index": 73,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_hzngrz8zv7"
+       },
+       {
+        "index": 74,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_j46hhp4yrv"
+       },
+       {
+        "index": 75,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_jg3f5d6n3b"
+       },
+       {
+        "index": 76,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_jgrn775ff9"
+       },
+       {
+        "index": 77,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_jgt7ghdmg5"
+       },
+       {
+        "index": 78,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_jjbfcckrsp"
+       },
+       {
+        "index": 79,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_k9xwb5hyzn"
+       },
+       {
+        "index": 80,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_ksdwxdwtxg"
+       },
+       {
+        "index": 81,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_ksfnxmszns"
+       },
+       {
+        "index": 82,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_ksj8gyymj3"
+       },
+       {
+        "index": 83,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_kvzmgjhv95"
+       },
+       {
+        "index": 84,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_kwyz4gby2k"
+       },
+       {
+        "index": 85,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_m4h6zdsh79"
+       },
+       {
+        "index": 86,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_mf48nrdf55"
+       },
+       {
+        "index": 87,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_mmp87df9ct"
+       },
+       {
+        "index": 88,
+        "reasons": [
+         "collector: not_fetchable"
+        ],
+        "source": "mendeley_mthv4ppwyw"
+       },
+       {
+        "index": 89,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_n78zj449tv"
+       },
+       {
+        "index": 90,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_n7nbhmcchh"
+       },
+       {
+        "index": 91,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_nxv3h8kszp"
+       },
+       {
+        "index": 92,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_nymmw3955c"
+       },
+       {
+        "index": 93,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_p3dhzyhvnk"
+       },
+       {
+        "index": 94,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_phsmy7kpy9"
+       },
+       {
+        "index": 95,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_ptt9g259fh"
+       },
+       {
+        "index": 96,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_rc92z3cjrv"
+       },
+       {
+        "index": 97,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_rp73yg93n8"
+       },
+       {
+        "index": 98,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_rrs6y7xbg5"
+       },
+       {
+        "index": 99,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_rt92rjrdgf"
+       },
+       {
+        "index": 100,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_rtx9ngb68j"
+       },
+       {
+        "index": 101,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_s42kpg8h37"
+       },
+       {
+        "index": 102,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_s9v495y83j"
+       },
+       {
+        "index": 103,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_stm3cb6y7r"
+       },
+       {
+        "index": 104,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_swrwmfy6tg"
+       },
+       {
+        "index": 105,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_t42j85xn68"
+       },
+       {
+        "index": 106,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_t8jsndsmwd"
+       },
+       {
+        "index": 107,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_v5f4g7n53z"
+       },
+       {
+        "index": 108,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_v8673h6y98"
+       },
+       {
+        "index": 109,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "image-level labels only",
+         "collector: image_level_only",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_vzt878hwdn"
+       },
+       {
+        "index": 110,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_vzx64zbkny"
+       },
+       {
+        "index": 111,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_w427ks4wvy"
+       },
+       {
+        "index": 112,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_w7bgjcxbxb"
+       },
+       {
+        "index": 113,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_wbj8fm8p8n"
+       },
+       {
+        "index": 114,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_xczzcyjd69"
+       },
+       {
+        "index": 115,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_xgg8xcscr5"
+       },
+       {
+        "index": 116,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_xp73238s9p"
+       },
+       {
+        "index": 117,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_xzvdkhr4bg"
+       },
+       {
+        "index": 118,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_yvbwg5sjg2"
+       },
+       {
+        "index": 119,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_zfv4jj7855"
+       },
+       {
+        "index": 120,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "mendeley_zjwvrbtbyt"
+       },
+       {
+        "index": 121,
+        "reasons": [
+         "licence unknown",
+         "image-level labels only",
+         "a source of an evaluation lab without the copy scan"
+        ],
+        "source": "ndsu_classification_sets"
+       },
+       {
+        "index": 122,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "image-level labels only",
+         "collector: image_level_only",
+         "collector: no_target_class"
+        ],
+        "source": "punlalit19__waterhemp_greenhouse_images"
+       },
+       {
+        "index": 123,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_888-psk7o__240505"
+       },
+       {
+        "index": 124,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_a-programlama__ag-programlama"
+       },
+       {
+        "index": 125,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_abdulrahman-eidhah__drone-detection-colab-with-tall"
+       },
+       {
+        "index": 127,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_aden-ugdkx__peaunt1"
+       },
+       {
+        "index": 129,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_after-defense-vgg16__og-annot-for-dl-only"
+       },
+       {
+        "index": 130,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_agaymanto__cosecha-de-aguaymanto"
+       },
+       {
+        "index": 131,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_agaymanto__physalis-peruviana"
+       },
+       {
+        "index": 132,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_aguaymanto__proyecto-aguaymanto"
+       },
+       {
+        "index": 133,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_akshay-r-x26rd__weed-xwtdg"
+       },
+       {
+        "index": 134,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_aleksandra-chiginceva-weh3j__my-project-p0vzx"
+       },
+       {
+        "index": 136,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_alexander-jtyc5__cactus-8ph8i"
+       },
+       {
+        "index": 137,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_alvansatoru15-gmail-com__detection-plant-wbaaf"
+       },
+       {
+        "index": 139,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_an-x8gyy__okra-fruit-detection"
+       },
+       {
+        "index": 140,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_anade-gobel__sida-caala"
+       },
+       {
+        "index": 141,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_animal-ihvth__wild-cpbq1"
+       },
+       {
+        "index": 142,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_aston-hackathon__pascal-rmzeo"
+       },
+       {
+        "index": 143,
+        "reasons": [
+         "licence unknown",
+         "collector: licence_unresolved"
+        ],
+        "source": "rf_awais-bpxqc__cigarette-fsrjj"
+       },
+       {
+        "index": 144,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_awarri-y7314__wild-wzzhz"
+       },
+       {
+        "index": 145,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_ayu8shvision__ayushvision-plant"
+       },
+       {
+        "index": 146,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_b6534257lab11__lab11-n7y1e"
+       },
+       {
+        "index": 147,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_beetles-06dmp__test-combined-jnvvn"
+       },
+       {
+        "index": 148,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_beetles__sony-beetles-images640-filtered"
+       },
+       {
+        "index": 149,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_bitki-ialon__son-yk7w2"
+       },
+       {
+        "index": 150,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_blaind__blaind"
+       },
+       {
+        "index": 151,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_bryan-pratama-putra__asset-melon-3bwe9"
+       },
+       {
+        "index": 152,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_candy-abygy__elon-candy"
+       },
+       {
+        "index": 153,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_case1-dmyty__eating-drinking-mobile-smoking"
+       },
+       {
+        "index": 154,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_cbait__drugs-qnvjt"
+       },
+       {
+        "index": 155,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_cbait__new-drugs"
+       },
+       {
+        "index": 156,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_chestnut-detection__burr-detection-tile-review-2tr4w"
+       },
+       {
+        "index": 157,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_cigarette-detection__cigarette-detection-4yphm"
+       },
+       {
+        "index": 158,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_cigarette-lqptw__cigarette-gpofi"
+       },
+       {
+        "index": 159,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_computergraphics__cg-houseobjects"
+       },
+       {
+        "index": 161,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_curry__tomato-mcxrq"
+       },
+       {
+        "index": 162,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_daniel-sydox__aguaymanto"
+       },
+       {
+        "index": 163,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_deep-learning-minor-project__real-time-weed-detection1"
+       },
+       {
+        "index": 164,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_demo-b8vox__object-detection-uas1g"
+       },
+       {
+        "index": 165,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_demo-zh9xo__object-el701"
+       },
+       {
+        "index": 166,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_deteccion1__colors-and-shapes"
+       },
+       {
+        "index": 168,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_diah-4ztxp__tomat-jkl5c"
+       },
+       {
+        "index": 169,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_dmi-devs-gozrv__prickly-heat-yt7s8"
+       },
+       {
+        "index": 170,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_e-n__piggies-v2rix"
+       },
+       {
+        "index": 171,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_ec-inno__amaranthus-and-sp-leaf"
+       },
+       {
+        "index": 173,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_evg-iqwfy__my-first-project-tgrlp"
+       },
+       {
+        "index": 174,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_farid-ygtfe__negatif-durian"
+       },
+       {
+        "index": 175,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_fearless__ee494-wce1q"
+       },
+       {
+        "index": 176,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_fffff-6hfsg__fffff-gjqzy"
+       },
+       {
+        "index": 178,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_firstone-15w0w__mugs-counting"
+       },
+       {
+        "index": 181,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_football-ai-xg__flower-detection-online-source"
+       },
+       {
+        "index": 182,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_fruit-dsna0__tomato-5yhlt"
+       },
+       {
+        "index": 183,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_fruits-and-veggies__tomato-tskho"
+       },
+       {
+        "index": 184,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_gent-lab__tssm-detection-instance-segmentation"
+       },
+       {
+        "index": 185,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_getting-started-zia6y__testing-z4aus"
+       },
+       {
+        "index": 186,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_girija-b-wuyx3__medileaf"
+       },
+       {
+        "index": 187,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_grass-xfg4j__tall-grass-segmentation"
+       },
+       {
+        "index": 188,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_green-amaranthus__green-amaranthus"
+       },
+       {
+        "index": 189,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_gunsbase__hibrid"
+       },
+       {
+        "index": 191,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_hair-xaf6w__parinya-sida"
+       },
+       {
+        "index": 192,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_heo-sion__prickly-waterlily"
+       },
+       {
+        "index": 198,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_idp-project-qpttb__wild-pgcds"
+       },
+       {
+        "index": 199,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_image-detection-project-gaqmm__fashion-cropped"
+       },
+       {
+        "index": 200,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_imageclassification-xlsex__my-first-project-wagy2"
+       },
+       {
+        "index": 201,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_iona__coffee-cup-yidms"
+       },
+       {
+        "index": 202,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_jae-hwan__cigar-0rsde"
+       },
+       {
+        "index": 203,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_jaya-dhruw-s-workspace__tomato-flower-3awgh"
+       },
+       {
+        "index": 204,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_jeff-shen__cotton-top-mix"
+       },
+       {
+        "index": 205,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_jlcf85__fusariumini"
+       },
+       {
+        "index": 206,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_joys__classification2-3esrn"
+       },
+       {
+        "index": 207,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_kmitl-kehnl__abyeyamook-detection-g3iqo"
+       },
+       {
+        "index": 208,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_labtest-kzcsf__mask-vwcl8"
+       },
+       {
+        "index": 210,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_leaf-eweqd__leaf-1hdti"
+       },
+       {
+        "index": 211,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_leaf-jd11r__leaftt"
+       },
+       {
+        "index": 212,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_leaf-u2qug__leaf-projects"
+       },
+       {
+        "index": 213,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_leafdetection-yza4r__tree-classification1"
+       },
+       {
+        "index": 214,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_lekha-dhhns__wild-tghxs"
+       },
+       {
+        "index": 215,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_liyonnard__amaranth-pest-disease"
+       },
+       {
+        "index": 216,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_lkz1522279718-163-com__treedata-jual9"
+       },
+       {
+        "index": 217,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_lol-kmzk7__mahfujul-lol"
+       },
+       {
+        "index": 220,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_maize-bwleh__croped-mask-mask"
+       },
+       {
+        "index": 221,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_mcs-vtk03__pilila-segmentation-v4"
+       },
+       {
+        "index": 224,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_moe-howard__coffee-cups-xsj1m"
+       },
+       {
+        "index": 226,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_moment__huleca"
+       },
+       {
+        "index": 227,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_mriimage__mri-seg-health"
+       },
+       {
+        "index": 231,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_napaskanoks__hyrax-ladybug-starfish"
+       },
+       {
+        "index": 232,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_nematode-detection__infection-mg"
+       },
+       {
+        "index": 233,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_new-workspace-cnxcn__senna-siamea"
+       },
+       {
+        "index": 235,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_new-workspace-h6g69__sm1"
+       },
+       {
+        "index": 236,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_newml-zjn3i__img27-tanner-s-cassia-leaf"
+       },
+       {
+        "index": 237,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_nhm-5-dv2401clcb__nhom-5-dv2401clcb"
+       },
+       {
+        "index": 238,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_nhom-5-ttnt-ca4-dv2401clca__gan-nhan-cho-trong-hinh-anh"
+       },
+       {
+        "index": 239,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_nishivips__metal-defect-detecton-tjixw"
+       },
+       {
+        "index": 240,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_noname-dcx4d__tashhanov"
+       },
+       {
+        "index": 242,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_objdetect-m76ur__melon-flower-detect"
+       },
+       {
+        "index": 243,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_object-detection-vobsy__multi-objek"
+       },
+       {
+        "index": 244,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_object-qf9bc__simis-detection"
+       },
+       {
+        "index": 245,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_objectdetection-q3o0b__none-od"
+       },
+       {
+        "index": 247,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_otavio-souza-wq69t__wild-ho9er"
+       },
+       {
+        "index": 249,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_pappus-workspace__physalis-detection"
+       },
+       {
+        "index": 250,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_physalisperuviana-mrkwr__enfermedad-fruto"
+       },
+       {
+        "index": 251,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_physalisperuviana-mrkwr__physalis-peruviana-hojas-frutas"
+       },
+       {
+        "index": 252,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_physalisperuviana-mrkwr__physalis-peruviana-madurez"
+       },
+       {
+        "index": 254,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_plantclassification-emrc6__qa-furit-orange"
+       },
+       {
+        "index": 255,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_plantclassification-emrc6__qa-furit-strawberry"
+       },
+       {
+        "index": 256,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_pongsakorn-samothai-f0x4l__wrist-lateral-radiograph-pose"
+       },
+       {
+        "index": 257,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_pouya-hrcrb__pesil-splitted"
+       },
+       {
+        "index": 259,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_proje-k3lw2__remkae"
+       },
+       {
+        "index": 260,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_project-5lwhl__weed-detection-llj2n"
+       },
+       {
+        "index": 261,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_project-6lvep__wild-uixvz"
+       },
+       {
+        "index": 264,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_projects-amqlr__image-forgery-detection-qdnou"
+       },
+       {
+        "index": 265,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_proyecto-de-sistemas-expertos__clasificacion-ilyci"
+       },
+       {
+        "index": 266,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_pulgones__pulgones"
+       },
+       {
+        "index": 269,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_ravi-e8hze__netra-jshxx"
+       },
+       {
+        "index": 270,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_research-qekix__datura-stramonium"
+       },
+       {
+        "index": 271,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_research-qekix__physalis-angulata-1zz6y"
+       },
+       {
+        "index": 272,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_researchtest__caltech-256-grapes"
+       },
+       {
+        "index": 277,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_rifa__senna-hirsuta"
+       },
+       {
+        "index": 278,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_road-vegrq__n1-ljeyz"
+       },
+       {
+        "index": 285,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_rocks-m2zj9__rocks-v5"
+       },
+       {
+        "index": 286,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_ryandigzz-w0sj3__sus-images"
+       },
+       {
+        "index": 287,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_s-wy8xj__wild-z8jc3"
+       },
+       {
+        "index": 288,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_saim-bagut-m3qap__saim-basguts"
+       },
+       {
+        "index": 290,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_schu__kiosk-7jrzg"
+       },
+       {
+        "index": 291,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_segmentacion-iwaek__medicinal-plants"
+       },
+       {
+        "index": 292,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_seksan__yolov7-v2"
+       },
+       {
+        "index": 293,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_shiinaka__tomato-detection-q87hl"
+       },
+       {
+        "index": 294,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_sim-vs4dr__deneme3-710yc"
+       },
+       {
+        "index": 295,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_sistemas-expertos-upec-ag0b1__physalis-peruviana-5txqb"
+       },
+       {
+        "index": 296,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_sistemas-expertos-upec-b4tao__estado-de-frutos-nn"
+       },
+       {
+        "index": 297,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_smoking-bycpp__smoking-detection-8fgr8"
+       },
+       {
+        "index": 298,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_soukarya__soukarya1"
+       },
+       {
+        "index": 299,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_sp2-w9mrj__mugs-lmwae"
+       },
+       {
+        "index": 300,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_sr-jdm2s__cacao-ky4j8"
+       },
+       {
+        "index": 301,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_stv-8xjqc__object-g4zt0"
+       },
+       {
+        "index": 302,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_stvio__custom-workflow-single-label-classification-hihhv"
+       },
+       {
+        "index": 303,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_sumitha-karthikeyan__wild-hq6rr"
+       },
+       {
+        "index": 304,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_surendherredddy__my-first-project-s56x4"
+       },
+       {
+        "index": 306,
+        "reasons": [
+         "licence unknown",
+         "collector: licence_unresolved"
+        ],
+        "source": "rf_t-1-plc6m__ihjqt"
+       },
+       {
+        "index": 307,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_tanaman__tanaman"
+       },
+       {
+        "index": 309,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_test-8npjb__porcupine-detection"
+       },
+       {
+        "index": 310,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_test-i8oy9__go-xuws0"
+       },
+       {
+        "index": 311,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_test1234__tomato-xyz-fbtmu"
+       },
+       {
+        "index": 314,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_thiru-ejr4u__wild-qzkxh"
+       },
+       {
+        "index": 315,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_tim-4ijf0__damage-detection-0otvb"
+       },
+       {
+        "index": 316,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_tin-uie3o__lab07-xskgc"
+       },
+       {
+        "index": 317,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_tree-z4xct__ipr-rose-cactus"
+       },
+       {
+        "index": 319,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_uas-ml__uas-ml-bbydj"
+       },
+       {
+        "index": 320,
+        "reasons": [
+         "image-level labels only",
+         "collector: image_level_only"
+        ],
+        "source": "rf_uitvida1k__uit-vida-kcfyg"
+       },
+       {
+        "index": 323,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_uygulamas-workspace__wild-zspqb"
+       },
+       {
+        "index": 324,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_version2-it7g5__object-tk08l"
+       },
+       {
+        "index": 326,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_vit-hocio__okra-leafv1"
+       },
+       {
+        "index": 327,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_vitaliy-pak__some-pascal"
+       },
+       {
+        "index": 329,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_weedlabshinshutrue__20240803-05"
+       },
+       {
+        "index": 331,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_wild-animal-detection-g2xs9__wild-rwcpg"
+       },
+       {
+        "index": 332,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_wild-animal-detection-mc589__wild-qwqw1"
+       },
+       {
+        "index": 333,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_wild-m0pjq__wild-sugv5"
+       },
+       {
+        "index": 334,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_workspace-haksy__mallow-leaves"
+       },
+       {
+        "index": 335,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_workspace-oij6g__wild-rduz7"
+       },
+       {
+        "index": 337,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_yep-jtzsr__lai-manual"
+       },
+       {
+        "index": 338,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_yolo-plant-species__senna-alata"
+       },
+       {
+        "index": 339,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_yolo-project-ce03u__person-detection-vcwek"
+       },
+       {
+        "index": 340,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_yolo-rxc0m__d3uir"
+       },
+       {
+        "index": 341,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_yolo-t2dqq__yolo-jws9k"
+       },
+       {
+        "index": 342,
+        "reasons": [
+         "collector: no_target_class"
+        ],
+        "source": "rf_yolov5-buetb__animals-kkgf7"
+       },
+       {
+        "index": 343,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "rf_yolowildfire__wild-airwz"
+       },
+       {
+        "index": 357,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10069455"
+       },
+       {
+        "index": 358,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10215901"
+       },
+       {
+        "index": 359,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10219223"
+       },
+       {
+        "index": 360,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10221513"
+       },
+       {
+        "index": 361,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10230726"
+       },
+       {
+        "index": 362,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10255691"
+       },
+       {
+        "index": 363,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10274550"
+       },
+       {
+        "index": 364,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10282374"
+       },
+       {
+        "index": 365,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10306107"
+       },
+       {
+        "index": 366,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10322617"
+       },
+       {
+        "index": 367,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10328037"
+       },
+       {
+        "index": 368,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10338172"
+       },
+       {
+        "index": 369,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10343556"
+       },
+       {
+        "index": 370,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10357695"
+       },
+       {
+        "index": 371,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10365245"
+       },
+       {
+        "index": 372,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10596654"
+       },
+       {
+        "index": 374,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10793888"
+       },
+       {
+        "index": 375,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10795181"
+       },
+       {
+        "index": 376,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10805429"
+       },
+       {
+        "index": 377,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10853371"
+       },
+       {
+        "index": 378,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10906982"
+       },
+       {
+        "index": 379,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10957050"
+       },
+       {
+        "index": 380,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_10963326"
+       },
+       {
+        "index": 381,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_11048344"
+       },
+       {
+        "index": 382,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_11373251"
+       },
+       {
+        "index": 383,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_11655251"
+       },
+       {
+        "index": 384,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_12772944"
+       },
+       {
+        "index": 385,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_13386458"
+       },
+       {
+        "index": 386,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_13386902"
+       },
+       {
+        "index": 387,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_13890887"
+       },
+       {
+        "index": 388,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_13977261"
+       },
+       {
+        "index": 389,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_13977854"
+       },
+       {
+        "index": 390,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_13978501"
+       },
+       {
+        "index": 391,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_14538255"
+       },
+       {
+        "index": 392,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_14717873"
+       },
+       {
+        "index": 394,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_14906400"
+       },
+       {
+        "index": 395,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_14957554"
+       },
+       {
+        "index": 396,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15080493"
+       },
+       {
+        "index": 397,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15136334"
+       },
+       {
+        "index": 398,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15156059"
+       },
+       {
+        "index": 399,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15158305"
+       },
+       {
+        "index": 400,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15159182"
+       },
+       {
+        "index": 401,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15172285"
+       },
+       {
+        "index": 402,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15495973"
+       },
+       {
+        "index": 403,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15581422"
+       },
+       {
+        "index": 405,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_15875029"
+       },
+       {
+        "index": 406,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_16083355"
+       },
+       {
+        "index": 407,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_16090067"
+       },
+       {
+        "index": 408,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_16090529"
+       },
+       {
+        "index": 409,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_16091477"
+       },
+       {
+        "index": 410,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_16091876"
+       },
+       {
+        "index": 411,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_16092346"
+       },
+       {
+        "index": 412,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_16792882"
+       },
+       {
+        "index": 413,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_16842143"
+       },
+       {
+        "index": 414,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_17094810"
+       },
+       {
+        "index": 415,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_17398082"
+       },
+       {
+        "index": 416,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_17905739"
+       },
+       {
+        "index": 417,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_18240917"
+       },
+       {
+        "index": 418,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_18240971"
+       },
+       {
+        "index": 419,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_18311594"
+       },
+       {
+        "index": 420,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_18514486"
+       },
+       {
+        "index": 421,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_18613222"
+       },
+       {
+        "index": 422,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_190374"
+       },
+       {
+        "index": 423,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_19555969"
+       },
+       {
+        "index": 424,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_19656245"
+       },
+       {
+        "index": 425,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_19692300"
+       },
+       {
+        "index": 426,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_19743400"
+       },
+       {
+        "index": 427,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_19846186"
+       },
+       {
+        "index": 428,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_20011782"
+       },
+       {
+        "index": 429,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "over the 50 GB per-source cap",
+         "collector: no_target_class",
+         "collector: over_source_cap"
+        ],
+        "source": "zenodo_20148697"
+       },
+       {
+        "index": 430,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_20663123"
+       },
+       {
+        "index": 431,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21280659"
+       },
+       {
+        "index": 432,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21290842"
+       },
+       {
+        "index": 433,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21377232"
+       },
+       {
+        "index": 434,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21488378"
+       },
+       {
+        "index": 435,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21489851"
+       },
+       {
+        "index": 436,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21568143"
+       },
+       {
+        "index": 437,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21648104"
+       },
+       {
+        "index": 438,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21679267"
+       },
+       {
+        "index": 439,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21980652"
+       },
+       {
+        "index": 440,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_21993282"
+       },
+       {
+        "index": 442,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_22792219"
+       },
+       {
+        "index": 443,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_22793618"
+       },
+       {
+        "index": 444,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_22794579"
+       },
+       {
+        "index": 445,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_22799397"
+       },
+       {
+        "index": 446,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_23157550"
+       },
+       {
+        "index": 447,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_23184538"
+       },
+       {
+        "index": 448,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_2385441"
+       },
+       {
+        "index": 449,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_3571718"
+       },
+       {
+        "index": 450,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_3610997"
+       },
+       {
+        "index": 451,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_3611053"
+       },
+       {
+        "index": 452,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_3962195"
+       },
+       {
+        "index": 453,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_3962805"
+       },
+       {
+        "index": 454,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_3985126"
+       },
+       {
+        "index": 455,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4002721"
+       },
+       {
+        "index": 456,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4010856"
+       },
+       {
+        "index": 457,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4245075"
+       },
+       {
+        "index": 458,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4253000"
+       },
+       {
+        "index": 459,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4320023"
+       },
+       {
+        "index": 460,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4455821"
+       },
+       {
+        "index": 461,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4933987"
+       },
+       {
+        "index": 462,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4934737"
+       },
+       {
+        "index": 463,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4936595"
+       },
+       {
+        "index": 464,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4941014"
+       },
+       {
+        "index": 465,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4946447"
+       },
+       {
+        "index": 466,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4946984"
+       },
+       {
+        "index": 467,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4948919"
+       },
+       {
+        "index": 468,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4955105"
+       },
+       {
+        "index": 469,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4957985"
+       },
+       {
+        "index": 470,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4959731"
+       },
+       {
+        "index": 471,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4959903"
+       },
+       {
+        "index": 472,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4962099"
+       },
+       {
+        "index": 473,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4962210"
+       },
+       {
+        "index": 474,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4962314"
+       },
+       {
+        "index": 475,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4963210"
+       },
+       {
+        "index": 476,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4965806"
+       },
+       {
+        "index": 477,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4969827"
+       },
+       {
+        "index": 478,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4970849"
+       },
+       {
+        "index": 479,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4975089"
+       },
+       {
+        "index": 480,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4984819"
+       },
+       {
+        "index": 481,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4992190"
+       },
+       {
+        "index": 482,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4992338"
+       },
+       {
+        "index": 483,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4992870"
+       },
+       {
+        "index": 484,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4993748"
+       },
+       {
+        "index": 485,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4995943"
+       },
+       {
+        "index": 486,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4996130"
+       },
+       {
+        "index": 487,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4997868"
+       },
+       {
+        "index": 488,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4998359"
+       },
+       {
+        "index": 489,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4998431"
+       },
+       {
+        "index": 490,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4998616"
+       },
+       {
+        "index": 491,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_4999967"
+       },
+       {
+        "index": 492,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5001114"
+       },
+       {
+        "index": 493,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5001260"
+       },
+       {
+        "index": 494,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5002594"
+       },
+       {
+        "index": 495,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5003110"
+       },
+       {
+        "index": 496,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5004047"
+       },
+       {
+        "index": 497,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5008999"
+       },
+       {
+        "index": 498,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5012484"
+       },
+       {
+        "index": 499,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5017455"
+       },
+       {
+        "index": 500,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5017765"
+       },
+       {
+        "index": 501,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5018695"
+       },
+       {
+        "index": 502,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5106824"
+       },
+       {
+        "index": 503,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5336910"
+       },
+       {
+        "index": 504,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5515576"
+       },
+       {
+        "index": 505,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5532803"
+       },
+       {
+        "index": 506,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5703336"
+       },
+       {
+        "index": 507,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5745545"
+       },
+       {
+        "index": 508,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5761962"
+       },
+       {
+        "index": 509,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5856310"
+       },
+       {
+        "index": 510,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5905378"
+       },
+       {
+        "index": 511,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_5941675"
+       },
+       {
+        "index": 512,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6403359"
+       },
+       {
+        "index": 513,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6502780"
+       },
+       {
+        "index": 514,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6547494"
+       },
+       {
+        "index": 515,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6561175"
+       },
+       {
+        "index": 516,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6656903"
+       },
+       {
+        "index": 517,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6811678"
+       },
+       {
+        "index": 518,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6859209"
+       },
+       {
+        "index": 519,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6859248"
+       },
+       {
+        "index": 520,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6859262"
+       },
+       {
+        "index": 521,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_6859282"
+       },
+       {
+        "index": 522,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7056809"
+       },
+       {
+        "index": 523,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7119052"
+       },
+       {
+        "index": 524,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7131715"
+       },
+       {
+        "index": 525,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7134230"
+       },
+       {
+        "index": 526,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7139621"
+       },
+       {
+        "index": 527,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7139731"
+       },
+       {
+        "index": 528,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7139754"
+       },
+       {
+        "index": 529,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7199900"
+       },
+       {
+        "index": 530,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7225931"
+       },
+       {
+        "index": 531,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7349899"
+       },
+       {
+        "index": 532,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7512489"
+       },
+       {
+        "index": 534,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7551780"
+       },
+       {
+        "index": 535,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7602864"
+       },
+       {
+        "index": 536,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7820168"
+       },
+       {
+        "index": 537,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7862042"
+       },
+       {
+        "index": 538,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_7944665"
+       },
+       {
+        "index": 539,
+        "reasons": [
+         "licence unknown",
+         "no target class in its card or the taxonomy",
+         "collector: licence_unresolved",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_8035351"
+       },
+       {
+        "index": 540,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_8040666"
+       },
+       {
+        "index": 541,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_8073917"
+       },
+       {
+        "index": 542,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_8286126"
+       },
+       {
+        "index": 543,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_8286529"
+       },
+       {
+        "index": 544,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_835579"
+       },
+       {
+        "index": 545,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_8417027"
+       },
+       {
+        "index": 546,
+        "reasons": [
+         "no target class in its card or the taxonomy",
+         "collector: no_target_class"
+        ],
+        "source": "zenodo_8428384"
+       }
+      ],
+      "zero_estimate": {
+       "n": 50,
+       "sources": [
+        "rf_abubakar__diet-coke-tall-twwav",
+        "rf_adithya-buyz9__amaranthus-spinosus",
+        "rf_alex-ncoox__segmentacion-2-nx6ho",
+        "rf_amaranthus-hbuiw__amaranthus",
+        "rf_devs-workspace-tou4m__moong-3",
+        "rf_eqweqweq__crown-unlabelled-tall-vjlz1",
+        "rf_firetesting__tall",
+        "rf_floriano-canda-8gfrh__sida-caala-rt3rz",
+        "rf_flower-test__ubs-keypoint",
+        "rf_hackthon-nkacd__tassle-vmnzd",
+        "rf_hi-0aisx__hi-2-7hti8",
+        "rf_hossein-gyjmn__mint-qswdd",
+        "rf_hsi-gzliu__palmer-kfdv6",
+        "rf_huangjunyue__palmer-gwrsm",
+        "rf_hussnainmichael__diet-coke-tall",
+        "rf_laser-weeding__oxnard-pigweed",
+        "rf_lsuprecisionag__dlsoyweeds",
+        "rf_lsuprecisionag__dlsoyweeds-2",
+        "rf_ml-35ot7__img34-wild-amaranth-ywe66",
+        "rf_ml-a3dxu__img34-wild-amaranth"
+       ]
+      }
+     },
+     "exp": null,
+     "fired": true,
+     "id": "D20",
+     "levers": [
+      "L16"
+     ],
+     "name": "data_needed",
+     "severity": "info",
+     "summary": "Q 1487 < 5456 (2M) -> L16 on zenodo_10762138 (rank 13.95)"
+    }
+   ],
+   "filed_utc": "2026-10-28T11:35:43Z",
+   "lever": "L16L",
+   "proposal": {
+    "argv": [
+     "python",
+     "-m",
+     "weed_optimizer_framework.tools.collect",
+     "fetch",
+     "--source",
+     "zenodo_10762138",
+     "--max-bytes",
+     "35829729400",
+     "--out",
+     "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/"
+    ],
+    "attempt": 0,
+    "child_exp": null,
+    "cites": [
+     {
+      "artifact": "stream/weed_stream_v1_fork1364_fork2728/queue_summary.json",
+      "line": null,
+      "pointer": "/eligible/images",
+      "value": 1487
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/M",
+      "value": 2728
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/lanes/DATA",
+      "value": {
+       "busy": false,
+       "half_cadence": false,
+       "hold": null,
+       "phase": "IDLE"
+      }
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/candidates/373/id",
+      "value": "zenodo_10762138"
+     }
+    ],
+    "control": "As L16.",
+    "est_gpu_hours": 0.0,
+    "estimate": {
+     "estimator": "zero"
+    },
+    "falsifier": "As L16.",
+    "family": "L16",
+    "follow": "lab",
+    "id": "443791333d0fd1138b8d95ee40d4dfc1",
+    "lane": "DATA",
+    "lever": "L16L",
+    "lit": [],
+    "params": {
+     "max_bytes": 35829729400,
+     "out": "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/",
+     "source": "zenodo_10762138"
+    },
+    "parent_exp": null,
+    "policy_action": "inc_stream_collect_lab",
+    "proposed_by": "round-scheduler:inc-autopilot",
+    "risk": "R2",
+    "success": "As L16, then a verified sync to the cluster.",
+    "trigger": [
+     "D20"
+    ]
+   },
+   "since_utc": "2026-10-28T11:35:43Z",
+   "status": "filed",
+   "trigger": "D20"
+  },
+  "phase": "COLLECT",
+  "until_utc": null
+ },
+ "ledger": {
+  "path": "results/framework/_brain/weed/inc/inc_campaign.jsonl",
+  "sha256": "e5436ca9774ea7b9d8152b882bc0ceb619fa66a5aa262910eb6ecab198eafa63"
+ },
+ "ledger_rows": [
+  {
+   "line": 2845,
+   "row": {
+    "event": "diagnosed",
+    "fired": [
+     {
+      "code": null,
+      "levers": null,
+      "summary": "Q 1299 < 2728 (2M) -> L16 on zenodo_10762138 (rank 27.91)"
+     }
+    ],
+    "tick": 3573,
+    "utc": "2026-10-27T10:35:41Z"
+   }
+  },
+  {
+   "line": 2850,
+   "row": {
+    "event": "diagnosed",
+    "fired": [
+     {
+      "code": null,
+      "levers": null,
+      "summary": "Q 1299 < 2728 (2M) -> L16 on zenodo_10762138 (rank 27.91)"
+     }
+    ],
+    "tick": 3575,
+    "utc": "2026-10-27T10:55:41Z"
+   }
+  },
+  {
+   "line": 2855,
+   "row": {
+    "event": "diagnosed",
+    "fired": [
+     {
+      "code": null,
+      "levers": null,
+      "summary": "Q 1487 < 2728 (2M) -> L16 on zenodo_10762138 (rank 27.91)"
+     }
+    ],
+    "tick": 3578,
+    "utc": "2026-10-27T11:25:41Z"
+   }
+  },
+  {
+   "line": 2858,
+   "row": {
+    "action": "inc_stream_collect_lab",
+    "argv": [
+     "python",
+     "-m",
+     "weed_optimizer_framework.tools.collect",
+     "fetch",
+     "--source",
+     "zenodo_10762138",
+     "--max-bytes",
+     "35829729400",
+     "--out",
+     "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/"
+    ],
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "cites": [
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/eligible/images",
+      "value": 1487
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/M",
+      "value": 1364
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/lanes/DATA",
+      "value": {
+       "busy": false,
+       "half_cadence": false,
+       "hold": null,
+       "phase": "IDLE"
+      }
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/PalmerAmaranth",
+      "value": 2980
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/PricklySida",
+      "value": 1810
+     },
+     {
+      "artifact": "stream/weed_stream_v1_fork1364/queue_summary.json",
+      "line": null,
+      "pointer": "/consumed_last/Waterhemp",
+      "value": 666
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/candidates/373/id",
+      "value": "zenodo_10762138"
+     }
+    ],
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_gpu_hours": 0.0,
+    "event": "proposed",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "443791333d0fd1138b8d95ee40d4dfc1",
+    "risk": "R2",
+    "tick": 3578,
+    "trigger": [
+     "D20"
+    ],
+    "utc": "2026-10-27T11:25:41Z"
+   }
+  },
+  {
+   "line": 2890,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lab_job_finished",
+    "lab_job": "fetch_zenodo_10762138_669e542169",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "ok": true,
+    "rc": 0,
+    "seconds": 33159.08,
+    "tick": 3634,
+    "utc": "2026-10-27T20:45:42Z"
+   }
+  },
+  {
+   "line": 2892,
+   "row": {
+    "event": "diagnosed",
+    "fired": [
+     {
+      "code": null,
+      "levers": null,
+      "summary": "source zenodo_10762138 is fetched -> L16S"
+     }
+    ],
+    "tick": 3634,
+    "utc": "2026-10-27T20:45:42Z"
+   }
+  },
+  {
+   "line": 2893,
+   "row": {
+    "action": "inc_stream_sync",
+    "argv": null,
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "cites": [
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/sources/zenodo_10762138/status",
+      "value": "fetched"
+     }
+    ],
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_gpu_hours": 0.0,
+    "event": "proposed",
+    "lane": "DATA",
+    "lever": "L16S",
+    "mode": "stream",
+    "proposal_id": "8c7d7dce19d5379087644afed6d22381",
+    "risk": "R0",
+    "tick": 3634,
+    "trigger": [
+     "DPIPE"
+    ],
+    "utc": "2026-10-27T20:45:42Z"
+   }
+  },
+  {
+   "line": 2895,
+   "row": {
+    "event": "diagnosed",
+    "fired": [
+     {
+      "code": null,
+      "levers": null,
+      "summary": "source zenodo_10762138 is fetched -> L16S"
+     }
+    ],
+    "tick": 3635,
+    "utc": "2026-10-27T20:55:42Z"
+   }
+  },
+  {
+   "line": 2897,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "lab_job_finished",
+    "lab_job": "sync_zenodo_10762138_f5dde2ea62",
+    "lane": "DATA",
+    "lever": "L16S",
+    "mode": "stream",
+    "ok": true,
+    "rc": 0,
+    "seconds": 11948.6,
+    "tick": 3654,
+    "utc": "2026-10-28T00:05:42Z"
+   }
+  },
+  {
+   "line": 2899,
+   "row": {
+    "event": "diagnosed",
+    "fired": [
+     {
+      "code": null,
+      "levers": null,
+      "summary": "source zenodo_10762138 is fetched -> L16I"
+     }
+    ],
+    "tick": 3654,
+    "utc": "2026-10-28T00:05:42Z"
+   }
+  },
+  {
+   "line": 2900,
+   "row": {
+    "action": "inc_stream_intake",
+    "argv": [
+     "sbatch",
+     "-p",
+     "GPU-shared",
+     "run_inc_collect.sh",
+     "intake",
+     "--source",
+     "zenodo_10762138"
+    ],
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "cites": [
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/sources/zenodo_10762138/status",
+      "value": "fetched"
+     }
+    ],
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_gpu_hours": 1.0,
+    "event": "proposed",
+    "lane": "DATA",
+    "lever": "L16I",
+    "mode": "stream",
+    "proposal_id": "483681cbc65de57072be56f3edfc213b",
+    "risk": "R2",
+    "tick": 3654,
+    "trigger": [
+     "DPIPE"
+    ],
+    "utc": "2026-10-28T00:05:42Z"
+   }
+  },
+  {
+   "line": 2901,
+   "row": {
+    "action": "inc_stream_intake",
+    "approval_id": null,
+    "basis": "direct",
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_su": 1.0,
+    "event": "executed",
+    "job_ids": [
+     "49959269"
+    ],
+    "lane": "DATA",
+    "lever": "L16I",
+    "mode": "stream",
+    "proposal_id": "483681cbc65de57072be56f3edfc213b",
+    "tick": 3654,
+    "trigger": [
+     "DPIPE"
+    ],
+    "utc": "2026-10-28T00:05:42Z"
+   }
+  },
+  {
+   "line": 2902,
+   "row": {
+    "event": "diagnosed",
+    "fired": [
+     {
+      "code": null,
+      "levers": null,
+      "summary": "source zenodo_10762138 is fetched -> L16I"
+     }
+    ],
+    "tick": 3655,
+    "utc": "2026-10-28T00:15:42Z"
+   }
+  },
+  {
+   "line": 2903,
+   "row": {
+    "campaign": "weed_stream_v1",
+    "charged": true,
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "failed",
+    "fails": 1,
+    "lane": "DATA",
+    "lever": "L16I",
+    "mode": "stream",
+    "proposal_id": "483681cbc65de57072be56f3edfc213b",
+    "reasons": [
+     "job(s) 49959269 ended FAILED"
+    ],
+    "tick": 3672,
+    "utc": "2026-10-28T03:05:42Z"
+   }
+  },
+  {
+   "line": 3154,
+   "row": {
+    "event": "diagnosed",
+    "fired": [
+     {
+      "code": null,
+      "levers": null,
+      "summary": "Q 1487 < 5456 (2M) -> L16 on zenodo_10762138 (rank 13.95)"
+     }
+    ],
+    "tick": 3723,
+    "utc": "2026-10-28T11:35:43Z"
+   }
+  },
+  {
+   "line": 3155,
+   "row": {
+    "action": "inc_stream_collect_lab",
+    "argv": [
+     "python",
+     "-m",
+     "weed_optimizer_framework.tools.collect",
+     "fetch",
+     "--source",
+     "zenodo_10762138",
+     "--max-bytes",
+     "35829729400",
+     "--out",
+     "/home/lab/weed_llm_benchmark/results/framework/inc/intake/staging/"
+    ],
+    "campaign": "weed_stream_v1",
+    "child_exp": null,
+    "cites": [
+     {
+      "artifact": "stream/weed_stream_v1_fork1364_fork2728/queue_summary.json",
+      "line": null,
+      "pointer": "/eligible/images",
+      "value": 1487
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/M",
+      "value": 2728
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/lanes/DATA",
+      "value": {
+       "busy": false,
+       "half_cadence": false,
+       "hold": null,
+       "phase": "IDLE"
+      }
+     },
+     {
+      "artifact": "campaign/context.json",
+      "line": null,
+      "pointer": "/candidates/373/id",
+      "value": "zenodo_10762138"
+     }
+    ],
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_gpu_hours": 0.0,
+    "event": "proposed",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "443791333d0fd1138b8d95ee40d4dfc1",
+    "risk": "R2",
+    "tick": 3723,
+    "trigger": [
+     "D20"
+    ],
+    "utc": "2026-10-28T11:35:43Z"
+   }
+  },
+  {
+   "line": 3156,
+   "row": {
+    "approval_id": "ap-1793187344-83572915",
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "est_su": 0.0,
+    "event": "filed",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "proposal_id": "443791333d0fd1138b8d95ee40d4dfc1",
+    "reasons": [
+     "awaiting a person: source zenodo_10762138 would reach 71.7 GB (limit 50 GB unless a person approves)"
+    ],
+    "tick": 3723,
+    "utc": "2026-10-28T11:35:43Z"
+   }
+  },
+  {
+   "line": 3158,
+   "row": {
+    "approval_id": "ap-1793187344-83572915",
+    "campaign": "weed_stream_v1",
+    "decided_by": "round-scheduler:inc-autopilot",
+    "event": "waiting",
+    "lane": "DATA",
+    "lever": "L16L",
+    "mode": "stream",
+    "reasons": [
+     "already filed as ap-1793187344-83572915 (pending)"
+    ],
+    "tick": 3724,
+    "utc": "2026-10-28T11:45:43Z"
+   }
+  }
+ ],
+ "read_utc": "2026-10-28",
+ "source": {
+  "attempts": 1,
+  "failures": 1,
+  "fetch_remaining": 0,
+  "fetched_utc": "2026-10-27T20:45:42Z",
+  "max_bytes": 35829729400,
+  "partial": false,
+  "placement": "lab",
+  "status": "candidate",
+  "synced": true
+ },
+ "state": {
+  "path": "results/framework/_brain/weed/inc/campaigns/weed_stream_v1/state.json",
+  "sha256": "b83175892e2fdc2ecbc28e49d2d41ab40c7fc7d8f68d409851b81d3725ee1c6d",
+  "updated_utc": "2026-10-28T18:05:43Z"
+ },
+ "step_failures": {
+  "L16I:02a8ed6176ea": {
+   "lane": "DATA",
+   "last": "job(s) 49959269 ended FAILED",
+   "lever": "L16I",
+   "n": 1,
+   "proposal_id": "483681cbc65de57072be56f3edfc213b",
+   "utc": "2026-10-28T03:05:42Z"
+  }
+ },
+ "what": "The lab's records of zenodo_10762138 (2SeasonWeedDet8) on 2026-10-28: fetched on the lab (L16L, 9.2 h), synced (L16S), its intake job 49959269 crashed in collect.normalize.read_via (L16I failed), the source made a candidate again, D20 proposed a second lab fetch (L16L) and filed it for a person (ap-1793187344-83572915: 'would reach 71.7 GB, limit 50 GB'); the DATA lane has waited on it since. Rows copied as read from the lab (state.json, inc_campaign.jsonl, approvals.jsonl); diagnosed rows keep only the fired diagnoses that name the source."
+}

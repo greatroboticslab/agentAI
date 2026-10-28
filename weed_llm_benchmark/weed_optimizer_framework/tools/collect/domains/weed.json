@@ -401,6 +401,11 @@
     "provider": "zenodo",
     "ref": "14861516",
     "why": "3SeasonWeedDet10: data2022 and data2023 are base v2 (D-A), data2021 holds copies of the evaluation photographs (KT3)"
+   },
+   {
+    "provider": "zenodo",
+    "ref": "10762138",
+    "why": "2SeasonWeedDet8 (same lab): its 2021 part is derived from CottonWeedDet12 (its README) and its 2022 part holds every ood22 exam image; 6,662 of its 6,664 images are copies of cwd12 test, dev or train_core or of the ood22/ood23 exams (census 2026-10-28, docs/CONTINUOUS_LOOP.md amendment 2026-10-28)"
    }
   ],
   "never_fetch_title_regex": [
@@ -409,9 +414,11 @@
    "(?i)image\\s*weeds",
    "(?i)\\bweed\\s*sense\\b",
    "(?i)(?<![0-9])3\\s*-?\\s*season\\s*weed\\s*det",
-   "(?i)three[\\s_-]*season[\\s_-]*weed"
+   "(?i)three[\\s_-]*season[\\s_-]*weed",
+   "(?i)(?<![0-9])2\\s*-?\\s*season\\s*weed\\s*det",
+   "(?i)two[\\s_-]*season[\\s_-]*weed"
   ],
-  "why": "section 7.2: whole-token rejects; the legacy-label copy rule of verify.old_join; the reference and exam datasets are never fetched, and neither is 3SeasonWeedDet10 under any record or title (its 2022/2023 parts are base v2, its 2021 part holds copies of the evaluation photographs)"
+  "why": "section 7.2: whole-token rejects; the legacy-label copy rule of verify.old_join; the reference and exam datasets are never fetched, and neither is 3SeasonWeedDet10 under any record or title (its 2022/2023 parts are base v2, its 2021 part holds copies of the evaluation photographs), nor 2SeasonWeedDet8 (2026-10-28: its 2021 part is derived from CottonWeedDet12, its 2022 part holds the ood22 exam; all but 2 of its 6,664 images are copies of cwd12, ood22 or ood23)"
  },
  "class_map": {
   "status_map": {
