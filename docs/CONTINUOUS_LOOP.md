@@ -4900,7 +4900,19 @@ So 6,662 of 6,664 images (99.97 %) are copies of protected or base images, and t
 
 ### How it was verified
 
-⟨VERIFIED⟩
+- **On the cluster's files** (read-only, 2026-10-28):
+  - The branch's `normalize.read` on zenodo_10762138's extracted tree: 6,664 items, 11,540 boxes, none bad, 37 clipped, no problem, 25 class names (9 legacy labels); the config's never-fetch rule matches its `fetch.json`.
+  - The census above: the sha256 of all 6,664 images against every row of splits v1 and v2; dHash under 8 variants for the 6 that matched none.
+  - The 264,430 rows of the 21 committed intake batches: EXIF tags, and byte or dHash copies of ood22/ood23 (none of either).
+  - The two ood22 label gaps: 2SeasonWeedDet8's boxes against ood22's label files and 3SeasonWeedDet10's XMLs.
+- **The live state, replayed** (lab; a copy of the stream state, ledger, approvals log and `inc/` without staging; no ssh, the lab runner a recorder; the final tree). The first tick makes the source `fetched`, withdraws ap-1793187344-83572915 as its requester (`withdrawn`), logs the lane item `withdrawn`, and proposes L16I under a new id (e6b3e047…); nothing is proposed for a fetch or filed for a person, and no card is written. The second tick adds nothing. The live files were not touched (approvals log sha256 247a1cf3… before and after).
+- **Lab scratch copies** (`~/intake_via_ci`, the platform's Python, Ultralytics 8.4.37 first on its path; `git archive` without `docs/poster`'s binaries):
+  - **Base 642e49a:** 173 test files, 155 pass, 18 fail.
+  - **Branch 7e76497:** 177 files (the 173 and 4 new), 159 pass, and the same 18 fail with the same failure lines. The 18 are environmental (packages the lab venv lacks, scratch copies that are not git checkouts); `test_funnel_job_script.py`'s 16 lines differ only where the captured tail is cut, as on earlier amendments.
+  - **The new tests on the base's code:** `test_collect_normalize_via.py` reproduces the live crash (`normalize.py:461`, `'list' object has no attribute 'get'`); `test_collect_intake_exams.py` finds no exam guard; `test_stream_ap_intake_retry.py` fails 16 checks; `test_approvals.py` fails 1 and errors 4.
+- **Replay gate** (`executor.run_replay_tests` on a scratch lab tree): pass, 56 of 58 cases (R2 and R4b skipped, as before).
+- **Mutation runs** (all killed): `test_collect_intake_via_mutants.py` IV1-IV43, 43 of 43 (new); `test_stream_ap_stalls_mutants.py` 42 of 42; `test_inc2_audit_stream_mutants.py` 40 of 40; `test_stream_ap_mutations.py` SM1-SM18; deviations 4, 5 and 6, 28 of 28, 53 of 53, 39 of 39.
+- **Workstation:** every `test_collect_*.py` passes; `deploy_funnel.sh --dry-run` passes with no `--allow-*` flag; no code_shas, pinned or shared file is changed (`inc2/v3fam.py` 3d776dae… unchanged), and the fixtures and `test_approvals.py` are listed.
 
 ### Open items
 
