@@ -2458,7 +2458,7 @@ Each item: the defect, the fix, and the check that covers it. Where an item chan
 16. **A failed canary holds TRAIN (DCAN)** and escalates to a person, since §10's R0 acceptance is "canary within 1 sd". B0 ∪ tsw is built after the required baselines and blocks nothing.
 17. **Dev scores are no longer requested by the snapshot.** D25 reads inc2.stream's recorded comparison instead of recomputing the permutation test. `stream-snapshot --dev-scores` remains available.
 18. **A STOP lane** takes L24 (quarantine) and L7 (unblock), so a busy DATA lane never delays a quarantine.
-19. **The L4 label audit on a stream segment** reuses the existing v1 lever and `run_inc_audit.sh` on the segment's `exp.json`. Whether that script accepts a v2 segment's manifests is [to verify on cluster]. *Verified 2026-10-26:* it runs on a v2 segment (job 47429146, 5 min 9 s, exit 0) but judges no box of a stream increment: every image is `image_not_in_crops`, because `tools/inc/audit.py` reads Step 1's `crops.csv` only. D31 reads such a record as not judged (Amendment 2026-10-26).
+19. **The L4 label audit on a stream segment** reuses the existing v1 lever and `run_inc_audit.sh` on the segment's `exp.json`. Whether that script accepts a v2 segment's manifests is [to verify on cluster]. *Verified 2026-10-26:* it runs on a v2 segment (job 47429146, 5 min 9 s, exit 0) but judges no box of a stream increment: every image is `image_not_in_crops`, because `tools/inc/audit.py` reads Step 1's `crops.csv` only. D31 reads such a record as not judged (Amendment 2026-10-26). *Changed 2026-10-27:* the script runs `inc2.audit_stream`, which also looks each box up in the stream's own batches; on copies of the cluster's files it judges every species box of s001's and s002's increments (Amendment 2026-10-27).
 
 **Not done.**
 - **Two wirings in files group F does not own.** The dashboard's harvest route does not call `old_path_refusal(..., auto_sync=True)` yet. The brain (tier2) digest covers experiment campaigns only; no brain may request a stream action, since the policy rows allow only `round-scheduler` and `human`.
@@ -2713,7 +2713,7 @@ The groups' own mutation checks, recorded in their build notes, stand beside the
    - MFWD over FTP (6.78 GB for POROL) and the Roboflow export;
    - the owner's acceptance of the EPPO table and the PAGS8 card table;
    - `floor_gb` and `floor_su` from the first wave.
-10. **The L4 label audit on a v2 segment.** `run_inc_audit.sh` must read v2 manifests, and the policy's paths must match the cluster's INC_DIR. *Verified 2026-10-26:* it reads them and runs, and judges 0 boxes of a stream increment (Step 1's crops only); see Amendment 2026-10-26.
+10. **The L4 label audit on a v2 segment.** `run_inc_audit.sh` must read v2 manifests, and the policy's paths must match the cluster's INC_DIR. *Verified 2026-10-26:* it reads them and runs, and judges 0 boxes of a stream increment (Step 1's crops only); see Amendment 2026-10-26. *Changed 2026-10-27:* it judges them (Amendment 2026-10-27).
 11. **The pinned `inc.report` on v2 experiments with real scores.** In the run it wrote every baseline's, Stage C's and every segment's report.
 
 ### V.6 The R0 command sequence the platform runs
@@ -4729,5 +4729,116 @@ Then check: the ledger has `configured` and, on the next tick, `lane_released` (
 
 - `executor.fetched_bytes` still counts zenodo_15808623's attempt killed on 2026-10-03 (an unclosed `fetch_started`) at its 49.7 GB plan: the collect envelope shows 83.6 GB left where about 133 GB are.
 - D20 ranks placeholder estimates first (500 boxes over a small repository), so code repositories come before datasets.
-- L4 cannot judge stream increments (`tools/inc/audit.py` is pinned); making it do so would largely repeat the intake verifier.
+- L4 cannot judge stream increments (`tools/inc/audit.py` is pinned); making it do so would largely repeat the intake verifier. *Closed 2026-10-27* (Amendment 2026-10-27): L4 runs `inc2.audit_stream`, which reads the stream's batches with the pinned module unchanged; how far it repeats the intake verifier is measured there.
 - `runs/mlflow` (337 GB) is kept as it is; deduplicating it is a separate decision.
+
+## Amendment (2026-10-27): the label audit reads the stream's own crops, and D31 expects real coverage
+
+Decided by the delegate under the owner's 2026-09-30 grant. Platform code only: no code_shas file (`inc2/v3fam.py` and the six E3-frozen files), no `PINNED_RE` file (`tools/inc/audit.py` is used as a library, unchanged) and no `SHARED_RE` file is changed, and no V3F artifact is touched.
+
+### What happened
+
+- **s001, 2026-10-05.** L4 judged 0 of the 4,092 boxes of inc0001, inc0003 and inc0004 (every image `image_not_in_crops`).
+- **s002, 2026-10-27.** L4 judged 8 of inc0005's 1,784 species-labelled boxes (91 of its 1,867 boxes): the 7 images Step 1 holds (project_agml__weed_crop_detection, v1 pool rows the backfill b0000 queued). The other 1,357 images (1,776 boxes) were `image_not_in_crops`.
+- **Why.** `tools/inc/audit.py` finds a box's crop only among the images Step 1's `crops.csv` was cut from. A stream increment is cut from `step1_stream` queue rows, whose boxes were cropped, embedded (BioCLIP-2, the same embedder) and judged at their own intake batch (`batches/bNNNN/crops.csv`, `emb.npz`, `verdicts.npz`).
+- **D31's share.** D31 counted a step as judged when the audit gave a species verdict on half of all its boxes. An OtherPlant box never gets a species verdict, so a step that is mostly OtherPlant could never be judged, even with full coverage.
+
+### What changed
+
+| # | What changed | Why | How verified |
+|---|---|---|---|
+| 1 | **`inc2/audit_stream.py` (new); `run_inc_audit.sh` runs it.** It runs inc/audit.py's audit unchanged: the manifests and label files (`read_rows`), the Step 1 inputs and their freshness, the Step 1 lookup (`CropIndex`, `resolve`, `in_trusted`), the probe fitted on the trusted manifest's Step 1 crops only, the held-out baseline, the verdicts, every rate, interval, per-mix baseline, noise estimate and `above_baseline` test, and the three output files. What it adds is the lookup of an audited image that Step 1 does not hold.<br>• **The queue row:** the stream's queue row with the same key, image path and sha256, in a committed batch. The row with the same `label_sha256` is preferred, else the latest.<br>• **The batch's files:** `crops_info.json`, `emb.npz` and `verdicts.npz` must describe the batch's `crops.csv`; `crops_skipped.csv` must hash as `crops_info.json` recorded it; `crops.csv`, `emb.npz` and `verdicts.npz` must hash as `batch.json` recorded them at commit; and the embedder must be Step 1's. Otherwise the audit stops with no output.<br>• **The admission record:** `batch.json` records no hash of `admission.jsonl`, so each record is checked against the queue row it admitted: the same admission, as many masked boxes, and per class as many kept boxes as the row counts. A record that disagrees leaves that row's boxes not judged (`admission_mismatch`, counted as `no_crop_row`), and the audit runs on.<br>• **A batch without `crops.csv`:** a rejoin row (key `<original>__rjN`) is looked up in its original's intake batch under the original's key, or in Step 1 for a v1 row; a backfill row (b0000, input `v1`, whole or masked) in Step 1, by its unmasked original as inc/audit.py finds an image. The keep list, the intake verdict and the class at intake are the row's own admission record's. A row with no such original stays `image_not_in_crops` (`original_not_found` or `batch_without_crops`).<br>• **The box:** label box j of a masked admission is kept box `keep[j]`. It is used only within inc/audit.py's geometry tolerance and with a finite embedding.<br>• **Trusted images:** an image whose unmasked original is a trusted image is refused.<br>• **The stream's directory:** `--stream-dir`, else the `step1_stream` that the audited increments' `stream.json` names (`<stream>/increments/<name>.jsonl`), else `INC_DIR/step1_stream`. Increments of streams naming different directories are refused.<br>• **Records:** a box without a crop gets one of inc/audit.py's reasons, and the stream's own cause is counted beside it. OUT.json gains `"lookup": "step1+step1_stream"`, `inputs.step1_stream`, and per manifest a `stream` block (with the intake verdict of each located box) and a `coverage` block. OUT.md gains one section. | L4 judged no stream increment. The trusted boxes, the probe and the baseline stay Step 1's, so a new record shares them with the old ones byte for byte. | `test_inc2_audit_stream.py`: on inc/audit.py's own test world the same OUT.json (minus the added keys), the same OUT_boxes.csv byte for byte and the same OUT.md up to the added section; whole and masked admissions; rejoin rows (masked and whole, of a stream row and of a v1 row) and a masked backfill row judged through their original; the admission check; the stream's directory; every stream cause; 9 refusals. `test_inc2_audit_stream_s002.py` (the cluster's records of inc0005). |
+| 2 | **D31 expects real coverage** (`diagnose_stream._audit_result`, `_audit_said`; `D31.audit_expected_coverage` 0.9, new and pre-registered here; `audit_min_judged_share` now applies to species-labelled boxes).<br>• **Judged:** a step counts as judged on its species-labelled boxes, from the record's `coverage` block or else its per-species blocks.<br>• **Shortfall:** a record whose lookup read the stream and that judged under 0.9 of a step's species boxes names the step in `coverage_short`, whatever the verdict. D31's card splits the step's unjudged species boxes into the audit's known limits (`small`, `no_size`, `failed`, `label_unseen`, `in_trusted`) and the rest, and calls only the rest a defect of the audit's inputs.<br>• **Older records:** a Step-1-only record that left a step `image_not_in_crops` is read as predating the stream lookup. The card says a re-audit is a person's decision (`remote.py submit audit` refuses a rerun over an existing audit).<br>• **Unchanged:** few judged boxes are still no finding, and L4 is never called for again. | With the stream lookup, a short coverage is no longer expected. | `test_stream_ap_audit_coverage.py` (`units`, `world`, `real`: the lab run's s001 record reads "labels are not the cause", no card). |
+| 3 | `deploy_funnel.sh` ships `run_inc_audit.sh`, which it had never shipped (the cluster's copy came from git), and `tests/fixtures/audit_stream_s002`. | The job script must reach both cluster copies. | `--dry-run`. |
+| 4 | `test_inc_audit.py`: the sbatch-script check names the new module. `test_stream_ap_stalls_mutants.py`: SG8 and SG10 follow the moved code. | — | Mutation runs. |
+
+### What the audit finds (2026-10-27, lab run on copies)
+
+The run used copies of the cluster's files (Step 1's crops and embeddings; the stream's queue and batches b0002, b0003, b0005–b0009, b0013, b0016–b0018 and b0021; the pool P_1 and the increments with their label files; 13,060 files, 2,201,450,858 bytes). The inputs were read only. The manifests' label paths were moved under the copy, and the label bytes were checked against each row's `label_sha256`.
+
+Trusted set: P_1 (the same bytes as P_0, 7,493 images). The probe used its 5,151 train_core species boxes from 29 groups, as the cluster's records did.
+
+**Reproduction.** inc.audit on the copies reproduces the cluster's s002 record: the same per-manifest block and the same `baseline_cv`. The probe's thresholds differ in the fifth decimal (sklearn 1.9.0 here, 1.7.2 on the cluster).
+
+Baseline: held-out false-conflict rate f = 0.0060 [0.0042, 0.0085] and conflict recall on a wrong species r = 0.9526.
+
+| Step (segment) | Species boxes judged | Conflicts (rate [95 % CI]) | Baseline f for its mix [95 % CI] | Above baseline | Verified / unknown |
+|---|---|---|---|---|---|
+| inc0001 (s001) | 1,364 of 1,364 (was 0) | 0 (0.000 [0, 0.0028]) | 0.0036 [0.0021, 0.0118] | no | 0.995 / 0.005 |
+| inc0003 (s001) | 1,364 of 1,364 (was 0) | 0 (0.000 [0, 0.0028]) | 0.0041 [0.0019, 0.0137] | no | 0.998 / 0.002 |
+| inc0004 (s001) | 1,364 of 1,364 (was 0) | 0 (0.000 [0, 0.0028]) | 0.0033 [0.0020, 0.0115] | no | 0.982 / 0.018 |
+| inc0005 (s002) | 1,784 of 1,784 (was 8) | 1 (0.0006 [0.0001, 0.0032]) | 0.0011 [0.0007, 0.0109] | no | 0.971 / 0.028 |
+
+**Per species, every one at or below its baseline.** The table gives conflicts out of judged boxes, the upper end of the 95 % interval, and the trusted baseline f per species.
+
+| Species | inc0001 | inc0003 | inc0004 | inc0005 | Baseline f |
+|---|---|---|---|---|---|
+| PalmerAmaranth | 0/747 (≤ 0.005) | 0/633 (≤ 0.006) | 0/807 (≤ 0.005) | 1/1,382 (≤ 0.004; one weedai_0935d5a0 box called Waterhemp) | 0.000 (n 205) |
+| PricklySida | 0/388 (≤ 0.010) | 0/618 (≤ 0.006) | 0/323 (≤ 0.012) | – | 0.008 |
+| Waterhemp | 0/229 | 0/113 | 0/234 | 0/56 | 0.009 |
+| Purslane | – | – | – | 0/273 | 0.005 |
+| MorningGlory | – | – | – | 0/69 | 0.003 |
+| Carpetweed | – | – | – | 0/3 | 0.006 |
+| Ragweed | – | – | – | 0/1 | 0.000 |
+
+**OtherPlant-labelled boxes in inc0005.** 5 of 83 are called Goosegrass (0.060 [0.026, 0.133]). All 5 are among the 91 boxes the platform's record had already judged, and all are in one image (project_agml__weed_crop_detection, default_train_000392). No baseline exists for this rate.
+
+**Shared sessions.** 61 rows of inc0005 (CottonWeedDet3, session 20200819; 73 boxes) share a capture session with trusted rows of P_1 (`rows_in_shared_sessions` counts sessions of every trusted row). None of those trusted rows has a Step 1 crop, so none was used to fit the probe, which uses train_core's 5,151 boxes only. The shared session therefore gives these boxes no optimism through the probe's fit.
+
+**Reading.** The label audit finds no label noise above the trusted baseline in any of the four data-blamed increments, for any species. The noise estimate is 0.0 for each. Labels are not what the data blames point to.
+
+**Not an independent check.** Every located box was admitted as `verified` by the intake's frozen v1 verifier, which was fitted on train_core crops (`intake_verdicts`: verified 1,364 / 1,364 / 1,364 / 1,776). The audit's probe is also fitted on train_core's BioCLIP-2 crops. A conflict is therefore close to impossible by construction. What the audit adds is per-species agreement within the trusted set's own held-out error. Of the boxes the intake verified, 7, 3, 25 and 50 are `unknown` to the audit, and one is a conflict.
+
+**Unchanged by this finding.** A label error that both probes read as the labelled species is invisible to both. So is any problem that is not a label at all: the redundant video frames of zenodo_15808623 (up to 486 frames per clip), or the distance from cwd12's dev domain.
+
+### The data, next
+
+- The cluster's records of s001 (2026-10-05) and s002 (2026-10-27) stay as they are. D31 reads them as not judged and as predating the stream lookup. The lab run's records are not platform records.
+- A re-audit on the cluster is a person's decision, because `remote.py submit audit` refuses a rerun over an existing audit. It is two steps:
+  1. Move the old `audit/label_audit.*` aside (never delete it).
+  2. Run `sbatch run_inc_audit.sh --trusted <P_0 or P_1> --audit <steps> --out <exp>/audit/label_audit.json`.
+
+  A frozen experiment's record is taken again only after an L4 done by the ticker (`_refreeze_pending`).
+- inc0001, inc0003 and inc0004 stay rejected, and zenodo_15808623 stays quarantined. With labels ruled out as far as this audit can see, the clip-level redundancy hypothesis (2026-10-26) is the next thing to test. A per-clip cap is a new pre-registered rule and a person's decision.
+- Future segments' L4 runs judge their stream increments from the first audit.
+- The gate records themselves point at naming rather than boxes (s001/s002 `report.json`, chain attribution): on inc0001 the warm chain's class-agnostic AP rose 0.0027 while its 12-class mAP fell 0.0037 (seed-only z −2.5); on inc0003 agnostic −0.0002 against 12-class −0.0063 (z −4.7); both are attributed "labels". inc0004's "data" call (−0.0026, z −1.4) is within seed noise and fired on direction alone (p_data 0.22). Recorded here as input to a later amendment of the stream's gate; nothing switches.
+
+### Deploy
+
+`diagnose_stream.py` and `stream_thresholds.json` change the stream rules version: the ticker writes a new prospective stream record before the next L18, and `executor.run_replay_tests` runs again before envelope grants resume. `run_inc_audit.sh` applies to L4 jobs submitted after the deploy. Sync the lab and both cluster copies from one commit descending from f6d9b8a with `deploy/deploy_funnel.sh` (no `--allow-*` flag).
+
+### How it was verified
+
+- **On copies of the cluster's files** (lab, `~/audit_stream_ci`, the platform's Python; 13,060 files copied read-only, byte counts equal). Three runs:
+  - `inc2.audit_stream` for s002: inc0005, 1,784 of 1,784 species boxes.
+  - `inc.audit` for s002: it reproduces the cluster's record of 2026-10-27, 8 species boxes, the same `baseline_cv`.
+  - `inc2.audit_stream` for s001: 1,364 of 1,364 on each step.
+
+  The new records' `baseline_cv` equals the cluster's records' (s001 of 2026-10-05, s002 of 2026-10-27) value for value.
+- **After the review fixes (8fdf3d0), the same runs again** on the same copies: s001 and s002 write byte-identical `OUT_boxes.csv` files, the same `probe`, `baseline_cv` and `trusted` blocks, and per step differ only in the added keys of `coverage` and `stream`. Every one of the 5,868 located boxes passed the admission-record check; no row of these increments goes through an original (no rejoin batch exists, and no backfill row was cut into them).
+- **The shared-session note** was checked on the copies: the 337 trusted P_1 rows of session 20200819 (kg_yuzhenlu__cottonweeddet3) have no Step 1 crop, by path or by sha256.
+- **`test_inc2_audit_stream_s002.py`.** It rebuilds inc0005's stream lookup from the cluster's records (776 KB, every file's sha256 in `FIXTURE.json`, every label against its `label_sha256`). inc/audit.py judges 8 species boxes and 91 boxes, as the platform did. inc2.audit_stream judges 1,784 of 1,784, with the per-batch counts of the lab run.
+- **Lab scratch copies** (`~/audit_stream_ci`), the platform's Python, Ultralytics 8.4.37 first on its path.
+  - **Base.** `git archive f6d9b8a` (without `docs/poster`'s binaries; `figures_data.json` kept), equal file by file to the deployed lab copy (364 files).
+  - **Every test file on both, check by check.** The base's 169 files: 151 pass, 18 fail. The branch's 173 (the 169 and 4 new): 155 pass, and the same 18 fail with the same failure lines. The 18 are environmental: packages that the lab venv or the job scripts' python lacks, and scratch copies that are not git checkouts. `test_funnel_job_script.py`'s 16 lines differ only where the captured tail is cut.
+  - **Again after the review fixes** (tree 8fdf3d0, the same way): 173 files, 155 pass, the same 18 fail with the same failure lines as on the base and on b8e2f60.
+- **Replay gate** (`executor.run_replay_tests` on a scratch lab tree): pass, 56 of 58 cases (R2 and R4b skipped, as before), on b8e2f60 and again on 8fdf3d0.
+- **Mutation runs** (all mutants killed):
+
+  | Run | Killed |
+  |---|---|
+  | `test_inc2_audit_stream_mutants.py` (AS1-AS40, new; AS28-AS40 cover the review fixes) | 40 of 40 |
+  | `test_stream_ap_stalls_mutants.py` (SG8 and SG10 follow the moved code) | 42 of 42 |
+  | `test_stream_ap_mutations.py` | SM1-SM18 |
+  | Deviations 4, 5 and 6 | 28 of 28, 53 of 53, 39 of 39 |
+- **The new tests on the base's code.** `test_inc2_audit_stream.py` and `test_inc2_audit_stream_s002.py` cannot import the module. `test_stream_ap_audit_coverage.py` fails 3 checks: the threshold is missing, and a shortfall raises no card. The 6 checks that hold on the base too are: no L4 proposed again, the full-coverage world, and the real s001 record with its fixture checks. Every SIU box is species-labelled, so both readings of that record agree.
+- **Workstation checkout:**
+  - `test_stream_pipeline.py` and `test_stream_ap_no_throttles.py`: 0 failures on b8e2f60 (they fail on the lab scratch copies for environmental reasons, on the base as well); the deploy's pre-flight runs them again on the merged tree.
+  - `deploy_funnel.sh --dry-run`: passes with no `--allow-*` flag, on b8e2f60 and on 8fdf3d0. No code_shas, pinned or shared file is changed (`inc2/v3fam.py` 3d776dae… unchanged), and `run_inc_audit.sh` and the fixture are listed.
+
+### Open items
+
+- *Closed before deploy:* batches without `crops.csv`. The backfill b0000's 451 masked rows (held `funnel_F9`) and every rejoin row (a rejoin batch writes no `crops.csv`; the cluster's ledger holds no rejoin batch yet) are judged through their original, as row 1 describes.
+- L4's proposal id is built from its argv alone, so a failed L4 is proposed again under the same id until the `step_retries` stop-loss holds MAINT with a card. This predates the amendment and is unchanged. The audit stops only on a batch file that does not describe its `crops.csv` or on another embedder; a disagreeing admission record leaves only its row unjudged.
+- The trusted probe is train_core's alone. P_1's tsw22/tsw23 rows (3,697 images) and its stream rows (682 CottonWeedDet3 images, 66 base B rows) have no Step 1 crops and are not used: 21,180 trusted boxes in all. Fitting the probe on them would change the baseline, so it would be a new pre-registered rule.
+- The audit and the intake verifier share their training data, as described above. An independent check would need labels of another origin, for example a person's sample of the blamed increments.

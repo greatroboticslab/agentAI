@@ -159,7 +159,11 @@
   },
   "audit_min_judged_share": {
    "value": 0.5,
-   "why": "D31 reads the label audit (L4) it called for: a blamed step counts as judged only when the audit gave a species verdict on at least this share of its boxes, and only then does the record's above_baseline (labels the cause -> X3) or its absence (labels not the cause) say anything. Below it the audit is 'not judged': one card, and L4 is not called for again. Amended 2026-10-26 (docs/CONTINUOUS_LOOP.md): s001's audit of 2026-10-05 judged 0 of 4,092 boxes (every image image_not_in_crops: tools/inc/audit.py reads Step 1's crops only) and wrote above_baseline false as an empty default."
+   "why": "D31 reads the label audit (L4) it called for: a blamed step counts as judged only when the audit gave a species verdict on at least this share of its species-labelled boxes (amended 2026-10-27: of the boxes it can judge; it was all boxes, so a step mostly of the non-target class could never be judged), and compared at least this share of those with its baseline, and only then does the record's above_baseline (labels the cause -> X3) or its absence (labels not the cause) say anything. Below it the audit is 'not judged': one card, and L4 is not called for again. Amended 2026-10-26 (docs/CONTINUOUS_LOOP.md): s001's audit of 2026-10-05 judged 0 of 4,092 boxes (every image image_not_in_crops: tools/inc/audit.py reads Step 1's crops only) and wrote above_baseline false as an empty default."
+  },
+  "audit_expected_coverage": {
+   "value": 0.9,
+   "why": "Amendment 2026-10-27 (docs/CONTINUOUS_LOOP.md): since the label audit (L4, inc2.audit_stream) reads the stream's own Step 1 batches as well as Step 1's, a record whose lookup is step1+step1_stream is expected to give a species verdict on at least this share of each blamed step's species-labelled boxes (what it cannot judge: boxes the intake left out as small, failed crops, species the trusted probe never saw). A step under it is named in D31's summary and card whatever the verdict, its unjudged species boxes split into the audit's known limits (small, no_size, failed, label_unseen, in_trusted) and the rest, and only the rest is called a defect of the audit's inputs; the verdict itself still follows audit_min_judged_share. Measured 2026-10-27 on copies of the cluster's files: s002's inc0005, 1,784 of 1,784 species boxes judged with the stream lookup, 8 without it; s001's inc0001, inc0003 and inc0004, 1,364 of 1,364 each, 0 without it."
   }
  },
  "D32": {

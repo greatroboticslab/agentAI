@@ -8,13 +8,13 @@
 #SBATCH --time=02:00:00
 #SBATCH --output=/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/logs/%x_%j.out
 #
-# INC attribution item 4, the BioCLIP-2 label audit: docs/INCREMENTAL_PROTOCOL.md,
-# "Gate", attribution. A 12-species probe is fitted on the trusted manifest's
+# INC attribution item 4, the BioCLIP-2 label audit (lever L4): docs/INCREMENTAL_PROTOCOL.md,
+# "Gate", attribution. A 12-species probe is fitted on the trusted manifest's Step 1
 # boxes only (verify's probe, CV and 95 %-recall thresholds) and judges every
 # box of each audited manifest against that manifest's own labels. It reads
 # the Step 1 crops and BioCLIP-2 embeddings (results/framework/inc/step1/:
-# crops.csv, crops_skipped.csv, crops_info.json, emb/); it opens no image and
-# embeds nothing, so its GPU stays idle. It still runs on GPU-shared because
+# crops.csv, crops_skipped.csv, crops_info.json, emb/) and the stream's (below); it
+# opens no image and embeds nothing, so its GPU stays idle. It still runs on GPU-shared because
 # the allocation cis240145p is a GPU allocation: RM-shared submissions fail
 # with "Invalid qos" (CHANGELOG v3.0.99.19, run_v3_0_99_rf_pull.sh). Memory is
 # sized for loading every crop's embedding, as `verify fit` does.
@@ -22,8 +22,8 @@
 # --out must end in .json and may only overwrite an earlier audit's outputs.
 #
 # Every argument goes to the module:
-#   python -m weed_optimizer_framework.tools.inc.audit --trusted T.jsonl \
-#       --audit NAME=M.jsonl [NAME=M.jsonl ...] --out OUT.json [--nshards N]
+#   python -m weed_optimizer_framework.tools.inc2.audit_stream --trusted T.jsonl \
+#       --audit NAME=M.jsonl [NAME=M.jsonl ...] --out OUT.json [--nshards N] [--stream-dir DIR]
 #
 # The pilot's post-hoc item 4 (Slurm opens the log file before this script
 # runs, so the log dir must exist):
@@ -34,6 +34,12 @@
 #       --audit I1=$M/I1.jsonl I2=$M/I2.jsonl I3=$M/I3.jsonl I4=$M/I4.jsonl I5=$M/I5.jsonl \
 #               Bswap=$M/Bswap.jsonl Breal=$M/Breal.jsonl \
 #       --out $INC/pilot_v1/audit/label_audit.json
+#
+# The module is inc2.audit_stream (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-27; before it,
+# inc.audit, which judged no box of a stream increment): inc/audit.py's audit unchanged, and
+# for an audited image Step 1 does not hold (a stream increment's), the lookup of its crops in
+# the stream's own committed batches (results/framework/inc/step1_stream/: queue/queue.jsonl,
+# batches/bNNNN/{crops.csv, emb.npz, verdicts.npz, admission.jsonl}).
 #
 # The job imports the OUTER package copy ($REPO/weed_optimizer_framework)
 # through PYTHONPATH; deploy there first. Nothing is synced here. Every module
@@ -48,7 +54,7 @@ cd "$REPO" || exit 1
 export PYTHONPATH="$REPO${PYTHONPATH:+:$PYTHONPATH}"
 
 if [ "$#" -eq 0 ]; then
-    echo "usage: sbatch run_inc_audit.sh --trusted T.jsonl --audit NAME=M.jsonl [NAME=M.jsonl ...] --out OUT.json [--nshards N]" >&2
+    echo "usage: sbatch run_inc_audit.sh --trusted T.jsonl --audit NAME=M.jsonl [NAME=M.jsonl ...] --out OUT.json [--nshards N] [--stream-dir DIR]" >&2
     exit 2
 fi
 
@@ -59,7 +65,7 @@ echo "python: $(which python)  $(python -V 2>&1)"
 
 # Every module this job imports, outer copy (what runs) vs nested (git-tracked).
 MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/verify.py tools/inc/audit.py
-         tools/cwd12_species.py tools/near_dup.py)
+         tools/inc2/__init__.py tools/inc2/audit_stream.py tools/cwd12_species.py tools/near_dup.py)
 drift=0
 for m in "${MODULES[@]}"; do
     OUTER=$REPO/weed_optimizer_framework/$m
@@ -87,7 +93,7 @@ fi
 python -u -c "import numpy, sklearn, joblib; print('numpy', numpy.__version__, 'sklearn', sklearn.__version__)" || exit 1
 
 t0=$(date +%s)
-python -u -m weed_optimizer_framework.tools.inc.audit "$@"
+python -u -m weed_optimizer_framework.tools.inc2.audit_stream "$@"
 rc=$?
 echo "=== exit $rc after $(( $(date +%s) - t0 ))s  $(date) ==="
 exit $rc
