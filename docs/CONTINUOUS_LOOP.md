@@ -4801,6 +4801,7 @@ Baseline: held-out false-conflict rate f = 0.0060 [0.0042, 0.0085] and conflict 
   A frozen experiment's record is taken again only after an L4 done by the ticker (`_refreeze_pending`).
 - inc0001, inc0003 and inc0004 stay rejected, and zenodo_15808623 stays quarantined. With labels ruled out as far as this audit can see, the clip-level redundancy hypothesis (2026-10-26) is the next thing to test. A per-clip cap is a new pre-registered rule and a person's decision.
 - Future segments' L4 runs judge their stream increments from the first audit.
+- The gate records themselves point at naming rather than boxes (s001/s002 `report.json`, chain attribution): on inc0001 the warm chain's class-agnostic AP rose 0.0027 while its 12-class mAP fell 0.0037 (seed-only z −2.5); on inc0003 agnostic −0.0002 against 12-class −0.0063 (z −4.7); both are attributed "labels". inc0004's "data" call (−0.0026, z −1.4) is within seed noise and fired on direction alone (p_data 0.22). Recorded here as input to a later amendment of the stream's gate; nothing switches.
 
 ### Deploy
 
@@ -4814,23 +4815,26 @@ Baseline: held-out false-conflict rate f = 0.0060 [0.0042, 0.0085] and conflict 
   - `inc2.audit_stream` for s001: 1,364 of 1,364 on each step.
 
   The new records' `baseline_cv` equals the cluster's records' (s001 of 2026-10-05, s002 of 2026-10-27) value for value.
+- **After the review fixes (8fdf3d0), the same runs again** on the same copies: s001 and s002 write byte-identical `OUT_boxes.csv` files, the same `probe`, `baseline_cv` and `trusted` blocks, and per step differ only in the added keys of `coverage` and `stream`. Every one of the 5,868 located boxes passed the admission-record check; no row of these increments goes through an original (no rejoin batch exists, and no backfill row was cut into them).
+- **The shared-session note** was checked on the copies: the 337 trusted P_1 rows of session 20200819 (kg_yuzhenlu__cottonweeddet3) have no Step 1 crop, by path or by sha256.
 - **`test_inc2_audit_stream_s002.py`.** It rebuilds inc0005's stream lookup from the cluster's records (776 KB, every file's sha256 in `FIXTURE.json`, every label against its `label_sha256`). inc/audit.py judges 8 species boxes and 91 boxes, as the platform did. inc2.audit_stream judges 1,784 of 1,784, with the per-batch counts of the lab run.
 - **Lab scratch copies** (`~/audit_stream_ci`), the platform's Python, Ultralytics 8.4.37 first on its path.
   - **Base.** `git archive f6d9b8a` (without `docs/poster`'s binaries; `figures_data.json` kept), equal file by file to the deployed lab copy (364 files).
   - **Every test file on both, check by check.** The base's 169 files: 151 pass, 18 fail. The branch's 173 (the 169 and 4 new): 155 pass, and the same 18 fail with the same failure lines. The 18 are environmental: packages that the lab venv or the job scripts' python lacks, and scratch copies that are not git checkouts. `test_funnel_job_script.py`'s 16 lines differ only where the captured tail is cut.
-- **Replay gate** (`executor.run_replay_tests` on a scratch lab tree): pass, 56 of 58 cases (R2 and R4b skipped, as before).
+  - **Again after the review fixes** (tree 8fdf3d0, the same way): 173 files, 155 pass, the same 18 fail with the same failure lines as on the base and on b8e2f60.
+- **Replay gate** (`executor.run_replay_tests` on a scratch lab tree): pass, 56 of 58 cases (R2 and R4b skipped, as before), on b8e2f60 and again on 8fdf3d0.
 - **Mutation runs** (all mutants killed):
 
   | Run | Killed |
   |---|---|
-  | `test_inc2_audit_stream_mutants.py` (AS1-AS27, new) | 27 of 27 |
+  | `test_inc2_audit_stream_mutants.py` (AS1-AS40, new; AS28-AS40 cover the review fixes) | 40 of 40 |
   | `test_stream_ap_stalls_mutants.py` (SG8 and SG10 follow the moved code) | 42 of 42 |
   | `test_stream_ap_mutations.py` | SM1-SM18 |
   | Deviations 4, 5 and 6 | 28 of 28, 53 of 53, 39 of 39 |
 - **The new tests on the base's code.** `test_inc2_audit_stream.py` and `test_inc2_audit_stream_s002.py` cannot import the module. `test_stream_ap_audit_coverage.py` fails 3 checks: the threshold is missing, and a shortfall raises no card. The 6 checks that hold on the base too are: no L4 proposed again, the full-coverage world, and the real s001 record with its fixture checks. Every SIU box is species-labelled, so both readings of that record agree.
 - **Workstation checkout:**
-  - `test_stream_pipeline.py` and `test_stream_ap_no_throttles.py`: 0 failures.
-  - `deploy_funnel.sh --dry-run`: passes with no `--allow-*` flag. No code_shas, pinned or shared file is changed (`inc2/v3fam.py` 3d776dae… unchanged), and `run_inc_audit.sh` and the fixture are listed.
+  - `test_stream_pipeline.py` and `test_stream_ap_no_throttles.py`: 0 failures on b8e2f60 (they fail on the lab scratch copies for environmental reasons, on the base as well); the deploy's pre-flight runs them again on the merged tree.
+  - `deploy_funnel.sh --dry-run`: passes with no `--allow-*` flag, on b8e2f60 and on 8fdf3d0. No code_shas, pinned or shared file is changed (`inc2/v3fam.py` 3d776dae… unchanged), and `run_inc_audit.sh` and the fixture are listed.
 
 ### Open items
 
