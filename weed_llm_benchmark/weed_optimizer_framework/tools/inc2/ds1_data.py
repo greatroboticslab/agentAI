@@ -158,6 +158,9 @@ AUDIT_IOU = 0.5
 # reference always did; a screen's audit taken before it (no "version") read [class, cx, cy, w] as the box and is
 # taken again (reaudit) before any pool applies it
 AUDIT_VERSION = 2
+# The audit's predictor, E1-A seed 0 (e1a_predictor: INC/e1_a_m640/runs/base__s0/weights/final.pt, the file the screen
+# p1_r001 read; cited by sha256 in Revision 2's stamp file): the audit taken again refuses any other weights
+AUDIT_PREDICTOR_SHA256 = "a8e1b61ad29806c11228b9a54a463e40ac466fb3a717a17fcb2d6fc620e4cfcb"
 FAMILY_CAP = 0.35
 MD_SHARE, MD_MIN, MD_MAX = 0.05, 15, 500
 MTW_SHARE, MTW_MIN, MTW_MAX = 0.10, 30, 1000
@@ -2216,6 +2219,10 @@ def reaudit(phase, inputs, write=True):
     it in place of the revision's own audit, which the record keeps beside it (superseded)."""
     if inputs.predict is None or inputs.audit_ref is None:
         raise DataRefused("the model audit is taken again only with E1-A's predictor and train_core's reference")
+    wsha = getattr(inputs.predict, "weights_sha256", None)
+    if (wsha is not None or inputs.production) and wsha != AUDIT_PREDICTOR_SHA256:
+        raise DataRefused("the model audit is taken again with the screen's predictor, E1-A seed 0 (weights sha256 "
+                          "%s...), not weights %s" % (AUDIT_PREDICTOR_SHA256[:12], wsha))
     ctx = eligibility_ctx(inputs)
     done = []
     for p in audit_due(phase):
@@ -2228,13 +2235,19 @@ def reaudit(phase, inputs, write=True):
                 continue
             rs = live.get(s, [])
             new = source_audit(rs, s, inputs.predict, inputs.audit_ref)
+            # the rows the screen held: eligibility is read now, so a row a later quarantine, never-train entry or
+            # stream consumed is out; each source's record says whether its live count is the screen's, and its
+            # sample's keys, so any difference from the screen (and from Revision 2's check, R2) is on record
             srcs[s] = {"audit_verdict": new, "superseded": old, "live_then": v.get("live"), "live_now": len(rs),
+                       "rows_as_screened": len(rs) == int(v.get("live") or 0),
+                       "sample_keys": [str(r["key"]) for r in audit_sample(rs, s)],
                        "partial_changed": bool(old.get("partial")) != bool(new.get("partial"))}
         doc = {"format": FMT_REAUDIT, "phase": int(phase), "revision": d.get("revision"), "screen": p.name,
                "screen_sha256": C.sha256_file(p), "version": AUDIT_VERSION,
                "why": "Revision 2, item 4: the screen's audit read each labelled box as [class, cx, cy, w]; taken "
                       "again with the class stripped, as train_core's reference reads its boxes",
-               "predictor_weights_sha256": getattr(inputs.predict, "weights_sha256", None),
+               "predictor_weights_sha256": wsha,
+               "rows_differ": sorted(s for s, x in srcs.items() if not x["rows_as_screened"]),
                "train_core": inputs.audit_ref, "sources": srcs, "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
         if write:
             write_once(reaudit_path(p), doc)

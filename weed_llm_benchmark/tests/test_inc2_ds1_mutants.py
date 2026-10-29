@@ -125,6 +125,10 @@ must occur exactly once in its file), runs its target against the copy and requi
   DX20  stream            an item is reopened before the deployed tree holds the Revision's file
   DX21  stream            the time-stamp card asked for once is never raised again for a later Revision
   DX22  diagnose_stream   an 'accept' on a partially labelled source waits for a pool, not for its sheet
+  DX23  ds1_data          the audit is taken again with another predictor than the screen's (E1-A seed 0)
+  DX24  ds1_data          a source whose live rows are no longer the screen's is recorded as the screen's
+  DX25  stream            the time-stamp card names every Revision, also one the record names (refused)
+  DX26  ds1               timestamp_missing lists a Revision its own record names
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -347,8 +351,9 @@ MUTANTS = {
     "DX14": (DD, '    if audit_due(phase):\n        # a screen', '    if False:\n        # a screen', REV2),
     "DX15": (DC, 'RA_SEGMENT_RE = re.compile(r"weed_stream_v1_fork1364_s[0-9]{3}\\Z")',
              'RA_SEGMENT_RE = re.compile(r".*_s[0-9]{3}\\Z")', REV2),
-    "DX16": (DC, '        if isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP and sep.get("sha256") == '
-                 'rv["sha256"] \\', '        if isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP \\', REV2),
+    "DX16": (DC, '    return bool(isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP and sep.get("sha256") == '
+                 'rv["sha256"]\n', '    return bool(isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP and True\n',
+             REV2),
     "DX17": (DC, '           "proofs": _proof_pair(proof, stamp_proof, rv["sha256"], rv["commit"], rv["file"]), '
                  '"written_utc": _utc()}', '           "proofs": [{"sha256": "x"}, {"sha256": "y"}], "written_utc": _utc()}',
              REV2),
@@ -357,8 +362,16 @@ MUTANTS = {
              '                        False:', REV2),
     "DX20": (ST, 'or not self._ds1_tree_file(ro.get("file") or "",',
              'or not (lambda *a, **k: True)(ro.get("file") or "",', REV2),
-    "DX21": (ST, '"missing:%s" % ",".join(str(r.get("sha256"))[:12] for r in rv)', '"missing"', REV2),
+    "DX21": (ST, 'self._ds1_card_once("timestamp", "revisions:%s" % ",".join(',
+             'self._ds1_card_once("timestamp", "missing" or ",".join(', REV2),
     "DX22": (DSM, '        if DS1_DECIDE_AGAIN in str(x.get("why") or ""):', '        if False:', REV2),
+    # Revision 2 as registered again before its deploy (the review's points)
+    "DX23": (DD, '    if (wsha is not None or inputs.production) and wsha != AUDIT_PREDICTOR_SHA256:', '    if False:', REV2),
+    "DX24": (DD, '"rows_as_screened": len(rs) == int(v.get("live") or 0),', '"rows_as_screened": True,', REV2),
+    "DX25": (ST, '                    int(r["n"]) in [int(x) for x in tm.get("revisions") or []]]',
+             '                    True]', REV2),
+    "DX26": (DC, '    return {"record": rec, "revisions": [int(rv["n"]) for rv in REVISIONS if not revision_named(rv, d, p)]}',
+             '    return {"record": rec, "revisions": [int(rv["n"]) for rv in REVISIONS]}', REV2),
 }
 
 

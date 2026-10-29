@@ -796,12 +796,14 @@
   "amendment_sha256": "3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699",
   "revisions": [
    {
+    "n": 1,
     "file": "docs/prereg/DS1_rev1_2026-10-29.md",
     "sha256": "543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7",
     "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt",
     "why": "DS1 Revision 1 (docs/CONTINUOUS_LOOP.md, Revision (2026-10-29)), before any DS1 data: no DS1 lever is proposed until the deployed tree holds it by this sha256"
    },
    {
+    "n": 2,
     "file": "docs/prereg/DS1_rev2_2026-10-29.md",
     "sha256": "b9c7350052c720510db4cd3188fc437d8aa54460795a90c8649d2b37d8a2bb13",
     "stamp_file": "docs/prereg/DS1_rev2_2026-10-29.stamp.txt",

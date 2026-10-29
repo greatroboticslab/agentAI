@@ -358,19 +358,32 @@ def _two_proofs(r):
     return len([p for p in (r or {}).get("proofs") or [] if isinstance(p, dict) and p.get("sha256")]) == 2
 
 
+def revision_named(rv, d, ts_path=None):
+    """True when Revision rv (an entry of REVISIONS) is named by its sha256 with two proofs: in the time-stamp record d,
+    or (a Revision made after it) in its own record beside it (revision_stamp_path)."""
+    got = {r.get("sha256"): r for r in (d or {}).get("revisions") or [] if isinstance(r, dict)} \
+        if isinstance(d, dict) else {}
+    if rv["sha256"] in got and _two_proofs(got[rv["sha256"]]):
+        return True
+    sep = _read_json(revision_stamp_path(rv["n"], ts_path))
+    return bool(isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP and sep.get("sha256") == rv["sha256"]
+                and sep.get("prereg_sha256") == PREREG_SHA256 and _two_proofs(sep))
+
+
 def revisions_ok(d, ts_path=None):
-    """True when every Revision (REVISIONS) is named by its sha256 with two proofs: in the time-stamp record, or (a
-    Revision made after it) in its own record beside it (revision_stamp_path)."""
-    got = {r.get("sha256"): r for r in (d or {}).get("revisions") or [] if isinstance(r, dict)}
-    for rv in REVISIONS:
-        if rv["sha256"] in got and _two_proofs(got[rv["sha256"]]):
-            continue
-        sep = _read_json(revision_stamp_path(rv["n"], ts_path))
-        if isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP and sep.get("sha256") == rv["sha256"] \
-                and sep.get("prereg_sha256") == PREREG_SHA256 and _two_proofs(sep):
-            continue
-        return False
-    return True
+    """True when every Revision (REVISIONS) is named (revision_named)."""
+    return all(revision_named(rv, d, ts_path) for rv in REVISIONS)
+
+
+def timestamp_missing(path=None):
+    """What the time stamp still lacks, for the ticker's card (it names only these steps, each Revision by its own
+    number): {"record": True when ds1/v1/timestamp.json names the prereg's sha256 with two proofs (it is written
+    once), "revisions": [the number of each Revision named neither by it nor by its own record]}."""
+    p = Path(path or timestamp_path())
+    d = _read_json(p)
+    rec = bool(isinstance(d, dict) and d.get("format") == FMT_TIMESTAMP and d.get("sha256") == PREREG_SHA256
+               and _two_proofs(d))
+    return {"record": rec, "revisions": [int(rv["n"]) for rv in REVISIONS if not revision_named(rv, d, p)]}
 
 
 def timestamp_record(proof, stamp_proof, sha256=None, revisions=None):

@@ -6158,10 +6158,11 @@ class StreamRun(object):
                 now.append(key)
             if now:
                 self._ledger("ds1_reopened", record_only=True, ds1_items=now, marker=marker, reasons=[
-                    "DS1: %s reopened under %s (%s): proposed again under new ids, earlier spend kept in prior_gpuh"
-                    % (", ".join(now), marker, ro.get("file"))])
-                self._card("research", "DS1: %s proposed again (%s)" % (", ".join(now), marker),
-                           "%s, recorded in %s. Earlier attempts stay counted against the family cap." % (
+                    "DS1: %s reopened under %s (%s): proposed again under a new id once DS1's gate is open, earlier "
+                    "spend kept in prior_gpuh" % (", ".join(now), marker, ro.get("file"))])
+                self._card("research", "DS1: %s reopened (%s)" % (", ".join(now), marker),
+                           "%s, recorded in %s. It is proposed again under a new id once DS1's gate is open (every "
+                           "time-stamp record in place). Earlier attempts stay counted against the family cap." % (
                                ro.get("why") or marker, ro.get("file")), lever="L33")
                 out += now
         return out
@@ -6596,23 +6597,32 @@ class StreamRun(object):
             return
         if not st.get("timestamp"):
             rv = list(cfg.get("revisions") or [])
+            tm = st.get("timestamp_missing") if isinstance(st.get("timestamp_missing"), dict) else {}
+            upgrade = ("Nothing of DS1 is proposed before it. A proof still pending in Bitcoin is upgraded later (ots "
+                       "upgrade; ots verify's output recorded) and committed: the record names what each proof "
+                       "stamps, which the upgrade does not change.")
+            # one card per set of missing records (Revision 2, item 6): ds1/v1/timestamp.json is written once, so a
+            # Revision it does not name is recorded by its own step, named by the Revision's own number, and only the
+            # Revisions the cluster's status lists as unnamed are named (never one already recorded, which is refused)
+            need = [r for r in rv if tm.get("record") and r.get("n") is not None and
+                    int(r["n"]) in [int(x) for x in tm.get("revisions") or []]]
+            if need:
+                self._ds1_card_once("timestamp", "revisions:%s" % ",".join("%s=%s" % (r["n"], str(r.get("sha256"))[
+                    :12]) for r in need), "research", "DS1 waits for its time-stamp record",
+                    "DS.12 step 0a: ds1/v1/timestamp.json exists (it is written once) and names no record of %s. On "
+                    "the login node, from the deployed tree's root: %s (ds1/v1/timestamp_rev<n>.json). %s" % (
+                        ", ".join("Revision %s" % r["n"] for r in need), "; ".join(
+                            "%s.ds1 timestamp-revision --revision %s --proof %s.ots --stamp-proof %s.ots" % (
+                                mod, r["n"], r.get("file"), r.get("stamp_file")) for r in need), upgrade), "L30")
+                return
             revs = " ".join("--revision-proof %s.ots --revision-stamp-proof %s.ots" % (r.get("file"), r.get(
                 "stamp_file")) for r in rv)
-            # one card per set of Revisions (Revision 2: a Revision made after the record has its own record, so the
-            # card that asked for the first record is raised again with the step that names the new one)
-            later = "; ".join("%s.ds1 timestamp-revision --revision %d --proof %s.ots --stamp-proof %s.ots" % (
-                mod, i + 1, r.get("file"), r.get("stamp_file")) for i, r in enumerate(rv))
             self._ds1_card_once("timestamp", "missing:%s" % ",".join(str(r.get("sha256"))[:12] for r in rv),
                                 "research", "DS1 waits for its time-stamp record",
                                 "DS.12 step 0a: on the login node, %s.ds1 timestamp --proof docs/prereg/"
                                 "DS1_2026-10-29.md.ots --stamp-proof docs/prereg/DS1_2026-10-29.stamp.txt.ots %s "
-                                "(ds1/v1/timestamp.json names the prereg's and each Revision's sha256 and proofs). If "
-                                "ds1/v1/timestamp.json exists already (it is written once), each Revision it does not "
-                                "name is recorded by its own step: %s (ds1/v1/timestamp_rev<n>.json). "
-                                "Nothing of DS1 is proposed before it. A proof still pending in Bitcoin is upgraded "
-                                "later (ots upgrade; ots verify's output recorded) and committed: the record names "
-                                "what each proof stamps, which the upgrade does not change." % (mod, revs, later),
-                                "L30")
+                                "(ds1/v1/timestamp.json names the prereg's and each Revision's sha256 and proofs). %s"
+                                % (mod, revs, upgrade), "L30")
             return
         steps = []
         if not st.get("ra"):
@@ -6637,10 +6647,11 @@ class StreamRun(object):
             again = sorted(s_ for s_, x in srcs.items() if x.get("decided") and DS.DS1_DECIDE_AGAIN in str(x.get("why")
                                                                                                        or ""))
             if again:
-                steps.append("a new sheet decision waits (phase %s, the delegate; DS.5.1 item 4: the model audit finds "
-                             "them partially labelled, so they enter only as 'accept for training only'): %s; stored "
-                             "with %s.ds1_sheets record --file <it> --decided-by delegate" % (ph, ", ".join(again[:12]),
-                                                                                             mod))
+                steps.append("a new sheet decision waits (phase %s; DS.5.1 item 4: the model audit finds them "
+                             "partially labelled, so they enter only as 'accept for training only'): %s; stored with "
+                             "%s.ds1_sheets record --file <it> --decided-by delegate, or --decided-by human:<his id> "
+                             "for a source whose owner's audit decision governs it (the delegate's does not override "
+                             "his)" % (ph, ", ".join(again[:12]), mod))
         if sh.get("audit_pending"):
             steps.append("owner audit waiting (DS.0 item 4): %s; the audit sheet batch is rendered on the lab; his "
                          "decisions are stored with %s.ds1_sheets record --file <it> --decided-by human:<his id>"

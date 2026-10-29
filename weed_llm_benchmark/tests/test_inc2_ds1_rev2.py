@@ -462,6 +462,19 @@ def t_audit():
         check("  pools never applies masks from an audit taken before Revision 2", e_mask is not None and
               "taken before Revision 2" in str(e_mask), e_mask)
         inputs = screen_inputs(rs, pred, REF)
+        pred.weights_sha256 = "0" * 64
+        e_w = refused(DD.reaudit, 1, inputs, write=False)
+        pred.weights_sha256 = DD.AUDIT_PREDICTOR_SHA256
+        check("  reaudit refuses another predictor than the screen's (E1-A seed 0's weights by sha256)",
+              e_w is not None and "E1-A seed 0" in str(e_w) and refused(DD.reaudit, 1, inputs, write=False) is None,
+              e_w)
+        later = types.SimpleNamespace(**vars(inputs))
+        later.never = {"src_mask"}                  # a never-train entry made after the screen
+        gone = DD.reaudit(1, later, write=False)[0]
+        check("  a source whose live rows are no longer the screen's is on record (rows_as_screened, rows_differ)",
+              gone["rows_differ"] == ["src_mask"] and gone["sources"]["src_mask"]["rows_as_screened"] is False and
+              gone["sources"]["src_mask"]["live_now"] == 0 and gone["sources"]["src_full"]["rows_as_screened"],
+              {k: gone[k] for k in ("rows_differ",)})
         done = DD.reaudit(1, inputs)
         ra = DD._read_json(DD.reaudit_path(rev))
         new = ra["sources"]["src_full"]["audit_verdict"]
@@ -469,6 +482,11 @@ def t_audit():
               "kept beside, partial_changed", len(done) == 1 and not new["partial"] and new["version"] ==
               DD.AUDIT_VERSION and ra["sources"]["src_full"]["superseded"] == old and ra["sources"]["src_full"][
                   "partial_changed"] and new["source"]["images"] == 5, ra["sources"]["src_full"])
+        check("  the record names the predictor, the rows as screened and each sample's keys", ra[
+            "predictor_weights_sha256"] == DD.AUDIT_PREDICTOR_SHA256 and ra["rows_differ"] == [] and ra["sources"][
+            "src_full"]["sample_keys"] == [r["key"] for r in DD.audit_sample([x for x in rs if x["source"] ==
+                                                                               "src_full"], "src_full")],
+              {k: ra.get(k) for k in ("predictor_weights_sha256", "rows_differ")})
         check("  written once, beside the revision and under the sheets (the lab's pull carries it)",
               refused(DD.reaudit, 1, inputs) is None and DD.reaudit_sheet_path(rev).is_file() and
               DD.audit_due(1) == [] and refused(DD.write_once, DD.reaudit_path(rev), {}) is not None)
@@ -561,6 +579,8 @@ def t_reopen():
           and rec["fails"] == 0 and {"pidA", "pidB"} <= set(st["failed_ids"]) and abs(rec["prior_gpuh"] - 0.08) <
           1e-12 and rec["reopen_history"][-1]["marker"] == blk["marker"] and len(run.cards) == 1 and
           run.ledger[0][0] == "ds1_reopened", (got, rec, run.cards))
+    check("  its card says reopened, not proposed (nothing is proposed while the gate is closed)",
+          "reopened" in run.cards[0] and "proposed again" not in run.cards[0], run.cards)
     rec.update(state="failed", started_utc="2026-10-29T18:30:00Z")
     check("  never twice under one marker", ST.StreamRun._ds1_reopen(run) == [] and rec["state"] == "failed")
     st["ds1"]["items"]["score:POWER:draft_r001"] = {"state": "failed", "started_utc": "2026-10-30T02:00:00Z",
@@ -581,15 +601,25 @@ def t_ts_card():
     run.cards = []
     run._card = lambda kind, title, body, **kw: run.cards.append((title, body))
     run._ds1_card_once = types.MethodType(ST.StreamRun._ds1_card_once, run)
-    ctx = {"stage": {"ds1": {"amendment": True, "never_cut": True, "status": {"timestamp": False}}}}
+    status = {"timestamp": False, "timestamp_missing": {"record": True, "revisions": [2]}}
+    ctx = {"stage": {"ds1": {"amendment": True, "never_cut": True, "status": status}}}
     run.ev = types.SimpleNamespace(json=lambda name: ctx)
     ST.StreamRun._ds1_cards(run, None)
     body = run.cards[0][1] if run.cards else ""
     check("the card asked for before is raised again, naming timestamp-revision --revision 2 with Revision 2's proofs",
           len(run.cards) == 1 and "timestamp-revision --revision 2 --proof docs/prereg/DS1_rev2_2026-10-29.md.ots "
           "--stamp-proof docs/prereg/DS1_rev2_2026-10-29.stamp.txt.ots" in body, run.cards)
+    check("  only the Revision the status lists as unnamed, by its own number (never Revision 1, which the record "
+          "names and timestamp-revision refuses), and not the record's own step; short enough for the ledger's copy",
+          "--revision 1" not in body and "ds1 timestamp --proof" not in body and len(body) <= 1000, body)
     ST.StreamRun._ds1_cards(run, None)
     check("  and only once", len(run.cards) == 1)
+    status["timestamp_missing"] = {"record": False, "revisions": [1, 2]}
+    ST.StreamRun._ds1_cards(run, None)
+    body = run.cards[-1][1] if len(run.cards) == 2 else ""
+    check("  with no record yet: the record's own step with every Revision's proofs, no timestamp-revision",
+          "ds1 timestamp --proof docs/prereg/DS1_2026-10-29.md.ots" in body and "--revision-proof docs/prereg/"
+          "DS1_rev2_2026-10-29.md.ots" in body and "timestamp-revision" not in body, run.cards[1:])
 
 
 def t_decide_again():
@@ -647,6 +677,8 @@ def t_registration():
                 {"file": "c", "sha256": "c" * 64}, {"file": "d", "sha256": "d" * 64}]}]})
         check("the live record (the amendment and Revision 1 only) does not open the gate once Revision 2 exists",
               not D.timestamp_ok() and refused(D.require_timestamp) is not None)
+        check("  timestamp_missing: the record exists, Revision 2 is unnamed",
+              D.timestamp_missing() == {"record": True, "revisions": [2]}, D.timestamp_missing())
         ots = [str(GIT / (rv["file"] + ".ots")), str(GIT / (rv["stamp_file"] + ".ots"))]
         e_sw = refused(D.timestamp_revision, 2, ots[1], ots[0])
         e_r1 = refused(D.timestamp_revision, 2, str(GIT / (revs[1]["file"] + ".ots")),
@@ -662,9 +694,18 @@ def t_registration():
               "follows), once; then the gate opens", rec["proofs"][0]["stamps"] == rv["sha256"] and
               rec["follows"]["sha256"] == C.sha256_file(D.timestamp_path()) and D.timestamp_ok() and
               refused(D.timestamp_revision, 2, ots[0], ots[1]) is not None)
+        check("  timestamp_missing then lists nothing", D.timestamp_missing() == {"record": True, "revisions": []},
+              D.timestamp_missing())
         bad = dict(json.loads(D.revision_stamp_path(2).read_text()), sha256="0" * 64)
         D.revision_stamp_path(2).write_text(json.dumps(bad))
-        check("  a revision record naming another sha256 keeps it closed", not D.timestamp_ok())
+        check("  a revision record naming another sha256 keeps it closed", not D.timestamp_ok() and
+              D.timestamp_missing()["revisions"] == [2])
+    with inc("inc_ts_none"):
+        check("no record: timestamp_missing names the record and every Revision",
+              D.timestamp_missing() == {"record": False, "revisions": [r["n"] for r in D.REVISIONS]},
+              D.timestamp_missing())
+    check("the domain's Revisions carry their own numbers (the card names each by it)",
+          [r.get("n") for r in LS.load_domain("weed")["ds1"]["revisions"]] == [r["n"] for r in D.REVISIONS])
 
 
 def main():
