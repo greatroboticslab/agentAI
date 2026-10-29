@@ -789,6 +789,267 @@
   "storage_why": "GB each item writes (V3F.5's storage lines): D6's smoke stages base_v2 (at most 3 GB, the transposed copies) and trains one epoch (at most 1.1 GB transient) = 4.1; its train writes at most 1.1 GB transient per running seed and 0.135 GB per final, 3 x 1.235 = 3.7 (the staging is the smoke's). /ocean holds the Hugging Face cache too, so the step-0c downloads (8.7 GB) come out of the same headroom; the ticker raises one card when the items not yet done need more than /ocean holds above the floor and margin.",
   "why": "V3F, the v3 experiment family D0-D9 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, pre-registered as one family; docs/prereg/V3F_2026-10-11.md): once E3's verdict is decided and the model-zoo audit is complete, the deployed tree holds the amendment (its sha256), v3fam/v1/timestamp.json exists and D0-S's record is complete (the derived status v3fam/v1/status.json the snapshot ships), DR0 proposes, one MAINT item at a time and in V3F.7's order: L23H once (inc2.v3fam_data build), then L23J for E3RS, D2's nine arms, D3 and D9 (inc2.v3fam score --arm X), then L23I for each build (inc2.baseline build --exp E --v3fam ARM; D0BCLEAN first and only when D0-S triggered it; a lane item ends when its build job ends and the seeds' runs overlap), then L23J for BCLEAN, D8, D4F, D4N, D4R15, D1 (after the EXIF frame pre-flight passed) and D6 once its runs (or D6's three seed exports) are done, then L23L once (inc2.v3fam_verdict verdict; deviation 5) when every arm is done, failed or not run; on TRAIN, L23K's smoke after L23H, then its three seeds in one item when the smoke's projection is within 28.8 h. Every item is record only: a failure is one card and the item is proposed once more; after a second failure it is recorded failed, never holds the other arms, and keeps its place in the verdict. A refusal of the platform's own making (a reproduction record taken by other code, an E3-frozen file changed: deviation 5) is never a failure: the item is held with a card and proposed again once the snapshot reports the records current; no family score is proposed while a record is taken by other code than the deployed one (v3fam.equivalence_code names the code the cluster's records pin). No item is proposed while storage is under 30 GiB above the 3 % floor for its bytes (a card names the shortfall), or while its estimate would take the family past 260 GPU-h (the family cap, decision 25: running items at their estimates, ended ones settled from sacct or the experiment's report, the person steps from the derived status; it is recorded 'not run (family cap)' and never retried). D5b's three builds train with dev as their only final (Revision 30: the pinned driver's minimum; the family never reads those dev scores). An L23K seed job killed at its walltime fails D6 and is not retried; a retry of L23K's train names only the seeds not yet trained; every attempt of an item counts against the cap; the verdict's argv names the items the ticker refused at the cap. Person and delegate steps are never levers: D0-S's sweep and verdicts, the weight downloads, D7, the EXIF verdict, every sealed-test read and the re-analysis; the family card gives their exact commands."
  },
+ "ds1": {
+  "family": "v1",
+  "amendment_commit": "b60b8ee4763867f03b37f09a35ae808b630f5d28",
+  "amendment_file": "docs/prereg/DS1_2026-10-29.md",
+  "amendment_sha256": "3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699",
+  "revisions": [
+   {
+    "file": "docs/prereg/DS1_rev1_2026-10-29.md",
+    "sha256": "543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7",
+    "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt",
+    "why": "DS1 Revision 1 (docs/CONTINUOUS_LOOP.md, Revision (2026-10-29)), before any DS1 data: no DS1 lever is proposed until the deployed tree holds it by this sha256"
+   }
+  ],
+  "never_cut": {
+   "module": "weed_optimizer_framework/tools/inc2/step1_stream.py",
+   "marker": "DS1_NEVER_TRAIN",
+   "list": "splits/ds1/never_train.jsonl",
+   "why": "DS.9.1 and DS.9.3: the stream cutter's never-cut list reads DS1's MD v1 and MT-W v2 lists; no DS1 item is proposed before the deployed tree's cutter does (the marker in the deployed step1_stream.py)"
+  },
+  "status": "ds1/v1/status.json",
+  "data_record": "splits/ds1/summary.json",
+  "score_record": "capacity/ds1_score_%s.json",
+  "verdict_records": {
+   "1": "capacity/ds1_v1.json",
+   "2": "capacity/ds1_v2.json"
+  },
+  "power_record": "capacity/ds1_power.json",
+  "ra_record": "capacity/ds1_ra_gate.json",
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "steps": [
+   "screen",
+   "md_s0",
+   "pools",
+   "draw",
+   "manifests"
+  ],
+  "phase1_builds": [
+   "S0",
+   "KF",
+   "KD",
+   "KT",
+   "S1CR",
+   "S1C",
+   "S1U"
+  ],
+  "phase2_builds": [
+   "S2"
+  ],
+  "build_exps": {
+   "KD": "ds1_kd_m640",
+   "KT": "ds1_kt_m640",
+   "KF": "ds1_kf_m640",
+   "S0": "ds1_s0_m640",
+   "S1CR": "ds1_s1cr_m640",
+   "S1C": "ds1_s1c_m640",
+   "S1U": "ds1_s1u_m640",
+   "S2": "ds1_s2_m640"
+  },
+  "k_source": "zenodo_15808623",
+  "long_arms": {
+   "S0X": "S0",
+   "S2X": "S2",
+   "S1UX": "S1U"
+  },
+  "score_arms": [
+   "POWER",
+   "K0",
+   "KD",
+   "KT",
+   "KF",
+   "S0",
+   "S1CR",
+   "S1C",
+   "S1U",
+   "S2",
+   "S0X",
+   "S2X",
+   "S1UX"
+  ],
+  "score_after": {
+   "POWER": [
+    "data:1:md_s0"
+   ],
+   "K0": [
+    "score:POWER"
+   ],
+   "KD": [
+    "build:KD"
+   ],
+   "KT": [
+    "build:KT"
+   ],
+   "KF": [
+    "build:KF"
+   ],
+   "S0": [
+    "build:S0"
+   ],
+   "S1CR": [
+    "build:S1CR"
+   ],
+   "S1C": [
+    "build:S1C"
+   ],
+   "S1U": [
+    "build:S1U"
+   ],
+   "S2": [
+    "build:S2"
+   ],
+   "S0X": [
+    "long:S0X:train"
+   ],
+   "S2X": [
+    "long:S2X:train"
+   ],
+   "S1UX": [
+    "long:S1UX:train"
+   ]
+  },
+  "verdict_arms": {
+   "1": [
+    "K0",
+    "KD",
+    "KT",
+    "KF",
+    "S0",
+    "S1CR",
+    "S1C",
+    "S1U"
+   ],
+   "2": [
+    "S0X",
+    "S2",
+    "S2X"
+   ],
+   "2_substituted": [
+    "S0X",
+    "S1UX"
+   ]
+  },
+  "phase_of": {
+   "POWER": 1,
+   "K0": 1,
+   "KD": 1,
+   "KT": 1,
+   "KF": 1,
+   "S0": 1,
+   "S1CR": 1,
+   "S1C": 1,
+   "S1U": 1,
+   "S0X": 1,
+   "S2": 2,
+   "S2X": 2,
+   "S1UX": 2
+  },
+  "substitute": {
+   "S2": "S1U",
+   "S2X": "S1UX"
+  },
+  "dates": {
+   "s2_freeze_by": "2026-12-05",
+   "reads_by": "2026-12-20",
+   "su_end": "2026-12-31"
+  },
+  "max_failures": 2,
+  "cap_gpu_hours": 260.0,
+  "phase_reserve_gpu_hours": 85.8,
+  "cut_last": [
+   "read:challenger",
+   "build:S2",
+   "build:S1CR"
+  ],
+  "phase1_bytes_gb": 60.0,
+  "floors": {
+   "v3f": {
+    "share": 0.03,
+    "margin_gib": 30.0
+   },
+   "data": {
+    "share": 0.03,
+    "margin_gb": 200.0
+   },
+   "why": "DS.0 item 21: phase 1's byte-adding items within its 60 GB keep V3F's floor (D27's 3 % plus 30 GiB, 257.8 GB on the 6.836 TiB quota) free; any later byte-adding item keeps lane DATA's floor (3 % plus 200 GB, 425.6 GB) too; every other item keeps V3F's floor"
+  },
+  "costs": {
+   "data_hours": {
+    "screen": 1.0,
+    "md_s0": 0.5,
+    "pools": 0.5,
+    "draw": 0.25,
+    "manifests": 0.75
+   },
+   "data_cap": {
+    "screen": 2.0,
+    "md_s0": 1.0,
+    "pools": 1.0,
+    "draw": 0.5,
+    "manifests": 1.5
+   },
+   "build_ms_per_image_epoch": 13.2,
+   "budget_image_epochs": 1200000,
+   "finals_hours_per_run": 0.1,
+   "build_job_hours": 4.0,
+   "build_cap": 20.0,
+   "long_smoke_hours": 0.5,
+   "long_smoke_cap": 1.0,
+   "long_train_hours": 14.2,
+   "long_train_cap": 19.2,
+   "long_resubmit_cap": 28.8,
+   "score_hours": {
+    "POWER": 1.5,
+    "K0": 0.6,
+    "KD": 0.8,
+    "KT": 0.8,
+    "KF": 0.8,
+    "S0": 1.2,
+    "S1CR": 0.6,
+    "S1C": 1.2,
+    "S1U": 1.2,
+    "S2": 1.2,
+    "S0X": 1.2,
+    "S2X": 1.2,
+    "S1UX": 1.2
+   },
+   "score_cap": 2.0,
+   "verdict_hours": 0.5,
+   "verdict_cap": 1.0,
+   "person_hours": {
+    "read": 0.6
+   },
+   "why": "DS.9.2's estimates and caps (DS.11): L30 3.0 GPU-h a phase over its five steps (<= 6), L32 seeds x 1.2 M x the rate + finals (<= 20), the rate 13.2 ms: a 1.2 M m640 run took 4.4 GPU-h in V3F (DS.11's 13.2 a 3-seed arm); the build job's own GPU-h is settled from sacct, not estimated, L32X's smoke 0.5 (<= 1) and 14.2 per seed (<= 19.2 at the decided compute; 28.8 for S2x's one 36 h re-submission), L33 per arm (<= 2), L34 0.5 (<= 1); a sealed read about 0.6 (a person's job)"
+  },
+  "storage_gb": {
+   "data:screen": 2.0,
+   "data:md_s0": 1.0,
+   "data:pools": 30.0,
+   "data:draw": 1.0,
+   "data:manifests": 5.0,
+   "build": 0.5,
+   "long:smoke": 0.5,
+   "long:train": 1.0,
+   "score": 0.3,
+   "verdict": 0.01,
+   "why": "GB each item writes at most (DS.11's bounds: phase 1's written images, only masked rows, at most 45 GB; runs, manifests, exam lists and score arrays at most 15 GB)"
+  },
+  "reaudit_segments": [
+   "weed_stream_v1_fork1364_s001",
+   "weed_stream_v1_fork1364_s002"
+  ],
+  "lab": {
+   "sheets_html": "ds1/v1/sheets/html",
+   "owner_folder": "_work/v7/sheets",
+   "why": "L31 renders each batch on the lab (0 SU) and the delegate copies its HTML to the owner's working folder; record runs on the login node"
+  },
+  "why": "DS1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29; docs/prereg/DS1_2026-10-29.md): once the deployed tree holds the amendment (its sha256), ds1/v1/timestamp.json names it and its proofs, and the deployed cutter reads DS1's never-train list, DR0 proposes DS1's items in DS.12's order, one MAINT item at a time (L30 data steps, L31 sheets on the lab, L32 1.2 M builds, L33 scores, L34 verdicts) and L32X on TRAIN, record only: a failure is one card and the item is proposed once more; after a second failure it is recorded failed and never holds another item. An item that needs a person's decision is not proposed and one card names what waits (sheets, the owner's audit, the MT-W check, LN, RA, the time stamp); every other DS1 item whose conditions hold, and every stream and DATA item, is proposed as usual. No item is proposed while storage would fall under its floor, its estimate would take the family past 260 GPU-h, or (a phase-1 item, until verdict v2 or the date substitution) past 174.2 GPU-h, the phase reserve's line. Nothing switches: no DS1 number changes a stream rule, pool, hold, incumbent or deployed model."
+ },
  "stage_a": {
   "exp": "pilot_v4",
   "from_exp": "pilot_v3",

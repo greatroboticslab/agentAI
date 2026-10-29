@@ -1,0 +1,13 @@
+DS1 Revision 1 time-stamp file (docs/CONTINUOUS_LOOP.md, Revision (2026-10-29): DS1 Revision 1, before any DS1 data; the procedure of V3F.12)
+
+revision_sha256: 543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7
+revision_text: docs/CONTINUOUS_LOOP.md from line 5643 ('## Revision (2026-10-29): DS1 Revision 1, ...') to the end of the file at the commit below; byte-identical to docs/prereg/DS1_rev1_2026-10-29.md
+revision_commit: eb0835695680b4cefa9c3c0cdd94e3970425eaad
+amendment_sha256: 3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699 (unchanged; docs/prereg/DS1_2026-10-29.md)
+written_utc: 2026-10-29T08:21:07Z
+decided_by: the delegate under the owner's 2026-09-30 admin grant (Revision 1, items 1-5)
+
+outside-repository records cited (sha256, file name under the paper's working folder _work/):
+b892c9c27a5a4d68f91f0cb57c9790448646d77f1b32e5ada03941b211b2e491  v7/ds1_evidence/rev1/IMPLEMENTATION_REVIEW_2026-10-29.md (the review of DS1's implementation before deploy and what was done)
+
+Proofs: OpenTimestamps (`ots stamp`) of this file and of docs/prereg/DS1_rev1_2026-10-29.md, as DS1_rev1_2026-10-29.stamp.txt.ots and DS1_rev1_2026-10-29.md.ots beside them.

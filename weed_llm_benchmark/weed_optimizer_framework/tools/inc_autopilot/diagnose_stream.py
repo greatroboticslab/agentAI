@@ -30,6 +30,7 @@ make some S-case of tests/test_stream_ap_replay.py fail.
 """
 from __future__ import annotations
 
+import collections
 import datetime
 import hashlib
 import json
@@ -2184,6 +2185,277 @@ def v3fam_plan(fam, fs):
     return out, waits
 
 
+# DS1 (2026-10-29; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.3, DS.12): DS1's items, in DS.12's order
+DS1_TERMINAL = ("done", "failed", "not needed")
+DS1_PERSON = "waits for a person"
+
+
+def ds1_terminal(state):
+    """True for a DS1 item state that never changes again: done, failed (after its second failure), not needed, and
+    every 'not run (...)' (the family cap, the walltime, the supply, the date substitution)."""
+    return state in DS1_TERMINAL or str(state or "").startswith("not run")
+
+
+def _ds1_unscored(state):
+    """True for a build or long-path state that ended without anything to score (failed, not run)."""
+    return ds1_terminal(state) and state != "done"
+
+
+def _ds1_due(state):
+    """An item DR0 proposes: never proposed (missing) or failed once (proposed once more under a new id)."""
+    return state in (None, "missing", "failed_once")
+
+
+def _ds1_gate(v, st, cfg):
+    """(True, cites) when DS1's items may be proposed (DS.9.3): the deployed tree holds the amendment (its file's
+    sha256) and the cutter's never-cut change (its marker in the deployed step1_stream.py), and
+    ds1/v1/timestamp.json names the text's sha256 and its proofs. Else (False, why)."""
+    fs = st.get("ds1") or {}
+    if not fs.get("amendment"):
+        return False, "the deployed tree does not hold the amendment (%s)" % cfg.get("amendment_file")
+    if not fs.get("never_cut"):
+        return False, "the deployed cutter does not read DS1's never-train list (DS.9.1)"
+    if not (fs.get("status") or {}).get("timestamp"):
+        return False, "ds1/v1/timestamp.json does not name the amendment's sha256 and its proofs (DS.12 step 0a)"
+    return True, [v.ccite("/stage/ds1/amendment"), v.ccite("/stage/ds1/never_cut"), v.ccite("/stage/ds1/timestamp")]
+
+
+def _ds1_floor_short(v, cfg, item_gb, phase, phase1_gb, charged=False):
+    """'' when /ocean keeps the floor this item needs free after its bytes (DS.0 item 21), else why not: a phase-1
+    item within phase 1's 60 GB V3F's floor (3 % + 30 GiB), any later byte-adding item lane DATA's floor (3 % +
+    200 GB) too, every other item V3F's floor. charged: the item's bytes are counted in phase1_gb already (a data
+    step that runs again writes within its first run's bound)."""
+    qu = v.c("/quota") or {}
+    quota, free = _num(qu.get("quota_gb")), _num(qu.get("free_gb"))
+    if quota is None or free is None:
+        return "the quota is unknown"
+    fl = cfg.get("floors") or {}
+    v3f = float((fl.get("v3f") or {}).get("share", 0.03)) * quota + float((fl.get("v3f") or {}).get(
+        "margin_gib", 30.0)) * 1.073741824
+    data = float((fl.get("data") or {}).get("share", 0.03)) * quota + float((fl.get("data") or {}).get(
+        "margin_gb", 200.0))
+    gb = float(item_gb or 0.0)
+    within = int(phase) == 1 and float(phase1_gb or 0.0) + (0.0 if charged else gb) <= \
+        float(cfg.get("phase1_bytes_gb") or 60.0) + 1e-9
+    need = v3f if (within or gb <= 0) else max(v3f, data)
+    left = free - gb
+    if left < need:
+        return "storage short by %.1f GB (%.0f GB free - the item's %.1f GB, %.0f GB needed: %s)" % (
+            need - left, free, gb, need, "V3F's floor" if need == v3f else "lane DATA's floor")
+    return ""
+
+
+def _ds1_sources_settled(ph):
+    """(settled, waiting {why: [sources]}) of a phase's screened sources: a source role C (capture names) or
+    quarantined whole is settled with no decision, a rejected one by its decision; every other one decided, audited
+    where required, pooled, and, if 'accept' and drawn into exams (never the source the derived status marks
+    exam_draw false), its MD-N drawn (DS.5.4)."""
+    waits = collections.defaultdict(list)
+    for s_, x in sorted((ph.get("sources") or {}).items()):
+        if x.get("role_c") or x.get("quarantined_whole") or x.get("settled_out"):
+            continue
+        if not x.get("decided"):
+            waits["sheets"].append(s_)
+            continue
+        if x.get("decision") == "reject":
+            continue
+        if x.get("audit_required") and not x.get("audited"):
+            waits["audit"].append(s_)
+            continue
+        if not x.get("pooled"):
+            waits["pools"].append(s_)
+            continue
+        if x.get("decision") == "accept" and x.get("exam_draw", True) and not x.get("md_n"):
+            waits["draw"].append(s_)
+    return not waits, dict(waits)
+
+
+def _ds1_mtw_frozen(ph):
+    """The 'accept' sources whose MT-W v2 is not frozen (or left): training on their rows waits (DS.9.3)."""
+    return sorted(s_ for s_, x in (ph.get("sources") or {}).items() if x.get("decision") == "accept"
+                  and x.get("md_n") and x.get("mtw_draft") and not x.get("mtw"))
+
+
+def ds1_plan(cfg, fs):
+    """({lane: item}, {item: why}) DS1 wants next, from /stage/ds1 (pure: DR0 and DS1's cards read it): one MAINT
+    item and one TRAIN item in DS.12's order. fs: {"status" (the cluster's derived status), "items" {key: state},
+    "today", "phase1_gb"}. An item that needs a person's decision is never proposed: its wait is named;
+    every other item whose conditions hold is (DS.9.3, a card holds no lane)."""
+    st = fs.get("status") or {}
+    items = fs.get("items") or {}
+    phases = st.get("phases") or {}
+    p1, p2 = phases.get("1") or {}, phases.get("2") or {}
+    arms = st.get("arms") or {}
+    md = st.get("md_s0") or {}
+    sheets = st.get("sheets") or {}
+    long_ = (st.get("long") or {}).get("arms") or {}
+    pair = (st.get("long") or {}).get("pair")
+    scores = st.get("scores") or {}
+    verdicts = st.get("verdicts") or {}
+    dates = cfg.get("dates") or {}
+    s2x_wall = str(((long_.get("S2X") or {}).get("smoke")) or "").startswith("not run")
+    sub = s2x_wall or ((not arms.get("S2")) and str(fs.get("today") or "") > str(dates.get("s2_freeze_by") or "9999"))
+    waits, maint, train = {}, [], []
+
+    def state(key):
+        return items.get(key)
+
+    def due(key):
+        return _ds1_due(state(key))
+
+    def add(lst, it):
+        lst.append(dict(it, phase=int(it.get("phase") or 1)))
+    # ---- training conditions (DS.9.3)
+    train_ok = bool(st.get("ra")) and bool(st.get("power_final")) and bool(md.get("frozen"))
+    if not train_ok:
+        waits["training"] = "waits for %s" % ", ".join(x for x, c in (
+            ("RA (the delegate's inc2.ds1 ra)", not st.get("ra")), ("the power pre-flight", not st.get("power_final")),
+            ("MD-S0's freeze", not md.get("frozen"))) if c)
+    s1_frozen = bool(arms.get("S1U"))
+    # ---- 1. the phase-1 screen (again while new batches arrive before the phase-1 freeze)
+    if (not p1.get("revisions") or (p1.get("new_batches") and not s1_frozen)) and due("data:1:screen"):
+        add(maint, {"lever": "L30", "phase": 1, "step": "screen", "item": "data:1:screen"})
+    # ---- 2. the sheets on the lab
+    rendered = set(sheets.get("rendered") or [])
+    for kind, n in (("source", sheets.get("source_batches") or 0), ("ln", sheets.get("ln_batches") or 0),
+                    ("mtw", sheets.get("mtw_batches") or 0)):
+        for b in range(1, int(n) + 1):
+            key = "sheets:%s:%d" % (kind, b)
+            if "%s_%03d" % (kind, b) not in rendered and due(key):
+                add(maint, {"lever": "L31", "kind": kind, "batch": b, "item": key})
+    pend = list(sheets.get("audit_pending") or [])
+    if pend:
+        nb = 1 + len([x for x in rendered if x.startswith("audit_")])
+        key = "sheets:audit:%d" % nb
+        if due(key) and fs.get("audit_render_for") != sorted(pend):
+            add(maint, {"lever": "L31", "kind": "audit", "batch": nb, "item": key, "sources": sorted(pend)})
+    # ---- 3. MD-S0: drawn, its power, enlarged or frozen
+    if not md.get("frozen"):
+        if (not md.get("drafts") or md.get("power")) and due("data:1:md_s0"):
+            add(maint, {"lever": "L30", "phase": 1, "step": "md_s0", "item": "data:1:md_s0"})
+        elif md.get("drafts") and not md.get("power"):
+            key = "score:POWER:%s" % md.get("draft")
+            if due(key):
+                add(maint, {"lever": "L33", "arm": "POWER", "item": key})
+    # ---- 4. pools and draws of each phase
+    for phn, ph in (("1", p1), ("2", p2)):
+        srcs = ph.get("sources") or {}
+        if any(x.get("ready") and not x.get("pooled") for x in srcs.values()) and due("data:%s:pools" % phn):
+            add(maint, {"lever": "L30", "phase": int(phn), "step": "pools", "item": "data:%s:pools" % phn})
+        if any(x.get("pooled") and x.get("decision") == "accept" and x.get("exam_draw", True)
+               and not x.get("settled_out") and x.get("ready", True) and (not x.get("md_n") or (
+                   x.get("checked") and x.get("mtw_draft") and not x.get("mtw"))) for x in srcs.values()) \
+                and due("data:%s:draw" % phn):
+            add(maint, {"lever": "L30", "phase": int(phn), "step": "draw", "item": "data:%s:draw" % phn})
+    # ---- 5. the manifests (S0 and KF; KD and KT; S1c, S1c-R, S1u; S2)
+    settled1, w1 = _ds1_sources_settled(p1)
+    if md.get("frozen"):
+        want = []
+        if not arms.get("S0") or not arms.get("KF"):
+            want.append("S0/KF")
+        siu = (p1.get("sources") or {}).get(cfg.get("k_source") or "", {}) if cfg.get("k_source") else {}
+        if (not arms.get("KD") or not arms.get("KT")) and siu.get("pooled") and not st.get("k_not_run") \
+                and not st.get("k_source_out"):
+            want.append("KD/KT")
+        if st.get("k_source_out") and not st.get("k_not_run") and not arms.get("KD"):
+            want.append("KD/KT not run")
+        if settled1 and not arms.get("S1U"):
+            want.append("S1")
+        settled2, w2 = _ds1_sources_settled(p2)
+        if s1_frozen and p2.get("revisions") and settled2 and not arms.get("S2") and not sub:
+            want.append("S2")
+        for ph_, w_ in (("1", w1), ("2", w2 if s1_frozen else {})):
+            for k, ss in w_.items():
+                if k in ("sheets", "audit"):
+                    waits["%s:%s" % (k, ph_)] = "%s (phase %s): %s" % (DS1_PERSON, ph_, ", ".join(ss[:12]))
+        if want:
+            ph_ = 2 if want == ["S2"] else 1
+            if due("data:%d:manifests" % ph_):
+                add(maint, {"lever": "L30", "phase": ph_, "step": "manifests", "item": "data:%d:manifests" % ph_})
+    # ---- 6. the phase-2 screen: after the phase-1 freeze, before S2's freeze date
+    if s1_frozen and not arms.get("S2") and not sub and (not p2.get("revisions") or p2.get("new_batches")) \
+            and due("data:2:screen"):
+        add(maint, {"lever": "L30", "phase": 2, "step": "screen", "item": "data:2:screen"})
+    # ---- 7. builds (1.2 M) and the long path
+    blocked_mtw = _ds1_mtw_frozen(p1)
+    for arm in list(cfg.get("phase1_builds") or []) + list(cfg.get("phase2_builds") or []):
+        a = arms.get(arm)
+        if not a or not train_ok:
+            continue
+        if arm in ("S1C", "S1U", "S1CR") and blocked_mtw:
+            waits["build:%s" % arm] = "%s: MT-W v2 of %s is not frozen (the MT-W check)" % (DS1_PERSON,
+                                                                                         ", ".join(blocked_mtw[:8]))
+            continue
+        if arm == "S2" and (sub or _ds1_mtw_frozen(p2)):
+            continue
+        if a.get("over_line"):
+            for verb in ("smoke", "train"):
+                key = "long:%s:%s" % (arm, verb)
+                if verb == "train" and (long_.get(arm) or {}).get("smoke") != "complete":
+                    break
+                if due(key) and not ds1_terminal(state(key)):
+                    add(train, {"lever": "L32X", "verb": verb, "arm": arm, "item": key,
+                                "phase": (cfg.get("phase_of") or {}).get(arm, 1)})
+                    break
+            continue
+        if due("build:%s" % arm):
+            add(maint, {"lever": "L32", "arm": arm, "item": "build:%s" % arm,
+                        "phase": (cfg.get("phase_of") or {}).get(arm, 1)})
+    for x, parent in sorted((cfg.get("long_arms") or {}).items()):
+        if not train_ok or not arms.get(parent):
+            continue
+        if x == "S2X" and sub or x == "S1UX" and not sub:
+            continue
+        if x != "S0X" and not pair:
+            continue
+        sm = (long_.get(x) or {}).get("smoke")
+        if due("long:%s:smoke" % x) and not sm:
+            add(train, {"lever": "L32X", "verb": "smoke", "arm": x, "item": "long:%s:smoke" % x,
+                        "phase": (cfg.get("phase_of") or {}).get(x, 1)})
+        elif sm == "complete" and due("long:%s:train" % x) and \
+                sorted((long_.get(x) or {}).get("trained") or []) != [0, 1, 2]:
+            add(train, {"lever": "L32X", "verb": "train", "arm": x, "item": "long:%s:train" % x,
+                        "walltime_h": (long_.get(x) or {}).get("walltime_h"),
+                        "phase": (cfg.get("phase_of") or {}).get(x, 1)})
+    # ---- 8. scores, once an arm's runs are done (K0 once POWER is final)
+    for arm in cfg.get("score_arms") or []:
+        if arm == "POWER" or scores.get(arm) == "complete" or not due("score:%s" % arm):
+            continue
+        ready = False
+        if arm == "K0":
+            ready = bool(st.get("power_final")) and bool(md.get("frozen"))
+        elif arm in (cfg.get("long_arms") or {}):
+            ready = sorted((long_.get(arm) or {}).get("trained") or []) == [0, 1, 2]
+        else:
+            ready = state("build:%s" % arm) == "done" or (arms.get(arm) or {}).get("over_line") and \
+                sorted((long_.get(arm) or {}).get("trained") or []) == [0, 1, 2]
+        if ready:
+            add(maint, {"lever": "L33", "arm": arm, "item": "score:%s" % arm,
+                        "phase": (cfg.get("phase_of") or {}).get(arm, 1)})
+    # ---- 9. the verdicts, once every arm of the phase is scored, failed or not run
+    for phn in ("1", "2"):
+        if (verdicts.get(phn) or {}).get("status") == "decided" or not due("verdict:%s" % phn):
+            continue
+        va = (cfg.get("verdict_arms") or {}).get("2_substituted" if phn == "2" and sub else phn) or []
+        # an arm is settled once scored, or once its score, build or seeds ended without it (failed, not run); a
+        # build or seeds done still wait for the arm's score; KD and KT are settled when the K arms are not run
+        # (k_not_run.json: DS.5.7's supply rule)
+        pending = [a for a in va if scores.get(a) != "complete" and not ds1_terminal(state("score:%s" % a))
+                   and not _ds1_unscored(state("build:%s" % a)) and not _ds1_unscored(state("long:%s:train" % a))
+                   and not _ds1_unscored(state("long:%s:smoke" % a))
+                   and not (a in ("KD", "KT") and (st.get("k_not_run") or st.get("k_source_out")))]
+        if not pending:
+            add(maint, {"lever": "L34", "phase": int(phn), "item": "verdict:%s" % phn})
+        elif any(scores.get(a) == "complete" for a in va):
+            waits["verdict:%s" % phn] = "waits for %s" % ", ".join(pending[:8])
+    out = {}
+    if maint:
+        out["MAINT"] = maint[0]
+    if train:
+        out["TRAIN"] = train[0]
+    return out, waits, {"maint": maint, "train": train, "substituted": sub}
+
+
 def r0(v, d28=None):
     """DR0: the rollout's prerequisites (contract 10 R0, R0b, R1, R2), each
     proposed once in its lane when due, in order: MAINT -- the splits build
@@ -2500,10 +2772,45 @@ def r0(v, d28=None):
                 cites = cites + [c for c in fam_cites if c not in cites] if others else fam_cites
         else:
             fwait["gate"] = gc
+    # DS1 (2026-10-29): DS1's items once its gate is open (_ds1_gate), in DS.12's order (ds1_plan): one MAINT item
+    # at a time and L32X on TRAIN, after R0's own items; an item whose bytes would take /ocean under its floor waits
+    # and the next one whose conditions hold is proposed (DS.9.3: a wait holds no lane); the family cap and the phase
+    # reserve are the ticker's, at pricing
+    ds1c = v.dom.get("ds1") or {}
+    dwait = {}
+    if ds1c and st.get("lock") and ss["arm"] and ss["stage_c_read"]:
+        dok, dgc = _ds1_gate(v, st, ds1c)
+        if dok:
+            dfs = st.get("ds1") or {}
+            _plan, dwait, cand = ds1_plan(ds1c, dfs)
+            sizes = ds1c.get("storage_gb") or {}
+            others = any(out.values())
+            dcites = []
+            for ln, lst in (("MAINT", cand["maint"]), ("TRAIN", cand["train"])):
+                if out.get(ln) is not None or (ln == "MAINT" and out["DATA"] is not None):
+                    continue
+                for it in lst:
+                    kind = {"L30": "data:%s" % it.get("step"), "L32": "build", "L32X": "long:%s" % it.get("verb"),
+                            "L33": "score", "L34": "verdict"}.get(it["lever"])
+                    short = _ds1_floor_short(v, ds1c, sizes.get(kind) if kind else 0.0, it.get("phase") or 1,
+                                             dfs.get("phase1_gb"), it["item"] in (dfs.get("phase1_charged") or [])) \
+                        if kind else ""
+                    if short:
+                        dwait[it["item"]] = "storage: %s" % short
+                        continue
+                    out[ln] = dict(it, why="DS1 (record only): %s is next in DS.12's order" % it["item"])
+                    dcites.append(v.ccite(E.pointer("stage", "ds1", "items", it["item"])))
+                    break
+            if dcites:
+                d_cites = [v.ccite("/stage/lock")] + dgc + dcites
+                cites = cites + [c for c in d_cites if c not in cites] if others else d_cites
+        else:
+            dwait["gate"] = dgc
     items = {k: x for k, x in out.items() if x}
     wait = wait if wait and wait["state"] == "waiting" else None
     fshort = {k: x for k, x in fwait.items() if str(x).startswith("storage")}
-    if not items and not wait and not fshort:
+    dshort = {k: x for k, x in dwait.items() if str(x).startswith("storage")}
+    if not items and not wait and not fshort and not dshort:
         return _silent("DR0", "no rollout prerequisite is due", cites=cites)
     levers = sorted({x["lever"] for x in items.values()})
     summary = ["%s: %s -> %s" % (k, x["why"], x["lever"]) for k, x in sorted(items.items())]
@@ -2511,9 +2818,13 @@ def r0(v, d28=None):
         summary.append("L23V waits: %s" % wait["why"])
     for k, x in sorted(fshort.items()):
         summary.append("V3F's %s waits: %s" % (k, x))
+    for k, x in sorted(dshort.items()):
+        summary.append("DS1's %s waits: %s" % (k, x))
     extra = {"lift_wait": wait} if wait else ({"lift_wait_end": ended} if ended else {})
     if fwait:
         extra["v3fam_waits"] = fwait
+    if dwait:
+        extra["ds1_waits"] = dwait
     return _diag("DR0", True, "info", "; ".join(summary), cites, levers, None, dict({"due": items}, **extra))
 
 

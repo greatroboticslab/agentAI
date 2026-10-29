@@ -3236,26 +3236,60 @@ def load_queue(layout):
     return out
 
 
+# DS1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.5.4, DS.9.1): DS1's own never-train list, its MD v1 and
+# MT-W v2 rows and groups (inc2.ds1_data), which the never-cut list reads beside the main-test lists
+DS1_NEVER_TRAIN = "splits/ds1/never_train.jsonl"
+
+
+def ds1_never_rows(inc_dir):
+    """The rows of DS1's never-train list (DS1_NEVER_TRAIN under inc_dir), [] when it does not exist; a line that
+    does not parse refuses (StreamError): the cutter stops rather than guessing what the list holds."""
+    p = Path(inc_dir) / DS1_NEVER_TRAIN
+    if not p.is_file():
+        return []
+    out = []
+    with open(p, "r", encoding="utf-8") as fh:
+        for i, line in enumerate(fh, 1):
+            if not line.strip():
+                continue
+            try:
+                r = json.loads(line)
+            except ValueError as e:
+                raise StreamError("%s line %d does not parse (%s): its rows' status is unknown" % (p, i, e))
+            if not isinstance(r, dict) or not r.get("key"):
+                raise StreamError("%s line %d is not a never-train row" % (p, i))
+            out.append(r)
+    return out
+
+
 def test_v1_rows(layout, rows):
     """Mark the rows a main-test list holds (inc2.base3: <INC_DIR>/splits/*/
-    test_v1/*.jsonl, whatever splits directory wrote it): the same original or
-    written bytes, the same key, or a dHash within HOLDOUT_NEAR_DUP_BITS under
-    the list's 8 variants. Such a row gets `test_v1` (why) and is never
-    eligible: a test image must not reach any training pool through the
-    stream's segments. An unreadable list refuses (Base3Error), so the cutter
-    stops rather than guessing. Returns the number marked."""
+    test_v1/*.jsonl, whatever splits directory wrote it) or DS1's never-train
+    list holds (DS1_NEVER_TRAIN: its MD v1 and MT-W v2 rows, DS.9.1): the same
+    original or written bytes, the same key, or a dHash within
+    HOLDOUT_NEAR_DUP_BITS under the list's 8 variants. Such a row gets `test_v1`
+    (why; 'ds1:<why>' for DS1's list) and is never eligible: a test image must
+    not reach any training pool through the stream's segments. An unreadable
+    list refuses (Base3Error, StreamError), so the cutter stops rather than
+    guessing. Returns the number marked."""
     from . import base3 as B3
     prior, _rec = B3.prior_test_lists(layout.inc_dir / "splits")
-    if not prior:
+    ds1 = ds1_never_rows(layout.inc_dir)
+    if not prior and not ds1:
         return 0
     cand = [r for r in rows if not r.get("refused")]   # held ones too: the cutter's fold may release a hold
-    shadow = [{"drop": None, "key": r["key"], "sha256": r.get("unmasked_sha256") or r.get("sha256"),
-               "train_sha256": r.get("sha256"), "dhash": r.get("dhash")} for r in cand]
-    n = B3.mark_prior(shadow, prior, HOLDOUT_NEAR_DUP_BITS)
-    for r, sh in zip(cand, shadow):
-        if sh.get("prior_test"):
-            r["test_v1"] = sh["prior_test"]
-            r["eligible_step1"] = False
+    n = 0
+    for lst, tag in ((prior, ""), (ds1, "ds1:")):
+        if not lst:
+            continue
+        left = [r for r in cand if not r.get("test_v1")]
+        shadow = [{"drop": None, "key": r["key"], "sha256": r.get("unmasked_sha256") or r.get("sha256"),
+                   "train_sha256": r.get("sha256"), "dhash": r.get("dhash")} for r in left]
+        n += B3.mark_prior(shadow, lst, HOLDOUT_NEAR_DUP_BITS)
+        for r, sh in zip(left, shadow):
+            if sh.get("prior_test"):
+                r["test_v1"] = tag + sh["prior_test"]
+                r["eligible_step1"] = False
     return n
 
 

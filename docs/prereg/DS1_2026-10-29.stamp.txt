@@ -1,0 +1,24 @@
+DS1 time-stamp file (docs/CONTINUOUS_LOOP.md, Amendment (2026-10-29): DS1; the procedure of V3F.12)
+
+amendment_sha256: 3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699
+amendment_text: docs/CONTINUOUS_LOOP.md from line 4925 ('## Amendment (2026-10-29): DS1, ...') to the end of the file at the commit below; byte-identical to docs/prereg/DS1_2026-10-29.md
+amendment_commit: b60b8ee4763867f03b37f09a35ae808b630f5d28
+written_utc: 2026-10-29T00:45:22Z
+decided_by: the delegate under the owner's 2026-09-30 admin grant (DS.0, decisions 1-21)
+
+outside-repository records cited in the amendment's header (sha256, file name under the paper's working folder _work/):
+b3769957f71040748bd3d59dc316b189fece61318d04dc9db771b3c7842cb726  v7/DATA_SCALE_PLAN.md (the draft, revision 2)
+040dbf4e968954b7771ff2c194f8e4cefb1da1f41e9f201c967cf880f1501026  v7/DATA_SCALE_PLAN_draft1_2026-10-27.md (the draft, revision 1)
+e56cb3fa1dcad92e16b740836e655e6d68d6215dac2ef61ff7758b669c27fd26  v5/designs/MAIN_TEST.md
+a8709b51d92c20c1496a3925b3e22fab3e47d9fa8e7d7a25ae6da3418c4801ab  v5/designs/DETR_LADDER.md
+adfd871369578411f8fee9331d44cf9940a2967f4ab1d7daa2087dcdf9214502  v5/designs/CROP_WEED_COLLECTION.md
+468a03cb145c614b8d2aaf9ddf78d8edd662da9c3a5f63e6cdc5324d1103e364  v7/ds1_evidence/MANIFEST.sha256 (30 files: Q's trace scripts and outputs; the review's read scripts and copies of R2 and R6; R9-R11's scripts and outputs; the lab's stream_deployed.json and df; byte copies of the five cluster records below)
+
+cluster records cited by sha256 (INC = results/framework/inc on /ocean; unchanged at R9):
+c5f83abf1050e3f9debb2b95118e89e4544a877f921ef576993f4b03650089b7  INC/capacity/v3fam_v1_cont2_report.md (V3F-R)
+a46d155670dd1879d3bb72dc341efe9c5eb22cfb69098f996218299a398c792b  INC/splits/v3/summary.json (R3)
+3d8013b07ad5345fb33e6509361b4d6850204f5e283dbea84b071bca25b98c09  INC/splits/v3fam/summary.json (R4)
+fa4856e3a744b9f2d42bf5add629ca6bf45902d8aaffd4cec4b2f1a3f4258b98  INC/weed_stream_v1_fork1364_s001/report.json (R6)
+1bf148e77e1cd16585abc19bc66d3e87a0f3c29c00236b8754121608b9ed70a0  INC/weed_stream_v1_fork1364_s002/report.json (R6)
+
+Proofs: OpenTimestamps (`ots stamp`) of this file and of docs/prereg/DS1_2026-10-29.md, as DS1_2026-10-29.stamp.txt.ots and DS1_2026-10-29.md.ots beside them.

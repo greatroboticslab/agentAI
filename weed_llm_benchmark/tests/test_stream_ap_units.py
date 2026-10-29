@@ -77,6 +77,13 @@ PARAMS = {
     "L23J": {"pkg": "inc2", "arm": "E3RS"},
     "L23K": {"pkg": "inc2", "verb": "train", "seeds": "0,1,2"},
     "L23L": {"pkg": "inc2"},
+    # DS1 (2026-10-29)
+    "L30": {"pkg": "inc2", "phase": 1, "step": "screen"},
+    "L31": {"kind": "source", "batch": 1, "lab_inc": "/lab/x/results/framework/inc"},
+    "L32": {"pkg": "inc2", "exp": "ds1_s0_m640", "arm": "S0", "seeds": "0,1,2", "role": "baseline"},
+    "L32X": {"pkg": "inc2", "verb": "train", "arm": "S0X", "seeds": "0,1,2"},
+    "L33": {"pkg": "inc2", "arm": "S1C"},
+    "L34": {"pkg": "inc2", "phase": 1},
     "LV": {"pkg": "inc2", "module": "baseline", "verb": "canary-verdict", "exp": "canary_v2"},
     "LI": {"pkg": "inc2", "stream": "weed_stream_v1", "stage_b": "r0,x1a"},
     "LA": {"pkg": "inc2", "stream": "weed_stream_v1"},
@@ -182,7 +189,7 @@ def t_menu():
           LS.gated_r2() == ("L16", "L17", "L24")
           and set(LS.envelope_levers()) == {"L18", "L20", "L21", "L22", "L23B", "L23N", "L23V", "L23E", "L23C", "L23D",
                                             "L23Z", "L23F", "L23G", "L23H", "L23I", "L23J", "L23K", "L23L", "L25",
-                                            "L27", "L28", "LI"}
+                                            "L27", "L28", "LI", "L30", "L32", "L32X", "L33", "L34"}
           and "inc_rescore_e2" in AP.ENVELOPE_ACTIONS and "inc_rescore_e2_attr" in AP.ENVELOPE_ACTIONS
           and "inc_audit_zoo" in AP.ENVELOPE_ACTIONS and "inc_score_e3" in AP.ENVELOPE_ACTIONS
           and "inc_verdict_e3" in AP.ENVELOPE_ACTIONS)

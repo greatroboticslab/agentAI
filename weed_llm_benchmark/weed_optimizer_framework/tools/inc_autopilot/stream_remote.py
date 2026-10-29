@@ -79,7 +79,7 @@ FORMAT = "inc_autopilot.stream_remote/1"
 V2_JOB_SCRIPT = "run_inc2_job.sh"
 PARTITION = "GPU-shared"
 SCRIPTS = {"collect": "run_inc_collect.sh", "admit": "run_inc2_stream.sh", "build": "run_inc2_build.sh",
-           "zoo": "run_inc2_zoo.sh", "detr": "run_inc2_detr.sh"}
+           "zoo": "run_inc2_zoo.sh", "detr": "run_inc2_detr.sh", "long": "run_inc2_long.sh"}
 VERBS = {"collect": ("fetch", "intake", "probe"),
          "admit": ("admit", "bootstrap", "knowntruth", "backfill", "scan-holds", "eval-hits"), "zoo": ("submit",)}
 BUILD_VERBS = {"stream": ("init", "build", "milestone", "fork", "feasibility", "bisect"), "splits": ("build", "lock"),
@@ -93,9 +93,15 @@ BUILD_VERBS = {"stream": ("init", "build", "milestone", "fork", "feasibility", "
                # person's or the delegate's jobs, never the platform's. The verdict runs from inc2.v3fam_verdict
                # (deviation 5, 2026-10-24): inc2/v3fam.py, whose sha256 every reproduction record pins, keeps only
                # the verbs it had when they were taken
-               "v3fam_data": ("build",), "v3fam": ("score",), "v3fam_verdict": ("verdict",)}
+               "v3fam_data": ("build",), "v3fam": ("score",), "v3fam_verdict": ("verdict",),
+               # DS1 (2026-10-29): its data steps (L30), one arm's scores (L33) and a phase verdict (L34); its 1.2 M
+               # builds are inc2.baseline build --ds1 (L32); score-test, test-read and record are a person's or the
+               # delegate's
+               "ds1_data": ("build",), "ds1": ("score", "verdict")}
 # V3F (2026-10-11): D6's RF-DETR jobs (L23K, TRAIN lane) through run_inc2_detr.sh
 DETR_VERBS = {"v3fam_detr": ("smoke", "train")}
+# DS1 (2026-10-29): the long path (L32X, TRAIN lane) through run_inc2_long.sh
+LONG_VERBS = {"ds1_long": ("smoke", "train")}
 RUN_VERBS = {"stream": ("commit", "compare", "choose-arm", "rollback", "quarantine", "release"),
              "baseline": ("canary-verdict", "capacity-verdict"), "pilot4": ("verdict",)}
 EXIT_BUSY = 3                                   # inc2.stream: another writer holds stream.lease
@@ -136,6 +142,20 @@ V3FAM_FAILED_ITEMS_RE = re.compile(r"(score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|de
                                    r"(,(score:[A-Z0-9]{2,8}|build:[A-Z0-9]{2,8}|detr:(smoke|train))){0,39}\Z")
 V3FAM_DETR_JOB_NAMES = {"smoke": ("inc_detr_v3fam_smoke",),
                         "train": ("inc_detr_v3fam_s0", "inc_detr_v3fam_s1", "inc_detr_v3fam_s2")}
+# DS1 (2026-10-29): its jobs' names (run_inc2_build.sh names their provenance ds1_data_p<P>_<step>, ds1_score_<arm>,
+# ds1_v<P>; run_inc2_long.sh ds1_long_<arm>_smoke and ds1_long_<arm>_s<k>), a build (L32) inc_build_<exp>
+DS1_DATA_JOB_NAME = "inc_build_ds1_data_p%d_%s"
+DS1_SCORE_JOB_NAME = "inc_build_ds1_score_%s"
+DS1_VERDICT_JOB_NAME = "inc_build_ds1_v%d"
+DS1_LONG_JOB_NAME = "inc_long_ds1_%s_%s"
+DS1_STEPS = ("screen", "md_s0", "pools", "draw", "manifests")
+DS1_BUILD_ARMS = ("KD", "KT", "KF", "S0", "S1CR", "S1C", "S1U", "S2")
+DS1_LONG_ARMS = ("S0X", "S2X", "S1UX", "S1C", "S1U", "S2", "S1CR", "S0", "KD", "KT", "KF")
+DS1_SCORE_ARMS = ("POWER", "K0", "KD", "KT", "KF", "S0", "S1CR", "S1C", "S1U", "S2", "S0X", "S2X", "S1UX")
+DS1_ITEM = r"(data:[12]:(screen|md_s0|pools|draw|manifests)|build:[A-Z0-9]{2,5}|long:[A-Z0-9]{2,5}:(smoke|train)" \
+           r"|score:[A-Z0-9]{2,5})"
+DS1_ITEMS_RE = re.compile(r"%s(,%s){0,39}\Z" % (DS1_ITEM, DS1_ITEM))
+DS1_SEEDS_RE = V3FAM_DETR_SEEDS_RE
 V3FAM_SCORE_ARMS = ("E3RS", "D2LAION", "D2CLIP", "D2DINOL", "D2DINOB", "D2SIGLIP", "D2RN50", "D2BC1", "D2BC2640",
                     "D2FT", "D3", "D9", "D1", "D4F", "D4N", "D4R15", "D5B", "D6", "D8", "BCLEAN")
 V3FAM_BUILD_ARMS = ("D1A1", "D1B1", "D1A12", "D4F", "D4N", "D4R15", "D5B0", "D5B25", "D5B100", "D8S", "D8M",
@@ -981,6 +1001,62 @@ def v3fam_status(inc):
     return out
 
 
+DS1_STATUS = "ds1/v1/status.json"             # derived on the cluster each snapshot, never a file of the tree
+DS1_PERSON_JOBS = ("ds1test_",)
+
+
+def ds1_status(inc):
+    """DS1's state the ticker's gate and plan read (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.3), derived
+    from DS1's own files: the time stamp, RA, the power pre-flight, MD-S0's drafts and freeze, each phase's screens and
+    sources (sheet, audit, pool, MD-N, MT-W v2), the sheets' bundles and renders, the MT-W checks and LN, the arms
+    built, the long path (the pair's compute, smokes, seeds), the score records and verdicts (their statuses), the
+    reads prepared and taken, and the person jobs' GPU-h. No score, no exam key, no path of an evaluation image.
+    DS1's modules read INC_DIR (inc.common): it is bound to `inc` for the call (on the cluster they are the same
+    directory)."""
+    from ..inc import common as CM
+    prev = CM.INC_DIR
+    CM.INC_DIR = Path(inc)
+    try:
+        return _ds1_status(Path(inc))
+    finally:
+        CM.INC_DIR = prev
+
+
+def _ds1_status(inc):
+    from ..inc2 import ds1 as D
+    from ..inc2 import ds1_data as DD
+    from ..inc2 import ds1_long as LG
+    out = {"format": "inc_autopilot.ds1_status/1", "timestamp": D.timestamp_ok(inc / "ds1" / "v1" / "timestamp.json")}
+    out.update(DD.plan_state(inc))
+    out["long"] = LG.status()
+    sc = {}
+    for a in D.SCORE_ARMS:
+        r, _i = _read_json(inc / "capacity" / ("ds1_score_%s.json" % a.lower()))
+        sc[a] = (r or {}).get("status") if isinstance(r, dict) else None
+    out["scores"] = sc
+    out["verdicts"] = {}
+    for ph in (1, 2):
+        r, _i = _read_json(inc / "capacity" / ("ds1_v%d.json" % ph))
+        out["verdicts"][str(ph)] = {"status": (r or {}).get("status") if isinstance(r, dict) else None,
+                                    "reads": ((r or {}).get("reads") or {}).get("order") if isinstance(r, dict) else None,
+                                    "substitution": ((r or {}).get("substitution") or {}).get("applied")
+                                    if isinstance(r, dict) else None}
+    out["reads_done"] = sorted("%s:%s" % k for k in D.reads_done())
+    items, hours = [], 0.0
+    pdir = inc / "_campaign" / "provenance"
+    for p in sorted(pdir.glob("ds1*.json")) if pdir.is_dir() else []:
+        if not any(p.stem.startswith(n) for n in DS1_PERSON_JOBS):
+            continue
+        prov, _i = _read_json(p)
+        for att in (prov or {}).get("attempts") or [] if isinstance(prov, dict) else []:
+            h = _v3fam_hours(att)
+            items.append({"job": p.stem, "state": "ended" if att.get("finished_utc") else "running", "hours": h})
+            hours += h or 0.0
+    out["person_jobs"] = items
+    out["person_settled_gpuh"] = round(hours, 4)
+    return out
+
+
 def stream_summary(sid, dev_exps=()):
     """{"verb": "stream-summary", "decision": {"artifacts": {...}}, "files": {...}}."""
     rec = {"verb": "stream-summary", "ok": True, "sid": sid}
@@ -1091,6 +1167,19 @@ def stream_summary(sid, dev_exps=()):
         arts[V3FAM_STATUS] = _dev(v3fam_status(inc))
     except Exception as e:                      # a status that cannot be read is reported, never fatal
         notes.append("%s: %s: %s" % (V3FAM_STATUS, type(e).__name__, str(e)[:200]))
+    # DS1 (2026-10-29): its data index, each arm's score record, the power pre-flight, RA and the phase verdicts (dev
+    # and MD only; the external records, the reports, the sealed reads and INC_DIR/ds1 are for people, never read
+    # here), and the derived status of its gates, person steps and items (ds1_status: booleans, counts and sha256s)
+    put("splits/ds1/summary.json", inc / "splits" / "ds1" / "summary.json")
+    for arm in DS1_SCORE_ARMS:
+        put("capacity/ds1_score_%s.json" % arm.lower(), inc / "capacity" / ("ds1_score_%s.json" % arm.lower()))
+    for n in ("ds1_v1", "ds1_v2", "ds1_power", "ds1_ra_gate"):
+        put("capacity/%s.json" % n, inc / "capacity" / ("%s.json" % n))
+    if (inc / "ds1").is_dir() or (inc / "splits" / "ds1").is_dir():
+        try:
+            arts[DS1_STATUS] = _dev(ds1_status(inc))
+        except Exception as e:                  # reported, never fatal: the ticker then reads DS1's state as unknown
+            notes.append("%s: %s: %s" % (DS1_STATUS, type(e).__name__, str(e)[:200]))
     try:
         tops = sorted(p.name for p in inc.iterdir() if p.is_dir())   # INC_DIR's top level only, as remote.status
     except OSError:
@@ -1208,7 +1297,9 @@ BUILD_FLAGS = {
                             "--e2": ("e2", _ENUM("W", "S", "C")),
                             # V3F (2026-10-11): the family's build arms; the manifest, arm and finals are the
                             # family's (inc2.baseline build --v3fam)
-                            "--v3fam": ("v3fam", _ENUM(*V3FAM_BUILD_ARMS))},
+                            "--v3fam": ("v3fam", _ENUM(*V3FAM_BUILD_ARMS)),
+                            # DS1 (2026-10-29): its 1.2 M arms (inc2.baseline build --ds1)
+                            "--ds1": ("ds1", _ENUM(*DS1_BUILD_ARMS))},
     ("baseline", "rescore-native"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
     ("baseline", "rescore-e2"): {},
     ("baseline", "rescore-e2-attr"): {},
@@ -1218,6 +1309,10 @@ BUILD_FLAGS = {
     ("v3fam", "score"): {"--arm": ("arm", _ENUM(*V3FAM_SCORE_ARMS))},
     ("v3fam_verdict", "verdict"): {"--cap-refused": ("cap_refused", V3FAM_CAP_ITEMS_RE),
                                    "--ticker-failed": ("ticker_failed", V3FAM_FAILED_ITEMS_RE)},
+    ("ds1_data", "build"): {"--phase": ("phase", _ENUM("1", "2")), "--step": ("step", _ENUM(*DS1_STEPS))},
+    ("ds1", "score"): {"--arm": ("arm", _ENUM(*DS1_SCORE_ARMS))},
+    ("ds1", "verdict"): {"--phase": ("phase", _ENUM("1", "2")), "--cap-refused": ("cap_refused", DS1_ITEMS_RE),
+                         "--ticker-failed": ("ticker_failed", DS1_ITEMS_RE)},
     ("baseline", "rescore-agnostic"): {"--exp": ("exp", _NAME), "--reference": ("reference", _NAME)},
     ("base3", "build"): {"--stream": ("stream", _NAME)},
     ("pilot4", "build"): {"--exp": ("exp", _NAME), "--from": ("from_exp", _NAME), "--recipes": ("recipes", _RECIPES)},
@@ -1242,8 +1337,13 @@ REQUIRED = {("collect", "fetch"): ("source", "max_bytes"), ("collect", "intake")
             ("baseline", "rescore-native"): ("exp", "reference"),
             ("baseline", "rescore-agnostic"): ("exp", "reference"), ("base3", "build"): ("stream",),
             ("pilot4", "build"): ("exp", "from_exp", "recipes"), ("twostage", "score-arm"): ("arm",),
-            ("v3fam", "score"): ("arm",), ("v3fam_detr", "train"): ("seeds",)}
+            ("v3fam", "score"): ("arm",), ("v3fam_detr", "train"): ("seeds",),
+            ("ds1_data", "build"): ("phase", "step"), ("ds1", "score"): ("arm",), ("ds1", "verdict"): ("phase",),
+            ("ds1_long", "smoke"): ("arm",), ("ds1_long", "train"): ("arm", "seeds")}
 DETR_FLAGS = {("v3fam_detr", "smoke"): {}, ("v3fam_detr", "train"): {"--seeds": ("seeds", V3FAM_DETR_SEEDS_RE)}}
+LONG_FLAGS = {("ds1_long", "smoke"): {"--arm": ("arm", _ENUM(*DS1_LONG_ARMS))},
+              ("ds1_long", "train"): {"--arm": ("arm", _ENUM(*DS1_LONG_ARMS)), "--seeds": ("seeds", DS1_SEEDS_RE),
+                                      "--walltime-h": ("walltime_h", _ENUM("24", "36"))}}
 
 
 def parse_submit(kind, args):
@@ -1271,7 +1371,15 @@ def parse_submit(kind, args):
             raise R.Refused("%s %s is not a stream build (%s)" % (mod, verb, BUILD_VERBS))
         params = _flags(args[2:], BUILD_FLAGS[(mod, verb)])
         need = REQUIRED.get((mod, verb), ())
-        if (mod, verb) == ("baseline", "build") and "v3fam" in params:
+        if (mod, verb) == ("baseline", "build") and "ds1" in params:
+            # DS1 (2026-10-29): a DS1 build takes its manifest, arm and finals from DS1's definition
+            extra = sorted(k for k in ("manifest", "union", "arm", "e2", "v3fam") if k in params)
+            if extra:
+                raise R.Refused("baseline build --ds1 takes no %s" % ", ".join(extra))
+            need = ("exp", "seeds", "role")
+            if params.get("seeds") != "0,1,2" or params.get("role") != "baseline":
+                raise R.Refused("a DS1 build trains seeds 0,1,2 as role baseline")
+        elif (mod, verb) == ("baseline", "build") and "v3fam" in params:
             # V3F (2026-10-11): a family build takes its manifest, arm and finals from the family's definition
             extra = sorted(k for k in ("manifest", "union", "arm", "e2") if k in params)
             if extra:
@@ -1282,7 +1390,7 @@ def parse_submit(kind, args):
         missing = [p for p in need if p not in params]
         if missing:
             raise R.Refused("%s %s needs %s" % (mod, verb, missing))
-        if (mod, verb) == ("baseline", "build") and "v3fam" not in params \
+        if (mod, verb) == ("baseline", "build") and "v3fam" not in params and "ds1" not in params \
                 and ("manifest" in params) == ("union" in params):
             raise R.Refused("baseline build takes exactly one of --manifest and --union")
         short = "%s.%s" % (m.group("pkg"), mod)
@@ -1303,7 +1411,34 @@ def parse_submit(kind, args):
         short = "%s.%s" % (m.group("pkg"), mod)
         return {"kind": kind, "script": SCRIPTS[kind], "verb": verb, "module": mod, "pkg": m.group("pkg"),
                 "params": params, "script_args": [short, verb]}
+    if kind == "long":
+        # DS1 (2026-10-29): the long path (L32X): run_inc2_long.sh <pkg>.ds1_long smoke --arm A | train --arm A
+        # --seeds S [--walltime-h 36]
+        if len(args) < 2:
+            raise R.Refused("long takes <pkg>.ds1_long <verb> FLAGS")
+        m = PKG_RE.match(args[0])
+        if not m or args[1] not in LONG_VERBS.get(m.group("mod"), ()):
+            raise R.Refused("%s is not a DS1 long-path job (%s)" % (" ".join(args[:2]), LONG_VERBS))
+        mod, verb = m.group("mod"), args[1]
+        params = _flags(args[2:], LONG_FLAGS[(mod, verb)])
+        missing = [p for p in REQUIRED.get((mod, verb), ()) if p not in params]
+        if missing:
+            raise R.Refused("%s %s needs %s" % (mod, verb, missing))
+        if params.get("walltime_h") == "36" and params.get("arm") not in ("S2X", "S1UX"):
+            raise R.Refused("only S2x's (S1ux's) one re-submission takes 36 h (DS.6)")
+        short = "%s.%s" % (m.group("pkg"), mod)
+        return {"kind": kind, "script": SCRIPTS[kind], "verb": verb, "module": mod, "pkg": m.group("pkg"),
+                "params": params, "script_args": [short, verb, "--arm", params["arm"]]}
     raise R.Refused("stream-submit kind %r is not one of %s" % (kind, sorted(SCRIPTS)))
+
+
+def long_job_names(req):
+    """The job names of an L32X submission: the smoke's, or one per seed named by --seeds (ascending)."""
+    arm = req["params"]["arm"].lower()
+    if req["verb"] == "smoke":
+        return [DS1_LONG_JOB_NAME % (arm, "smoke")]
+    return [DS1_LONG_JOB_NAME % (arm, "s%s" % k) for k in sorted(str(req["params"].get("seeds") or "").split(","))
+            if k != ""]
 
 
 def detr_job_names(req):
@@ -1321,6 +1456,8 @@ def job_name(req, meta):
         return ZOO_JOB_NAMES[0] % p["version"]
     if req["kind"] == "detr":
         return detr_job_names(req)[0]
+    if req["kind"] == "long":
+        return long_job_names(req)[0]
     if req["kind"] == "build":
         if (req["module"], req["verb"]) == ("baseline", "rescore-native"):
             # it builds nothing: its own name, never the arm's build job's (inc_build_<exp>)
@@ -1341,6 +1478,12 @@ def job_name(req, meta):
             return V3FAM_SCORE_JOB_NAME % p["arm"].lower()
         if (req["module"], req["verb"]) == ("v3fam_verdict", "verdict"):
             return V3FAM_JOB_NAME
+        if (req["module"], req["verb"]) == ("ds1_data", "build"):
+            return DS1_DATA_JOB_NAME % (int(p["phase"]), p["step"])
+        if (req["module"], req["verb"]) == ("ds1", "score"):
+            return DS1_SCORE_JOB_NAME % p["arm"].lower()
+        if (req["module"], req["verb"]) == ("ds1", "verdict"):
+            return DS1_VERDICT_JOB_NAME % int(p["phase"])
         if (req["module"], req["verb"]) == ("base3", "build"):
             return BASE3_JOB_NAME
         tag = meta.get("child_exp") or (p.get("exp") if req["module"] in ("baseline", "pilot4") else None) \
@@ -1386,6 +1529,20 @@ def stream_submit(kind, args, meta=None, dry_run=False):
             argv = [os.environ.get("INCAP_BASH", "bash"), str(script)] + req["script_args"]
             names = [n % req["params"]["version"] for n in ZOO_JOB_NAMES]
             rec.update(job_name=name, job_names=names, argv=argv, partition=PARTITION)
+        elif kind == "long":
+            # DS1's long path (L32X): the smoke, or one sbatch of run_inc2_long.sh per seed (36 h only for S2x's one
+            # re-submission: --time=36:00:00 with --walltime-h 36)
+            sbatch = os.environ.get("INCAP_SBATCH", "sbatch")
+            names = long_job_names(req)
+            wall = req["params"].get("walltime_h")
+            argvs = []
+            for n in names:
+                tail = req["script_args"] + (["--seed", n.rsplit("_s", 1)[1]] if req["verb"] == "train" else []) + \
+                    (["--walltime-h", wall] if wall else [])
+                argvs.append([sbatch, "--parsable", "--job-name=%s" % n, "-p", PARTITION] +
+                             (["--time=36:00:00"] if wall == "36" else []) + [sbatch_export(prov), str(script)] + tail)
+            argv = argvs[0]
+            rec.update(job_name=name, job_names=names, sbatch_argvs=argvs, partition=PARTITION)
         elif kind == "detr":
             # V3F's D6 (L23K): the smoke, or the three seed jobs, each its own sbatch of run_inc2_detr.sh
             sbatch = os.environ.get("INCAP_SBATCH", "sbatch")
@@ -1409,14 +1566,15 @@ def stream_submit(kind, args, meta=None, dry_run=False):
         q = R.squeue_jobs()
         if not q["ok"]:
             raise R.Refused("squeue unavailable (%s): cannot rule out a duplicate job, nothing submitted" % q["error"])
-        dup = [j for j in q["jobs"] if j["name"] == name or (kind in ("zoo", "detr") and j["name"] in rec["job_names"])]
+        dup = [j for j in q["jobs"] if j["name"] == name or (kind in ("zoo", "detr", "long")
+                                                             and j["name"] in rec["job_names"])]
         if dup:
             raise R.Refused("%s is already queued or running as job %s" % (dup[0]["name"], dup[0]["id"]))
     except R.Refused as e:
         return R.fail(rec, e, error_kind="refused")
     if kind == "zoo":
         return _zoo_submit(rec, argv, prov)
-    if kind == "detr":
+    if kind in ("detr", "long"):
         return _detr_submit(rec, prov)
     (R.inc_dir() / "logs").mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)

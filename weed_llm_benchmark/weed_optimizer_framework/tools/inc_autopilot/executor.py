@@ -161,6 +161,9 @@ STREAM_ENVELOPE_LEVERS = {"L18": ("inc_build_segment",), "L20": ("inc_build_cons
                           "L23H": ("inc_build_v3fam_data",), "L23I": ("inc_build_v3fam",),
                           "L23J": ("inc_score_v3fam",), "L23K": ("inc_build_v3fam_detr",),
                           "L23L": ("inc_verdict_v3fam",),
+                          # DS1 (2026-10-29): its data steps, 1.2 M builds, long path (TRAIN), scores and verdicts
+                          "L30": ("inc_build_ds1_data",), "L32": ("inc_build_ds1",), "L32X": ("inc_build_ds1_long",),
+                          "L33": ("inc_score_ds1",), "L34": ("inc_verdict_ds1",),
                           "L25": ("inc_build_pilot4",), "L27": ("inc_build_consolidation",),
                           "L28": ("inc_build_segment",), "LI": ("inc_stream_init",)}
 # The R2 data levers that run directly only with data_autonomy on, a stream
@@ -196,7 +199,10 @@ REMOTE_TIMEOUT_S = {"inc_snapshot": 300, "inc_report": 300, "inc_advance": 240,
                     "inc_audit_zoo": 300, "inc_score_e3": 300, "inc_verdict_e3": 300,
                     # V3F (2026-10-11): one sbatch each, but L23K's train submits its three seeds in one call
                     "inc_build_v3fam_data": 300, "inc_build_v3fam": 300, "inc_score_v3fam": 300,
-                    "inc_build_v3fam_detr": 420, "inc_verdict_v3fam": 300}
+                    "inc_build_v3fam_detr": 420, "inc_verdict_v3fam": 300,
+                    # DS1 (2026-10-29): one sbatch each, but L32X's train submits its seeds in one call
+                    "inc_build_ds1_data": 300, "inc_build_ds1": 300, "inc_build_ds1_long": 420, "inc_score_ds1": 300,
+                    "inc_verdict_ds1": 300}
 DEFAULT_REMOTE_TIMEOUT_S = 120
 # ssh's own messages for a connection that was never made (read off the last
 # stderr line of a call that printed nothing): the remote command never ran.
@@ -239,7 +245,7 @@ REPLAY_MAY_SKIP = ("R2", "R4b")
 # needs every one of them to pass (stream_replay_status).
 STREAM_REPLAY_CASES = ("S1", "S1b", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S13",
                        "S14", "S15", "S16", "S17", "S18", "S19", "S20", "S21", "S22", "S23", "S24", "S25", "S26",
-                       "S27", "S28", "S29", "stream_prospective", "stream_r0")
+                       "S27", "S28", "S29", "S30", "stream_prospective", "stream_r0")
 STREAM_MUTATION_CASE = "stream_mutations"
 CODE_ROOT = Path(__file__).resolve().parents[3]       # the directory holding weed_optimizer_framework/
 # Files outside this package that decide what the executor may do; a replay
@@ -407,6 +413,24 @@ ARGV_FORMS = {
     "inc_build_v3fam_detr": ("{pkg}.v3fam_detr", "{verb}", (("--seeds", "seeds", "str"),), ("pkg", "verb")),
     "inc_verdict_v3fam": ("{pkg}.v3fam_verdict", "verdict", (("--cap-refused", "cap_refused", "str"),
                                                              ("--ticker-failed", "ticker_failed", "str")), ("pkg",)),
+    # DS1 (2026-10-29; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.2): L30 one data step (inc2.ds1_data build),
+    # L31 one batch of sheets on the lab (inc2.ds1_sheets render), L32 one 1.2 M arm (inc2.baseline build --ds1), L32X
+    # the long path on TRAIN (run_inc2_long.sh inc2.ds1_long smoke | train --seeds S: one job per seed), L33 one arm's
+    # scores (inc2.ds1 score), L34 a phase verdict (inc2.ds1 verdict)
+    "inc_build_ds1_data": ("{pkg}.ds1_data", "build", (("--phase", "phase", "int"), ("--step", "step", "str")),
+                           ("pkg", "phase", "step")),
+    "inc_ds1_sheets": ("inc2.ds1_sheets", "render", (("--kind", "kind", "str"), ("--batch", "batch", "int"),
+                                                     ("--lab-inc", "lab_inc", "str"), ("--sources", "sources", "str")),
+                       ("kind", "batch", "lab_inc")),
+    "inc_build_ds1": ("{pkg}.baseline", "build",
+                      (("--exp", "exp", "str"), ("--ds1", "arm", "str"), ("--seeds", "seeds", "str"),
+                       ("--role", "role", "str")),
+                      ("pkg", "exp", "arm", "seeds", "role")),
+    "inc_build_ds1_long": ("{pkg}.ds1_long", "{verb}", (("--arm", "arm", "str"), ("--seeds", "seeds", "str"),
+                                                        ("--walltime-h", "walltime_h", "int")), ("pkg", "verb", "arm")),
+    "inc_score_ds1": ("{pkg}.ds1", "score", (("--arm", "arm", "str"),), ("pkg", "arm")),
+    "inc_verdict_ds1": ("{pkg}.ds1", "verdict", (("--phase", "phase", "int"), ("--cap-refused", "cap_refused", "str"),
+                                                 ("--ticker-failed", "ticker_failed", "str")), ("pkg", "phase")),
     "inc_stream_collect": ("run_inc_collect.sh", "fetch",
                            (("--source", "source", "str"), ("--max-bytes", "max_bytes", "bigint"),
                             ("--candidates", "candidates", "str")),
@@ -443,6 +467,8 @@ STREAM_REMOTE = {"inc_build_segment": "build", "inc_build_consolidation": "build
                  "inc_audit_zoo": "zoo",
                  "inc_build_v3fam_data": "build", "inc_build_v3fam": "build", "inc_score_v3fam": "build",
                  "inc_verdict_v3fam": "build", "inc_build_v3fam_detr": "detr",
+                 "inc_build_ds1_data": "build", "inc_build_ds1": "build", "inc_score_ds1": "build",
+                 "inc_verdict_ds1": "build", "inc_build_ds1_long": "long",
                  "inc_stream_collect": "collect", "inc_stream_collect_review": "collect",
                  "inc_stream_intake": "collect", "inc_stream_probe": "collect", "inc_stream_admit": "admit",
                  "inc_stream_commit": "run", "inc_stream_rollback": "run", "inc_stream_quarantine": "run",
@@ -458,7 +484,7 @@ _BIGINT_RE = re.compile(r"^[1-9][0-9]{0,12}$")
 # (Context.local_hooks) and refuses when none is.
 LAB_ACTIONS = ("inc_lit_fetch", "inc_funnel_fetch", "inc_verify_queue", "inc_funnel_sync",
                "inc_stream_discover", "inc_stream_names", "inc_stream_collect_lab", "inc_stream_collect_review_lab",
-               "inc_stream_sync")
+               "inc_stream_sync", "inc_ds1_sheets")
 # The research brain's plan job (docs/INC_AUTOPILOT.md (c)): staged and
 # submitted, then pulled back, by segments the executor builds itself
 # (_plan_segment), not by remote.py verbs.
@@ -1002,7 +1028,7 @@ def render(action, params, meta=None):
         if kind == "run":
             remote = ["stream-run", first, command] + _stream_meta_tokens(meta or {}, run=True) + ["--"] + flags
         else:
-            args = ([first] if kind in ("build", "detr") else []) + ([command] if command else []) + flags
+            args = ([first] if kind in ("build", "detr", "long") else []) + ([command] if command else []) + flags
             remote = ["stream-submit", kind] + _stream_meta_tokens(meta or {}) + ["--"] + args
         return {"builder": builder, "remote": remote, "local": False}
     if action == "inc_unblock_transient":

@@ -13,6 +13,34 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-29 — DS1 Revision 1, before DS1's first step: the exams stay clean of near copies, roles follow source classes, and person checks must be answered
+
+- **Where the data stands.** Unchanged so far: base B's D1 B′ holds 40,743 images and the stream's pool P_1 7,493; the target is tens to hundreds of thousands of verified images. Accuracy unchanged: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90), sealed test 0.8950 (0.0050 under). DS1 is the step that adds data: S1 the in-hand pools (registered estimate ≈ 52,000–116,000 images), S2 the named phase-2 fetches (≈ 80,000–140,000).
+- **Change.** Before deploy, DS1's implementation was reviewed and corrected:
+  - The exams: MD-N and MT-W v2 groups that are near copies of rows already in a built manifest (or of base B, for MT-W v2) are never drawn, so no trained model has seen a twin of an exam image; the DINOv2 half of the guard now covers MD, MT-W, the evaluation groups and H10d; an MT-W correction keeps the whole corrected label.
+  - The data: a source whose file names carry cwd12 or 3SeasonWeedDet10 capture names, or whose intake refused a cwd12 copy, never enters; a box's role follows its source class (crops and non-target weeds no longer share one unit); phase 2 takes only the named sources.
+  - The person checks: nothing is pre-filled on the owner's audit, every LN and MT-W image must be answered, and the owner's audit sample stays fixed as screens add sources.
+  - The platform: sheets now render on the lab; no DS1 step can repeat for ever or hold a verdict for ever; a failed DS1 build is a card, never a pause of the stream.
+  - These are DS1 Revision 1, committed and time-stamped before any DS1 data (the registered numbers and decision rules are unchanged); the registration's own proofs now carry their Bitcoin attestations.
+- **Verified.** The full lab suite fails nothing the base does not (base 160 of 177 files, branch 167 of 184, the same 17 environment failures); the DS1 test files pass on the final tree and fail on the base; the replay gate passes on both; the mutation run kills 93 of 93. A copy of the live lab state ticked with the final tree waits for the time stamp with one card, then proposes the phase-1 screen, while collection runs on.
+- **Next.** Deploy; the delegate's `inc2.ds1 timestamp` (with the Revision's proofs) and `inc2.ds1 ra` on the login node; then the platform's L30 screen of phase 1's sources and the owner's audit sheets. The Revision's proofs get their Bitcoin attestations with `ots upgrade` once confirmed. The re-audit of s001 and s002 (DS.10 item 2) is a person's step.
+
+## 2026-10-29 — DS1 is built as registered: the platform can run the weed-level data-scaling experiment once it is deployed and its gate opens
+
+- **Where the data stands.** No change yet. Base B's D1 B′ holds 40,743 images. The stream's pool P_1 holds 7,493. The target is tens to hundreds of thousands of verified images. E3-B is at 0.8859 dev species mAP50-95, 0.0141 under 0.90. DS1 is how the training set grows: S1 adds every verified phase-1 source the sheets accept (registered estimate ≈ 77,000 new S rows), and S2 adds the named phase-2 fetches (80,000-140,000 images in all).
+- **Change.** The code DS.9 asks for, on branch `ds1` (not deployed):
+  - DS1's data builds: eligibility, roles, rules, dedupe, `thin(10)`, the leakage guard in both directions, EXIF refusal, MD v1 and MT-W v2 by capture group, the manifests with the cwd12 floor, the 35 % cap, the K arms, every S arm season-free.
+  - The sheets rendered on the lab, scores, verdicts, sealed reads, RA, LN and the long path.
+  - The ticker's levers L30-L34 and L32X, record only. Steps that need a person are cards that hold no lane. The storage floors apply, and so do the 260 GPU-h cap and the 174.2 GPU-h phase reserve.
+  - The stream cutter now never cuts DS1's exam rows.
+- **Compute.** At the platform's estimates the plan is about 217 GPU-h (registered default about 213, cap 260): phase 1 about 152 (line 174.2), phase 2 and the reads about 65.
+- **Verified.** On lab scratch copies the base passes 160 of 177 test files and the branch 167 of 184; the 17 failures are the same environment failures on both. The six new test files (359 checks) and the new replay case S30 (5 checks) pass on the branch and fail on the base. The replay gate passes on both (57 of 59 on the branch with the new case S30). Every DS1 mutant is killed (53 of 53).
+- **Next.**
+  - Deploy.
+  - The delegate writes the time-stamp record and RA.
+  - L30's phase-1 screen.
+  - The owner's steps: the sheet audit (≈ 30-45 min), the MT-W check, the LN sheet (55-75 min), and phase-2 approvals above 50 GB per source. Each is a sheet in `_work/v7/sheets/`.
+
 ## 2026-10-28 — 2SeasonWeedDet8 is a repackage of our own test and exam images; the collector no longer refetches after a failed intake, and intake now refuses copies of every exam
 
 - **Where the data stands.** Unchanged: the stream's pool P_1 holds 7,493 images, and the target stays tens to hundreds of thousands of verified images. Accuracy unchanged: E3-B 0.8859 dev species mAP50-95, 0.0141 under 0.90 (sealed test 0.8950).

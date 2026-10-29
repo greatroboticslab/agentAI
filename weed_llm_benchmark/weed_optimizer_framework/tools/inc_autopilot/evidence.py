@@ -134,7 +134,7 @@ VERIFIER_FIT_INFO = "verifier_fit_info.json"   # remote.py's projection of step1
 
 EXP_RE = r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}"
 RESERVED_DIRS = ("step1", "splits", "exams", "logs", "audit", "funnel",   # INC_DIR entries that are not experiments
-                 "stream", "step1_stream", "intake", "twostage", "v3fam")
+                 "stream", "step1_stream", "intake", "twostage", "v3fam", "ds1")
 ROOT_AUDIT = "audit/%s_audit.json"          # a label audit run with --out $INC/audit/<exp>_audit.json
 EXP_FILES = ("exp.json", "state.json", "report.json", "build_summary.json", "ledger.jsonl",
              "audit/label_audit.json", "manifests/increments_summary.json")
@@ -209,7 +209,10 @@ DERIVED_STATE_RUNS = "derived/state_runs.json"
 # counts and sha256s, no score); capacity/v3fam_v1_external.json,
 # v3fam_ext_v1.json, v3fam_v1_report.*, v3fam_test_*.*, v3fam_retest.json,
 # the classifier pins and INC_DIR/v3fam/ (a reserved directory) are never on
-# the list. A Step 1 sidecar,
+# the list; DS1's (2026-10-29): capacity/ds1_v1.json and ds1_v2.json (the phase verdicts, dev and MD only),
+# capacity/ds1_score_<arm>.json, capacity/ds1_power.json, capacity/ds1_ra_gate.json, splits/ds1/summary.json and
+# ds1/v1/status.json (derived on the cluster, stream_remote.ds1_status); ds1_v{1,2}_external.json,
+# ds1_test_*.*, ds1_report.* and INC_DIR/ds1/ are never on the list. A Step 1 sidecar,
 # step1_stream/eval_hits/<batch>.json, is not on the list: status.json carries
 # its fold, and the sidecar names each hit's matched evaluation key. A stream
 # ledger has no experiment: it is kept as a JSON list artifact, not under
@@ -239,6 +242,12 @@ ALLOWED = tuple(re.compile(p) for p in (
          "d9", "d1", "d4f", "d4n", "d4r15", "d5b", "d6", "d8", "bclean")),
     r"splits/v3fam/summary\.json\Z",
     r"v3fam/v1/status\.json\Z",
+    # DS1 (2026-10-29): its score records, power pre-flight, RA and phase verdicts (dev and MD only), its data index,
+    # its derived status; never its external records, reports, sealed reads or INC_DIR/ds1's files
+    r"capacity/ds1_(?:v1|v2|power|ra_gate|score_(?:%s))\.json\Z" % "|".join(
+        ("power", "k0", "kd", "kt", "kf", "s0", "s1cr", "s1c", "s1u", "s2", "s0x", "s2x", "s1ux")),
+    r"splits/ds1/summary\.json\Z",
+    r"ds1/v1/status\.json\Z",
     r"(?!(?:%s)/)(?P<rexp>%s)/(?P<record>canary|stage_a|native_rescore|agnostic_rescore)\.json\Z"
     % ("|".join(RESERVED_DIRS), EXP_RE),
 ))

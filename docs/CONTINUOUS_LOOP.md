@@ -4921,3 +4921,735 @@ So 6,662 of 6,664 images (99.97 %) are copies of protected or base images, and t
 - An entry found by name elsewhere with no file beside the image keeps its boxes: a VIA project whose images sit in another folder is common, so a missing image whose same-named photograph elsewhere has no VIA file of its own is still given the entry's boxes.
 - An EXIF-rotated image is refused, not turned: a source of phone photographs with orientation tags loses those images (counted in `decisions.by_reason`). Using the annotation's own frame size where a format records one (VOC `<size>`, COCO `width`/`height`) is a later rule.
 - 2SeasonWeedDet8's staging (34 GB on the lab, 34 GB on /ocean) and its extracted tree (34 GB on /ocean) are kept: nothing is deleted. Reclaiming them is a person's decision.
+
+## Amendment (2026-10-29): DS1, scaling verified training data at the weed level (pre-registered)
+
+Decided by the delegate under the owner's 2026-09-30 grant; the decisions DS.10 gives to the owner are recorded as his. Committed and time-stamped by V3F.12's procedure (DS.12 step 0a) before any DS1 build, run or score. It registers revision 2 of the draft of 2026-10-27, after its review, re-checked against the records of 2026-10-29; DS.15 lists what changed at registration. This commit changes no code.
+
+**What it does.** E3-B's box detector is trained on base B: 44,485 images, 36,531 distinct photos. DS1 admits more images at the weed level: every box whose source class is a weed, of any species. A new source enters only after its sample sheet is decided (DS.10).
+- Phase 1 uses data already on /ocean: about 52,000–70,000 images with the SIU video family capped at 35 % (S1c), about 69,000–116,000 without the cap (S1u).
+- Phase 2 adds named fetched sources within the storage headroom: about 80,000–140,000 images in all (S2). 150,000 or more needs an Ocean supplement and further sources (DS.11).
+- These ranges are planning numbers. The rehearsal (DS.9.5) replaces them with counts.
+
+**It asks:**
+- Does the larger set place better weed boxes on held-out scenes of base B's own sources (MD-S0), at equal compute and at two to three times the compute, and in a held-out season (ood23)?
+- Does it keep cwd12 species accuracy through the two-stage system?
+- What do the stream's gate records say about why its increments were rejected (RA, no GPU), and what do frame density and setting do to a weed-level detector (Tier S, with their power)?
+
+**Evidence.**
+- `CLOOP:n` is line n of `docs/CONTINUOUS_LOOP.md` at a312c7d. Lines 1–4733 carry the numbers they had at f6d9b8a.
+- `V3F-R` is V3F's family report of 2026-10-26T13:21Z, `INC/capacity/v3fam_v1_cont2_report.md` (sha256 c5f83abf…89b7).
+- `Q` is the funnel trace of 2026-10-27: per-stage and per-source tables, recomputed read-only on the cluster's login node with `step1_stream.load_queue` and `stream.Fold`.
+- `AS` is the label audit that reads the stream's own crops (Amendment 2026-10-27). It was merged as 642e49a and deployed with a312c7d on 2026-10-28T22:48Z (the lab's `stream_deployed.json`, replay gate rc 0).
+- `R1`–`R8` are read-only reads of 2026-10-27, 21:20–23:00Z:
+  - R1: `df`, the project quota and `projects`.
+  - R2: V3F-R.
+  - R3: `splits/v3/summary.json` (a46d1556…) and `splits/v3/test_v1/*.jsonl`.
+  - R4: `splits/v3fam/summary.json` (3d8013b0…).
+  - R5: a stat of 300 seeded base B image files.
+  - R6: `weed_stream_v1_fork1364_s001/report.json` (fa4856e3…) and `…_s002/report.json` (1bf148e7…).
+  - R7: the lab's SU ledger, the campaign's status and ledger, and `splits/v1/summary.json`.
+  - R8: the D28 sources' `near_eval_embed` refusals in step1_stream batches b0010, b0011 and b0015; the arms D1A1 and D1B1 of R4; R6's chain fields (`cand_sd`, `null_sd`, `attribution`).
+- `R9`–`R11` are read-only reads of 2026-10-29, 00:27–00:44Z:
+  - R9: `df`, the project's `lfs quota` and `projects`; the sha256s of the files of R2, R3, R4 and R6 (unchanged); the audit folders of s001 and s002; the stream's pools; `step1_r1/`; `step1_stream/status.json`; the lab's `df` and `stream_deployed.json`.
+  - R10: fork2728's records.
+  - R11: R8's refusals recounted (the same 152).
+- Every read went through the lab's ControlMaster, submitted no job and wrote nothing on the cluster. The trace, the read scripts and their outputs, both revisions of the draft and the three design notes this text cites (`MAIN_TEST.md`, `DETR_LADDER.md`, `CROP_WEED_COLLECTION.md`) lie outside the repository. The stamp file lists their sha256s.
+- "Derived" marks arithmetic on cited numbers. A "planning number" is an extrapolation, never evidence.
+
+---
+
+### DS.0 Decisions
+
+1. **Weed level.**
+   - Every box whose source class resolves to a weed becomes class 12, as in E1 (CLOOP:2886). A weed is one of the 12 target species, another weed taxon, or a generic weed name.
+   - Crop, plant-part and non-plant boxes are dropped as background, E1's rule.
+   - Species identity is recorded per box and never required. Naming stays with E3's pinned BioCLIP-2 classifier: DS1 scales the boxes, not the names.
+2. **Pools.** Phase 1 reads Q's recoverable pools that are on goal and on /ocean: pool 1 (SIU video frames), pool 3 (class-name failures) and pool 5 (species-gate rejects and the eligible rows the cutter cannot take), plus the rows that intake commits from lane DATA's fetches before the phase-1 freeze. Phase 2 adds the named sources of DS.5.2. Not in DS1:
+   - **Q pool 4** (weeddec2-sqnot, weeds1-dsqzl, weedsv2). These are CottonWeedDet12 re-uploads (role C, like cwp10 and vanpe).
+     - 152 of their rows were refused at intake as embedding near-copies of cwd12 evaluation images: 127 of test and 25 of dev (weeds1 111 + 24, weeddec2 13 + 1, weedsv2 3 + 0; R8, R11).
+     - The matches lie at cosine 0.9465–0.9882 against the copy threshold 0.946384 and at dHash distances of 7–29 bits, so dHash alone misses them.
+     - Their file names carry cwd12 capture names (`IphoneSE_YL_Morningglory_039_JPG.rf.…` matched `test__20210628_iPhoneSE_YL_63`).
+     - Their 2,990 species-verified rows are most likely verified because they are cwd12 photographs: the intake verifier was fitted on cwd12 train_core crops. D28-v2's whole-source quarantine stands.
+   - **Q pool 2** (rf_weed-tnf9e and rf_srec fqrtg; median weed box under 32 px at 640 px). It waits for a scorer that infers above 640 px (DETR_LADDER).
+   - **2SeasonWeedDet8** (zenodo_10762138). 6,662 of its 6,664 images copy protected or base images, and the other 2 are EXIF-rotated. It is never fetched (Amendment 2026-10-28).
+   - **Queue rows holding `funnel_F9`, `join_conflict` or `h6_scan`** (451, 74 and 0 rows on 2026-10-29; R9), so that DS1 touches neither the funnel's recovery arms nor labels that disagree.
+   - Every row refused for a copy, an exam, a hold-out, a licence or EXIF orientation. A row that was only not admitted at species level (a verifier conflict, an unmapped species) is a weed-level candidate.
+3. **Video and tray series are thinned.**
+   - Within one capture series (an SIU video, an MFWD tray), frames are taken in a seeded order. A frame is kept only when its dHash is more than 10 bits from every frame already kept from that series. The frames S0 already holds from the series count as kept (CROP_WEED_COLLECTION.md CW.7 step 2). This is `thin(10)`.
+   - Base v3's 35 % per-family cap (`base3_v2.json`; R3 `selection.family_caps`) applies in S1c and S2, counted on rows before item 15's repeats. S1u lifts it.
+4. **Source sheets.**
+   - A source, or a file-name family of one, enters a DS1 manifest only after its sheet is decided "accept", "accept for training only" or "reject", with its setting and its class roles. The delegate decides the sheets.
+   - The owner audits:
+     - a seeded sample of 5 decided sheets (the 5 lowest `stable_int("inc2/ds1/audit/<source>")`); if he reverses any of the 5, he audits every decided sheet;
+     - every source whose class names were resolved in the names round (DS.5.1 item 2);
+     - SIU's species-role table.
+   - A source drawn for his audit enters a manifest only after it. A source he rejects leaves every DS1 manifest, MD and MT-W. A reversal is recorded as his.
+5. **Exams.**
+   - **MD v1** is DS1's own development set, drawn by capture group (DS.5.4), never from SIU. It has two strata:
+     - **MD-S0**, from base B's external sources (base_v2 excluded), decides P1–P3. It is drawn, sized by the power pre-flight (DS.7.6) and frozen before B′° is built, so that no later choice can change it.
+     - **MD-N**, from every new non-SIU source, is frozen per source before any arm trains on that source's rows. It is reported as coverage.
+   - MD is not the main test. MAIN_TEST.md MT.2 item 2(a) (no group touching base_v2, base B or a stream pool) governs the main test and does not apply to MD. Models trained on base B (E1-B, E3-B, TS-B′, B′1) trained on MD-S0's rows and are never scored on MD.
+   - **MT-W**, the weed-level main test, is test v1 without its SIU stratum (2,630 images, 15 sources; sealed, CLOOP:3581) plus **MT-W v2**, drawn under MT.2 item 2 from DS1's new non-SIU sources only. A person checks MT-W before it is frozen (DS.10 item 4).
+   - **SIU is in no deciding exam.** Its plants recur across videos: each species has 22 videos (11 weeks × 2), which fits two pots per species filmed weekly (CLOOP:3185, an inference). A held-out SIU video therefore very likely shares its plants with training videos of the same species. Test v1's 400 SIU images are reported as a separate in-plant stratum, never in a headline.
+6. **Every S arm is season-free:** no row of tsw22 or tsw23, none of session 20220129 (as D1's B′, V3F.5 D1), and no copy of an ood22 or ood23 image (DS.5.1 item 7). That keeps ood22 and ood23 usable as external exams. Their known defects are disclosed in DS.4.
+7. **Compute.**
+   - Every arm trains at E1's equal compute: `cold_budget`, 1.2 M image-epochs (CLOOP:2894–2899).
+   - One scaled pair, S0x and S2x, trains at 3.6 M image-epochs on the long path. If S0x's smoke projects a 3.6 M seed over 0.8 × 24 h, both members of the pair train at 2.4 M instead. This is decided once, from S0x's smoke (DS.6).
+8. **Statistics are V3F's** (V3F.3.2–3.3): the E-rule, the paired image bootstrap and the session or capture-group bootstrap, the combined z, SESOI 0.005, the three outcome classes.
+   - Multiplicity: Bonferroni within each exam, one-sided. P1–P3 on MD-S0 (m = 3, z > 2.128); P4 on ood23 (m = 1, z > 1.645).
+   - A primary is **confirmed** when it qualifies under the E-rule and its z passes its threshold. Each primary is decided once, when its own records are complete (DS.7.2).
+   - One non-inferiority statement (N1, cwd12 dev, margin 0.005) stands outside the correction, as V3F decision 28, with its power stated. One harm check (H1).
+   - Every primary's minimum detectable effect is recorded before the first training item (DS.7.6).
+9. **Reads.** At most 3 MT-W reads and at most 1 sealed cwd12 test read (DS.7.5). `evalgroups_v1` is read in the same jobs.
+10. **Family cap: 260 V100 GPU-h**, enforced as V3F decision 25. The default plan is about 213 GPU-h; the worst case that DS.6's walltime rules allow is about 258 (DS.11).
+11. **Label noise** is measured by a person's per-box label sheet, with cwd12 train_core as the reference (LN, DS.8.2). The machine audit (AS) is reported beside it.
+12. **The stream's gate records are re-analysed** before any DS1 training (RA, DS.8.1), with no GPU. RA is descriptive: its reading rule was written after R6 was read.
+13. **Nothing switches.** No DS1 number changes a stream rule, pool, hold, incumbent or deployed model, and DS1 changes no stream rule: phase-2 fetches are named sources fetched by lane DATA's existing levers, and D20's ranking and lane DATA's storage floor stay. What each outcome suggests is written in DS.14 as input to a later amendment.
+14. **Scoped use of a quarantined source.**
+    - DS1 builds may read zenodo_15808623 (SIU, quarantined by D31) once its species-role table and sheet are decided and audited. Its stream quarantine stays, and the cutter never sees DS1's decisions.
+    - The owner's audit of the SIU sheet is the "re-admission … a person's decision" of CLOOP:4703, scoped to DS1's manifests.
+    - The D28 sources are not read by DS1 at all (item 2).
+15. **cwd12 exposure floor.**
+    - B′° holds C ≈ 3,005 cwd12 train_core rows (A′1, base_v2 without tsw, holds 3,071 images, base_v2's 66 NDSU rows among them; R8).
+    - In every S arm larger than S0, each train_core row is listed r times, r = round_half_up((N − C) / (N_S0 − C)), with N the arm's rows before repeats. train_core's image-epochs then equal S0's at the same compute (about 30 epochs per row at 1.2 M).
+    - N1 thus measures what the added images do, not how much cwd12's share of the epochs shrank.
+16. **Contamination already in base B leaves B′°.**
+    - Both directions of the leakage guard (DS.5.1 item 7) run on B′° itself, and base_v2's 66 NDSU rows are removed.
+    - base_v2 rows that the calibrated detector flags against cwd12 dev or test (cwd12's own near-duplicates across its splits; R8's `nevertrain.base_b_kept`) are kept and listed, as V3F did (V3F.3.7 item 2), because S0 and every S arm hold them alike.
+17. **Dates.** The allocation's SU expire on 2026-12-31 (R9). If S2's manifest is not frozen by 2026-12-05, the S1ux substitution (DS.7.2) runs without a further decision. Every sealed read is submitted by 2026-12-20.
+18. **EXIF.** A new row whose EXIF orientation is 2–8 is refused (`exif_orientation`), the intake's rule since a312c7d: most label formats do not say in which frame the boxes were drawn. Base B's rows keep base3's handling. No DS1 row is written for a transpose.
+19. **Exam copies and hold-outs.** DS1's guard adds the calibrated DINOv2 detector against ood22 and ood23, which intake checks by dHash only. It includes the funnel's H10d hold-out once F9 has written it (it had not on 2026-10-29: no `step1_r1/domain_dev.jsonl`; R9). DS1 never scores H10d.
+20. **A wait for a person holds nothing else.** An item that needs a person's decision is not proposed, and one card names what waits. Every other DS1 item whose conditions hold, and every stream and DATA item, is proposed as usual (DS.9.3). Sheets reach the owner in batches, one HTML file per batch (DS.10).
+21. **Storage.** DS1's phase-1 bytes (at most 60 GB) need V3F's floor: D27's 3 % plus 30 GiB, 257.8 GB free. Every later DS1 item that adds bytes also needs lane DATA's floor, 425.6 GB free. Lane DATA's rule is unchanged: if phase 1's bytes take free space under its floor, DATA waits by its own rule (DS.11).
+
+---
+
+### DS.1 State on 2026-10-29
+
+**Accuracy.**
+- Sealed cwd12 test, 12-class mAP50-95:
+
+  | System | Score | Gap to 0.90 |
+  |---|---|---|
+  | E3-B, two-stage | 0.8950 ± 0.0029 | 0.0050 |
+  | RF-DETR-L (D6) | 0.8855 | |
+  | YOLO11m on train_core (D8M) | 0.8850 | |
+  | b_v2_m640 (reference) | 0.8786 | |
+
+- E3-B scores 0.8859 on dev (gap 0.0141). With perfect naming of its own boxes it would score 0.8952 (O5), so box placement is the limit.
+- V3F's primaries (V3F-R):
+
+  | Primary | Comparison | D | z or interval | Outcome |
+  |---|---|---|---|---|
+  | P1 | BioCLIP-2 over the LAION CLIP namer | +0.0757 | 7.77 | confirmed |
+  | P5 | E3-B over RF-DETR-L | +0.0365 | 3.19 | confirmed |
+  | P6 | TS-B′ over A′12 on ood22 | +0.0345 | 2.20 | confirmed |
+  | P7 | B′1 over A′1 on ood23 (0.256 against 0.146) | +0.0423 | 2.61 | confirmed |
+  | P8 | probe, near copies inflate | +0.1381 | 3.31 | confirmed |
+  | P2 | E3-B over TS-F | +0.0102 | 1.62 | not confirmed |
+  | P3 | E3-B over TS-N (no SIU) | −0.0011 | [−0.0083, 0.0061] | not confirmed |
+
+- Tier S in V3F-R, stage-1 agnostic on dev:
+  - TS-F over TS-R15 (field-only against a random sample of base B of the same size, 15,432 images): +0.0250 (z 3.48).
+  - **TS-R15 over E1-A: −0.0178** (z −2.20). A random 15,432 images of base B place cwd12 dev boxes worse than base_v2's 6,811: on cwd12 dev, the share of in-domain images matters more than N.
+  - TS-N over E1-A: +0.0246 (z 3.83); TS-N over E1-B: +0.0025 [−0.0032, 0.0081].
+- ood23 sits at about 0.25 agnostic for every system.
+- **ooddev_v1** reads 0.000–0.013 for every model of every kind (R2). DS1 does not use it.
+
+**Base B and test v1.**
+- Base B: 44,485 images, 36,531 distinct photos, 128,306 boxes (R3); Field 15,432, Turf 5,910, Indoor 23,143 (V3F.4). SIU frames: 15,532, after the 35 % family cap cut 18,751 (R3).
+- D1's B′ after the season guard: 40,743 images, 29 epochs at 1.2 M (R4, R8). A′1 (base_v2 without tsw): 3,071 images, 391 epochs.
+- Test v1: 3,030 images in 1,903 groups from 16 sources, at most 400 per source (R3). The four sources at 400 are mh_weed16, rf_tuf, rf_unitec and SIU.
+  - Its companion lists are never-train. It is sealed and has never been read for a model trained after Z1 (CLOOP:3581, 4521).
+  - E1-B has 46 test v1 companions and 20 `evalgroups_v1` near hits among its training rows; base_v2's 66 NDSU rows are the likely cause of the latter (CLOOP:4521).
+
+**Collection funnel (Q, R9).**
+- 367,350 distinct boxed images were collected. 229,666 queue rows passed BioCLIP-2's per-box admission, 210,905 of them holding only OtherPlant boxes (`kind: other`; R9), which the stream's cutter never cuts (CLOOP:416).
+- Holds on the queue: licence 51,637, `funnel_F9` 451, `join_conflict` 74 (R9).
+- The stream pool P = 7,493 (6,811 base_v2 + 682 CottonWeedDet3), unchanged since 2026-10-01 (R9). fork1364's last cut record counted 1,487 eligible rows (2026-10-27T11:38Z; R9), and fork2728 has M = 2,728 (R10), so no increment can be cut.
+- Recoverable pools, on goal and never trained:
+
+  | Q pool | Content | Images | In DS1 |
+  |---|---|---|---|
+  | 1 | SIU video frames | 100,361 free frames (35,343 3-bit groups from 331 videos), plus 64,421 frames not admitted at species level | yes, weed level, thinned |
+  | 2 | small-box Roboflow sources | | no: boxes under 32 px |
+  | 3 | class-name failures | 20,905 | after the names round |
+  | 4 | D28-quarantined sources | 5,352 + 3,124 | no: cwd12 re-uploads |
+  | 5 | species-gate rejects and the eligible rows the cutter cannot take | 4,688 | yes |
+
+**The increments and the gate (R6, R8).** Every increment held 1,364 images cut on the 12 species and was trained 12-class on P_1 with m640.
+- *chain*: 30 epochs warm from the incumbent, full replay, 3 seeds; the candidate against one null (the same recipe on P_1 alone, 0.8645 ± 0.0018), shared by all five steps.
+- *truth*: a cold P ∪ D against P, 3 seeds; one control (0.8627 ± 0.0076), shared by all five steps.
+
+| Increment | Content | chain D, 12-class (cand sd) | seed-only z (derived) | chain agnostic D | class_vs_loc | Disposition | truth D (verdict) |
+|---|---|---|---|---|---|---|---|
+| s001 inc0001 | SIU frames | −0.0037 (0.0019) | −2.5 | +0.0027 | labels | data | −0.0024 (neutral) |
+| s001 inc0002 | (returned) | −0.0043 (0.0060) | −1.2 | −0.0019 | domain/localisation | hold | −0.0023 (neutral) |
+| s001 inc0003 | SIU frames | −0.0063 (0.0015) | −4.7 | −0.0002 | labels | data (regression and Sicklepod guards failed) | −0.0013 (neutral) |
+| s001 inc0004 | SIU frames | −0.0026 (0.0028) | −1.4 | −0.0012 | none | data | −0.0059 (hurts; PricklySida, Goosegrass) |
+| s002 inc0005 | weedai_0935d5a0 Palmer, MFWD, CottonWeedDet3 and others | −0.0007 (0.0020) | −0.4 | +0.0010 | none | hold | −0.0060 (hurts) |
+
+- The seed-only z is D / √((cand sd² + null sd²)/3). It leaves out the dev image sampling of the paired difference (the chain kept no per-image arrays), so it overstates |z|.
+- The warm chain resolves differences of about 0.004 (seed-only MDE, one-sided 5 %, power 0.8: 2.487 × 0.0015 ≈ 0.0037; derived). inc0001 and inc0003 are resolved 12-class losses on dev. inc0004's "data" fires on direction alone (p_data 0.22 ≤ 0.25, CLOOP:468, a rule with no effect-size floor).
+- The cold truth arm resolves only about 0.0145 (pooled seed sd 0.0071; derived).
+- On inc0001 the chain's box placement improved (agnostic +0.0027) while 12-class mAP fell (−0.0037); on inc0003 placement was unchanged (−0.0002) while 12-class mAP fell by 0.0063. The attribution calls both "labels": class confusion, not localisation. The stream's 12-class gate rejected greenhouse frames that kept or improved boxes and hurt the 12-class head's naming.
+
+**Label audit (AS).**
+- With full coverage, on copies of the cluster's files, the increments' labels are at or below the trusted baseline for every species: 0 conflicts in 1,364 boxes each for inc0001, inc0003 and inc0004, and 1 in 1,784 for inc0005.
+- Every audited box had already passed the intake verifier, whose probe was trained on the same train_core crops, so a near-zero rate is close to built in.
+- The cluster's own records for s001 (2026-10-05) and s002 (2026-10-27T13:36Z) predate AS's deploy (R9). DS.10 item 2 re-runs them.
+
+**Resources (R9).**
+- /ocean: 611.0 GB free (569 GiB); 6.280 TiB used of the 6.836 TiB quota.
+- Lane DATA proposes only while at least 425.6 GB are free (3 % plus the 200 GB envelope; CLOOP Amendment 2026-10-26). That leaves about 185 GB of headroom (derived), which lane DATA spends under D20's ranking.
+- Since R1 (about 675 GB free), 2SeasonWeedDet8's staging and extracted tree took about 68 GB on /ocean and add no image. They are kept.
+- The lab: 119 GiB free, 34 GB of it 2SeasonWeedDet8's staging.
+- GPU: 9,914 of 19,800 SU left, expiring 2026-12-31 (R9, as R1). The platform's SU ledger records 665.5 SU for the weed domain, 221.1 of them since 2026-10-11 (R7).
+- Deployed on the lab and both cluster copies: a312c7d (2026-10-28T22:48Z), which carries AS and intake's exam and EXIF guards.
+
+---
+
+### DS.2 Why the increments have not moved the cwd12 gate, and what can separate the causes
+
+| Cause | What it predicts | Evidence that exists | What DS1 does with it |
+|---|---|---|---|
+| **C. 12-class naming confusion** | Greenhouse frames of target species shift the 12-class head's boundaries on field cwd12 images: boxes are kept or improved, names get worse. | inc0001: agnostic +0.0027, 12-class −0.0037, "labels"; inc0003: agnostic −0.0002, 12-class −0.0063, "labels" (R6, R8). | Not testable in DS1: the one-class stage 1 and the fixed classifier remove this path by construction. RA tabulates it for every gate record; DS.14 states what it implies for the stream's gate. |
+| **G. The gate cannot resolve the effect** | Effects smaller than the gate's MDE are called by direction. | The warm chain resolves ~0.004 and found inc0001 and inc0003 (z −2.5, −4.7, seed-only); inc0004 (−1.4) and inc0005 (−0.4) are within noise. The truth arm resolves only ~0.0145. | G holds for inc0004's "data" call and for every truth arm, not for inc0001 or inc0003. RA records this per step. |
+| **R. Redundant frames** | Dense frames from few videos add less than the same number spread over many. | P3: removing base B's 15,532 SIU frames changed dev by −0.0011 [−0.0083, 0.0061]. Each SIU increment held 13–25 clips, up to 486 frames from one clip (CLOOP:4703). | KT over KD, Tier S (DS.7.3), with its MDE. |
+| **D. Setting shift** (greenhouse and controlled backdrops against field) | Field additions help cwd12 dev, which is field cotton, more than greenhouse additions. | TS-F over TS-R15 +0.0250 (z 3.48, Tier S); TS-R15 below E1-A by 0.0178. | KF over KT, Tier S, with its MDE; MD's setting strata for every S arm. |
+| **L. Label noise** | The increments' boxes are wrong more often than the trusted base's. | AS: at or below baseline, but the audit is not independent of the verifier. | **LN**: a person's per-box sheet against train_core (DS.8.2). |
+
+All five chain steps share one null and all five truth arms share one control, so a high null or control draw shifts every step together. RA reports this.
+
+**Power on cwd12 dev (derived from V3F-R).** Stage-1 dev comparisons between training sets have a combined σ_c of 0.0034–0.0081, from their 90 % intervals (S_s1_tsn_over_e1b 0.0034, S_s1_tsf_over_e1b 0.0055, S_s1_tsf_over_e1a 0.0057, S_s1_tsn_over_e1a 0.0064, S_s1_tsr15_over_e1a 0.0081). The image term dominates: 617 images, 1,094 boxes. At three seeds:
+- an "equivalent" outcome needs 1.645 σ_c < 0.005, that is σ_c < 0.0030, which none of these reaches;
+- qualifying at one-sided 5 % with power 0.8 needs D ≈ 2.487 σ_c ≈ 0.0085–0.020.
+
+More seeds shrink only the seed term. Causes R and D are therefore not decided on dev; their K arms are Tier S with these MDEs printed beside their results. No planning effect of N is assumed: TS-R15 and V3F's P3 contradict N as the driver on dev, and none exists for MD. DS1 sizes its contrasts by DS.7.6's MDEs.
+
+---
+
+### DS.3 Hypotheses
+
+- **H1 (in-hand scale, equal compute).** S1c, base B′° plus the in-hand pools under the 35 % family cap, places weed boxes better than S0 on MD-S0. → P1.
+- **H2 (more thinned greenhouse frames).** Lifting the SIU cap (S1u over S1c) helps on MD-S0 at equal compute, so the other images get fewer epochs. → P2.
+- **H3 (scaled build).** S2x, the phase-2 build at 3.6 M (or 2.4 M) image-epochs, beats S0x at the same compute on MD-S0. → P3.
+- **H4 (external season).** S2x beats S0x on ood23. → P4.
+- **N1 (keep cwd12).** S2x is non-inferior to S0x on cwd12 dev species through the two-stage system with E3's pinned classifier, at margin 0.005.
+- **Tier S (described, never decided):** frame density (KT over KD), setting (KF over KT), volume against composition (S1c over S1c-R, DS.5.3).
+
+---
+
+### DS.4 Exams
+
+| Exam | Size | Metric | Role |
+|---|---|---|---|
+| **MD v1** (new; own root and LOCK per stratum) | MD-S0 ≈ 1,100 images (about 5 % of base B's ≈ 22,100 external non-SIU images; derived), enlarged by DS.7.6 if needed; MD-N about 5 % of each new non-SIU source | weed AP50-95: class-collapsed `collapsed_ap`, one class | **MD-S0 decides P1–P3.** SE = max(image, capture-group bootstrap). MD-N is coverage (in-source for arms trained on its sources). Setting and per-source strata reported. |
+| cwd12 dev | 617 images / 1,094 boxes, 8 sessions (LOCK v1) | two-stage species mAP50-95 (stage-1 boxes and E3's pinned classifier, through the V3F validator); stage-1 agnostic | N1 and H1. Image SE; session SE reported. Tier S comparisons. |
+| ood23 | 1,784 images, 11 sessions | target-species agnostic AP with OtherPlant boxes as ignore regions (V3F.3.2, the statistic of V3F's P7) | Decides P4 (S arms only: season-free). SE = max(image, session). |
+| ood22 | 1,915 images, 32 sessions | agnostic | Reported (S arms only). |
+| ImageWeeds | 3,208 images | agnostic and Ragweed AP | Reported, never deciding. Cross-laboratory for S arms only if the guard finds no residual hit after B′°'s NDSU rows are removed; otherwise same-laboratory (V3F.3.5). |
+| **MT-W** = test v1 without SIU ∪ MT-W v2 | 2,630 images (15 sources) + ≈ 1,000–3,000 images of DS1's new non-SIU sources (planning) | weed AP50-95; strata as MD; the checked subset beside | Sealed reads only (DS.7.5). The weed half of the 0.90 target. Test v1's 400 SIU images are a separate in-plant stratum. |
+| evalgroups_v1 | NDSU, Latvia, sesame, maize, PAGS8 (sealed) | agnostic | Read in the MT-W read jobs. NDSU is reported as same-laboratory for every arm that trained on base_v2's NDSU rows (the K arms, E1-A), and as cross-laboratory for the S arms only under ImageWeeds' rule. |
+| cwd12 sealed test | 1,977 images | two-stage species | At most 1 read (S2x), descriptive: the literature anchor. |
+
+- **Known defects of the season exams** (Amendment 2026-10-28), disclosed with every number on them:
+  - ood23's 13 images ood23__20230810_HTRC_iPhone13_BD_26 … BD_38 are published by the same laboratory as 2022 photographs (2SeasonWeedDet8) and as 2023 photographs (3SeasonWeedDet10); no EXIF date settles it. One of them is the photograph ood22 also holds (ood22__20221008_iPhoneSE_YL_2, re-encoded). P4 is decided on all 1,784 images, as V3F's P7, and the same statistic on the other 1,771 is reported beside it.
+  - ood22's labels lack plants that the laboratory's later annotation boxes (2 of 120 images compared), so its false positives are overstated. It decides nothing.
+  - No S arm trains on these exams' images: all but 2 of them are tsw rows, which the S arms leave out, and the season guard removes copies.
+- MD's strata are scored like ooddev_v1 was meant to be: their own root under `splits/ds1/md_v1/`, their own LOCK, the locked scorer in a subprocess (CLOOP:4048).
+- MT-W v2 has its own root and LOCK. Test v1 is read through Z1's sealed root. If the person's check corrects test v1 labels, the corrected labels are frozen as **MT-W v1.1** with their own LOCK; test v1's own files never change, and both are scored and reported.
+- MT-W's headline is **weed AP50-95**, named so. DS1 holds no crop labels, so MAIN_TEST.md's crop/weed headline waits for base C (DS.14).
+
+---
+
+### DS.5 Data builds
+
+#### DS.5.1 Admission rules for every new row, in order (each writes counts with a reason code)
+
+1. **Source and row eligibility.**
+   - Not a cwd12, 3SeasonWeedDet10 or 2SeasonWeedDet8 copy. Role C holds cwp10, vanpe, weeddec2-sqnot, weeds1-dsqzl, weedsv2 and the domain config's never-fetch and never-train sources. Every other source is screened before its sheet:
+     - (a) any intake or DS1 guard hit against cwd12 dev or test at the calibrated copy threshold quarantines the source whole (D28-v2, unchanged);
+     - (b) a scan of file names for cwd12 and 3SeasonWeedDet10 capture names (date, camera and initials stems such as `iPhoneSE_YL`, `NIKOND3300_YL`, `iPhone11Pro_BT`) sends a matching source to role C once its sheet shows the matched pairs.
+   - Not an evaluation or OOD-dev group, excluded **by name** and by the 6-bit guard (base3's `evaluation_groups`). This also keeps out the 7 NDSU rows that Q found in inc0005.
+   - Not off-goal (Q's role X). Its sheet is decided "accept" or "accept for training only", and audited where DS.0 item 4 says so.
+   - Not a queue row holding `funnel_F9`, `join_conflict` or `h6_scan`, and not a row refused at intake or admission for a copy, an exam, a hold-out, a licence or EXIF orientation (DS.0 item 2).
+2. **Names to roles.**
+   - The names layer gives each source class one role: weed, crop, plant part, non-plant or unresolved.
+   - A role is never set from the class name alone. Each source class shows at least 12 seeded images with their boxes on the source's sheet, and a class whose images show a crop, a mix of plants or no plant is "unresolved". This matters for the rows the species verifier rejected: SIU's 12,853 unmapped and 14,481 ragweed-labelled frames (1 verified), and a9s9v's 6,516 Carpetweed/Eclipta rows, whose 7,010 boxes BioCLIP-2 all called conflict.
+   - SIU is resolved per EPPO code from its own metadata; crop codes (SORVU and any other) are removed.
+   - A source with an unresolved class goes through one names round (L26) and then its sheet. Until then its rows are held.
+3. **Boxes and images: base3's rules** (CLOOP:2912–2913).
+   - The source rule: median side ≥ 32 px; ≤ 25 % of boxes under 16 px; ≤ 10 % of boxes over 80 % of the image; median ≤ 25 boxes per image.
+   - A box under 8 px is masked with the image mean.
+   - An image is dropped when a box covers over 90 % of it, its short side is under 320 px, more than 50 % of it is masked, or no weed box remains.
+4. **Model audit per source** (CW.7 step 6), by E1-A (trained on base_v2 only, so it never saw these sources), on training candidates only, never on MD, MT-W or test v1 rows.
+   - The source's missing-label rate, false-box rate and box convention are compared with cwd12 train_core's.
+   - A source over train_core's missing-label rate by more than 0.15 is shown on its sheet as partially labelled. It enters only as "accept for training only", with predicted unlabelled plants masked (`inc2/mask.py`).
+5. **Dedupe** (base3's copy rule, never at 4–6 bits; CLOOP:2914): the same bytes; or 3 bits plus an 80 % box match; or an identical label layout. Base B rows win over copies.
+6. **Thinning `thin(10)`** for video and tray series (DS.0 item 3), in the order `stable_int("inc2/ds1/thin/<series>")`, seeded with the series' frames S0 already holds.
+   - Applied to the S arms' new rows, to KT and KF, and to the MD and MT-W v2 groups.
+   - Not applied to KD, whose point is density. KD's frames have still passed step 5's 3-bit dedupe, so KT against KD compares 10-bit thinning spread over all videos with 3-bit dedupe within few videos, not raw frames.
+7. **Leakage guard, both directions** (V3F.3.7 item 2), on every DS1 manifest including B′°:
+   - against cwd12 dev and test, ImageWeeds, ood22, ood23, test v1 and its companion lists, evalgroups_v1, MD v1, MT-W v2 and, once F9 has written it, the funnel's H10d hold-out: the 8-variant 6-bit dHash plus the calibrated DINOv2 detector (cosine 0.946384);
+   - every DS1 manifest's rows against MD and MT-W at the capture-group level.
+
+   A hit is dropped and counted, in B′° too (DS.0 item 16).
+8. **EXIF.** A row whose EXIF orientation is 2–8 is refused (`exif_orientation`), after the guard, so that a copy is still named as a copy (DS.0 item 18).
+9. **Licence.** Research-only rows are allowed and flagged. Every SIU frame is CC BY-NC-SA, so every model trained on SIU is research-only.
+   - Unresolved licences (51,637 queue rows; R9) are re-read from the provider's API where one exists. The rest are research-only until a person decides.
+   - The permissive-only subset of each manifest is counted.
+10. **Writes.** A row is written as a PNG only when a mask fill changes its pixels. Every other row is referenced by its original path.
+
+#### DS.5.2 Pools and expected sizes (planning; the rehearsal replaces them with counts)
+
+| Pool | Source rows (Q) | Expected after DS.5.1 |
+|---|---|---|
+| **S0's base: B′°** = base B minus tsw22, tsw23, session 20220129, MD-S0's groups, base_v2's 66 NDSU rows and the guard's hits | 40,743 (R4) minus about 1,100 (MD-S0) and about 130 | ≈ 39,500 (SIU ≈ 15,500; cwd12 train_core ≈ 3,005) |
+| SIU, weed level, not in B, not test v1 or its companions | about 170,000 frames before step 5 (123,349 queue rows − 15,532 in B − 2,587 test v1, plus 64,421 not admitted at species level); after step 5 at most a few tens of thousands of 3-bit groups (the 100,361 free admitted frames form 35,343); SORVU and other crop videos removed | `thin(10)`: 20,000–55,000 |
+| Q pool 3, class names (a9s9v, test-gzc3r, mendeley, zenodo_22033986, schwarz) | 20,905 | 6,000–17,000, after names, sheets and the cwd12-copy screen |
+| Q pool 5, species-gate rejects and uncut eligible rows | 4,688 | 4,000–4,700 |
+| Rows intake commits from lane DATA's fetches before the phase-1 freeze (2SeasonWeedDet8 adds none) | – | counted at build |
+| **Phase 1 in hand** | | **S1u ≈ 69,000–116,000; S1c ≈ 52,000–70,000** |
+| Phase 2, named now: MFWD full (94,321 images, CC BY; a tray time series, so `thin(10)` per tray and base3's dedupe leave far fewer: base B holds 1,867 of the 4,079 MFWD images collected so far, Q), CropAndWeed, PhenoBench (2,179), Sugar Beets 2016 labelled frames | to fetch | 25,000–70,000 admitted, **bound by bytes** (DS.11) |
+| **S2** = S1c ∪ phase 2, with family caps | | ≈ 80,000–140,000 |
+
+- CWD30 (219,770 images) is not a phase-2 source: it is published as an image-level classification set without boxes, to the delegate's knowledge. If its release holds boxes, adding it is a Revision before any DS1 number (DS.13).
+- **Images are not the unit of diversity.** Every status line and record prints three counts for each manifest, and the gap to the owner's scale rule (tens to hundreds of thousands of verified images): images; distinct photos (6-bit components); capture groups (videos, trays, sessions and export stems). For example, SIU's 230,598 frames come from 331 videos of potted plants, 84–1,437 frames each (Q), and about two pots per species.
+
+#### DS.5.3 Manifests
+
+S arms. Each larger manifest contains every row of each smaller one, row bytes unchanged.
+- **S0** = B′°.
+- **S1c** = S0 ∪ the in-hand pools of DS.5.2, with the SIU family capped at 35 % of the manifest. The cap drops whole thinned SIU videos in the order `stable_int("inc2/ds1/cap/siu/<video>")`.
+- **S1c-R** (Tier S) = a seeded random subset of S1c of exactly S0's size, in the order `stable_int("inc2/ds1/r/<key>")`, with the cwd12 train_core rows kept whole: S1c's composition at S0's volume.
+- **S1u** = S0 ∪ the same pools, with no SIU cap. S1c ⊂ S1u.
+- **S2** = S1c ∪ the phase-2 admitted rows, every family (SIU, MFWD, the dock family) capped at 35 %.
+- S0x and S2x use S0's and S2's manifests.
+- **The cwd12 exposure floor** (DS.0 item 15) applies in S1c, S1c-R, S1u and S2 against S0, and in S2x against S0x. The repeats count in the arm's N and in its compute.
+
+K arms (Tier S). Base **A** = base_v2's 6,811 images, every box set to class 12. E1-A trained on exactly this and is reused as K0 (V3F's records). Each K arm adds exactly N_K images to A.
+- **N_K** = min(15,000, the supply of each K pool at build). The same N_K is used in every K arm.
+- T = the number of thinned target-species SIU frames available (AMAPA, AMATA and SIDSP videos; Q counts 12,499 target rows; planning number 3,000–5,000).
+
+| Arm | Added rows (N_K each) | What it holds constant |
+|---|---|---|
+| **KD**, dense SIU | Whole target-species videos in seeded order until T frames, then whole non-target videos (no crop video) until N_K. Every frame that passed step 5 is taken. | Source, label process, species quota (T target), setting |
+| **KT**, thin SIU | T thinned target-species frames round-robin across all target videos, then N_K − T thinned non-target frames round-robin across all non-target videos | As KD; differs in frames per video (and slightly in which non-target species, since KD takes whole videos) |
+| **KF**, field and turf | N_K thinned rows of base B's Field and Turf external rows (V3F.4), outside MD-S0, test v1 and its companions | Size and thinning; differs in setting (and, stated, in sources, label conventions and species mix) |
+
+- MD's and MT-W's groups and every test v1 companion are excluded from every pool before any K or S draw.
+- The K draws use `stable_int("inc2/ds1/k/<arm>/<series or row>")`.
+- KD's dense frames are referenced by path; only their masked rows are written.
+
+#### DS.5.4 MD v1 and MT-W v2
+
+- **Capture groups** (MAIN_TEST.md MT.2 item 1). Images join one group when the 8-variant dHash puts them within 6 bits in either direction, a copy edge links them, they share a Roboflow export stem or an intake capture group (a video, an MFWD tray), or the calibrated DINOv2 detector links them (cosine ≥ 0.946384). A group is named by the sha256 of its members' sorted sha256s. Video and tray groups are thinned with `thin(10)` before they enter MD or MT-W v2, so that near-identical frames do not count as separate test images.
+- **Eligible sources.**
+  - MD-S0: base B's external sources except SIU and base_v2 (the cwd12 and tsw core).
+  - MD-N and MT-W v2: every new non-SIU source whose sheet is "accept" (not "accept for training only"), audited where DS.0 item 4 says so.
+  - Never SIU, an evaluation group, a cwd12 copy, a test v1 group or companion, or a group of more than 500 images.
+  - MT-W v2 also obeys MT.2 item 2: no group with an image in base_v2, base B or a stream pool or within 6 bits of one, and none within 6 bits of, or a verified copy of, an image of another exam (cwd12 dev and test, ImageWeeds, ood22, ood23, ooddev_v1, the evaluation groups).
+- **Draw.** Per source, groups in the order `stable_int("inc2/ds1/md_v1/<source>/<digest>")`:
+  - MD until about 5 % of the source's admitted images (at least 15, at most 500);
+  - then, for new sources only, MT-W v2 until about 10 % more (at least 30, at most 1,000);
+  - MD and MT-W v2 together hold at most 30 % of a source.
+  - If DS.7.6's pre-flight puts MD-S0's MDE over 0.02, MD-S0 is enlarged by further groups in the same order, within the 30 % cap, before it is frozen.
+- **Freezing.** Each frozen exam gets a `LOCK.json` whose sha256 is time-stamped with OpenTimestamps.
+  - MD-S0 is frozen before B′° is built. Its rows leave base B to form B′°, which is why S0 is retrained rather than reusing D1's B′1 seeds.
+  - A source's MD-N and MT-W v2 rows are frozen before any arm trains on a row of that source, MT-W v2 after the person's check (DS.10 item 4).
+  - Every MD and MT-W v2 row and group enters DS1's own never-train list (`splits/ds1/never_train.jsonl`, under MD-S0's LOCK and then each source's) at its draw. DS1's guard and the stream cutter's never-cut list (DS.9.1) read it. LOCK v2's never-train index is not changed, since intake fails closed when it does not hash as recorded.
+- Phase 2 draws MD-N and MT-W v2 for its sources the same way before S2's build. P3 is decided on MD-S0 only, so phase-2 source choices cannot change its exam.
+
+---
+
+### DS.6 Arms
+
+All arms: YOLO11m at 640 px (`yolo11m.pt`, sha256 as `recipes.ARMS` records), one class, seeds 0, 1 and 2, final EMA weights, no checkpoint selection, Ultralytics 8.4.37, one V100-32GB.
+
+| Arm | Rows (planning) | Image-epochs | Lane, path | Exams |
+|---|---|---|---|---|
+| K0 = E1-A (exists) | 6,811 | 1.2 M | – (scored only) | dev, ImageWeeds (MD as a reference only) |
+| KD, KT, KF (Tier S) | 6,811 + N_K | 1.2 M | MAINT, `inc2.baseline build --ds1` | dev (two-stage and stage 1), MD, ImageWeeds |
+| S0 | ≈ 39,500 | 1.2 M | MAINT | MD, dev (two-stage), ood22, ood23, ImageWeeds |
+| S1c-R (Tier S) | as S0 | 1.2 M | MAINT | MD, dev |
+| S1c | ≈ 52,000–70,000 | 1.2 M | MAINT (long path if over the walltime line) | as S0 |
+| S1u | ≈ 69,000–116,000 | 1.2 M | as S1c | as S0 |
+| S2 | ≈ 80,000–140,000 (byte-bound) | 1.2 M | as S1c | as S0 |
+| **S0x** | as S0 | **3.6 M (or 2.4 M)** | TRAIN, `inc2.ds1_long`, 24 h walltime | as S0; MT-W read |
+| **S2x** | as S2 | **as S0x** | TRAIN, long path | as S0; MT-W read; cwd12 test read |
+
+- Recipe: `cold_budget` (epochs = round_half_up(I/N), warmup fixed at 640 iterations, close_mosaic 10 % of epochs), recomputed from each manifest's final count, repeats included.
+- At 1.2 M, S0 gets about 30 epochs, S1u about 10–17 and S2 about 8–15. At 3.6 M, S0x gets about 91 and S2x about 24–45 (derived, the cwd12 floor's repeats included). The S0x/S2x pair, and S2x over S2 in Tier S, show whether the 1.2 M arms under-train the large sets.
+- **Walltime.**
+  - A 1.2 M arm runs under the pinned 8 h cold limit when base3's loader projection is under 0.8 × 8 h (CLOOP:2927). Otherwise it moves to the long path, recorded, at the same 1.2 M.
+  - The long path is a DS1 module, `inc2.ds1_long`, like V3F's `v3fam_detr` (L23K). It runs on lane TRAIN with a 24 h walltime, a one-epoch smoke first.
+  - **The pair's compute is fixed once, from S0x's smoke:** 3.6 M if the projected seed is at most 19.2 h (0.8 × 24); otherwise 2.4 M for both S0x and S2x, recorded. S2x's own smoke must then project at most 19.2 h at the pair's compute. If it does not, S2x is submitted once with 36 h; if it projects over 28.8 h, it is recorded "not run (walltime)" and the substitution of DS.7.2 applies.
+
+---
+
+### DS.7 Decision rules
+
+#### DS.7.1 Statistics (V3F's, unchanged)
+
+- D = mean(X) − mean(Y) over 3 seeds per side. X **qualifies** when D > 2 × pooled sd **and** D > SE (the E-rule).
+- Combined z = D / σ_c, σ_c = √(SE² + (sd_X² + sd_Y²)/3). 90 % interval: D ± 1.645 σ_c. SESOI = 0.005 on every exam.
+- **Outcome classes:**
+  1. qualifies (flagged "below SESOI" when its 90 % interval lies inside ±0.005);
+  2. equivalent (does not qualify, and the interval lies inside ±0.005);
+  3. inconclusive (flagged "reversed" when the whole interval is below 0).
+- SE:
+  - the image SE is V3F's paired image bootstrap, 1,000 resamples, seed text `stable_int("inc2/ds1/<comparison id>/image")`;
+  - on MD, the larger of the image SE and the capture-group SE (`…/group`);
+  - on ood23, the larger of the image SE and the session SE (`…/session`, V3F's session rule);
+  - on cwd12 dev, the image SE, with the session SE reported.
+- One scoring path for both sides of every comparison. DS1's pass is built on E3's validator class, imported and never edited (V3F.3.2); `v3fam.py` is imported and never edited.
+- **The image loader is deviation 6's** (`v3fam_loader`, the MPO and EXIF fix, CLOOP:4635 ff.), under which B′1's ood23 values were taken. MD, MT-W v2 and, in each read job, test v1 pass the same loader pre-flight: every file opens, and orientation is applied once.
+- Before any DS1 score, three reproductions must hold to ≤ 1e-6:
+  - E1-A's three stage-1 dev records and E3-A's dev species records;
+  - B′1's ood23 statistic (0.2562, 0.2517, 0.2598) under that loader;
+  - an identity pass on MD equal to a plain `inc.scorer.score` on its root.
+
+  Between 1e-6 and 0.002 the job continues with a recorded deviation. Over 0.002 it refuses.
+
+#### DS.7.2 Primaries and their thresholds
+
+| id | Exam | X over Y | Question | SE | Threshold (one-sided) |
+|---|---|---|---|---|---|
+| P1 | MD-S0 | S1c over S0 | Do the in-hand pools, quality-capped, place better weed boxes on held-out scenes of S0's own sources, at equal compute? | max(image, group) | z > 2.128 (α/3) |
+| P2 | MD-S0 | S1u over S1c | Do more thinned greenhouse frames help on top of them, at equal compute? | max(image, group) | z > 2.128 |
+| P3 | MD-S0 | S2x over S0x | Does the phase-2 build beat base B′° at the pair's compute? | max(image, group) | z > 2.128 |
+| P4 | ood23 | S2x over S0x | Does the scaled build transfer to a held-out season and region? (V3F P7's statistic) | max(image, session) | z > 1.645 |
+
+- A primary is **confirmed** when it qualifies and its z passes its threshold. A primary that qualifies without passing its threshold is reported "qualifies, not confirmed" and is exploratory.
+- Bonferroni within an exam: each primary is decided once, when its own arms' records are complete or failed; P1 and P2 at verdict v1, P3 and P4 at verdict v2. No decision waits for another primary's z.
+- A primary whose arm was not run or failed is reported "not run" and keeps its α share.
+- Only confirmed primaries and "equivalent" outcomes, stated with their ±0.005 90 % interval, may appear as findings in an abstract or a conclusion. Equivalence is judged per primary, without a multiplicity correction (V3F decision 28).
+- **N1 (non-inferiority, DS.0 item 8).** S2x minus S0x on cwd12 dev species through the two-stage system. "Non-inferior" when the lower end of the 90 % interval is above −0.005. Outside the correction; the paper states the convention and N1's power (DS.7.6: about 0.3 if the true difference is 0 and σ_c is 0.0044).
+- **H1 (harm check).** S2x minus S0x on cwd12 dev species with z < −1.645 is reported as "the scaled build lowered cwd12 dev", whatever N1 says.
+- **If S2 does not exist** (phase 2 not frozen by 2026-12-05, DS.0 item 17): P3, P4, N1 and H1 are taken with S1u in place of S2, under the same ids, with the substitution named. S1u's long-path twin S1ux is built in S2x's budget slot.
+
+#### DS.7.3 Secondary comparisons (Tier S: reported with their MDE, never a claim or a read)
+
+- KT over KD (frame density), KF over KT (setting), every K arm over K0, on dev (two-stage and stage 1) and MD.
+- S1c over S1c-R (volume at fixed composition) and S1c-R over S0 (composition at fixed volume), on MD-S0 and dev.
+- S1u and S2 over S0 at 1.2 M on MD-S0, dev (non-inferiority form) and ood23.
+- S2 over S1c (phase 2 at equal compute). S2x over S2 and S0x over S0 (compute).
+- Every S arm on ood22, on ImageWeeds and on ood23 without its 13 disputed images.
+- MD-N's coverage strata, the setting strata (Field, Turf, Indoor) and source-balanced means.
+- Per-species dev AP for every arm.
+- S0 against D1's B′1 on dev, ood22 and ood23. They differ by MD-S0's rows, the NDSU rows, the guard's hits and the cwd12 floor, so this is a check, not a question.
+
+#### DS.7.4 Outcome sentences (fixed now)
+
+- **P1** confirmed: "Adding the in-hand recovered images (N images, P distinct photos, G capture groups) raised weed AP on held-out scenes of base B's own sources by D at equal compute." Equivalent: "… changed it by less than ±0.005". Inconclusive: "… cannot tell (D, interval)".
+- **P2**: the same for "more thinned greenhouse video frames, at equal compute, which gave every other image X % fewer epochs", X from the two manifests.
+- **P3**: the same for the scaled build, "at k times base B's compute", with k = 3 or 2 as fixed by DS.6.
+- **P4**: "On a held-out season and region (ood23), the scaled build raised target-species agnostic AP by D", or the equivalent and inconclusive forms, each with ood23's caveat (DS.4).
+- **N1**: "On cwd12, the scaled build is non-inferior to base B′° within 0.005 (90 % interval …)", or "… non-inferiority was not shown (power about …)".
+- Every MD-N number is worded "on held-out scenes of sources it trained on", never as transfer.
+- Tier S results are worded "these sources" and "in this design", with their MDE.
+
+#### DS.7.5 Sealed reads (each after the verdict that decides its arm)
+
+| Read | Exam | Condition | Max |
+|---|---|---|---|
+| S0x | MT-W and evalgroups_v1 | Reference read, declared now | 1 |
+| S2x (or S1ux, DS.7.2) | MT-W and evalgroups_v1 | Candidate read, declared now, whatever its MD outcome | 1 |
+| one 1.2 M arm | MT-W and evalgroups_v1 | Only if P1 or P2 is confirmed: the arm of the confirmed primary with the larger D (S1c for P1, S1u for P2) | 1 |
+| S2x (or S1ux) | cwd12 sealed test, two-stage | After verdict v2; descriptive | 1 |
+| **Total** | | | **≤ 4 inference reads** |
+
+- No other model is run on any MT-W image. The person's check of DS.10 item 4 uses only stored verifier verdicts as flags, which are records, not reads.
+- Each read follows V3F.3.6's procedure: `test-read` writes `read.json` once, with `read_by` exactly "Harry He (owner)" or "the delegate under the 2026-09-30 owner grant". The named person submits it.
+- **0.90 wording (MAIN_TEST.md MT.8, at weed level).**
+  - An arm *reaches* 0.90 when its 3-seed mean weed AP50-95 on MT-W is ≥ 0.9000. It *clears* 0.90 when the lower end of its 90 % interval, mean − 1.645 √(SE² + sd²/3) with SE = max(image, capture-group bootstrap SE of the 3-seed mean), is ≥ 0.9000.
+  - Both are reported with the test v1 stratum (and v1.1 if corrected), the MT-W v2 stratum (in-source only for arms trained on those sources), the Field stratum, the checked subset and, separately, the SIU in-plant stratum.
+  - The crop/weed target is not claimed from MT-W.
+
+#### DS.7.6 Power, recorded before the first training item
+
+- **MD-S0.** σ_c on the drawn MD-S0 is estimated from two existing models that never trained on base B: E1-A against b_v2_m640 (both trained on base_v2 only), their seeds' predictions scored with the group bootstrap. MDE = (2.128 + 0.842) σ_c is recorded for P1–P3. If it exceeds 0.02, MD-S0 is enlarged (DS.5.4) before it is frozen and the MDE is recomputed.
+- **cwd12 dev.** DS.2's MDEs (≈ 0.0085–0.020) are printed beside N1, H1 and every Tier S dev comparison. N1's power is computed from E1-A's and E1-B's stage-1 seeds.
+- **ood23.** V3F P7's σ_c (0.0162, derived from its interval) gives an MDE of about 0.040 at z 1.645 and power 0.8. P4 is stated as underpowered for effects below that.
+- These numbers are written to `capacity/ds1_power.json` before the first training item; the gate checks that the file exists (DS.9.3).
+
+---
+
+### DS.8 Two measurements without training
+
+#### DS.8.1 RA: re-analysis of the stream's gate records (no GPU; the first DS1 step after the stamp; descriptive)
+
+For every stream step with a recorded gate (s001's inc0001–inc0004, s002's inc0005, and any later one):
+- chain D and truth D;
+- the seed sds, the pooled sd, the seed-only SE and z of the 3-v-3 difference, and the MDE at power 0.8, for chain and truth separately;
+- the outcome class against SESOI 0.005 from the seed term only (no per-image arrays were kept), flagged as overstating |z|;
+- the chain's agnostic delta beside its 12-class delta and the recorded `class_vs_loc`;
+- the shared null (chain) and the shared control (truth), and how far each step's D would move under a one-sd shift of that shared value.
+
+Output: `capacity/ds1_ra_gate.json` and `.md`.
+
+**Reading (written after R6 was read, so descriptive).**
+- A "data" call whose seed-only interval includes 0 (inc0004 today) is "not evidence of harm at the chain's resolution".
+- A "data" call whose seed-only interval excludes 0 is a resolved 12-class loss, above or below SESOI (inc0001, −0.0037, is below it; inc0003, −0.0063, above).
+- Where the agnostic delta is ≥ 0 and `class_vs_loc` is "labels", the loss is recorded as naming, not placement (cause C).
+
+#### DS.8.2 LN: a person's per-box label sheet
+
+- **Rows**, seeded draws:
+  - 200 images from inc0001, inc0003 and inc0004 pooled (SIU frames, about one box each);
+  - 100 images from inc0005;
+  - 250 images from cwd12 train_core (the reference: labels from the dataset's authors, the rows every verifier was trained on).
+
+  550 images in all, mixed in the order `stable_int("inc2/ds1/ln/<sha256>")`, with source, file name and species hidden. SIU frames are recognisable by eye, so the sheet is not blind; the fixed rubric and the mixed order are what limit bias.
+- **Marks per box:** correct; not a plant; loose or partial; two plants in one box. Per image: a plant left unboxed (one missing box per plant).
+- **Statistic.** Per group, the per-box error share (wrong boxes plus missing boxes over boxes plus missing boxes), with a 95 % interval from an image bootstrap (1,000 resamples). For each increment group minus train_core, the bootstrap interval of the difference.
+- **Reading (fixed now).** Label noise is **supported** as a cause when the difference's lower end is above 0.03, **not supported** when its upper end is below 0.03, and **unresolved** otherwise. At 2 % error in both groups, the 95 % half-width of the SIU-minus-train_core difference is about 0.025 (derived, with about 1.8 boxes per train_core image), so "not supported" is reachable.
+- AS's machine numbers and the cluster's re-audit of s001 and s002 (DS.10 item 2) are reported beside, with AS's limitation.
+- Estimated time: 550 images at about 6–8 s, 55–75 min.
+
+---
+
+### DS.9 What the platform does
+
+#### DS.9.1 Code (no pinned, shared or code_shas file is edited)
+
+- `inc2/ds1_data.py`, the builds: the cwd12-copy screen and the D28-v2 rule per source; the MD and MT-W v2 draws, their thinning and DS1's never-train list; pools, admission and thinning; the leakage guard on every manifest including B′°; the model audit; the manifests, the cwd12 exposure floor and S1c-R; `splits/ds1/summary.json` with the three counts per manifest.
+- `inc2/ds1_sheets.py`, on the lab (0 SU):
+  - `render` writes each batch of sheets as one self-contained HTML file: the source sheets (24 admitted and 12 removed images per source or family with reasons, and 12 images per source class), the owner's audit sheets, the LN sheet and the MT-W check sheets (flagged by stored verifier verdicts only). Every image is drawn with every box and its class.
+  - `record` reads the decisions file a sheet saves (the sheet's sha256, each decision, the decider, the time) and stores each decision with `decided_by` (`human:<id>` or the delegate).
+- `inc2/ds1.py`, scoring and verdicts: the DS1 pass on E3's validator with deviation 6's loader; the reproductions and statistics (v3fam's array functions imported); the power pre-flight (DS.7.6); `verdict` and `test-read`.
+- `inc2/ds1_long.py` and its job script `run_inc2_long.sh` (24 h default walltime; 36 h only for DS.6's one re-submission): smoke, the pair's compute decision, training, export of final EMA weights.
+- `inc2/baseline.py` gains `--ds1 <ARM>`, as it gained `--v3fam`.
+- **The stream cutter's never-cut list** (`inc2/step1_stream.py`) reads DS1's MD and MT-W v2 lists; today it matches only `splits/*/test_v1` (CLOOP:2924, 3131). This change has its own tests and replay case and is deployed before DS1's first draw. It removes rows from what the cutter may cut and changes nothing else.
+- Writes go only under `INC_DIR/ds1/`, `INC_DIR/splits/ds1/` and `INC_DIR/capacity/ds1_*`. Every DS1 job records the sha256 tree of `twostage/e3_v1/` and `capacity/{e*,v3fam}_*` before and after it runs, and fails if either changed.
+
+#### DS.9.2 Levers (record-only; L30–L34 are unused at a312c7d)
+
+| Lever | Lane | Argv | Estimate (cap) |
+|---|---|---|---|
+| L30 | MAINT | `inc2.ds1_data build --phase 1\|2 --step screen\|md_s0\|pools\|draw\|manifests` | phase 1: 3.0 GPU-h (≤ 6); phase 2: 3.0 (≤ 6) |
+| L31 | MAINT, on the lab | `inc2.ds1_sheets render --kind source\|audit\|ln\|mtw --batch <n>` | 0 SU |
+| L32 | MAINT | `inc2.baseline build --exp <exp> --ds1 <ARM> --seeds 0,1,2 --role baseline`, ARM ∈ {KD, KT, KF, S0, S1CR, S1C, S1U, S2} | seeds × 1.2 M × rate + finals (≤ 20) |
+| L32X | TRAIN | `run_inc2_long.sh inc2.ds1_long smoke\|train --arm S0X\|S2X\|S1UX --seed k` | smoke 0.5 (≤ 1); train 3 × 14.2 (≤ 3 × 19.2 at the decided compute) |
+| L33 | MAINT | `inc2.ds1 score --arm <ARM>` | ≤ 2 per arm |
+| L34 | MAINT | `inc2.ds1 verdict --phase 1\|2` | 0.5 (≤ 1) |
+
+- Phase-2 fetches are lane DATA's existing levers (L15, L16*, L17, L26) on the sources DS.5.2 names, their source ids given explicitly. D20's ranking is unchanged. The per-source 50 GB cap and the byte envelope stay, as do the person's approvals above them.
+- `ds1_sheets record` and `test-read` are a person's or the delegate's steps, not levers.
+
+#### DS.9.3 The gate (`_ds1_gate`, in `diagnose_stream.py`)
+
+A DS1 item is proposed only when all of these hold:
+- the deployed commit has this amendment's commit as an ancestor, and `ds1/v1/timestamp.json` names this text's sha256 and its proofs;
+- the cutter's never-cut change is deployed;
+- for any training item: RA's record and `capacity/ds1_power.json` exist, MD-S0 is frozen, and every source the item trains on has its MD-N and MT-W v2 rows frozen;
+- for a build: every source in it has a decided sheet, audited where DS.0 item 4 says so;
+- storage (DS.0 item 21): phase 1's byte-adding items within its 60 GB keep 257.8 GB free; any later item that adds bytes keeps 425.6 GB free; every other item keeps 257.8 GB free;
+- the remaining SU covers the estimate;
+- the item fits the family cap and the phase reserve (DS.11).
+
+Each unmet condition is one card naming it: "sheets waiting: <sources>", "owner audit waiting", "MT-W check waiting", "storage short by X GB", "not run (family cap)". **A card holds no lane:** the next DS1 item whose conditions hold, and every stream and DATA item, is proposed as usual. A failed arm is recorded failed after a second failure and does not hold the other arms (V3F.6.4).
+
+#### DS.9.4 Records and evidence
+
+- The platform's evidence admits only dev and MD records: `capacity/ds1_score_<arm>.json`, `capacity/ds1_v1.json` and `capacity/ds1_v2.json` (the phase verdicts), `capacity/ds1_power.json`, `capacity/ds1_ra_gate.json` and `splits/ds1/summary.json`.
+- ood22, ood23, ImageWeeds, MT-W, evalgroups_v1 and cwd12 test numbers go to `capacity/ds1_v{1,2}_external.json`, `capacity/ds1_test_<arm>.{json,md}` and `capacity/ds1_report.{json,md}`, never admitted (V3F.3.5).
+- **Verdict v1** decides P1 and P2 and writes Tier S for the phase-1 arms. **Verdict v2** decides P3, P4, N1 and H1.
+
+#### DS.9.5 Verification before deploy
+
+- Unit tests for every rule:
+  - names to roles, with the per-class image sample;
+  - the cwd12-copy screen (a planted re-upload with cwd12 capture names and one dev copy is role C whole);
+  - the holds and refusals that keep a row out; the EXIF refusal after the guard;
+  - the box and image rules;
+  - `thin(10)` on a synthetic video, seeded with S0's frames;
+  - the family cap dropping whole videos in seeded order, on rows before repeats;
+  - KD/KT/KF quotas and equal N_K;
+  - S1c-R's size, composition and kept cwd12 rows;
+  - the cwd12 exposure floor's repeat count and the equality of train_core's image-epochs;
+  - both guard directions on planted copies (an MD and an MT-W v2 copy, one planted inside B′°, one of ood23 found only by DINOv2, one of an H10d record);
+  - test v1 companions and SIU never drawn into MD or MT-W v2; evaluation groups excluded by name;
+  - nested manifests (S0 ⊂ S1c ⊂ S1u; S1c ⊂ S2) with row bytes unchanged;
+  - the draws (content-named groups; a new source leaves other draws unchanged; enlargement keeps the order; MD-S0 frozen before B′°; the per-source freeze);
+  - the never-cut list read by the cutter (replay case);
+  - the sheet decisions: a saved decisions file round-trips through `record`; the seeded audit sample and its widening on a reversal; the gate's sheet and audit conditions;
+  - a waiting card holds no lane (replay case);
+  - the ignore-region statistic on a hand-computed case, and ood23's sensitivity subset;
+  - the group, image and session bootstraps reproduced on synthetic arrays;
+  - "confirmed" (qualifies and passes the threshold), Bonferroni per exam, N1, H1, and the substitution of DS.7.2 with its date trigger;
+  - the read cap, order, condition and `read_by`; the 0.90 interval;
+  - the pair's compute decision and the walltime branches;
+  - the storage floors, the family cap and the phase reserve;
+  - RA on the two real report files (fixtures, sha256-checked);
+  - the LN statistic; the power pre-flight's arithmetic.
+- A mutation run with at least one mutant per rule. A survivor gets a killing case before deploy.
+- The platform's suites on the lab scratch copy against the deployed base, as for AS.
+- A read-only rehearsal on the login node that writes nothing under `INC_DIR`: every pool's and manifest's counts (images, distinct photos, capture groups) and the role C screen's hits per source; N_K and T; the MD and MT-W v2 sizes; the loader projection of S1u and of S2's planning size; free storage and SU.
+- `deploy_funnel.sh --dry-run` with no `--allow-*` flag; `inc2/v3fam.py` (3d776dae…) and the six E3-frozen files unchanged; `run_inc2_long.sh` shipped.
+
+---
+
+### DS.10 What people do
+
+| # | Who | What | Estimated time |
+|---|---|---|---|
+| 1 | Delegate | Commit and stamp this amendment. Implement, test and deploy DS.9 and the cutter's never-cut change (AS is deployed: a312c7d). | – |
+| 2 | Owner or delegate | Re-audit s001 and s002 on the cluster with AS: move each `audit/label_audit.json` aside (never delete) and re-submit L4's job script; `remote.py` refuses a rerun over an existing record (AS). | 10 min |
+| 3 | **Delegate: source sheets** | For every source or file-name family new to a DS1 manifest (phase 1 ≈ 12–20, among them SIU per species, a9s9v, test-gzc3r, palmer-id and MFWD), decide "accept", "accept for training only" or "reject", and set the setting (Field, Turf, Indoor, Aerial) and the class roles. | 3–5 min per source: ≈ 1–1.5 h in phase 1, ≈ 0.5–1 h in phase 2 |
+| 3a | **Owner: sheet audit** | The seeded 5 decided sheets (all of them if he reverses one), every names-round sheet, and SIU's species-role table (DS.0 item 4). | ≈ 30–45 min |
+| 4 | **Owner, or a person he names: MT-W check** | Test v1 without SIU: min(60, all) seeded images per source (15 sources, ≈ 900), plus every image whose stored verifier verdicts flag a box. MT-W v2: the same per new source (≈ 600–1,200). Error = a weed left unboxed, a box on a crop or on no plant, a loose or partial box. A source passes with at most 1 image in error out of 60 (95 % Wilson upper bound 0.089; 2 errors give 0.114, over 0.10). A source whose sample is all its MT-W images is checked whole: its errors are corrected and it passes. A failing source is checked image by image or leaves MT-W; its rows stay never-train. Corrections are logged and frozen as MT-W v1.1 / v2 labels, and never change a training label. | ≈ 2–3 h viewing at 5 s per image, plus 1–3 h of corrections |
+| 5 | **Owner: LN sheet** | DS.8.2. | 55–75 min |
+| 6 | Delegate | Licence decisions for rows the provider's API cannot resolve, recorded as the delegate's; a commercial-use question goes to the owner. | ≤ 30 min |
+| 7 | Owner | Approve phase-2 fetches above 50 GB per source (MFWD full, Sugar Beets 2016). Request an Ocean supplement if S2 should exceed the headroom (DS.11). Reclaiming kept bytes is his decision, and DS1 assumes none: 2SeasonWeedDet8's staging and tree (about 68 GB on /ocean, 34 GB on the lab) and `runs/mlflow` (337 GB, of which about 320 GB are byte-identical to run folders; CLOOP Amendment 2026-10-26). | minutes |
+| 8 | Owner or delegate | Submit the sealed reads (DS.7.5). | – |
+
+- **Sheets.** Each batch of items 3, 3a, 4 and 5 is one self-contained HTML file, rendered on the lab (L31) and copied to the owner's working folder `_work/v7/sheets/`. It shows every image with every box drawn and its class written, headings in Chinese and English, and one decision box per source (per image or per box where the item asks for that). Its save button writes a decisions file naming the sheet's sha256; `ds1_sheets record` stores it. While a batch waits, nothing else waits (DS.9.3).
+- The owner's total is about 5–8 h (items 3a, 4, 5 and 7). Every decision carries `decided_by`: `human:<id>` for a person, the delegate's own record for a decision under the grant.
+
+---
+
+### DS.11 Compute and storage budget
+
+**GPU-h (V100, 1 SU each).**
+- A 1.2 M m640 run takes 4.4 GPU-h (V3F, measured), so 13.2 per 3-seed arm.
+- A 3.6 M run takes about 14.2 GPU-h at 14.2 ms per image-epoch; at the 2.4 M fallback a seed is at most 19.2 h by DS.6's rule. The loader at 100,000+ images may be slower; the smoke measures it.
+
+| Item | Default GPU-h | Worst allowed |
+|---|---:|---:|
+| L30 phase 1: DINOv2 descriptors and dHash of new rows; BioCLIP-2 embeddings where the queue lacks them; model audit by E1-A | 3.0 | 6.0 |
+| KD, KT, KF (3 × 13.2) | 39.6 | 39.6 |
+| S0, S1c-R, S1c, S1u at 1.2 M (4 × 13.2) | 52.8 | 52.8 |
+| S0x (3 seeds) | 42.6 | 57.6 |
+| Smokes and loader projections (S1u, S0x, S2x) | 1.5 | 3.0 |
+| L33 phase 1: E1-A and b_v2_m640 on MD-S0 (power pre-flight); 3 K arms; S0, S1c-R, S1c, S1u, S0x (dev two-stage, MD, ImageWeeds, ood22, ood23) | 9.0 | 12.0 |
+| L34 verdict v1 | 0.5 | 1.0 |
+| **Phase 1 subtotal** | **149.0** | **172.0** |
+| L30 phase 2: intake embeddings, descriptors, audit for the new images | 3.0 | 6.0 |
+| S2 at 1.2 M | 13.2 | 13.2 |
+| S2x (3 seeds) | 42.6 | 57.6 |
+| L33 phase 2 (S2, S2x) | 2.4 | 4.0 |
+| L34 verdict v2 | 0.5 | 1.0 |
+| Reads (≤ 4 jobs; evalgroups_v1 in the same jobs) | 2.4 | 4.0 |
+| **Phase 2 and reads (the reserve, R)** | **64.1** | **85.8** |
+| **Total** | **≈ 213** | **≈ 258** |
+| **Family cap** (hard; the gate and `test-read` refuse past it) | **260** | |
+
+- *Worst case.* The worst column takes every item at its cap (DS.9.2) and the pair at 3 × 19.2 h. It stays under 260 by 2 GPU-h, with no retry of a failed arm. A retried arm (13.2) or an S2x re-submission at 36 h (DS.6) could pass the cap; the gate then records the later item "not run (family cap)".
+- *Phase reserve.* Until verdict v2, or the date substitution, no phase-1 item may take the family past 260 − 85.8 = 174.2 GPU-h. Phase 1's default leaves 25.2 GPU-h of margin, enough for one failed 1.2 M arm retried in full (13.2) plus overruns.
+- *Order when the cap binds* (cut last): the 1.2 M challenger read, then S2 at 1.2 M, then S1c-R. A refused item stays in its table as "not run (family cap)".
+- *SU.* About 213–258 SU against 9,914 SU left (R9). The campaign envelope is read at the pre-flight. If it covers less than 260 SU, the delegate raises it under the grant (V3F decision 22's precedent), and an item it does not cover waits at the gate.
+
+**Storage (/ocean: 611.0 GB free on 2026-10-29, R9).**
+
+| Item | Bound |
+|---|---:|
+| Phase 1 written images (only masked rows; at most all ≈ 77,000 new S rows + 15,000 KD rows × 0.35–0.47 MB, measured on base B's written files, R5) | ≤ 45 GB |
+| Runs (no MLflow copies since 2026-10-26; final EMA weights; logs), manifests, MD and MT-W lists, per-image score arrays without per-box features | ≤ 15 GB |
+| Phase 2 raw fetches plus extracted and written images | ≤ lane DATA's headroom when phase 2 starts |
+| **DS1 total** | **≤ 60 GB plus phase 2; nothing deleted** |
+
+- Lane DATA keeps fetching under D20's ranking and spends the headroom above 425.6 GB (about 185 GB on 2026-10-29). Phase 1's 60 GB need only V3F's floor (257.8 GB free; DS.0 item 21), so DATA's spending cannot stall phase 1.
+- Phase 2 assumes no bytes in advance: its size is whatever the headroom holds when it starts, read then and printed with S2's counts against the target. S2 of 80,000–140,000 assumes roughly 100–180 GB for phase 2, the top of today's headroom before DATA spends any. More needs an Ocean supplement or the owner's decision on kept bytes (DS.10 item 7).
+- A lab fetch is bounded by the lab's free disk (119 GiB on 2026-10-29), the collector's own cap.
+
+---
+
+### DS.12 Order of steps and dates
+
+| # | Step | Who / lever | GPU-h | By (planned) |
+|---|---|---|---:|---|
+| 0a | Commit this amendment; OpenTimestamps proof | delegate | 0 | 2026-10-29 |
+| 0b | Re-audit s001 and s002 with AS (DS.10 item 2) | person | ≈ 0.2 | 2026-10-30 |
+| 0c | RA (DS.8.1) on the stream's records | delegate (L34's code, no job) | 0 | 2026-10-30 |
+| 0d | Implement DS.9 and the cutter's never-cut change; tests, mutation run, rehearsal, deploy, replay gate; write `ds1/v1/timestamp.json` | delegate | 0 | 2026-11-07 |
+| 1 | L30 phase 1: screens; draw MD-S0; pools; render the first sheets (L31) | MAINT, lab | ≈ 1.5 | 2026-11-09 |
+| 2 | Power pre-flight on MD-S0 (DS.7.6; E1-A and b_v2_m640); enlarge if needed; freeze and stamp MD-S0; build S0 = B′° and KF | MAINT, delegate | ≈ 1.5 | 2026-11-10 |
+| 3 | L32 S0 and KF; L32X S0x smoke, the pair's compute, 3 seeds; KD and KT once SIU's table is audited | MAINT, TRAIN | ≈ 96–111 | 2026-11-17 |
+| 4 | Sheets (delegate), the owner's audit, the MT-W check and the LN sheet (DS.10 items 3–5); draw and freeze MD-N and MT-W v2 per source | delegate, owner | ≈ 0.5 | 2026-11-14 |
+| 5 | L30 phase 1: manifests S1c-R, S1c, S1u; final counts; walltime projections | MAINT | ≈ 1.0 | 2026-11-15 |
+| 6 | L32 S1c-R, S1c, S1u (seed runs overlap; about 3–5 days with 8 V100s free) | MAINT | 39.6 | 2026-11-21 |
+| 7 | L33 on each arm once its runs end; L34 verdict v1 (P1, P2; Tier S) | MAINT | 8.5 | 2026-11-24 |
+| 8 | Phase-2 fetches by lane DATA on the named sources, within the headroom; the owner's byte approvals | DATA, owner | 0 (CPU) | 2026-12-01 |
+| 9 | L30 phase 2: sheets, MD-N and MT-W v2 draws, check and freeze; S2 manifest frozen | MAINT, delegate, owner | 3.0 | **2026-12-05** (else S1ux, DS.7.2) |
+| 10 | L32 S2; L32X S2x (or S1ux) | MAINT, TRAIN | 56–71 | 2026-12-12 |
+| 11 | L33 phase 2; L34 verdict v2 (P3, P4, N1, H1) | MAINT | 2.9 | 2026-12-15 |
+| 12 | Sealed reads in DS.7.5's order: S0x, S2x, the confirmed 1.2 M arm (MT-W with evalgroups_v1), then S2x on the cwd12 test | owner or delegate | 2.4 | 2026-12-20 |
+
+- Steps 2–3 do not wait for step 4: S0, S0x and KF train on base B's rows only, and KD and KT need only SIU's audited table. A slipped person's step moves the steps that need it, never the 2026-12-05 rule.
+- V3F took 15 days (2026-10-11 to 10-26) with six deviations for about 200 GPU-h. This schedule leaves about 11 days of slack before the allocation ends.
+- The stream keeps running beside DS1. DS1 takes MAINT and TRAIN slots that the stream cannot use now: no cut is possible with 1,487 eligible rows against M = 2,728.
+
+---
+
+### DS.13 Caveats and open items
+
+- **MD measures held-out scenes of the training sources**, not new laboratories. P1–P3 are decided on MD-S0 so that more data is not confused with coverage of new sources. evalgroups_v1, ImageWeeds (under its rule), ood22 and ood23 measure transfer.
+- MD is checked by a person only through the source sheets. MT-W's checked subset is the human-verified number.
+- **Tier S contrasts are underpowered on cwd12 dev** (MDE ≈ 0.0085–0.020): they describe, they do not decide.
+- **KF against KT** changes setting together with sources, label conventions and species mix. KT against KD compares 10-bit with 3-bit thinning plus video spread, not raw density.
+- **The 1.2 M standard under-trains large sets** (8–17 epochs). The S0x/S2x pair, and S2x over S2 in Tier S, show by how much.
+- **The cwd12 exposure floor** changes how S arms spend their compute: repeats of about 3,005 images take about 91,000 of each arm's 1.2 M image-epochs (derived).
+- **Species are not scaled.** E3's classifier stays fixed, so cwd12 species gains can come only from boxes. Scaling the classifier with species-verified crops is base C's work, and cause C (naming) is a classifier question.
+- **The season exams' defects** (DS.4): ood23's 13 images of disputed season, the photograph in both season exams, and ood22's missing boxes.
+- **EXIF-rotated images are refused, not turned**, so sources of phone photographs lose those images (counted per source). Using a format's own frame size is a later rule.
+- **H10d** does not exist yet. DS1's guard reads it once F9 writes it; a DS1 manifest frozen before then may hold images that H10d later holds out. DS1 never scores H10d.
+- **Research-only.** Every arm with SIU or another non-commercial source is research-only. The permissive-only count is printed per manifest.
+- **The owner is an interested party** in the result. The stamp before training, Bonferroni per exam and the fixed outcome sentences limit this; the LN sheet is not blind.
+- **ooddev_v1** reads near zero for every model of every kind. It is not used until its labels and the predictions are inspected (an open item outside DS1).
+- **Phase-2 sources:** CWD30's annotation type is to be confirmed; MFWD's yield after per-tray thinning and dedupe is likely a small fraction of its 94,321 images.
+- **Open items:**
+  - Q pool 2 waits for a resolution-capable scorer (DETR_LADDER).
+  - The stream's cutter should exclude evaluation-group sources by name (Q problem D.1); DS1 does so in its own manifests.
+  - The D28 one-hit dHash quarantines of 2026-09-30 of uav-wqshy and bishwarup were false alarms by cosine (Q problem D.2). Both sources are off-goal and stay out.
+  - 21,180 trusted boxes without Step 1 crops are unused by the audit's probe (AS).
+  - Intake and later base builds do not read DS1's never-train list yet; until a later amendment adds it, DS1's guard and the cutter's never-cut list hold it.
+
+---
+
+### DS.14 What follows from each outcome (inputs to a later amendment; nothing switches here)
+
+| Outcome | Next |
+|---|---|
+| RA: losses are naming (agnostic ≥ 0, `class_vs_loc` "labels") | A stream amendment: stage-1 data is gated on the two-stage system or on stage-1 agnostic AP, not on the 12-class head; a "data" disposition requires D < −0.005 with an interval excluding 0 under the arm that decides it; M is sized to the supply that exists. |
+| KT clearly above KD (Tier S, above its MDE) | `thin(10)` or a per-video cap becomes a candidate rule for the stream and for every base, for video and tray sources; a person could revisit SIU's stream quarantine under it. |
+| P1 confirmed | The in-hand weed-level pools enter the next base build. |
+| P1 and P3 confirmed, N1 holds | The scaled weed-level build becomes the box detector of the next two-stage candidate; base C (crop/weed, CROP_WEED_COLLECTION.md) builds on it, and the main test (MAIN_TEST.md) adds crop scope. |
+| P2 not confirmed, or reversed | SIU stays capped at 35 % in every base. |
+| P1–P3 equivalent or inconclusive | More images of these kinds do not place better boxes at YOLO11m's capacity on these sources: the next lever is capacity and resolution (DETR_LADDER), not volume. |
+| N1 fails or H1 fires | The cwd12 floor is not enough: the next build weights cwd12 train_core higher or keeps a cwd12-only fine-tuning stage. |
+| LN supports label noise | The audit is made independent of the intake verifier (a probe from authoritative sources outside train_core), and the noisy sources are sheeted again. |
+
+---
+
+### DS.15 Changes at registration (from revision 2 of the draft)
+
+Each was checked against the records named before it was made.
+1. **The facts of 2026-10-29** (R9–R11, Amendment 2026-10-28): free storage (611.0 GB; DATA's headroom about 185 GB), AS deployed with a312c7d, the re-audits still due, F9 not written, the queue's holds, R8's 152 refusals recounted. The draft's "zenodo_10762138" as a new phase-1 source is replaced: it is 2SeasonWeedDet8, which adds no image and is never fetched.
+2. **Intake's new guards carried into DS1** (a312c7d): EXIF orientation 2–8 refused, not transposed (DS.0 item 18, DS.5.1 item 8); the guard adds DINOv2 against ood22 and ood23 and reads H10d once it exists (DS.0 item 19).
+3. **The season exams' defects disclosed** (DS.4): P4 stays on all of ood23, so that B′1's reproduction holds, with the 1,771-image sensitivity beside it.
+4. **Rows the funnel or a conflict holds** (`funnel_F9`, `join_conflict`, `h6_scan`) stay out of DS1 (DS.0 item 2).
+5. **"Confirmed" defined** as qualifying and passing the Bonferroni threshold; the challenger read opens only on a confirmed primary (DS.7.2, DS.7.5). The 0.90 interval of a single arm is defined (DS.7.5).
+6. **MD split into MD-S0 and MD-N**, MD-S0 frozen first and every source frozen before training on it. With KF drawn from base B's rows only, S0, S0x and KF wait for no sheet, and KD and KT only for SIU's (DS.0 items 5 and 20, DS.5.3, DS.5.4, DS.12). DS1 keeps its own never-train list rather than changing LOCK v2's index (DS.5.4).
+7. **The owner's audit:** the seeded 5 widen to every sheet on one reversal, and an audited source enters a manifest only after the audit (DS.0 item 4).
+8. **The MT-W check:** a source whose sample is all its images is checked whole, since 60 is not reachable; a failing source's rows stay never-train, as test v1's promise requires (DS.10 item 4).
+9. **Sheets:** one self-contained HTML file per batch with a decision box per source, and a waiting card holds no lane (DS.0 item 20, DS.9.1, DS.9.3, DS.10).
+10. **Storage floors:** phase 1's at most 60 GB need V3F's floor, so lane DATA's spending cannot stall phase 1; later byte-adding items keep DATA's floor (DS.0 item 21, DS.11).
+11. **Numbers made consistent:** the worst case is about 258 GPU-h everywhere (the draft's DS.0 said 243); the exposure floor's repeat count is exact; the family cap counts rows before repeats; the floor's share is about 91,000 image-epochs; `CLOOP:n` refers to a312c7d.
+12. **Code named:** `run_inc2_long.sh`, `--ds1` in `inc2/baseline.py`, the cutter change in `inc2/step1_stream.py`, and the sheets' `record` step.
+
+## Revision (2026-10-29): DS1 Revision 1, before any DS1 data
+
+Made on 2026-10-29 by the delegate under the owner's 2026-09-30 grant, after a review of DS1's implementation and before its deploy. No DS1 step had been taken: DS1's code was not deployed, so no DS1 job, record or score existed on the cluster or the lab. Each change below is therefore a Revision made before any DS1 number. The amendment's text above is unchanged, and so is its sha256 (3b63933b…9699). No number, threshold, arm, exam, statistic or decision rule of the amendment changes. This section is its own record. It is kept byte for byte as `docs/prereg/DS1_rev1_2026-10-29.md` and time-stamped as V3F.12 says before DS1's first step: `ds1/v1/timestamp.json` names its sha256 and its proofs beside the amendment's, and the ticker proposes no DS1 lever until the deployed tree holds this file with the sha256 the stream domain records.
+
+| # | What changed | Why | How verified |
+|---|---|---|---|
+| 1 | **The guard's direction from a later exam to an earlier manifest is applied at the draw** (DS.5.1 item 7, DS.5.4). A group of MD-N or MT-W v2 is not drawn when one of its images lies within 6 dHash bits (8 variants, either direction) of a row of a DS1 manifest already built, or when the calibrated DINOv2 detector calls it a copy of such a row. The group stays a training candidate, and each draw records how many groups it left out. MT-W v2 also leaves out every group with an image within 6 bits of a row of base B (base_v2 among them) or of a stream's pool, or holding one of base B's files (MAIN_TEST.md MT.2 item 2). Rows added to a manifest later still pass the guard against every frozen MD and MT-W row, as before. | S0 = B′° and KF are built once MD-S0 is frozen, before any MD-N or MT-W v2 exists, and a built manifest never changes (DS.5.3: each larger manifest holds every row of each smaller one). The guard can therefore no longer drop a B′° row that a later exam image copies, so it keeps the exam image out of the exam instead. Near copies across sources lie at 4–6 bits and, for re-uploads, at 7–29 bits (R8), and they inflate scores (V3F P8, +0.138). | Unit tests on planted near copies of S0's rows (by dHash, and by DINOv2 only) and of base B's rows (MT-W v2 only); a mutation that draws them is killed |
+| 2 | **A box's role is decided on its source class** (DS.5.1 item 2). Each box's source class is read from the source's own label files with the collector's own reader (the staging blobs, `collect.normalize.read` with the fetch's options), and a box traced so takes the role its source class is given. A row is traced only when its boxes, mapped by the source's class map, equal its intake label box for box. Where several source classes map to one INC class and a box cannot be traced (the staging files are gone, or the re-read does not match), its unit is that INC class with every name it stands for shown on the sheet: one role covers them all, and it is "unresolved" (the image is held) when the names differ in role. | The intake label keeps the INC class only, and every non-target class maps to one class (OtherPlant). The crops and the non-target weeds of one source then shared one unit, and no role was right for both. | Unit tests: traced units, the untraced fallback, the class map's names on the sheet |
+| 3 | **The owner's seeded sample over several screens** (DS.0 item 4). After each screen revision of a phase, the 5 sources with the lowest `stable_int("inc2/ds1/audit/<source>")` among the sources screened so far are drawn. Sources that are role C or quarantined whole are left out, since they enter no manifest. A source once drawn stays drawn, so the sample can exceed 5 when a later screen adds sources with lower values. | A phase's sources arrive over several screens. Recomputing "the 5 lowest" over a growing set dropped a source already drawn, which then entered a manifest without his audit; DS.0 item 4 says a source drawn for his audit enters a manifest only after it. | A unit test with a second screen revision; a mutation that recomputes the sample is killed |
+| 4 | **The K arms keep base A whole** (DS.5.3, DS.5.1 item 7). Base A's rows that the guard flags against an exam are kept in every K arm and listed in its record, as DS.0 item 16 keeps base_v2's flagged rows in B′°. The N_K rows each K arm adds pass the guard against every frozen MD and MT-W row. | K0 = E1-A trained on exactly base A, and each K arm is base A plus N_K rows. Dropping base A rows would leave the K arms unequal to K0 and to each other, while every K arm holds them alike. | The K arms' records list the hits; a unit test |
+| 5 | **Every answer on a person's sheet is given explicitly** (DS.10 items 3a, 4 and 5). The owner's audit sheets pre-select no decision, setting or role; the delegate's choice is shown beside each box. Each image of the LN sheet is marked checked, and each image of the MT-W check is answered "correct" or "in error", before a sheet saves. `ds1_sheets record` refuses a file that misses one, and records an audit sheet only under the owner's id. An MT-W correction is the image's whole corrected label: its boxes without those removed, with those drawn. | A sheet saved untouched confirmed every audited decision, gave 0 % label error on LN and passed every MT-W source, and a correction kept only the boxes drawn. | Unit tests of `record` and of the corrected labels; mutations that accept an untouched sheet are killed |
+
+The registered text is read with these Revisions. DS.5.4's draw is item 1's, DS.5.1 item 2's roles are item 2's, DS.0 item 4's sample is item 3's, DS.5.3's K arms are item 4's, and DS.10's sheets are item 5's.

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Stream-mode replay and scenario cases S1-S29 (docs/CONTINUOUS_LOOP.md 6.8;
+"""Stream-mode replay and scenario cases S1-S30 (docs/CONTINUOUS_LOOP.md 6.8;
 S29 reproduces the live incident of 2026-09-28: a failed job's step proposed
-again under its old id).
+again under its old id; S30, DS1 (Amendment 2026-10-29): the stream cutter's
+never-cut list reads DS1's never-train list, and a DS1 card waiting for a
+person holds no lane).
 
 Each case prints "case <id>: pass|fail"; executor.run_replay_tests records
 them per case (executor.STREAM_REPLAY_CASES), and a failing case fails the
@@ -1483,6 +1485,66 @@ def s29():
     check("every tick made at most one ssh", w.max_calls() <= 1, w.max_calls())
 
 
+# ----------------------------------------------------------------------- S30
+def s30():
+    """DS1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.1 and DS.9.3). The stream cutter's never-cut list
+    reads DS1's never-train list (splits/ds1/never_train.jsonl: its MD v1 and MT-W v2 rows): a queue row with the
+    same bytes, the same key or a dHash within 6 bits is marked and never eligible; a list that does not parse stops
+    the cutter. No DS1 item is proposed while the deployed cutter lacks that change. A DS1 card waiting for a person
+    (the sheets to decide) holds no lane: in the same ticks the DATA lane's fetch and DS1's next item whose
+    conditions hold (MD-S0's draft, MAINT) are proposed and executed."""
+    import types
+    from weed_optimizer_framework.tools.inc2 import step1_stream as S1
+    sys.path.insert(0, str(PKG / "tests"))
+    import test_stream_ap_ds1 as T
+    inc = pathlib.Path(tempfile.mkdtemp(prefix="s30_", dir=str(W.TMP)))
+    lst = inc / S1.DS1_NEVER_TRAIN
+    lst.parent.mkdir(parents=True)
+    md = {"key": "mdn_src_x/img_0001", "sha256": "a" * 64, "dhash": str(0x0F0F0F0F0F0F0F0F),
+          "exam": "mdn_src_x", "why": "md_v1"}
+    lst.write_text(json.dumps(md) + "\n")
+    rows = [{"key": "q/bytes", "sha256": "a" * 64}, {"key": "mdn_src_x/img_0001", "sha256": "b" * 64},
+            {"key": "q/near", "sha256": "c" * 64, "dhash": str(0x0F0F0F0F0F0F0F0F ^ 0b111)},
+            {"key": "q/clean", "sha256": "d" * 64, "dhash": str(0x3C3C3C3C3C3C3C3C)}]
+    n = S1.test_v1_rows(types.SimpleNamespace(inc_dir=inc), rows)
+    check("the cutter's never-cut list reads DS1's list: the same bytes, the same key and a dHash 3 bits away "
+          "marked 'ds1:<why>', never eligible; the clean row untouched",
+          n == 3 and [str(r.get("test_v1") or "") for r in rows] == ["ds1:bytes", "ds1:key", "ds1:dhash_3", ""]
+          and all(r.get("eligible_step1") is False for r in rows[:3]) and "eligible_step1" not in rows[3],
+          [(r["key"], r.get("test_v1")) for r in rows])
+    lst.write_text(json.dumps(md) + "\n{not json\n")
+    try:
+        S1.test_v1_rows(types.SimpleNamespace(inc_dir=inc), [{"key": "q/x", "sha256": "e" * 64}])
+        stopped = False
+    except S1.StreamError:
+        stopped = True
+    check("  a list that does not parse stops the cutter (fail closed)", stopped)
+    wn = T.ds1_world("s30_cutter", never_cut=False)
+    wn.tick(3)
+    check("the deployed cutter without DS1's list: no DS1 item proposed, one card naming the change",
+          not T.pro(wn) and len(T.cards(wn, "never-cut change")) == 1, [c["title"] for c in T.cards(wn)])
+    w = T.ds1_world("s30")
+    w.queue(0)
+    w.placement({"hf": "pass"})
+    w.candidates([{"id": "src_top", "provider": "hf", "licence": "CC BY 4.0", "target_classes": ["PricklySida"],
+                   "bytes": 1e9, "images": 500, "expected_target_boxes": 800}])
+    T.data_step(w, 1, "screen")
+    w.ds1["sheets"]["rendered"] = ["source_001", "ln_001", "mtw_001"]
+    T.run(w, ticks=6, until=lambda: bool(fetches(w)) and ("L30", "1:md_s0") in T.seq(w))
+    pc = T.cards(w, "DS1 waits for a person")
+    ex = {e.get("lever") for e in w.events("executed")}
+    lanes = (w.state() or {}).get("lanes") or {}
+    check("a DS1 card waits for a person (the sheets of phase 1 undecided); in the same ticks the DATA lane's fetch "
+          "(L16) and DS1's MD-S0 draft (L30, MAINT) are proposed and executed; no lane is held",
+          pc and "sheets waiting (phase 1" in pc[-1]["detail"] and fetches(w) and ("L30", "1:md_s0") in T.seq(w)
+          and {"L16", "L30"} <= ex and not any((x or {}).get("hold") for x in lanes.values()),
+          ([c["title"] for c in pc], T.seq(w), sorted(x for x in ex if x), {k: (x or {}).get("hold")
+                                                                            for k, x in lanes.items()}))
+    check("  nothing that needs the person's decision is proposed: no pools, draw, manifests or build",
+          not [x for x in T.seq(w) if x in (("L30", "1:pools"), ("L30", "1:draw"), ("L30", "1:manifests"))]
+          and not T.pro(w, "L32"), T.seq(w))
+
+
 # ----------------------------------------------------------------------- S28
 def s28():
     sys.path.insert(0, str(PKG / "tests"))
@@ -1899,7 +1961,7 @@ CASES = [("S1", s1), ("S1b", s1b), ("S2", s2), ("S3", s3), ("S4", s4), ("S5", s5
          ("S7", s7), ("S8", s8), ("S9", s9), ("S10", s10), ("S11", s11), ("S12", s12), ("S13", s13), ("S14", s14),
          ("S15", s15), ("S16", s16), ("S17", s17), ("S18", s18), ("S19", s19), ("S20", s20), ("S21", s21),
          ("S22", s22), ("S23", s23), ("S24", s24), ("S25", s25), ("S26", s26), ("S27", s27), ("S28", s28),
-         ("S29", s29),
+         ("S29", s29), ("S30", s30),
          ("stream_prospective", s_prospective), ("stream_r0", s_r0)]
 
 

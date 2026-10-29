@@ -114,6 +114,9 @@ PKG_PATHS=(
   # 2026-10-28: 2SeasonWeedDet8's real VIA files (test_collect_normalize_via.py) and the lab's records of its failed
   # intake and filed second fetch (test_stream_ap_intake_retry.py)
   tests/fixtures/via_2swd8 tests/fixtures/intake_via
+  # DS1 (2026-10-29): its long-path job script (lever L32X) and the segment reports its RA tests read
+  run_inc2_long.sh
+  tests/fixtures/ds1
   # 2026-10-28: the approvals log's withdrawal kind (brain/approvals.py, shipped above) and its checks
   tests/test_approvals.py
   # 2026-10-26: the check of the job scripts' mlflow-off block (MLFLOW_OFF_REAL=1 on the cluster's bench env)
@@ -136,6 +139,15 @@ ROOT_PATHS=(docs/FUNNEL_AUDIT.md docs/FUNNEL_AUDIT_RUNNER.md docs/FUNNEL_REPRODU
             docs/CONTINUOUS_LOOP.md docs/INCREMENTAL_PROTOCOL.md docs/INCREMENTAL_PROTOCOL_RUNNER.md docs/INC_AUTOPILOT.md
             docs/prereg/V3F_2026-10-11.md docs/prereg/V3F_rev29-31_2026-10-11.md docs/prereg/V3F_dev4_2026-10-20.md
             docs/prereg/V3F_dev5_2026-10-24.md docs/prereg/V3F_dev6_2026-10-25.md)
+# DS1 (2026-10-29): the ticker proposes DS1's levers only once the deployed tree holds the amendment's byte copy
+# (docs/prereg/DS1_2026-10-29.md, by its sha256: stream_domains/weed.json "ds1"); the delegate's time-stamp record
+# (inc2.ds1 timestamp, on the login node) reads the two committed proofs and the stamp file beside them
+ROOT_PATHS+=(docs/prereg/DS1_2026-10-29.md docs/prereg/DS1_2026-10-29.md.ots docs/prereg/DS1_2026-10-29.stamp.txt
+             docs/prereg/DS1_2026-10-29.stamp.txt.ots)
+# DS1 Revision 1 (2026-10-29, before any DS1 data): its byte copy (the gate pins it by sha256, the domain's
+# ds1.revisions), its proofs and stamp file, which the delegate's time-stamp record reads
+ROOT_PATHS+=(docs/prereg/DS1_rev1_2026-10-29.md docs/prereg/DS1_rev1_2026-10-29.md.ots
+             docs/prereg/DS1_rev1_2026-10-29.stamp.txt docs/prereg/DS1_rev1_2026-10-29.stamp.txt.ots)
 # V3F (2026-10-11): the ticker proposes the family's levers only once the deployed tree holds the amendment's byte
 # copy (docs/prereg/V3F_2026-10-11.md) and its Revisions 29-31's (docs/prereg/V3F_rev29-31_2026-10-11.md), each by
 # its sha256; it reopens the items a recorded deviation names only once the deployed tree holds that deviation's
@@ -164,6 +176,9 @@ V3F_COMMIT=55cc2d97cd2147d01644c1e193098b73aeba0a06
 PREFLIGHT=(tests/test_inc_ap_replay.py tests/test_inc_ap_governance.py tests/test_funnel_ap_replay.py
            tests/test_funnel_ap_mutations.py tests/test_funnel_domain_free.py tests/test_stream_ap_replay.py
            tests/test_stream_ap_mutations.py tests/test_stream_pipeline.py tests/test_stream_ap_no_throttles.py)
+# DS1 (2026-10-29): what the deploy ships for DS1 (the amendment and its Revision by their pinned sha256, their proofs
+# and stamp files, DS1's modules, run_inc2_long.sh) is checked before anything is copied
+PREFLIGHT+=(tests/test_inc2_ds1_deploy.py)
 
 for p in "${PKG_PATHS[@]}" "${LAB_ONLY_PATHS[@]}"; do [ -e "$p" ] || { echo "missing package path: $p" >&2; exit 1; }; done
 for p in "${ROOT_PATHS[@]}"; do [ -e "$GIT_ROOT/$p" ] || { echo "missing git-root path: $p" >&2; exit 1; }; done
@@ -178,6 +193,9 @@ if [ -n "$(git status --porcelain --untracked-files=all -- "${PKG_PATHS[@]}" 2>/
 fi
 HEAD_SHA="$(git -C "$GIT_ROOT" rev-parse HEAD)"
 if git -C "$GIT_ROOT" merge-base --is-ancestor "$V3F_COMMIT" HEAD 2>/dev/null; then V3F_ANCESTOR=true; else V3F_ANCESTOR=false; fi
+# DS1 (2026-10-29): whether HEAD descends from DS1's amendment commit (inc2.ds1.PREREG_COMMIT), recorded beside V3F's
+DS1_COMMIT=b60b8ee4763867f03b37f09a35ae808b630f5d28
+if git -C "$GIT_ROOT" merge-base --is-ancestor "$DS1_COMMIT" HEAD 2>/dev/null; then DS1_ANCESTOR=true; else DS1_ANCESTOR=false; fi
 if [ -n "$ALLOW_V3F" ]; then
   case " ${ROOT_PATHS[*]} " in *" $ALLOW_V3F "*) ;; *)
     echo "refused: --allow-v3fam-code-change names $ALLOW_V3F, not a git-root path this deploy ships" >&2; exit 3 ;; esac
@@ -402,6 +420,7 @@ fi
 "${LSSH[@]}" "cat > ~/$LAB_TREE_REL/results/framework/inc/stream_deployed.json" <<REC
 {"deployed_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "git_head": "$HEAD_SHA", "script": "deploy/deploy_funnel.sh",
  "replay_rc": $REPLAY_RC, "v3fam_amendment_ancestor": $V3F_ANCESTOR, "v3fam_code_change": $V3F_CHANGE,
+ "ds1_amendment_ancestor": $DS1_ANCESTOR,
  "stream_module_sha256": $(cat /tmp/deploy_stream_modules_$TS.json)}
 REC
 echo "done: HEAD $HEAD_SHA"
