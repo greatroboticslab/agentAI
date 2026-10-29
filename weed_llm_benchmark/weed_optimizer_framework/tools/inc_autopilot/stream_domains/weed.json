@@ -985,7 +985,7 @@
     "draw": 0.5,
     "manifests": 1.5
    },
-   "build_ms_per_image_epoch": 14.2,
+   "build_ms_per_image_epoch": 13.2,
    "budget_image_epochs": 1200000,
    "finals_hours_per_run": 0.1,
    "build_job_hours": 4.0,
@@ -1016,7 +1016,7 @@
    "person_hours": {
     "read": 0.6
    },
-   "why": "DS.9.2's estimates and caps (DS.11): L30 3.0 GPU-h a phase over its five steps (<= 6), L32 seeds x 1.2 M x the measured 14.2 ms + finals + the build job (<= 20), L32X's smoke 0.5 (<= 1) and 14.2 per seed (<= 19.2 at the decided compute; 28.8 for S2x's one 36 h re-submission), L33 per arm (<= 2), L34 0.5 (<= 1); a sealed read about 0.6 (a person's job)"
+   "why": "DS.9.2's estimates and caps (DS.11): L30 3.0 GPU-h a phase over its five steps (<= 6), L32 seeds x 1.2 M x the rate + finals (<= 20), the rate 13.2 ms: a 1.2 M m640 run took 4.4 GPU-h in V3F (DS.11's 13.2 a 3-seed arm); the build job's own GPU-h is settled from sacct, not estimated, L32X's smoke 0.5 (<= 1) and 14.2 per seed (<= 19.2 at the decided compute; 28.8 for S2x's one 36 h re-submission), L33 per arm (<= 2), L34 0.5 (<= 1); a sealed read about 0.6 (a person's job)"
   },
   "storage_gb": {
    "data:screen": 2.0,

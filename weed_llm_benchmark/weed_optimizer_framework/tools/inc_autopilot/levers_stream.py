@@ -552,8 +552,8 @@ def _capped_ds1(h, cap, detail, why):
 
 def price_ds1(kind, p, dom, info, detail):
     """DS1's estimators (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.2; V100, 1 SU per GPU-h, est.), each under
-    its cap: ds1_data per step (3.0 a phase over five steps, <= 6); ds1_build seeds x 1.2 M image-epochs x 14.2 ms +
-    finals + the build job (<= 20); ds1_long the smoke 0.5 (<= 1) or per seed submitted its smoke's projection
+    its cap: ds1_data per step (3.0 a phase over five steps, <= 6); ds1_build seeds x 1.2 M image-epochs x 13.2 ms +
+    finals (<= 20; DS.11's 4.4 GPU-h a 1.2 M m640 run); ds1_long the smoke 0.5 (<= 1) or per seed submitted its smoke's projection
     (14.2 before a smoke; <= 19.2, 28.8 for S2x's one 36 h re-submission); ds1_score per arm (<= 2); ds1_verdict 0.5
     (<= 1). Every job is settled from sacct, a build's runs from its experiment's report."""
     detail = dict(detail, rates="DS1's domain block (DS.9.2, est.)")
@@ -598,11 +598,11 @@ def price_ds1(kind, p, dom, info, detail):
         epochs = max(1, int(math.floor(float(ds1_cost(dom, "budget_image_epochs")) / int(n) + 0.5)))
         runs = _hours(seeds * int(n), epochs, ms)
         finals = seeds * float(ds1_cost(dom, "finals_hours_per_run"))
-        job = float(ds1_cost(dom, "build_job_hours"))
-        return _capped_ds1(runs + finals + job, ds1_cost(dom, "build_cap"),
+        return _capped_ds1(runs + finals, ds1_cost(dom, "build_cap"),
                            dict(detail, arm=p.get("arm"), images=int(n), epochs=epochs, seeds=seeds,
-                                ms_per_image_epoch=ms, runs=round(runs, 3), finals=finals, build_job_hours=job),
-                           "seeds x 1.2 M image-epochs x the measured rate, the finals and the build job")
+                                ms_per_image_epoch=ms, runs=round(runs, 3), finals=finals),
+                           "seeds x 1.2 M image-epochs x the measured rate and the finals (DS.9.2; the build job's "
+                           "GPU-h settled from sacct)")
     raise LeverError("no ds1 estimator %r" % kind)
 
 

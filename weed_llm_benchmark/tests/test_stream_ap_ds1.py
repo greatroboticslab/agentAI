@@ -335,12 +335,13 @@ def t_static():
         prices["%s %s" % (lid, prm.get("step") or (prm.get("arm") if lid != "L32X" else "%s %s %s" % (
             prm["arm"], prm["verb"], prm.get("seeds") or "")) or prm.get("phase"))] = (est, ok)
     def build(n):
-        return round(3 * n * int(1.2e6 / n + 0.5) * 14.2 / 3.6e6 + 0.3 + 4.0, 3)
+        return round(3 * n * int(1.2e6 / n + 0.5) * 13.2 / 3.6e6 + 0.3, 3)
     want = {"L30 screen": 1.0, "L30 pools": 0.5, "L30 manifests": 0.75, "L32 S0": build(39500), "L32 KD": build(3000),
             "L32X S0X smoke ": 0.5, "L32X S0X train 0,1,2": 42.6, "L32X S0X train 1,2": 34.4,
             "L32X S2X train 0": 25.0, "L33 POWER": 1.5, "L33 KD": 0.8, "L33 S1CR": 0.6, "L34 2": 0.5}
     check("prices (DS.9.2): L30 per step (screen 1.0, pools 0.5, manifests 0.75), L32 3 seeds x N x round(1.2 M / N) "
-          "epochs x 14.2 ms + finals + the build job (S0 %.3f, KD %.3f), L32X's smoke 0.5 and 14.2 per seed before a "
+          "epochs x 13.2 ms (DS.11: 4.4 GPU-h a 1.2 M run) + finals, the build job settled, not estimated (S0 %.3f, KD "
+          "%.3f), L32X's smoke 0.5 and 14.2 per seed before a "
           "smoke, the smoke's projection after it (17.2 x 2), S2x's 36 h re-submission at its 25.0, L33 per arm, L34 "
           "0.5; each inside its policy row" % (build(39500), build(3000)),
           all(k in prices and abs(prices[k][0] - v) < 1e-6 and prices[k][1] for k, v in want.items()), prices)
@@ -707,7 +708,7 @@ def t_cap():
     _spent(w4, 205.0, key="data:1:pools")
     run(w4, ticks=3)
     c4 = cards(w4, "build:S1CR")
-    check("205 GPU-h spent, the long pair's three seeds (42.6) still to come: S1c-R's build (18.5) fits the cap alone "
+    check("205 GPU-h spent, the long pair's three seeds (42.6) still to come: S1c-R's build (13.4) fits the cap alone "
           "but not with the pair: not run (family cap), cut first (DS.11)", items(w4).get("build:S1CR", {}).get(
               "state") == S.DS1_NOT_RUN_CAP and len(c4) == 1 and "cut first" in c4[0]["detail"],
           (items(w4).get("build:S1CR"), seq(w4), [c["detail"][:200] for c in c4]))
