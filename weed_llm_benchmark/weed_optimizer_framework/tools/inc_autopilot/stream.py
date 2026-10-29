@@ -6146,7 +6146,7 @@ class StreamRun(object):
         out = {"amendment": self._ds1_tree_file(cfg.get("amendment_file") or "", sha=cfg.get("amendment_sha256")),
                "never_cut": self._ds1_tree_file(nc.get("module") or "", marker=nc.get("marker")),
                "timestamp": bool(status.get("timestamp")), "status": status, "items": items,
-               "today": str(self.utc)[:10], "lab_inc": str(self.paths.lab_inc),
+               "today": str(self.utc)[:10],
                "phase1_gb": round(float(f.get("phase1_gb") or 0.0), 3),
                "audit_render_for": f.get("audit_render_for"),
                "spend_gpuh": round(self._ds1_spend(exp_status, status, payload), 4),

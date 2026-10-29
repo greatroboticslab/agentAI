@@ -2273,7 +2273,7 @@ def _ds1_mtw_frozen(ph):
 def ds1_plan(cfg, fs):
     """({lane: item}, {item: why}) DS1 wants next, from /stage/ds1 (pure: DR0 and DS1's cards read it): one MAINT
     item and one TRAIN item in DS.12's order. fs: {"status" (the cluster's derived status), "items" {key: state},
-    "today", "lab_inc", "phase1_gb"}. An item that needs a person's decision is never proposed: its wait is named;
+    "today", "phase1_gb"}. An item that needs a person's decision is never proposed: its wait is named;
     every other item whose conditions hold is (DS.9.3, a card holds no lane)."""
     st = fs.get("status") or {}
     items = fs.get("items") or {}
