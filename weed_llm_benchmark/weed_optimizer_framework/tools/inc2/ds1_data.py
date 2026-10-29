@@ -867,6 +867,12 @@ def k_pools(siu_rows, kf_rows, crop_eppo=()):
     return {"target": tgt, "nontarget": non, "kf": kf_rows, "supplies": supplies}, t, n_k
 
 
+def k_short(supplies, n_k):
+    """{arm: supply} of KD and KT where the supply is under N_K (DS.5.3: N_K is the same in every K arm, so both are
+    then not run, recorded in k_not_run.json)."""
+    return {a: v for a, v in supplies.items() if a in ("KD", "KT") and v < n_k}
+
+
 def _videos(rows):
     by = collections.defaultdict(list)
     for r in rows:
@@ -2066,7 +2072,7 @@ def manifests(phase, inputs, write=True, on_date=None):
                                 {"n_k": nk_f, "pool": "base B Field and Turf, thinned", "supplies": kpools["supplies"]})
     if write and siu_ready and arm_record_path("KF").is_file():
         nk = int((_read_json(arm_record_path("KF")) or {}).get("n_k") or 0)
-        short = {a: v for a, v in kpools["supplies"].items() if a in ("KD", "KT") and v < nk}
+        short = k_short(kpools["supplies"], nk)
         if short:
             why = "not run (supply under N_K %d: %s): N_K is the same in every K arm" % (nk, short)
             built["k_waits"] = why

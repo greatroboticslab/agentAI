@@ -141,6 +141,13 @@ def t_registration():
           "require_timestamp pass", D.timestamp_ok() and D.require_timestamp() == C.sha256_file(D.timestamp_path())
           and rec["proofs"][0]["stamps"] == D.PREREG_SHA256, rec.get("proofs"))
     check("  and it is written once", refused(D.timestamp_record, real[0], real[1]))
+    other = TMP / "ts_other.json"
+    d_ = json.loads(D.timestamp_path().read_text())
+    other.write_text(json.dumps(dict(d_, sha256="0" * 64)))
+    one = TMP / "ts_one.json"
+    one.write_text(json.dumps(dict(d_, proofs=d_["proofs"][:1])))
+    check("  a record naming another sha256, or one proof, does not open the gate (timestamp_ok)",
+          not D.timestamp_ok(other) and not D.timestamp_ok(one) and D.timestamp_ok())
 
 
 def t_constants():
@@ -239,6 +246,11 @@ def t_reads():
     check("a read out of turn is refused", refused(D.check_read, "S2X", "mtw", o, {}))
     check("  a read not in the order is refused", refused(D.check_read, "S1C", "mtw", o, {}))
     check("  a read taken once", refused(D.check_read, "S0X", "mtw", o, {("S0X", "mtw"): "read"}))
+    o5 = [{"arm": a, "exam": "mtw", "kind": "k"} for a in ("S0X", "S2X", "S1C", "S1U")] + [
+        {"arm": "S2X", "exam": "cwd12", "kind": "cwd12"}]
+    done4 = {(o_["arm"], o_["exam"]): "read" for o_ in o5[:4]}
+    check("  at most four sealed reads in all, whatever the order holds", refused(D.check_read, "S2X", "cwd12", o5,
+                                                                                done4))
     check("  in order it passes with its position", D.check_read("S2X", "mtw", o, {("S0X", "mtw"): "read"})[
         "position"] == 2)
     check("read_by is exactly the owner's or the delegate's name", D.read_by_value("owner") == "Harry He (owner)" and
@@ -425,6 +437,14 @@ def t_verdict():
     cleaned, dropped = R.dev_only(doc)
     check("  the platform record holds no exam-named key (the evidence scrub leaves it whole)", not dropped, dropped)
     check("  written once (capacity/ds1_v1.json and its external record)", refused(D.verdict, 1, st, loader=loader))
+    for name in ("ds1_v1_external.json", "ds1_v1.json"):
+        p_ = D.capacity(name)
+        aside = p_.with_name(p_.name + ".aside")
+        p_.rename(aside)
+        e_ = refused(D.verdict, 1, st, loader=loader)
+        aside.rename(p_)
+        check("  each record alone is written once: with %s moved aside, the other refuses a second verdict" % name,
+              e_ is not None, e_)
     doc2, ext2 = D.verdict(2, st, loader=loader, on_date="2026-11-30", s2_frozen=True, write=False)
     p3, p4 = doc2["primaries"]["P3"], ext2["primaries"]["P4"]
     check("verdict v2 decides P3 (S2x over S0x on MD-S0); P4 on ood23 goes to the external record",

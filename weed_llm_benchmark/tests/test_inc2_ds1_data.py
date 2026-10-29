@@ -261,6 +261,9 @@ def t_k_arms():
               "eppo"] in DD.SIU_TARGET_EPPO}) == 3)
     check("KF's rows are thinned base B rows in the seeded order", all(r["thin"] for r in kfr))
     check("a K pool under N_K refuses its draw", refused(DD.kf_draw, {"kf": kf[:10]}, n_k))
+    check("KD and KT are not run when either supply is under KF's N_K; KF's own supply never counts",
+          DD.k_short({"KD": 72, "KT": 30, "KF": 10}, 36) == {"KT": 30} and DD.k_short(
+              {"KD": 72, "KT": 36, "KF": 10}, 36) == {})
 
 
 def t_groups_draws():
@@ -316,13 +319,25 @@ def t_guard():
     hits = DD.dhash_hits(rows, ex)
     check("a copy found under one of the 8 variants (rot90) within 6 bits is a hit; an unrelated row is not",
           "near" in hits and "far" not in hits and hits["near"][0]["exam"] == "ood23", hits)
-    ex_rows = [{"key": "e1", "dhash": rot[0], "variants": [rot[0]] + [h64(i) for i in range(7)]}]
+    row_h = h64(81)
+    ex_rows = [{"key": "e1", "dhash": h64(90), "variants": [h64(90), flip(row_h, 2)] + [h64(i) for i in range(6)]}]
     ex2 = {"md": {"keys": ["md|e1"], "H": np.asarray([ex_rows[0]["variants"]], dtype=np.uint64),
                   "ok": np.asarray([True])}}
-    rows2 = [{"key": "r1", "dhash": h64(81), "variants": [h64(81)] + [flip(rot[0], 2)] + [h64(i + 50) for i in
-                                                                                         range(6)]}]
-    check("  the other direction: the exam image's id within 6 bits of the row's hflip", "r1" in DD.dhash_hits(
-        rows2, ex2))
+    rows2 = [{"key": "r1", "dhash": row_h, "variants": [row_h] + [h64(i + 50) for i in range(7)]}]
+    check("  the other direction: the exam image's hflip within 6 bits of the row's dHash (no variant of the row near "
+          "the exam image's)", "r1" in DD.dhash_hits(rows2, ex2) and not DD.dhash_hits(
+              [{"key": "r2", "dhash": h64(91), "variants": [h64(91)] + [h64(i + 70) for i in range(7)]}], ex2))
+    gn = DD.guard_new(rows2 + [{"key": "r3", "dhash": h64(92), "variants": [h64(92)] + [h64(i + 80) for i in
+                                                                                        range(7)]}],
+                      DD.Inputs(exams={"ds1_exams": ex2["md"]}))
+    check("the new rows against DS1's own exams: a hit dropped, the rest kept (guard_new)", [r["key"] for r in gn] ==
+          ["r3"], [r["key"] for r in gn])
+
+    class Blind(object):
+        def scan(self, rows, desc_path=None, procs=1):
+            return {}, {rows[0]["key"]}
+    check("a file the DINOv2 detector cannot describe refuses (fail closed)", refused(
+        DD.embed_hits, [{"key": "x", "image": "/img/x.png"}], Blind()))
     sc = StubScanner({"/img/dino_only.png": ("ood23", "ood23__y_2")})
     eh = DD.embed_hits([{"key": "dino", "image": "/img/dino_only.png"}, {"key": "clean", "image": "/img/c.png"}], sc)
     check("a copy only the DINOv2 detector finds is a hit", list(eh) == ["dino"] and eh["dino"][0]["how"] == "embed")
@@ -594,6 +609,32 @@ def t_world():
     check("  an unreadable list stops the cutter (fail closed)", e is not None)
 
 
+def t_ready_freeze_bprime():
+    print("a source's readiness, an exam's freeze record, B'o's capture rule")
+    dec = {"s_a": {"decision": "accept", "audit_required": True, "audited": False},
+           "s_b": {"decision": "accept", "audit_required": True, "audited": True},
+           "s_c": {"decision": "reject"}, "s_d": {"decision": "accept_training_only"}}
+    check("a source drawn for the owner's audit waits for it; audited, or training-only, it is ready; rejected never",
+          DD.source_ready("s_a", dec, {}) == (False, "owner audit pending") and DD.source_ready("s_b", dec, {})[0]
+          and DD.source_ready("s_d", dec, {})[0] and not DD.source_ready("s_c", dec, {})[0]
+          and not DD.source_ready("s_b", dec, {"quarantine_whole": True})[0])
+    rr = {"root": str(TMP / "rootx" / "LOCK.json"), "lock_sha256": "a" * 64, "manifest_sha256": "b" * 64, "images": 3,
+          "groups": 2}
+    DD.freeze_record("mdn_unit_freeze", rr)
+    check("an exam's freeze record is written once (another draw refused)", refused(
+        DD.freeze_record, "mdn_unit_freeze", dict(rr, images=4)) and DD.frozen("mdn_unit_freeze")["images"] == 3)
+    base = {"label": "/x/l.txt", "label_sha256": "c" * 64, "session": "", "source": "src_b"}
+    bp = {"b_keep": dict(base, image="/x/k.png", sha256="sk", key="b_keep"),
+          "b_tray": dict(base, image="/x/t.png", sha256="st", key="b_tray")}
+    prov = {"b_keep": {"capture_keys": [], "dhash": h64(201), "variants": variants(h64(201), 201)},
+            "b_tray": {"capture_keys": [["capture", "src_b|tray9"]], "dhash": h64(202),
+                       "variants": variants(h64(202), 202)}}
+    ex_rows = [{"exam": "mtw_src_b", "key": "mtw|m1", "group": "gm", "capture_keys": [["capture", "src_b|tray9"]]}]
+    kept, rec = DD.b_prime_o(DD.Inputs(bprime=bp, base_b=prov), [], ex_rows)
+    check("B'o drops a base B row sharing a capture relation with an MT-W row, keeps the rest", [r["key"] for r in kept]
+          == ["b_keep"] and rec["removed"].get("capture_md_mtw") == 1, (rec, [r["key"] for r in kept]))
+
+
 def t_season():
     print("every S arm is season-free (DS.0 item 6)")
     base = {"image": "/x/a.jpg", "label": "/x/a.txt", "sha256": "a" * 64, "label_sha256": "b" * 64, "session": ""}
@@ -617,7 +658,8 @@ def t_season():
 
 
 def main():
-    for fn in (t_eligibility, t_roles_rules, t_thin_cap_floor, t_k_arms, t_season, t_groups_draws, t_guard, t_world):
+    for fn in (t_eligibility, t_roles_rules, t_thin_cap_floor, t_k_arms, t_season, t_ready_freeze_bprime, t_groups_draws,
+               t_guard, t_world):
         try:
             fn()
         except Exception as e:                   # noqa: BLE001

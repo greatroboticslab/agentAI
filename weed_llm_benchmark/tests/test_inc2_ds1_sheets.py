@@ -210,6 +210,23 @@ def t_audit():
     names.mkdir(parents=True, exist_ok=True)
     (names / "names_src_x.json").write_text(json.dumps({"source": "src_00"}))
     check("a names-round source always needs his audit", "names round" in SH.fold()["src_00"]["audit_reason"])
+    # without a reversal: a names-round source outside the seeded 5 still needs his audit, another one does not
+    inc2 = TMP / "inc_names_round"
+    dp = SH.decisions_path(inc2)
+    dp.parent.mkdir(parents=True, exist_ok=True)
+    srcs = ["nr_%02d" % i for i in range(9)]
+    dp.write_text("".join(json.dumps({"kind": "source", "source": s_, "decision": "accept", "setting": "Field",
+                                      "roles": {"inc:12": "weed"}, "decided_by": "delegate", "sheet_sha256": "x"})
+                          + "\n" for s_ in srcs))
+    f0 = SH.fold(inc2)
+    outside = [s_ for s_ in srcs if not f0[s_]["audit_required"]]
+    (inc2 / "intake" / "names").mkdir(parents=True, exist_ok=True)
+    (inc2 / "intake" / "names" / "names_nr.json").write_text(json.dumps({"source": outside[0]}))
+    f1 = SH.fold(inc2)
+    check("  without a reversal: a names-round source outside the seeded 5 needs his audit; another source outside "
+          "it does not", len(outside) >= 2 and f1[outside[0]]["audit_required"] and not f1[outside[1]][
+              "audit_required"] and sum(1 for s_ in srcs if f0[s_]["audit_required"]) <= 5,
+          (outside, {s_: f1[s_]["audit_reason"] for s_ in srcs}))
 
 
 def t_folds():
