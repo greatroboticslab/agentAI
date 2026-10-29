@@ -153,9 +153,11 @@ def t_eligibility():
     check("in: a row only not admitted at species level", DD.eligibility(dict(base, admission="not_admitted"), ctx)
           is None)
     hits = DD.capture_name_hits(["IphoneSE_YL_Morningglory_039_JPG.rf.0a1b", "20210628_iPhone11Pro_BT_63.jpg",
-                                 "NIKOND3300_YL_carpetweed_12.png", "field_plot_0007.jpg", "IMG_4521.JPG"])
-    check("the capture-name scan: cwd12 and 3SeasonWeedDet10 stems found, ordinary names not",
-          [h[0][:10] for h in hits] == ["IphoneSE_Y", "20210628_i", "NIKOND3300"], hits)
+                                 "NIKOND3300_YL_carpetweed_12.png", "field_plot_0007.jpg", "IMG_4521.JPG",
+                                 "ood23__20230810_HTRC_iPhone13_BD_26.jpg", "20190718_iPhone7_EB_12.jpg"])
+    check("the capture-name scan: cwd12 and 3SeasonWeedDet10 stems found; ordinary names and another set of the same "
+          "laboratory (CottonWeedDet3's iPhone7_EB) not",
+          [h[0][:10] for h in hits] == ["IphoneSE_Y", "20210628_i", "NIKOND3300", "ood23__202"], hits)
 
 
 def t_roles_rules():

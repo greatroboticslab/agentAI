@@ -135,6 +135,12 @@ NOT_ADMITTED_OK = ("not_admitted",)                 # admission outcomes that le
 # iPhone11Pro_BT, CanonEOS4000D_EO, ...), DS.5.1 item 1(b)
 CAPTURE_NAME_RE = re.compile(r"(?i)(?:^|[^a-z0-9])(?:\d{8}_)?(iphone ?(?:se|x[rs]?|\d{1,2}(?:pro(?:max)?)?)|"
                              r"nikon ?d\d{3,4}|canon ?eos ?\w{2,6}d?|htrc_iphone\d{1,2})[_ ]([a-z]{2})(?=[^a-z]|$)")
+# the (camera, initials) stems cwd12 and 3SeasonWeedDet10 name their photographs with (read on 2026-10-29 from LOCK
+# v2's dev, test, train_core, tsw22, tsw23 and base_v2 keys): a file name is a capture name only when its stem is
+# one of these (other sets of the same laboratory, CottonWeedDet3's iPhone7_EB, are not cwd12's)
+CAPTURE_STEMS = frozenset([("iphonese", "yl"), ("iphone11pro", "bt"), ("nikond3300", "yl"), ("nikond330", "yl"),
+                           ("canoneos4000d", "eo"), ("canoneos4000d", "yl"), ("htrc_iphone12", "wy"),
+                           ("htrc_iphone13", "bd"), ("iphone12", "wy"), ("iphone13", "bd")])
 # rule numbers (base3_v2.json's, read at build; the copy rule never at 4-6 bits)
 THIN_BITS = 10
 COPY_BITS = 3
@@ -326,9 +332,10 @@ def capture_name_hits(names):
     initials stems: iPhoneSE_YL, NIKOND3300_YL, iPhone11Pro_BT, ...): DS.5.1 item 1(b)."""
     out = []
     for n in names:
-        m = CAPTURE_NAME_RE.search(str(n))
-        if m:
-            out.append((str(n), "%s_%s" % (m.group(1), m.group(2))))
+        for m in CAPTURE_NAME_RE.finditer(str(n)):
+            if (re.sub(r"\s+", "", m.group(1)).lower(), m.group(2).lower()) in CAPTURE_STEMS:
+                out.append((str(n), "%s_%s" % (m.group(1), m.group(2))))
+                break
     return out
 
 
