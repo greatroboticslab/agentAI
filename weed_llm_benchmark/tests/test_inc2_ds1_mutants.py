@@ -189,7 +189,8 @@ MUTANTS = {
                 'PREREG_SHA256\n',
             '    return bool(isinstance(d, dict) and d.get("format") == FMT_TIMESTAMP\n', CORE),
     "DC8": (DC, "    if ots_digest(proof) != PREREG_SHA256:\n", "    if False:\n", CORE),
-    "DH1": (DH, '    if kind == "audit" and decided_by == "delegate":\n', "    if False:\n", SHEETS),
+    "DH1": (DH, '    if kind == "audit" and decided_by != OWNER_HUMAN:\n', '    if kind == "audit" and decided_by not in '
+                                                                         '(OWNER_HUMAN, "delegate"):\n', SHEETS),
     "DH2": (DH, "    reversed_any = any(_reversed(v) for v in out.values())\n", "    reversed_any = False\n", SHEETS),
     "DH3": (DH, '        v["audit_required"] = bool(reversed_any or s in sample or s in names_round or s == _siu())\n',
             '        v["audit_required"] = bool(reversed_any or s in sample or s == _siu())\n', SHEETS),

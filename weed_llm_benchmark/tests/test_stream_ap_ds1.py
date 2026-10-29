@@ -888,7 +888,9 @@ def t_plan_rev1():
         "src_alpha": source(decided=True, decision="accept", ready=True, pooled=True, md_n=True, mtw_draft=True,
                             mtw=True, checked=True),
         "src_cap": source(role_c=True, settled_out=True), "src_q": source(quarantined_whole=True, settled_out=True)}
-    _o, w1, c1 = DS.ds1_plan(CFG, fs)
+    fs1 = copy.deepcopy(fs)
+    fs1["status"]["k_not_run"] = True                # KD and KT settled: the manifests step is due only for S1's
+    _o, w1, c1 = DS.ds1_plan(CFG, fs1)
     items1 = [x["item"] for x in c1["maint"]]
     check("SIU accepted and pooled is never drawn (no L30 draw), and phase 1 is settled without it; a role C and a "
           "quarantined source settle with no decision: S1's manifests are due", "data:1:draw" not in items1

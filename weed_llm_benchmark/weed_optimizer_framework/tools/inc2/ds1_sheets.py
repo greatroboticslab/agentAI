@@ -685,8 +685,6 @@ def record(path, decided_by, inc=None):
     if rend is None:
         raise SheetRefused("%s names sheet %s, which no rendered sheet is" % (path, str(sh)[:12]))
     kind = rend["kind"]
-    if kind == "audit" and decided_by == "delegate":
-        raise SheetRefused("the audit sheets are the owner's: decided_by must name him (human:<id>)")
     if kind == "audit" and decided_by != OWNER_HUMAN:
         raise SheetRefused("the audit sheets are the owner's (DS.0 item 4): decided_by must be %s, not %r"
                            % (OWNER_HUMAN, decided_by))
