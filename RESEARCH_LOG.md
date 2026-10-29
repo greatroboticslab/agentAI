@@ -13,6 +13,17 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-29 — DS1 Revision 2: the power pre-flight can pass, the owner's audit is rendered once, and the label audit measures what it says
+
+- **Where the data stands.** No change. Base B's D1 B′ holds 40,743 images and the stream's pool P_1 holds 7,493, against a target of tens to hundreds of thousands of verified images. Accuracy is unchanged too: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90). DS1's phase-1 screen saw 290,532 candidates (34,970 live), and the delegate decided 20 sources: 10 for training only, 10 rejected. No DS1 training has started, because the power pre-flight refused.
+- **Change.** Three defects of the deployed DS1 code are fixed as DS1 Revision 2. It was committed and time-stamped before any DS1 training or score, and no registered number or rule changes.
+  - The power pre-flight compared one set of detections in two orders to 1e-9. 1,188 of E1-A's 1,693 dev boxes share a confidence with another (fp16), and the AP of tied boxes depends on their order and on the CPU's sort. The check now compares in the validator's own order, as E1's agnostic rescore does, and the pre-flight is proposed again.
+  - The owner's audit sheet was rendered again every 10 minutes for the same 5 sources, and that held the lane the pools step needs. Now there is one render per set; the extra renders are kept and will be marked superseded after the deploy. The owner audits ds1_audit_001 only.
+  - The label audit read each box's class as a coordinate, so every source with a confident prediction looked partially labelled. With the box read correctly, 2 of 14 such sources are not partial (rf_tuf and a rejected Aarhus tile set); 12 stay partial, among them MFWD and MH-Weed16. No decision changes; rf_tuf's rows get no predicted-plant masks. The pools step takes the audit again on the cluster before it reads one.
+- **Verified.** On lab copies, the full suite fails nothing the base does not (the same 17 environment failures). The mutation run kills 115 of 115. The new tests fail on main on the three defects themselves. A copy of the live lab state, ticked with the fix, reopens the power pre-flight, renders no further audit sheet and waits for the Revision's time stamp with one card.
+- **Next.** Deploy; the delegate's `inc2.ds1 timestamp-revision --revision 2` and `inc2.ds1_sheets supersede` on the login node; then the platform's power pre-flight, MD-S0's freeze and the pools of the sources decided for training. The owner's audit of the 5 seeded sheets (ds1_audit_001) waits for him.
+
+
 ## 2026-10-29 — DS1 Revision 1, before DS1's first step: the exams stay clean of near copies, roles follow source classes, and person checks must be answered
 
 - **Where the data stands.** Unchanged so far: base B's D1 B′ holds 40,743 images and the stream's pool P_1 7,493; the target is tens to hundreds of thousands of verified images. Accuracy unchanged: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90), sealed test 0.8950 (0.0050 under). DS1 is the step that adds data: S1 the in-hand pools (registered estimate ≈ 52,000–116,000 images), S2 the named phase-2 fetches (≈ 80,000–140,000).
