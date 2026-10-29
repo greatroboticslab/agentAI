@@ -771,9 +771,60 @@ def t_long():
               not (sw / "train" / "weights" / "best.pt").exists() and tr["cleanup_removed"], tr.get("cleanup_removed"))
 
 
+class HueEmbedder(object):
+    """A stand-in for the calibrated embedder: a hue histogram, L2-normalised (counts its calls)."""
+    dim = 12
+
+    def __init__(self, name="facebook/dinov2-base:cls"):
+        self.name = name
+        self.calls = 0
+
+    def __call__(self, pils):
+        self.calls += 1
+        out = []
+        for p in pils:
+            hsv = np.asarray(p.convert("HSV"), dtype=np.int64)
+            h = np.bincount((hsv[..., 0].reshape(-1) * self.dim) // 256, minlength=self.dim).astype(np.float32)
+            out.append(h / (np.linalg.norm(h) or 1.0))
+        return np.stack(out)
+
+
+def t_memo():
+    print("the job's descriptors described once across DS1's indexes (the same copies as EmbedScanner.scan)")
+    from weed_optimizer_framework.tools.inc2 import guard as G
+    d = TMP / "memo"
+    def solid(path, hue):
+        # one hue, random brightness: hue histograms apart, dHashes apart
+        path.parent.mkdir(parents=True, exist_ok=True)
+        v = np.random.default_rng(int(hue) + 7).integers(60, 255, (48, 64), dtype=np.uint8)
+        hsv = np.stack([np.full((48, 64), int(hue), np.uint8), np.full((48, 64), 255, np.uint8), v], axis=-1)
+        Image.fromarray(hsv, "HSV").convert("RGB").save(path)
+        return str(path)
+    ref = [{"key": "r%d" % i, "image": solid(d / ("r%d.png" % i), i * 21), "sha256": None} for i in range(6)]
+    emb = HueEmbedder()
+    idx = G.eval_index({"ref": ref}, emb, d / "ref_desc.npz")
+    cal = {"embedder": emb.name, "cos_threshold": 0.999, "dhash_bits_max": 2, "file": "x", "format": "y",
+           "calibration": {"ok": True, "cos_threshold": 0.999, "dhash_bits_max": 2}}
+    sc = G.EmbedScanner(idx, cal)
+    items = [{"key": "q%d" % i, "image": ref[i]["image"] if i < 2 else solid(d / ("q%d.png" % i), 140 + i * 21),
+              "sha256": None} for i in range(5)]
+    plain, _u = sc.scan(items)
+    DD._DESC_MEMO.clear()
+    c0 = emb.calls
+    memo, _u2 = DD._memo_scan(items, sc)
+    c1 = emb.calls
+    memo2, _u3 = DD._memo_scan(items, sc)
+    check("the same copies as the scanner's own scan (q0, q1 are r0, r1's files); a second index's scan of the same "
+          "images describes nothing again", sorted(plain) == sorted(memo) == sorted(memo2) == ["q0", "q1"] and
+          all(memo[k][0]["eval_key"] == plain[k][0]["eval_key"] for k in memo) and c1 > c0 and emb.calls == c1,
+          (sorted(plain), sorted(memo), c0, c1, emb.calls))
+    hits = DD.embed_hits([dict(it) for it in items], sc)
+    check("  embed_hits takes that path for a calibrated scanner", sorted(hits) == ["q0", "q1"], sorted(hits))
+
+
 def main():
     for fn in (t_copy_rules, t_screen, t_source_classes, t_draw_exclusions, t_audit_sample, t_sheets, t_sources_out,
-               t_core, t_long):
+               t_core, t_long, t_memo):
         try:
             fn()
         except Exception as e:                   # noqa: BLE001

@@ -634,14 +634,60 @@ def dhash_hits(rows, exams, bits=GUARD_BITS):
     return hits
 
 
+_DESC_MEMO = {}                 # {embedder name: {(image, sha256): (descriptor, 8 hashes) or None}} within one job
+
+
+def _memo_scan(items, scanner, desc_path=None, procs=1):
+    """EmbedScanner.scan with the job's descriptors described once: every DS1 scanner uses LOCK v2's calibrated
+    embedder, so an image described for one index is not described again for the next (the same descriptor and
+    hashes the scanner would compute; funnel.leak.detect under the scanner's own calibration)."""
+    import numpy as np
+    from ..funnel import embed as E
+    from ..funnel import leak as L
+    emb = scanner.index.embedder
+    memo = _DESC_MEMO.setdefault(str(getattr(emb, "name", id(emb))), {})
+    need, seen = [], set()
+    for it in items:
+        k = (str(it["image"]), it.get("sha256"))
+        if k not in memo and k not in seen:
+            seen.add(k)
+            need.append({"key": "m%d" % len(need), "image": str(it["image"]), "sha256": it.get("sha256"), "_k": k})
+    if need:
+        res = E.embed_images([{x: r[x] for x in ("key", "image", "sha256")} for r in need], desc_path, emb,
+                             prepare=L.prepare_hashed, n_hashes=len(L.VARIANTS), procs=procs, batch=32)
+        X = np.asarray(res["X"], dtype=np.float32)
+        H = np.asarray(res["H"], dtype=np.uint64)
+        with np.errstate(invalid="ignore"):
+            ok = np.isfinite(X).all(axis=1) & np.asarray(res["hash_ok"], dtype=bool) & \
+                (np.nan_to_num(np.linalg.norm(X, axis=1)) > 0)
+        for i, r in enumerate(need):
+            memo[r["_k"]] = (X[i], [int(h) for h in H[i]]) if ok[i] else None
+    images, unscannable = [], set()
+    for it in items:
+        m = memo.get((str(it["image"]), it.get("sha256")))
+        if m is None:
+            unscannable.add(it["key"])
+            continue
+        images.append({"key": it["key"], "path": str(it["image"]), "desc": m[0], "hashes": m[1]})
+    found = L.detect(images, scanner.index, scanner.calibration["calibration"]) if images else []
+    copies = {}
+    for e in found:
+        copies.setdefault(e["key"], []).append(e)
+    return copies, unscannable
+
+
 def embed_hits(rows, scanner, desc_path=None, procs=1):
     """{key: [{exam, exam_key, cos, how}]} of the calibrated DINOv2 detector on rows (fail closed on a file it cannot
-    describe)."""
+    describe). A calibrated EmbedScanner describes each image once per job (_memo_scan); any other scanner scans."""
     hits = collections.defaultdict(list)
     if not rows or scanner is None:
         return hits
     items = [{"key": r["key"], "image": r.get("train_image") or r["image"], "sha256": r.get("sha256")} for r in rows]
-    copies, unscannable = scanner.scan(items, desc_path=desc_path, procs=procs)
+    if getattr(getattr(scanner, "index", None), "embedder", None) is not None and \
+            isinstance(getattr(scanner, "calibration", None), dict):
+        copies, unscannable = _memo_scan(items, scanner, desc_path=desc_path, procs=procs)
+    else:
+        copies, unscannable = scanner.scan(items, desc_path=desc_path, procs=procs)
     if unscannable:
         raise DataRefused("%d file(s) the DINOv2 detector cannot describe (e.g. %s): fail closed"
                           % (len(unscannable), sorted(unscannable)[:3]))
@@ -1263,10 +1309,14 @@ def stream_consumed():
         return set()
 
 
-def stream_pool_hash_rows():
-    """[{key, dhash, variants}] of every stream version's current pool (its dHash map), what MT-W v2 keeps away from
-    (MAIN_TEST.md MT.2 item 2). Fail closed: a stream that cannot be folded refuses (DataRefused)."""
+def stream_pool_hash_rows(hasher=None):
+    """[{key, dhash, variants}] of every stream version's current pool, what MT-W v2 keeps away from (MAIN_TEST.md
+    MT.2 item 2): each row's hashes from the pool's dHash map, else hashed from its file. Fail closed: a stream that
+    cannot be folded, or a pool row that cannot be hashed, refuses (DataRefused)."""
     from . import stream as ST
+    if hasher is None:
+        from . import guard as G
+        hasher = G.image_hashes
     out = []
     sd = C.INC_DIR / "stream"
     for sid in sorted(p.name for p in sd.iterdir() if p.is_dir()) if sd.is_dir() else []:
@@ -1274,13 +1324,22 @@ def stream_pool_hash_rows():
             f = ST.Stream(sid, quiet=True).load(repair=False)
             if not f.pool:
                 continue
-            hs = f.pool_hashes(f.pool)
+            rows = f.pool_rows(f.pool)
+            try:
+                hs = f.pool_hashes(f.pool)
+            except Exception:  # noqa: BLE001 - no dHash map recorded: each row is hashed from its file below
+                hs = {}
         except Exception as e:  # noqa: BLE001
             raise DataRefused("stream %s's pool cannot be read (%s: %s): MT-W v2 cannot be kept apart from it "
                               "(fail closed)" % (sid, type(e).__name__, str(e)[:200]))
-        for k, v in hs.items():
-            v = [int(x) for x in v]
-            out.append({"key": "pool|%s|%s" % (sid, k), "dhash": v[0] if v else None,
+        for r in rows:
+            v = [int(x) for x in hs.get(r["key"]) or []]
+            if not v:
+                h, var = hasher(r["image"])
+                if h is None or var is None:
+                    raise DataRefused("stream %s's pool row %s cannot be hashed (fail closed)" % (sid, r["key"]))
+                v = [int(var[k]) for k in B3.VARIANTS] if isinstance(var, dict) else [int(x) for x in var]
+            out.append({"key": "pool|%s|%s" % (sid, r["key"]), "dhash": v[0],
                         "variants": v if len(v) == len(B3.VARIANTS) else None})
     return out
 
@@ -1502,9 +1561,39 @@ def scanners(embedder=None):
     out = {"eval": VD.eval_scanner(embedder), "ood": VD.ood_scanner(ood, embedder, cache=D.root() / "leak" /
                                                                        "ood_desc.npz")}
     own = own_exam_rows()
+    exams = own.pop("ds1_exams", None)
     if own:
-        out["own"] = own_scanner(own, embedder)
+        # the fixed part (test v1 and its companions, the evaluation groups, H10d): its index is described once,
+        # when a step first scans against it (a screen never does)
+        out["own"] = LazyScanner(lambda: own_scanner(own, embedder))
+    if exams:
+        # DS1's own MD and MT-W rows, an index of its own (it grows with each draw; the fixed part is not redone)
+        out["own_exams"] = LazyScanner(lambda: own_scanner({"ds1_exams": exams}, embedder, prefix="own_exams"))
     return out
+
+
+class LazyScanner(object):
+    """A scanner built the first time it is used (its index, its calibration or a scan)."""
+
+    def __init__(self, make):
+        self._make = make
+        self._sc = None
+
+    def _get(self):
+        if self._sc is None:
+            self._sc = self._make()
+        return self._sc
+
+    @property
+    def index(self):
+        return self._get().index
+
+    @property
+    def calibration(self):
+        return self._get().calibration
+
+    def scan(self, rows, desc_path=None, procs=1):
+        return self._get().scan(rows, desc_path=desc_path, procs=procs)
 
 
 def _registry():
@@ -1525,7 +1614,28 @@ def eval_group_hashes():
     if reg is None:
         raise DataRefused("the dataset registry %s cannot be read: the guard cannot clear against the evaluation "
                           "groups (fail closed)" % B3.registry_path())
-    egs, rec = B3.eval_group_hashes(conf, reg, stored=B3.pool_hashes()[0])
+    # the images base3 hashed here are hashed once for DS1 and kept (ds1/v1/leak/eval_group_hashes.json)
+    cache = D.root() / "leak" / "eval_group_hashes.json"
+    stored = dict(B3.pool_hashes()[0])
+    old = _read_json(cache) or {}
+    stored.update({p: [int(x) for x in v] for p, v in (old.get("hashes") or {}).items()})
+    imgs, _missing = B3.eval_group_images(conf, reg)
+    todo = sorted({os.path.normpath(p) for slugs in imgs.values() for ps in slugs.values() for p in ps
+                   if os.path.normpath(p) not in stored})
+    if todo:
+        from concurrent.futures import ThreadPoolExecutor
+        from . import guard as G
+
+        def one(p):
+            h, v = G.image_hashes(p)
+            return p, (None if h is None or v is None else [int(h)] + [int(v[k]) for k in B3.VARIANTS[1:]])
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            got = dict(ex.map(one, todo))
+        new = {p: v for p, v in got.items() if v is not None}
+        stored.update(new)
+        C2.write_json_atomic(cache, {"format": "inc2-ds1-eval-group-hashes/1", "hashes": dict(
+            sorted(dict(old.get("hashes") or {}, **new).items())), "written_utc": D._utc()})
+    egs, rec = B3.eval_group_hashes(conf, reg, stored=stored)
     bad = {g: v for g, v in (rec.get("groups") or {}).items() if any(int((s or {}).get("unhashed") or 0)
                                                                      for s in (v.get("slugs") or {}).values())}
     if bad:
@@ -2758,10 +2868,10 @@ def guard_new(rows, inputs):
     """The pools' rows against MD v1 and MT-W v2 (drawn after the pools' guard ran), both directions: the 8-variant
     6-bit dHash and the calibrated DINOv2 detector (DS1's own index); a hit is dropped (DS.5.1 item 7)."""
     ex = {k: v for k, v in inputs.exams.items() if k == "ds1_exams"}
-    q = hashlib.sha256("\n".join(sorted(str(r["key"]) for r in rows)).encode("utf-8")).hexdigest()[:16]
-    hits = merge_hits(dhash_hits(rows, ex) if ex else {},
-                      embed_hits(rows, inputs.scanners.get("own"), D.root() / "leak" / ("new_rows_own_%s.npz" % q))
-                      if inputs.scanners.get("own") and rows else {})
+    hits = dhash_hits(rows, ex) if ex else {}
+    for name in ("own_exams", "own"):
+        if inputs.scanners.get(name) and rows:
+            hits = merge_hits(hits, embed_hits(rows, inputs.scanners[name]))
     return [r for r in rows if not hits.get(r["key"])]
 
 

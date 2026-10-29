@@ -75,6 +75,7 @@ must occur exactly once in its file), runs its target against the copy and requi
   DR12  ds1_data          a re-read whose classes do not match the intake label is traced anyway
   DR13  ds1_data          the DINOv2 copies of a built manifest's rows are not left out of the draw
   DR14  ds1_data          a group near a built manifest's row is drawn into the exams
+  DR15  ds1_data          an image is described again for every index a job scans it against
   DH4   ds1_sheets        the owner's sample is recomputed on the latest screen only (a drawn source drops out)
   DH5   ds1_sheets        any person's id records an audit sheet
   DH6   ds1_sheets        an LN image not marked checked is recorded
@@ -254,6 +255,7 @@ MUTANTS = {
                  'r["boxes"])):\n', "        if False:\n", REV1),
     "DR13": (DD, "    hit_any |= set(dino)\n", "    hit_any |= set()\n", REV1),
     "DR14": (DD, "    ex = {groups[k] for k in hit_any if k in groups}\n", "    ex = set()\n", REV1),
+    "DR15": (DD, "        if k not in memo and k not in seen:\n", "        if k not in seen:\n", REV1),
     "DH4": (DH, "        sample |= sticky_audit_sample(revs) if revs else set(audit_sample(ss))\n",
             "        sample |= set(audit_sample(revs[-1])) if revs else set(audit_sample(ss))\n", REV1),
     "DH5": (DH, "    if kind == \"audit\" and decided_by != OWNER_HUMAN:\n", "    if False:\n", REV1),
