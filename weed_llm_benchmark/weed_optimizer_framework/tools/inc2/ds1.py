@@ -14,14 +14,18 @@ reproductions, the statistics and decisions, the power pre-flight, the re-analys
     python -m weed_optimizer_framework.tools.inc2.ds1 test-report --arm X --exam mtw|cwd12
     python -m weed_optimizer_framework.tools.inc2.ds1 timestamp --proof FILE --stamp-proof FILE
                                     --revision-proof FILE --revision-stamp-proof FILE   (the delegate's; per Revision)
+    python -m weed_optimizer_framework.tools.inc2.ds1 timestamp-revision --revision N --proof FILE --stamp-proof FILE
+                                    (the delegate's: a Revision made after timestamp.json was written)
     python -m weed_optimizer_framework.tools.inc2.ds1 spend                     (read-only: the family's GPU-h)
     python -m weed_optimizer_framework.tools.inc2.ds1 _pass --spec SPEC.json    (internal: a pass in an MD root)
 
 What it rests on. inc2/v3fam.py and the six E3-frozen files are imported and never edited (DS.7.1): DS1's pass
 (ds1_pass) installs a validator built on inc2.v3fam.family_validator_class (itself built on E3's validator class) with
 one layer of its own (_ds1_layer) that keeps, per image, the class-collapsed matches of the stage-1 box set against
-every ground-truth box: the weed arrays (keys, tp, conf, pred_img, n_gt) from which the class-collapsed AP of the
-stage-1 boxes (inc.scorer.collapsed_ap) is the pass's stage-1 agnostic AP exactly. The statistics are V3F's array
+every ground-truth box: the weed arrays (keys, tp, conf, pred_img, n_gt), which hold the stage-1 helper's records
+row for row and, put back in the validator's image order, give the pass's stage-1 agnostic AP (inc.scorer.collapsed_ap)
+exactly (weed_check; Revision 2, item 1: equal confidences rank by input order, so the check is never made across two
+orders). The statistics are V3F's array
 functions (inc2.v3fam.image_counts, session_counts, run_values, decide) under DS1's own seed texts
 (inc2/ds1/<comparison id>/image | group | session).
 
@@ -39,6 +43,7 @@ Exams (DS.4) and where they are scored:
 
 Records (each written once):
   ds1/v1/timestamp.json                 the prereg's sha256 and its proofs (the delegate's, DS.12 step 0a)
+  ds1/v1/timestamp_rev<n>.json          a later Revision's sha256 and proofs (timestamp_revision; Revision 2 on)
   ds1/v1/equivalence/<item>.json        the three reproductions (DS.7.1): e1a_dev, e3a_dev, b1_ood23, md_identity
   ds1/v1/arms/<ARM>/s<k>/<exam>.{json, images.npz, stage1.npz, rows.npz, p7.npz, weed.npz}
   ds1/v1/reported/<ARM>.json            the non-deciding passes' files and statuses
@@ -86,7 +91,7 @@ STAMP_FILE = "docs/prereg/DS1_2026-10-29.stamp.txt"
 # Revisions made before any DS1 data or number (docs/CONTINUOUS_LOOP.md, "Revision (2026-10-29): DS1 Revision 1"),
 # each kept byte for byte under docs/prereg/ and time-stamped as the amendment was (V3F.12); no DS1 job runs before
 # ds1/v1/timestamp.json names each with its proofs
-REVISIONS = ({"file": "docs/prereg/DS1_rev1_2026-10-29.md",
+REVISIONS = ({"n": 1, "file": "docs/prereg/DS1_rev1_2026-10-29.md",
               "sha256": "543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7",
               "commit": "eb0835695680b4cefa9c3c0cdd94e3970425eaad",
               "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt"},)
@@ -185,6 +190,12 @@ READ_KINDS = ("reference", "candidate", "challenger", "cwd12")
 REPRO_TOL = F.REPRO_TOL                       # 1e-6
 DEVIATION_TOL = F.DEVIATION_TOL               # 0.002
 REPRO_ITEMS = ("e1a_dev", "e3a_dev", "b1_ood23", "md_identity")
+# The weed arrays against the pass's stage-1 agnostic AP (Revision 2, item 1; E1's rule, inc2.scorer_agnostic):
+# ap_per_class ranks equal confidences by an unstable sort, so the AP of tied arrays depends on their order and on the
+# CPU's sort kernel. The identity is checked in the validator's own image order (the same rows in the same order:
+# exact); the tie-broken arrays in exam key order (what the statistics read) only within the ties' reach.
+WEED_RECOMPUTE_TOL = 1e-9                     # scorer_agnostic.MAX_RECOMPUTE_DIFF
+WEED_TIE_TOL = 0.02                           # scorer_agnostic.MAX_TIE_DIFF
 
 FMT_SCORE = "inc2-ds1-score/1"
 FMT_SCORE_RECORD = "inc2-ds1-score-record/1"
@@ -197,6 +208,7 @@ FMT_EXTERNAL = "inc2-ds1-external/1"
 FMT_READ = "inc2-ds1-read/1"
 FMT_TEST = "inc2-ds1-test/1"
 FMT_TIMESTAMP = "inc2-ds1-timestamp/1"
+FMT_REV_TIMESTAMP = "inc2-ds1-revision-timestamp/1"
 FMT_PASS_SPEC = "inc2-ds1-pass-spec/1"
 FMT_REPORTED = "inc2-ds1-reported/1"
 STAMP = "DS1-"
@@ -330,11 +342,29 @@ def _proof_pair(proof, stamp_proof, sha256, commit, what):
              "stamp_file_sha256": C.sha256_file(stamp)}]
 
 
-def revisions_ok(d):
-    """True when a time-stamp record names every Revision (REVISIONS) by its sha256 with two proofs."""
+def revision_stamp_path(n, ts_path=None):
+    """ds1/v1/timestamp_rev<n>.json beside the time-stamp record: a Revision made after the record was written (it is
+    written once) is named by its own record (timestamp_revision)."""
+    return Path(ts_path or timestamp_path()).parent / ("timestamp_rev%d.json" % int(n))
+
+
+def _two_proofs(r):
+    return len([p for p in (r or {}).get("proofs") or [] if isinstance(p, dict) and p.get("sha256")]) == 2
+
+
+def revisions_ok(d, ts_path=None):
+    """True when every Revision (REVISIONS) is named by its sha256 with two proofs: in the time-stamp record, or (a
+    Revision made after it) in its own record beside it (revision_stamp_path)."""
     got = {r.get("sha256"): r for r in (d or {}).get("revisions") or [] if isinstance(r, dict)}
-    return all(rv["sha256"] in got and len([p for p in got[rv["sha256"]].get("proofs") or []
-                                            if isinstance(p, dict) and p.get("sha256")]) == 2 for rv in REVISIONS)
+    for rv in REVISIONS:
+        if rv["sha256"] in got and _two_proofs(got[rv["sha256"]]):
+            continue
+        sep = _read_json(revision_stamp_path(rv["n"], ts_path))
+        if isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP and sep.get("sha256") == rv["sha256"] \
+                and sep.get("prereg_sha256") == PREREG_SHA256 and _two_proofs(sep):
+            continue
+        return False
+    return True
 
 
 def timestamp_record(proof, stamp_proof, sha256=None, revisions=None):
@@ -376,12 +406,33 @@ def timestamp_record(proof, stamp_proof, sha256=None, revisions=None):
     return doc
 
 
+def timestamp_revision(n, proof, stamp_proof):
+    """ds1/v1/timestamp_rev<n>.json (the delegate's, written once): Revision n (REVISIONS) made after the time-stamp
+    record was written, named by its sha256 and commit with its two proofs (the first stamps the Revision's byte copy,
+    the second the stamp file beside it, which names the Revision's sha256 and commit; V3F.12's procedure), and the
+    record it follows. Until it exists no DS1 job runs and the gate stays closed (timestamp_ok)."""
+    rv = next((r for r in REVISIONS if int(r["n"]) == int(n)), None)
+    if rv is None:
+        raise Ds1Refused("DS1 has no Revision %s: its Revisions are %s" % (n, [r["n"] for r in REVISIONS]))
+    d = _read_json(timestamp_path())
+    if not (isinstance(d, dict) and d.get("format") == FMT_TIMESTAMP and d.get("sha256") == PREREG_SHA256):
+        raise Ds1Refused("%s does not name the prereg: the amendment's time stamp comes first" % timestamp_path())
+    if any(isinstance(r, dict) and r.get("sha256") == rv["sha256"] for r in d.get("revisions") or []):
+        raise Ds1Refused("Revision %s is named by %s already" % (n, timestamp_path()))
+    doc = {"format": FMT_REV_TIMESTAMP, "revision": int(n), "file": rv["file"], "sha256": rv["sha256"],
+           "commit": rv["commit"], "prereg_sha256": PREREG_SHA256, "follows": {
+               "file": timestamp_path().name, "sha256": C.sha256_file(timestamp_path())},
+           "proofs": _proof_pair(proof, stamp_proof, rv["sha256"], rv["commit"], rv["file"]), "written_utc": _utc()}
+    write_once(revision_stamp_path(n), doc)
+    return doc
+
+
 def timestamp_ok(path=None):
     """True when ds1/v1/timestamp.json names this text's sha256 and two proofs (DS.9.3's first condition)."""
     d = _read_json(path or timestamp_path())
     return bool(isinstance(d, dict) and d.get("format") == FMT_TIMESTAMP and d.get("sha256") == PREREG_SHA256
                 and len([p for p in d.get("proofs") or [] if isinstance(p, dict) and p.get("sha256")]) == 2
-                and revisions_ok(d))
+                and revisions_ok(d, path or timestamp_path()))
 
 
 def require_timestamp():
@@ -766,6 +817,19 @@ def ra_step(step, segment):
     return out
 
 
+# RA's segments (DS.8.1, R6): the stream's segments since its fork at row 1364 (s001's inc0001-inc0004, s002's
+# inc0005, and any later one); never an experiment whose name merely ends in _s<3 digits> (b_v2_s640) and never a
+# segment of the stream before the fork (weed_stream_v1_s001, weed_stream_v1_s002)
+RA_SEGMENT_RE = re.compile(r"weed_stream_v1_fork1364_s[0-9]{3}\Z")
+
+
+def ra_reports(inc_dir=None):
+    """The default reports of `ra`: <INC>/<segment>/report.json of every segment RA_SEGMENT_RE names, sorted."""
+    base = Path(inc_dir) if inc_dir else C.INC_DIR
+    return sorted(str(p / "report.json") for p in base.iterdir() if p.is_dir() and RA_SEGMENT_RE.match(p.name)
+                  and (p / "report.json").is_file()) if base.is_dir() else []
+
+
 def ra(report_paths, out_dir=None, write=True):
     """capacity/ds1_ra_gate.{json,md} (DS.8.1): every stream step with a recorded gate in the named segment reports,
     each report recorded by its sha256. The first DS1 step after the stamp; no GPU; descriptive."""
@@ -940,6 +1004,7 @@ def ds1_validator_class(cfg):
         def inc_reset(self):
             super().inc_reset()
             self.d_weed = {}
+            self.d_order = []                 # the validator's image order (Revision 2, item 1)
 
         def e3_stage1(self, pred, pb):
             n0 = len(self.e3_s1_tp)
@@ -949,6 +1014,7 @@ def ds1_validator_class(cfg):
             self.d_weed[it["key"]] = {"tp": np.asarray(self.e3_s1_tp[-1], dtype=bool),
                                       "q": np.asarray(self.e3_s1_q[-1], dtype=np.float64),
                                       "n_gt": int(len(pb["cls"]))}
+            self.d_order.append(it["key"])
             return it
 
     layers = [k for k in Ds1Validator.__mro__ if k.__dict__.get("_ds1_layer")]
@@ -975,10 +1041,73 @@ def weed_arrays(v, keys):
             else np.zeros(0, np.int64), "n_gt": np.asarray(ngt, dtype=np.int64)}
 
 
+def weed_values(weed):
+    """(AP50-95, AP50) of the weed arrays as DS1's statistics read them: inc.scorer.collapsed_ap on the tie-broken
+    arrays in exam key order (inc2.scorer_sidecar.tie_break; inc2.v3fam.statistic_value's 'agnostic'), one value
+    whatever the machine's sort."""
+    tb = SC.tie_break(weed)
+    return S.collapsed_ap(tb["tp"], tb["conf"], int(tb["n_gt"].sum()))
+
+
+def weed_check(v, keys, weed, s1):
+    """The weed arrays are the stage-1 helper's own records (Revision 2, item 1): the validator saw each exam image
+    once, in the order it recorded; the arrays, put back in that order, hold every record row for row
+    (tp and conf equal) and the same ground-truth count, and give the pass's stage-1 agnostic AP (AP50-95 and AP50)
+    within WEED_RECOMPUTE_TOL; their tie-broken AP in exam key order is within WEED_TIE_TOL of it. Returns the
+    checks' record; Ds1Refused otherwise. (Before Revision 2 the key-order arrays were compared with the
+    validator-order AP within 1e-9, which ties in the confidences break: 0.856888007 against 0.856857855 for E1-A
+    seed 0 on dev, POWER jobs 50015220 and 50015542.)"""
+    import numpy as np
+    order = [str(k) for k in getattr(v, "d_order", None) or []]
+    keys = [str(k) for k in keys]
+    if len(order) != len(set(order)) or sorted(order) != sorted(keys) or len(order) != len(v.e3_s1_tp) \
+            or len(order) != len(v.e3_s1_q):
+        raise Ds1Refused("the DS1 layer recorded %d image(s) (%d distinct) in the validator's order, E3's stage-1 "
+                         "helper %d, the exam %d" % (len(order), len(set(order)), len(v.e3_s1_tp), len(keys)))
+    if [str(k) for k in weed["keys"]] != keys:
+        raise Ds1Refused("the weed arrays are not in the exam's key order")
+    at = {k: i for i, k in enumerate(keys)}
+    pimg = np.asarray(weed["pred_img"], dtype=np.int64)
+    if len(pimg) and (np.any(np.diff(pimg) < 0) or pimg[0] < 0 or pimg[-1] >= len(keys)):
+        raise Ds1Refused("the weed arrays' rows are not grouped by exam image in key order")
+    lo = np.searchsorted(pimg, np.arange(len(keys)), side="left")
+    hi = np.searchsorted(pimg, np.arange(len(keys)), side="right")
+    parts_tp, parts_q = [], []
+    for j, k in enumerate(order):
+        rows = np.arange(lo[at[k]], hi[at[k]])
+        tp_w = np.asarray(weed["tp"], dtype=bool)[rows].reshape(-1, SC.NIOU)
+        q_w = np.asarray(weed["conf"], dtype=np.float64)[rows]
+        tp_e = np.asarray(v.e3_s1_tp[j], dtype=bool).reshape(-1, SC.NIOU)
+        q_e = np.asarray(v.e3_s1_q[j], dtype=np.float64).reshape(-1)
+        if tp_w.shape != tp_e.shape or not np.array_equal(tp_w, tp_e) or not np.array_equal(q_w, q_e):
+            raise Ds1Refused("the weed arrays of exam image %s are not the stage-1 helper's record of it (%d rows "
+                             "against %d)" % (k, len(q_w), len(q_e)))
+        parts_tp.append(tp_w)
+        parts_q.append(q_w)
+    n_gt = int(np.asarray(weed["n_gt"], dtype=np.int64).sum())
+    if n_gt != int(v.e3_s1_ngt):
+        raise Ds1Refused("the weed arrays count %d ground-truth boxes, the stage-1 helper %d" % (n_gt, v.e3_s1_ngt))
+    tp = np.concatenate(parts_tp, 0) if parts_tp else np.zeros((0, SC.NIOU), dtype=bool)
+    q = np.concatenate(parts_q) if parts_q else np.zeros(0)
+    cap = S.collapsed_ap(tp, q, int(v.e3_s1_ngt))
+    rd = max(abs(float(cap[0]) - float(s1[0])), abs(float(cap[1]) - float(s1[1])))
+    if rd > WEED_RECOMPUTE_TOL:
+        raise Ds1Refused("the weed arrays in the validator's order give AP50-95 %.9f, the pass's stage-1 agnostic AP "
+                         "%.9f" % (cap[0], s1[0]))
+    tb = weed_values(weed)
+    td = abs(float(tb[0]) - float(s1[0]))
+    if td > WEED_TIE_TOL:
+        raise Ds1Refused("the tie-broken weed arrays give AP50-95 %.9f, %.6f from the pass's stage-1 agnostic AP "
+                         "(> %s: not the score's arrays)" % (tb[0], td, WEED_TIE_TOL))
+    return {"weed_recompute_capture_order": rd, "weed_recompute_tol": WEED_RECOMPUTE_TOL,
+            "weed_tie_broken_map50_95": float(tb[0]), "weed_tie_broken_vs_stage1": td, "weed_tie_tol": WEED_TIE_TOL}
+
+
 def ds1_pass(weights, exam, cfg, arm, lock_check=True, batch=S.BATCH, device=None, test_token_=None):
     """One locked-scorer pass of weights on exam with DS1's validator installed (inc2.v3fam._family_pass's steps,
     DS1's exam allow-list). Returns {result, arrays, weed, stage1, rows, p7, p7_full, stage1_agnostic, stats, gt,
-    seconds, mode, exam, arm}; weed's class-collapsed AP equals stage1_agnostic exactly or the pass refuses."""
+    seconds, mode, exam, arm}; the weed arrays are the stage-1 helper's records and give stage1_agnostic in the
+    validator's order (weed_check), or the pass refuses."""
     import numpy as np
     check_frozen()
     if (ROOT_EXAM_RE.match(exam) or exam in SEALED_ROOT_EXAMS) and _IN_ROOT.get("exam") != exam:
@@ -1037,14 +1166,13 @@ def ds1_pass(weights, exam, cfg, arm, lock_check=True, batch=S.BATCH, device=Non
     q = np.concatenate(v.e3_s1_q, 0) if v.e3_s1_q else np.zeros(0)
     s1 = S.collapsed_ap(tp, q, v.e3_s1_ngt)
     weed = weed_arrays(v, keys)
-    w_ap = S.collapsed_ap(weed["tp"], weed["conf"], int(weed["n_gt"].sum()))
-    if abs(float(w_ap[0]) - float(s1[0])) > 1e-9:
-        raise Ds1Refused("the weed arrays give AP50-95 %.9f, the pass's stage-1 agnostic AP %.9f" % (w_ap[0], s1[0]))
+    wchk = weed_check(v, keys, weed, s1)
     stats = {k: int(val) for k, val in sorted(v.e3_stats.items())}
     stats.update({k: int(val) for k, val in sorted(v.f_stats.items())})
     stats.update(orientations=dict(sorted(v.f_tags.items())), gt_roundtrip_max_diff=v.e3_gt_maxdiff,
                  full_recompute_max_abs_diff=recompute, species_restricted_max_abs_diff=restricted,
                  orientations_read=[str(t) for t in cfg["orientations"]])
+    stats.update(wchk)
     out = {"result": res, "arrays": arrays, "weed": weed, "stage1_agnostic": s1, "stats": stats, "gt": list(v.e3_gt),
            "seconds": round(time.time() - t0, 3), "mode": mode, "exam": exam, "arm": arm, "stage1": None,
            "rows": None, "p7": None, "p7_full": None}
@@ -1161,7 +1289,7 @@ def score_doc(arm, seed, exam, ps, cfg, source=None, extra=None, classifier=None
     locked = TS._locked(res["scorer_sha256"])
     test = not res.get("production")
     w = ps.get("weed")
-    w_ap = S.collapsed_ap(w["tp"], w["conf"], int(w["n_gt"].sum())) if w is not None else (None, None)
+    w_ap = weed_values(w) if w is not None else (None, None)        # tie-broken, key order (Revision 2, item 1)
     doc = dict(res)
     doc.update({"format": FMT_SCORE, "family": "ds1", "arm": arm, "seed": None if seed is None else int(seed),
                 "exam": exam, "scorer_sha256": "%s%s%s" % (S.TEST_PREFIX if test else "", STAMP, locked),
@@ -2081,7 +2209,7 @@ def spend():
 def main(argv=None):
     ap = argparse.ArgumentParser(description="DS1's core: scores (L33), verdicts (L34), RA, LN, reads.")
     ap.add_argument("command", choices=("score", "verdict", "ra", "ln", "test-read", "score-test", "test-report",
-                                        "timestamp", "spend", "_pass"))
+                                        "timestamp", "timestamp-revision", "spend", "_pass"))
     ap.add_argument("--arm", default=None)
     ap.add_argument("--phase", type=int, choices=(1, 2), default=None)
     ap.add_argument("--exam", choices=("mtw", "cwd12"), default=None)
@@ -2093,6 +2221,7 @@ def main(argv=None):
     ap.add_argument("--stamp-proof", default=None)
     ap.add_argument("--revision-proof", action="append", default=None)
     ap.add_argument("--revision-stamp-proof", action="append", default=None)
+    ap.add_argument("--revision", type=int, default=None, help="timestamp-revision: the Revision's number")
     ap.add_argument("--spec", default=None)
     a = ap.parse_args(argv)
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -2111,8 +2240,7 @@ def main(argv=None):
                         s2_frozen=bool(((fr.get("arms") or {}).get("S2") or {}).get("sha256")),
                         s2x_walltime=s2x_walltime_not_run())
         elif a.command == "ra":
-            paths = a.report or sorted(str(p) for p in C.INC_DIR.glob("*_s[0-9][0-9][0-9]/report.json"))
-            ra(paths)
+            ra(a.report or ra_reports())
         elif a.command == "ln":
             from . import ds1_sheets as SH
             rec = ln_statistic(SH.ln_marks())
@@ -2130,6 +2258,8 @@ def main(argv=None):
             if len(rp_) != len(rsp_):
                 raise Ds1Refused("--revision-proof and --revision-stamp-proof come in pairs")
             print(json.dumps(timestamp_record(a.proof, a.stamp_proof, revisions=list(zip(rp_, rsp_))), indent=1))
+        elif a.command == "timestamp-revision":
+            print(json.dumps(timestamp_revision(a.revision, a.proof, a.stamp_proof), indent=1))
         elif a.command == "spend":
             print(json.dumps(spend(), indent=1, sort_keys=True))
         else:

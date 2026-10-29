@@ -2216,7 +2216,8 @@ def _ds1_gate(v, st, cfg):
     if not fs.get("never_cut"):
         return False, "the deployed cutter does not read DS1's never-train list (DS.9.1)"
     if not (fs.get("status") or {}).get("timestamp"):
-        return False, "ds1/v1/timestamp.json does not name the amendment's sha256 and its proofs (DS.12 step 0a)"
+        return False, ("ds1/v1/timestamp.json does not name the amendment's sha256 and its proofs, or a Revision "
+                       "lacks its own (timestamp.json or timestamp_rev<n>.json; DS.12 step 0a)")
     return True, [v.ccite("/stage/ds1/amendment"), v.ccite("/stage/ds1/never_cut"), v.ccite("/stage/ds1/timestamp")]
 
 
@@ -2323,12 +2324,15 @@ def ds1_plan(cfg, fs):
             key = "sheets:%s:%d" % (kind, b)
             if "%s_%03d" % (kind, b) not in rendered and due(key):
                 add(maint, {"lever": "L31", "kind": kind, "batch": b, "item": key})
-    pend = list(sheets.get("audit_pending") or [])
+    pend = sorted(sheets.get("audit_pending") or [])
     if pend:
         nb = 1 + len([x for x in rendered if x.startswith("audit_")])
         key = "sheets:audit:%d" % nb
-        if due(key) and fs.get("audit_render_for") != sorted(pend):
-            add(maint, {"lever": "L31", "kind": "audit", "batch": nb, "item": key, "sources": sorted(pend)})
+        # one render per pending set (Revision 2, item 2): not when the ticker's own record names the set it last
+        # rendered, nor when the cluster lists a rendered, not superseded, audit batch of exactly this set
+        drawn = [sorted(v or []) for v in (sheets.get("audit_sets") or {}).values()]
+        if due(key) and fs.get("audit_render_for") != pend and pend not in drawn:
+            add(maint, {"lever": "L31", "kind": "audit", "batch": nb, "item": key, "sources": pend})
     # ---- 3. MD-S0: drawn, its power, enlarged or frozen
     if not md.get("frozen"):
         if (not md.get("drafts") or md.get("power")) and due("data:1:md_s0"):

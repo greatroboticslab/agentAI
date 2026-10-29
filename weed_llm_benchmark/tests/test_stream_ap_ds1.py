@@ -929,7 +929,8 @@ def t_plan_rev1():
 
 def t_review():
     section("the ticker, Revision 1's fixes: a DS1 build's blocked runs (a card, no pause, the arm failed), phase 1's "
-            "bytes counted once, the audit render's sources, a second screen when nothing is new")
+            "bytes counted once, the audit render's sources and a single render of its set (Revision 2), a second screen "
+            "when nothing is new")
     w = ds1_world("ds1_blocked")
     d = w.ds1
     d.update(ra=True, power_final=True, k_not_run=True)
@@ -986,6 +987,13 @@ def t_review():
     la = [l["argv"] for l in w3.runner.launched if l["job"].startswith("ds1sheets_audit")]
     check("the owner's audit batch rendered on the lab with --sources (the cluster's audit set)",
           la and la[0][la[0].index("--sources") + 1] == "src_alpha,src_beta", la)
+    # Revision 2, item 2: the render ends; the ticker records the set from its own proposal and never renders it again
+    run(w3, ticks=8)
+    la2 = [l["job"] for l in w3.runner.launched if l["job"].startswith("ds1sheets_audit")]
+    f3 = (w3.state() or {}).get("ds1") or {}
+    check("  rendered once: the set the render drew is recorded, and no second render of it follows (8 more ticks)",
+          len(la2) == 1 and f3.get("audit_render_for") == ["src_alpha", "src_beta"] and
+          "audit_001" in w3.ds1["sheets"]["rendered"], (la2, f3.get("audit_render_for")))
 
 
 def main():

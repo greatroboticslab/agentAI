@@ -9,6 +9,8 @@ DS.9.1, DS.10).
                                                                      [--lab-inc DIR] [--no-pull]
     python -m weed_optimizer_framework.tools.inc2.ds1_sheets record --file DECISIONS.json --decided-by human:<id>|delegate
     python -m weed_optimizer_framework.tools.inc2.ds1_sheets status            (read-only: what waits for whom)
+    python -m weed_optimizer_framework.tools.inc2.ds1_sheets supersede --sheet audit_002 --by audit_001 --why TEXT
+                                                                     (the delegate's: an extra render of one batch)
 
 Bundles (the cluster, inside L30's steps; ds1/v1/sheets/bundles/<kind>_<name>/): each sampled image downscaled to a
 JPEG of long side 512 (its pixels as stored: an EXIF-tagged image is refused at admission, DS.5.1 item 8), its boxes
@@ -33,6 +35,8 @@ The samples (seeded; stable_int texts named below):
           as MT-W v1.1 / v2 labels, never a training label.
 
 Records (ds1/v1/sheets/): rendered/<kind>_<batch>.json (the spec's sha256, the HTML's sha256, the sources or items),
+superseded.jsonl (append-only: a rendered sheet another render of the same batch stands for; kept, never recorded,
+not counted for its set; Revision 2, item 2), audit_v2/ (the model audit taken again, which later renders show),
 decisions.jsonl (append-only: one line per decision with decided_by human:<id> or 'delegate', the sheet's sha256,
 the decider's name as the file gives it, the time). A reversal of the delegate's decision on an audit sheet is
 recorded as the owner's and widens the audit to every decided sheet.
@@ -63,6 +67,7 @@ FMT_SPEC = "inc2-ds1-sheet/1"
 FMT_DECISIONS = "inc2-ds1-sheet-decisions/1"
 FMT_RENDER = "inc2-ds1-sheet-render/1"
 FMT_DECISION_ROW = "inc2-ds1-decision/1"
+FMT_SUPERSEDED = "inc2-ds1-sheet-superseded/1"
 KINDS = ("source", "audit", "ln", "mtw")
 BATCH_SOURCES = 4
 SAMPLE_ADMITTED, SAMPLE_REMOVED, SAMPLE_UNIT = 24, 12, 12
@@ -116,6 +121,24 @@ def rendered_path(kind, batch, inc=None):
 
 def html_path(kind, batch, inc=None):
     return sheets_dir(inc) / "html" / ("ds1_%s_%03d.html" % (kind, int(batch)))
+
+
+def superseded_path(inc=None):
+    return sheets_dir(inc) / "superseded.jsonl"
+
+
+def audit_v2(inc=None):
+    """{(phase, revision, source): the model audit taken again (Revision 2, item 3)} from ds1/v1/sheets/audit_v2/,
+    which inc2.ds1_data.reaudit writes beside each screen revision's record (the lab pulls it with the sheets)."""
+    from . import ds1_data as DD
+    out = {}
+    d = sheets_dir(inc) / "audit_v2"
+    for p in sorted(d.glob("p[12]_r[0-9][0-9][0-9]_audit_v2.json")) if d.is_dir() else []:
+        r = _read_json(p)
+        if isinstance(r, dict) and r.get("format") == DD.FMT_REAUDIT:
+            for src, v in (r.get("sources") or {}).items():
+                out[(int(r.get("phase") or 0), int(r.get("revision") or 0), src)] = v
+    return out
 
 
 def _read_json(p):
@@ -488,6 +511,7 @@ def _select(name, opts, chosen=None, blank=False):
 def render_html(spec, files):
     """One self-contained HTML page of a batch: spec (the sheet's content, its sha256 inside), files {file name:
     JPEG bytes}."""
+    from . import ds1_data as DD
     kind = spec["kind"]
     title = {"source": "来源审核表 Source sheets", "audit": "负责人抽查 Owner's audit",
              "ln": "逐框标注检查 LN: per-box label sheet", "mtw": "主测试集检查 MT-W check"}[kind]
@@ -509,12 +533,16 @@ def render_html(spec, files):
             src = s["source"]
             out.append('<h2>来源 Source: %s</h2>' % html.escape(src))
             scr = s.get("screen") or {}
+            av = scr.get("audit_verdict")
             out.append('<div class="meta">rows %s · live %s · out %s · cwd12 guard hits %s · capture-name pairs %s · '
-                       'convention %s · audit %s</div>' % (
+                       'convention %s · %s %s</div>' % (
                            scr.get("rows"), scr.get("live"), html.escape(json.dumps(scr.get("out") or {})),
                            scr.get("cwd12_hits"), html.escape(json.dumps((scr.get("capture_names") or {}).get(
                                "examples") or [])[:600]), html.escape(json.dumps((scr.get("convention") or {}).get(
-                                   "fails") or "passes")), html.escape(json.dumps(scr.get("audit_verdict"))[:300])))
+                                   "fails") or "passes")),
+                           "model audit (Revision 2)" if DD.audit_valid(av) or av is None else
+                           "model audit taken before Revision 2 (its rates read each box's class as a coordinate: "
+                           "not valid; it is taken again before any pool)", html.escape(json.dumps(av)[:300])))
             prev = s.get("delegate") or {}
             if scr.get("role_c") or scr.get("quarantine_whole"):
                 out.append('<div class="delegate"><b>%s</b></div>' % html.escape(
@@ -598,6 +626,7 @@ def sheet_spec(kind, batch, names, inc=None, decisions=None):
     """The sheet's content (what its sha256 covers): its bundles' items and, for source and audit sheets, each
     source's units, their source names and suggestions, and (audit) the delegate's decision."""
     decs = decisions if decisions is not None else fold(inc)
+    av2 = audit_v2(inc) if kind in ("source", "audit") else {}
     spec = {"format": FMT_SPEC, "kind": kind, "batch": int(batch), "bundles": [], "sources": [], "items": []}
     files = {}
     for n in names:
@@ -609,6 +638,10 @@ def sheet_spec(kind, batch, names, inc=None, decisions=None):
         meta = doc.get("meta") or {}
         if kind in ("source", "audit"):
             scr = meta.get("screen") or {}
+            ra = av2.get((int(meta.get("phase") or 0), int(meta.get("revision") or 0), meta.get("source")))
+            if ra:
+                # the model audit taken again (Revision 2, item 3) in place of the screen's, which is kept beside it
+                scr = dict(scr, audit_verdict=ra.get("audit_verdict"), audit_superseded=ra.get("superseded"))
             units = sorted((scr.get("units") or {}).keys())
             spec["sources"].append({
                 "source": meta.get("source"), "units": units, "screen": scr, "family": scr.get("family"),
@@ -669,6 +702,53 @@ def renders(inc=None):
     return out
 
 
+def superseded(inc=None):
+    """{sheet name (kind_batch): its row} of the rendered sheets marked superseded (kept, never recorded)."""
+    return {r.get("sheet"): r for r in _jsonl(superseded_path(inc)) if r.get("format") == FMT_SUPERSEDED}
+
+
+def supersede(sheet, by, why, inc=None):
+    """Mark a rendered sheet superseded by another of its kind with the same sources (2026-10-29: the owner's audit
+    batch rendered again on every tick for one set; Revision 2, item 2): the sheet and its HTML stay, `record` refuses
+    a decisions file naming it, the platform no longer counts it as that set's render. The delegate's, appended
+    once per sheet to ds1/v1/sheets/superseded.jsonl."""
+    rend = {"%s_%03d" % (r["kind"], r["batch"]): r for r in renders(inc).values()}
+    if sheet not in rend or by not in rend:
+        raise SheetRefused("supersede names rendered sheets: %s and %s are %s" % (
+            sheet, by, ["rendered" if x in rend else "not rendered" for x in (sheet, by)]))
+    if sheet == by:
+        raise SheetRefused("a sheet is not superseded by itself")
+    a, b = rend[sheet], rend[by]
+    if a["kind"] != b["kind"] or sorted(a.get("sources") or []) != sorted(b.get("sources") or []) or \
+            sorted(a.get("items") or []) != sorted(b.get("items") or []):
+        raise SheetRefused("%s and %s are not the same batch (kind, sources, items)" % (sheet, by))
+    sup = superseded(inc)
+    if sheet in sup:
+        raise SheetRefused("%s is superseded already (by %s)" % (sheet, sup[sheet].get("by")))
+    if by in sup:
+        raise SheetRefused("%s is itself superseded" % by)
+    if any(r.get("sheet_sha256") == a["spec_sha256"] for r in _jsonl(decisions_path(inc))):
+        raise SheetRefused("%s has recorded decisions: it is not superseded" % sheet)
+    if not str(why or "").strip():
+        raise SheetRefused("supersede needs --why")
+    row = {"format": FMT_SUPERSEDED, "sheet": sheet, "spec_sha256": a["spec_sha256"], "html_sha256": a["html_sha256"],
+           "by": by, "by_spec_sha256": b["spec_sha256"], "why": str(why), "decided_by": "delegate",
+           "decider": D.DELEGATE, "recorded_utc": D._utc()}
+    p = superseded_path(inc)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")
+    return row
+
+
+def audit_sets(inc=None):
+    """{sheet name: its sources (sorted)} of the owner's audit batches rendered and not superseded: the sets the
+    platform does not render again (Revision 2, item 2)."""
+    sup = superseded(inc)
+    return {"%s_%03d" % (r["kind"], r["batch"]): sorted(r.get("sources") or []) for r in renders(inc).values()
+            if r.get("kind") == "audit" and "%s_%03d" % (r["kind"], r["batch"]) not in sup}
+
+
 def record(path, decided_by, inc=None):
     """Store a saved decisions file (DS.9.1): it must name a rendered sheet by its spec sha256 and decide what
     that sheet asks; each decision is one appended line with decided_by (human:<id> for a person, 'delegate' for
@@ -685,6 +765,10 @@ def record(path, decided_by, inc=None):
     if rend is None:
         raise SheetRefused("%s names sheet %s, which no rendered sheet is" % (path, str(sh)[:12]))
     kind = rend["kind"]
+    sup = {r.get("spec_sha256"): r for r in superseded(inc).values()}
+    if sh in sup:
+        raise SheetRefused("%s names sheet %s, superseded by %s (%s): decide that sheet instead" % (
+            path, sup[sh].get("sheet"), sup[sh].get("by"), sup[sh].get("why")))
     if kind == "audit" and decided_by != OWNER_HUMAN:
         raise SheetRefused("the audit sheets are the owner's (DS.0 item 4): decided_by must be %s, not %r"
                            % (OWNER_HUMAN, decided_by))
@@ -888,12 +972,13 @@ def status(inc=None):
     return {"decided": sorted(s for s, v in f.items() if v.get("decision")),
             "audit_pending": audit_sources(f), "mtw_checks": {s: v["verdict"] for s, v in mtw_checks(inc).items()},
             "ln_recorded": sum(len(v) for v in ln_marks(inc).values()),
-            "rendered": sorted("%s_%03d" % (r["kind"], r["batch"]) for r in renders(inc).values())}
+            "rendered": sorted("%s_%03d" % (r["kind"], r["batch"]) for r in renders(inc).values()),
+            "superseded": sorted(superseded(inc)), "audit_sets": audit_sets(inc)}
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="DS1's sheets (L31) and their decision records.")
-    ap.add_argument("command", choices=("render", "record", "status"))
+    ap.add_argument("command", choices=("render", "record", "status", "supersede"))
     ap.add_argument("--kind", choices=KINDS, default=None)
     ap.add_argument("--batch", type=int, default=None)
     ap.add_argument("--lab-inc", default=None)
@@ -901,6 +986,9 @@ def main(argv=None):
     ap.add_argument("--file", default=None)
     ap.add_argument("--decided-by", default=None)
     ap.add_argument("--sources", default=None, help="render --kind audit: the sources of the batch (comma list)")
+    ap.add_argument("--sheet", default=None, help="supersede: the rendered sheet (kind_batch, e.g. audit_002)")
+    ap.add_argument("--by", default=None, help="supersede: the sheet of the same batch that stands (e.g. audit_001)")
+    ap.add_argument("--why", default=None, help="supersede: the reason, recorded")
     a = ap.parse_args(argv)
     try:
         if a.command == "render":
@@ -911,6 +999,8 @@ def main(argv=None):
         elif a.command == "record":
             rows = record(a.file, a.decided_by, inc=a.lab_inc)
             print(json.dumps({"recorded": len(rows)}))
+        elif a.command == "supersede":
+            print(json.dumps(supersede(a.sheet, a.by, a.why, inc=a.lab_inc), indent=1, sort_keys=True))
         else:
             print(json.dumps(status(a.lab_inc), indent=1, sort_keys=True))
     except (D.Ds1Refused, ValueError, OSError) as e:

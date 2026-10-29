@@ -36,7 +36,9 @@ The rules, in order, each counted with its reason code (DS.5.1):
     background), or unresolved (the image is held, never admitted); species identity is kept per box;
   3 base3's box and image rules (CLOOP:2912-2913): the source rule, boxes under 8 px masked, images dropped;
   4 the model audit (E1-A) per source: a source over train_core's missing-label rate by more than 0.15 enters only
-    as 'accept for training only' with predicted unlabelled plants masked (inc2.mask);
+    as 'accept for training only' with predicted unlabelled plants masked (inc2.mask); each labelled box read as
+    (cx, cy, w, h), its class stripped (Revision 2, item 3); a screen revision audited before that is taken again by
+    the pools step first (reaudit: screen/p<ph>_r<rev>_audit_v2.json and ds1/v1/sheets/audit_v2/, written once);
   5 dedupe (base3's copy rule; never at 4-6 bits): the same bytes; 3 bits plus an 80 % box match; an identical
     label layout; base B rows win over copies;
   6 thin(10) per capture series (an SIU video, an MFWD tray): frames in the series' seeded order
@@ -96,6 +98,7 @@ from . import ds1 as D
 FORMAT = "inc2-ds1-data/1"
 FMT_ARM = "inc2-ds1-arm/1"
 FMT_SCREEN = "inc2-ds1-screen/1"
+FMT_REAUDIT = "inc2-ds1-reaudit/1"
 FMT_POOL = "inc2-ds1-pool/1"
 FMT_EXAM = "inc2-ds1-exam/1"
 FMT_LOCK = "inc2-ds1-exam-lock/1"
@@ -151,6 +154,10 @@ PARTIAL_MISSING_EXCESS = 0.15
 AUDIT_SAMPLE = 200
 AUDIT_CONF = 0.5
 AUDIT_IOU = 0.5
+# Revision 2, item 3: the model audit reads each labelled box as (cx, cy, w, h), the class stripped, as train_core's
+# reference always did; a screen's audit taken before it (no "version") read [class, cx, cy, w] as the box and is
+# taken again (reaudit) before any pool applies it
+AUDIT_VERSION = 2
 FAMILY_CAP = 0.35
 MD_SHARE, MD_MIN, MD_MAX = 0.05, 15, 500
 MTW_SHARE, MTW_MIN, MTW_MAX = 0.10, 30, 1000
@@ -452,15 +459,26 @@ def _iou_xywh(a, b):
     return B3.box_iou(a, b)
 
 
+def audit_boxes(row):
+    """A candidate's labelled boxes as the audit reads them: (cx, cy, w, h), its class stripped (Revision 2, item 3;
+    train_core's reference reads b[1:5] of its labels)."""
+    return [tuple(float(x) for x in b[1:5]) for b in row.get("boxes") or ()]
+
+
 def audit_rates(rows, predict, conf=AUDIT_CONF, iou=AUDIT_IOU):
     """{images, predictions, missing_rate, false_box_rate, convention} of a detector's predictions on labelled
     rows: missing = confident predictions (conf >= 0.5) matching no labelled box at IoU 0.5 (unlabelled plants),
     false boxes = labelled boxes no prediction (conf >= 0.25) matches; convention = the median of log(predicted
-    area / labelled area) over matched pairs. predict(row) -> [(cx, cy, w, h, conf)]."""
+    area / labelled area) over matched pairs. predict(row) -> [(cx, cy, w, h, conf)]; each row's boxes are
+    (cx, cy, w, h) (audit_boxes), and a box of another length is refused (Revision 2, item 3)."""
     n_pred = n_miss = n_gt = n_false = 0
     logs = []
     for r in rows:
         gt = list(r.get("boxes") or ())
+        if any(len(g) != 4 for g in gt):
+            raise DataRefused("the model audit reads labelled boxes as (cx, cy, w, h); row %s holds a box of %d "
+                              "numbers (strip the class: audit_boxes)" % (r.get("key"), len(next(
+                                  g for g in gt if len(g) != 4))))
         pr = [p for p in predict(r)]
         conf_p = [p for p in pr if p[4] >= conf]
         n_pred += len(conf_p)
@@ -492,7 +510,19 @@ def audit_verdict(rates, ref):
     """Partially labelled (DS.5.1 item 4) when the source's missing-label rate exceeds train_core's by > 0.15."""
     excess = float(rates["missing_rate"]) - float(ref["missing_rate"])
     return {"partial": excess > PARTIAL_MISSING_EXCESS, "excess": excess, "threshold": PARTIAL_MISSING_EXCESS,
-            "source": rates, "train_core": ref}
+            "source": rates, "train_core": ref, "version": AUDIT_VERSION}
+
+
+def source_audit(rows, source, predict, ref):
+    """The model audit of one source's live screen rows (DS.5.1 item 4): its seeded sample, each row's boxes as
+    (cx, cy, w, h) (audit_boxes), against train_core's reference rates under the same predictor."""
+    smp = audit_sample(rows, source)
+    return audit_verdict(audit_rates([dict(r, boxes=audit_boxes(r)) for r in smp], predict), ref)
+
+
+def audit_valid(verdict):
+    """True for a model audit taken as Revision 2 reads boxes (its version), False for one taken before."""
+    return isinstance(verdict, dict) and int(verdict.get("version") or 1) >= AUDIT_VERSION
 
 
 def unlabelled_masks(row, predict, conf=AUDIT_CONF, iou=AUDIT_IOU):
@@ -2004,7 +2034,7 @@ def screen(phase, inputs, revision=None, write=True):
             continue
         audit = None
         if inputs.predict is not None and inputs.audit_ref is not None:
-            audit = audit_verdict(audit_rates(audit_sample(rs, s), inputs.predict), inputs.audit_ref)
+            audit = source_audit(rs, s, inputs.predict, inputs.audit_ref)
         inc_of = {k: v.get("inc_id") for k, v in (cmaps.get(s) or {}).items()}
         rec[s] = dict(base, units={u: {"boxes": n, "suggested": suggest_role(s, u, inc_of)}
                                    for u, n in sorted(per[s]["units"].items())},
@@ -2141,6 +2171,80 @@ def screen_revisions(phase):
         if (out_dir() / "screen").is_dir() else []
 
 
+def reaudit_path(rev_path):
+    """screen/p<ph>_r<rev>_audit_v2.json beside a screen revision: its model audit taken again (Revision 2, item 3)."""
+    return Path(str(rev_path)[:-5] + "_audit_v2.json")
+
+
+def reaudit_sheet_path(rev_path, inc=None):
+    """The same record under ds1/v1/sheets/audit_v2/ (written with it), so the lab's pull of the sheets' state
+    carries it to every later render of the sources it covers."""
+    from . import ds1_sheets as SH
+    return SH.sheets_dir(inc) / "audit_v2" / reaudit_path(rev_path).name
+
+
+def audit_due(phase):
+    """The screen revisions of a phase holding a model audit taken before Revision 2 (no version) and no record of
+    it taken again: reaudit takes them before any pool reads an audit (Revision 2, item 3)."""
+    out = []
+    for p in screen_revisions(phase):
+        d = _read_json(p) or {}
+        old = [s for s, v in (d.get("sources") or {}).items()
+               if v.get("audit_verdict") is not None and not audit_valid(v.get("audit_verdict"))]
+        if old and not isinstance(_read_json(reaudit_path(p)), dict):
+            out.append(p)
+    return out
+
+
+def screen_live_rows(rev_path, ctx):
+    """{source: [rows]} of a screen revision's live rows as its screen held them: each candidate that passes
+    eligibility now and that the screen did not drop (a file it could not hash)."""
+    out = collections.defaultdict(list)
+    for r in read_jsonl(Path(str(rev_path)[:-5] + "_candidates.jsonl")):
+        if eligibility(r, ctx) or r.get("drop"):
+            continue
+        r["boxes"] = [tuple(b) for b in r.get("boxes") or ()]
+        out[r["source"]].append(r)
+    return out
+
+
+def reaudit(phase, inputs, write=True):
+    """The model audit taken again, as Revision 2 reads boxes, for every screen revision of a phase whose audit was
+    taken before it (audit_due): each source the revision audited, its live rows' seeded sample (audit_sample: the
+    same draw), E1-A's predictions against train_core's reference under the same predictor. Written once per
+    revision (screen/p<ph>_r<rev>_audit_v2.json and its copy under ds1/v1/sheets/audit_v2/); screen_records reads
+    it in place of the revision's own audit, which the record keeps beside it (superseded)."""
+    if inputs.predict is None or inputs.audit_ref is None:
+        raise DataRefused("the model audit is taken again only with E1-A's predictor and train_core's reference")
+    ctx = eligibility_ctx(inputs)
+    done = []
+    for p in audit_due(phase):
+        d = _read_json(p) or {}
+        live = screen_live_rows(p, ctx)
+        srcs = {}
+        for s, v in sorted((d.get("sources") or {}).items()):
+            old = v.get("audit_verdict")
+            if old is None or audit_valid(old):
+                continue
+            rs = live.get(s, [])
+            new = source_audit(rs, s, inputs.predict, inputs.audit_ref)
+            srcs[s] = {"audit_verdict": new, "superseded": old, "live_then": v.get("live"), "live_now": len(rs),
+                       "partial_changed": bool(old.get("partial")) != bool(new.get("partial"))}
+        doc = {"format": FMT_REAUDIT, "phase": int(phase), "revision": d.get("revision"), "screen": p.name,
+               "screen_sha256": C.sha256_file(p), "version": AUDIT_VERSION,
+               "why": "Revision 2, item 3: the screen's audit read each labelled box as [class, cx, cy, w]; taken "
+                      "again with the class stripped, as train_core's reference reads its boxes",
+               "predictor_weights_sha256": getattr(inputs.predict, "weights_sha256", None),
+               "train_core": inputs.audit_ref, "sources": srcs, "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
+        if write:
+            write_once(reaudit_path(p), doc)
+            sp = reaudit_sheet_path(p)
+            if not sp.exists():
+                write_once(sp, doc)
+        done.append(doc)
+    return done
+
+
 def screened_keys(phase):
     """The keys every screen revision of this phase and of every earlier phase covered."""
     out = set()
@@ -2159,14 +2263,19 @@ def screened_rows(phase):
     return out
 
 
-def screen_records(phase):
+def screen_records(phase, reaudits=None):
     """{source: record} over every screen revision of a phase: the latest revision's record of the source, with the
     counts summed and the flags that settle a source taken from any revision (a cwd12 copy quarantines it whole
     whichever revision found it; a capture name sends it to role C)."""
     out = {}
     for p in screen_revisions(phase):
         d = _read_json(p) or {}
+        ra = (reaudits or {}).get(p.name) or _read_json(reaudit_path(p))
+        ra = (ra.get("sources") or {}) if isinstance(ra, dict) and ra.get("format") == FMT_REAUDIT else {}
         for s, v in (d.get("sources") or {}).items():
+            if s in ra:
+                # the audit taken again (Revision 2, item 3) in place of the revision's own, which stays beside it
+                v = dict(v, audit_verdict=ra[s]["audit_verdict"], audit_superseded=ra[s].get("superseded"))
             old = out.get(s)
             if old is None:
                 out[s] = dict(v)
@@ -2211,6 +2320,10 @@ def source_ready(source, decisions, screen_rec):
         return False, "decision %r" % d.get("decision")
     if d.get("audit_required") and not d.get("audited"):
         return False, "owner audit pending"
+    a = srec.get("audit_verdict")
+    if d.get("decision") == "accept" and audit_valid(a) and a.get("partial"):
+        return False, ("partially labelled by the model audit (DS.5.1 item 4): admitted only as 'accept for training "
+                       "only', so its sheet is decided again")
     return True, ""
 
 
@@ -2244,8 +2357,14 @@ def pools(phase, inputs, s0_rows=None, write=True):
     directions), EXIF, licence flags, the written files. Each source's pool is written once:
     splits/ds1/pools/p<phase>/<source slug>.jsonl."""
     rules, _conf = load_rules()
+    taken = {}
+    if audit_due(phase):
+        # a screen's audit taken before Revision 2 is taken again before any pool reads it (masks, readiness)
+        taken = {x["screen"]: x for x in reaudit(phase, inputs, write=write)}
+        if audit_due(phase) and write:
+            raise DataRefused("a screen revision's model audit is still the one taken before Revision 2")
     rows = screened_rows(phase)
-    srec = screen_records(phase)
+    srec = screen_records(phase, reaudits=taken)
     ready = {}
     for s in sorted({r["source"] for r in rows}):
         ok, why = source_ready(s, inputs.decisions, srec.get(s))
@@ -2276,6 +2395,9 @@ def pools(phase, inputs, s0_rows=None, write=True):
         if r.get("drop"):
             continue
         a = (srec.get(r["source"]) or {}).get("audit_verdict") or {}
+        if a.get("partial") and not audit_valid(a):
+            raise DataRefused("%s's model audit was taken before Revision 2: its masks are not applied from it"
+                              % r["source"])
         if a.get("partial") and inputs.predict is not None:
             extra = unlabelled_masks(r, inputs.predict)
             if extra:
@@ -2934,7 +3056,7 @@ def plan_state(inc_dir=None):
                        "role_c": bool(v.get("role_c") or int((v.get("capture_names") or {}).get("hits") or 0)),
                        "settled_out": settled_out(s, decs, v), "exam_draw": s != SIU}
         out["phases"][str(ph)] = {"revisions": len(revs), "new_batches": len(batches - seen) if revs else None,
-                                  "sources": srcs}
+                                  "sources": srcs, "audit_due": [p.name for p in audit_due(ph)]}
     drafts = sorted(exam_dir("md_s0").glob("draft_r[0-9][0-9][0-9]")) if exam_dir("md_s0").is_dir() else []
     last = drafts[-1].name if drafts else None
     pw = _read_json(D.root() / "power" / ("%s.json" % last)) if last else None
@@ -2956,7 +3078,10 @@ def plan_state(inc_dir=None):
                      "ln_batches": len([n for n in names if n.startswith("ln_")]),
                      "mtw_batches": len([n for n in names if n.startswith("mtw_")]),
                      "rendered": rendered, "audit_pending": SH.audit_sources(decs),
-                     "ln_recorded": bool(SH.ln_marks(inc))}
+                     "ln_recorded": bool(SH.ln_marks(inc)),
+                     # the owner's audit batches rendered and not superseded, by their sources: a set rendered is
+                     # never proposed again (Revision 2, item 2)
+                     "audit_sets": SH.audit_sets(inc), "superseded": sorted(SH.superseded(inc))}
     out["mtw_v1_1"] = (_read_json(out_dir() / "mtw_v1_1" / "status.json") or {}).get("format") is not None
     out["k_not_run"] = (out_dir() / "arms" / "k_not_run.json").is_file()
     srec1 = screen_records(1)

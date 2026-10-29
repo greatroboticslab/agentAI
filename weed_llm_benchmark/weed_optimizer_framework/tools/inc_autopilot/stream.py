@@ -373,6 +373,13 @@ DONE_AT_ONCE = ("inc_stream_commit", "inc_stream_rollback", "inc_stream_quaranti
 
 
 # ------------------------------------------------------------------ helpers
+def ds1_audit_sources(value):
+    """The sources of an owner's audit render as its proposal names them (a comma list, or a list), sorted."""
+    if isinstance(value, str):
+        value = value.split(",")
+    return sorted(str(x).strip() for x in value or () if str(x).strip())
+
+
 def step_key(lever, policy_params):
     """The key of one step of a lane (the attempts, the step's failed runs):
     the lever and its policy params (levers_stream.policy_params) without the
@@ -6356,9 +6363,10 @@ class StreamRun(object):
         else:
             rec.update(state="done", done_utc=self.utc)
         if it["lever"] == "L31" and (p.get("params") or {}).get("kind") == "audit":
-            stg = ((self.ev.json(E.CONTEXT) or {}).get("stage") or {}).get("ds1") if self.ev is not None else None
-            f["audit_render_for"] = sorted((((stg or {}).get("status") or {}).get("sheets") or {}).get(
-                "audit_pending") or [])
+            # the set this render drew: its own proposal's sources (DR0 named them from the cluster's audit set),
+            # never this tick's context, which need not hold DS1's status when a job's end is read (Revision 2,
+            # item 2: on 2026-10-29 it held none, so [] was recorded and the same set was rendered on every tick)
+            f["audit_render_for"] = ds1_audit_sources((p.get("params") or {}).get("sources"))
         # the next proposal of the same step takes a new id: the executor runs an id once
         akey = step_key(it["lever"], LS.policy_params(it["lever"], p.get("params") or {}))
         att = st.setdefault("attempts", {})
