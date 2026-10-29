@@ -1,0 +1,33 @@
+DS1 Revision 2 time-stamp file, second text (docs/CONTINUOUS_LOOP.md, Revision (2026-10-29): DS1 Revision 2, before any DS1 training or score; the procedure of V3F.12)
+
+revision_sha256: 5970fd759df8e291f645caff1d3da4ee540972da33f86c0a7248c44ff8760fc4
+revision_text: docs/CONTINUOUS_LOOP.md from line 5657 ('## Revision (2026-10-29): DS1 Revision 2, ...') to the end of the file at the commit below; byte-identical to docs/prereg/DS1_rev2_2026-10-29.md
+revision_commit: 9ca7e4d321bf11dc4abba35ed920fb27ecb9d8bc
+supersedes: Revision 2's first text, sha256 b9c7350052c720510db4cd3188fc437d8aa54460795a90c8649d2b37d8a2bb13 (commit f022a0b2f6a96dbab163d200191de799815d0e8c, stamp file written 2026-10-29T20:06:31Z), never deployed; kept unchanged under docs/prereg/superseded/DS1_rev2_first_text/:
+  b9c7350052c720510db4cd3188fc437d8aa54460795a90c8649d2b37d8a2bb13  DS1_rev2_2026-10-29.md
+  5d93b23648406537573c33a9f649b1ae2beb647519cb9ef26e41e02ec7ed8a89  DS1_rev2_2026-10-29.md.ots
+  30a078eed9ae96922a5b226c945875410722cef2877543bf16b9886e8e5df4bc  DS1_rev2_2026-10-29.stamp.txt
+  3bd97a046d8c2f27ed3dac0eed57c37cf9d6fc1272a251e7abc78b19939b3c95  DS1_rev2_2026-10-29.stamp.txt.ots
+amendment_sha256: 3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699 (unchanged; docs/prereg/DS1_2026-10-29.md)
+revision1_sha256: 543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7 (unchanged; docs/prereg/DS1_rev1_2026-10-29.md)
+written_utc: 2026-10-29T23:46:16Z
+decided_by: the delegate under the owner's 2026-09-30 admin grant (Revision 2, items 1-6)
+time_stamp_record: ds1/v1/timestamp.json is written once and names Revision 1; Revision 2 is named by ds1/v1/timestamp_rev2.json (inc2.ds1 timestamp-revision --revision 2), written by the delegate on the login node once this commit is deployed
+
+outside-repository records cited (sha256, file name under the paper's working folder _work/):
+3640eafc4ceaafe73489f8c4f8985a9266c7de523767817553335ecd22721b23  v7/ds1_evidence/rev2/MANIFEST.sha256 (15 files: R1 power/ (the POWER jobs' logs, the copied records' sha256s, the read scripts and outputs, POWER_DIVERGENCE.md); R2 reaudit/ (the screen's audit samples, E1-A seed 0's predictions on the lab, the old and corrected rates per source))
+15da8197cfe311f418bd51ed9abb24071e972e7ea65004b589e1d3d46f5e4e57  v7/sheets/ds1_audit_001_机器审核更正.md (R3: the owner's note on ds1_audit_001's corrected audit numbers)
+
+cluster records cited by sha256 (INC = results/framework/inc on /ocean; read only):
+d304e1634849c0070439169c1f41b88a4ea312ab728796df94d8ee62c6f85ba1  INC/e1_a_m640/runs/final__base__s0/scores/dev.json (E1-A seed 0's recorded dev score)
+8585bdbd47258723aa39b445ad989e8b32a0dcb853ed16799e2c4234a899f938  INC/e1_a_m640/runs/final__base__s0/scores/dev.agnostic.npz (its class-collapsed arrays in exam key order)
+f635abc61845cce907123a969514ca6876a74e6ddca2759e974f759dbf8032bb  INC/twostage/e3_v1/arms/A/s0/dev.json (E3-A seed 0: stage-1 agnostic 0.8568578547397661)
+e111adda7861a97200e86edf0def6ceb064e8b1b57fe46fee4ded99ebee193f8  INC/logs/inc_build_ds1_score_power_50015220.out
+72b70e736697acc994632ac4df5b143385251cb836666f6d14aab1451bf5d960  INC/logs/inc_build_ds1_score_power_50015542.out
+573e52c5321b6583cd302483b31f29bb4141e4c828ca4fe7f6b4d8523fa95be5  INC/splits/ds1/screen/p1_r001.json (the screen revision whose audit Revision 2 item 4 takes again)
+0a67347e4ca1cc60228ecba8496b3f91962668ab33d35cd885f5042bba5a3536  INC/splits/ds1/screen/p1_r002.json (the second phase-1 screen revision; it holds no model audit)
+da139d47299789aec2673cbc8fa492e325d280ac12353e6c16ec202ca7911aee  INC/capacity/ds1_ra_gate.json (RA's record, written 2026-10-29T11:39:24Z)
+52212f869e9b1979bebf863a2dcddd0493f90fc46579f49e86d90a89e161ba75  INC/splits/ds1/md_v1/md_s0/draft_r001/draw.json (MD-S0's draft_r001)
+a8e1b61ad29806c11228b9a54a463e40ac466fb3a717a17fcb2d6fc620e4cfcb  INC/e1_a_m640/runs/base__s0/weights/final.pt (the audit's predictor, E1-A seed 0; inc2.ds1_data.AUDIT_PREDICTOR_SHA256)
+
+Proofs: OpenTimestamps (ots stamp) of this file and of docs/prereg/DS1_rev2_2026-10-29.md, as DS1_rev2_2026-10-29.stamp.txt.ots and DS1_rev2_2026-10-29.md.ots beside them.

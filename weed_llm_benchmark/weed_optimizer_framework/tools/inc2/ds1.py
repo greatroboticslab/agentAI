@@ -96,10 +96,12 @@ REVISIONS = ({"n": 1, "file": "docs/prereg/DS1_rev1_2026-10-29.md",
               "sha256": "543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7",
               "commit": "eb0835695680b4cefa9c3c0cdd94e3970425eaad",
               "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt"},
-             # Revision 2 (2026-10-29), before any DS1 training or score; named by ds1/v1/timestamp_rev2.json
+             # Revision 2 (2026-10-29), before any DS1 training or score; named by ds1/v1/timestamp_rev2.json. Its
+             # second text (the first, b9c73500...bb13 of commit f022a0b, never deployed, is kept under
+             # docs/prereg/superseded/DS1_rev2_first_text/)
              {"n": 2, "file": "docs/prereg/DS1_rev2_2026-10-29.md",
-              "sha256": "b9c7350052c720510db4cd3188fc437d8aa54460795a90c8649d2b37d8a2bb13",
-              "commit": "f022a0b2f6a96dbab163d200191de799815d0e8c",
+              "sha256": "5970fd759df8e291f645caff1d3da4ee540972da33f86c0a7248c44ff8760fc4",
+              "commit": "9ca7e4d321bf11dc4abba35ed920fb27ecb9d8bc",
               "stamp_file": "docs/prereg/DS1_rev2_2026-10-29.stamp.txt"})
 DELEGATE = "the delegate under the 2026-09-30 owner grant"
 OWNER = "Harry He (owner)"
