@@ -185,8 +185,8 @@ MUTANTS = {
     "DP15": (SRM, "    CM.INC_DIR = Path(inc)\n", "    pass\n", AP_GATE),
     "DP16": (ST, '        if steps:\n            self._ds1_card_once("steps"', '        if False:\n            '
                  'self._ds1_card_once("steps"', AP_PATH),
-    "DP17": (DF, "            docs/prereg/DS1_2026-10-29.md docs/prereg/DS1_2026-10-29.md.ots",
-             "            docs/prereg/DS1_2026-10-29.md.ots", DEPLOY),
+    "DP17": (DF, "ROOT_PATHS+=(docs/prereg/DS1_2026-10-29.md docs/prereg/DS1_2026-10-29.md.ots",
+             "ROOT_PATHS+=(docs/prereg/DS1_2026-10-29.md.ots", DEPLOY),
 }
 
 

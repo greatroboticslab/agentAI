@@ -138,12 +138,12 @@ ROOT_PATHS=(docs/FUNNEL_AUDIT.md docs/FUNNEL_AUDIT_RUNNER.md docs/FUNNEL_REPRODU
             docs/poster/figures_data.json
             docs/CONTINUOUS_LOOP.md docs/INCREMENTAL_PROTOCOL.md docs/INCREMENTAL_PROTOCOL_RUNNER.md docs/INC_AUTOPILOT.md
             docs/prereg/V3F_2026-10-11.md docs/prereg/V3F_rev29-31_2026-10-11.md docs/prereg/V3F_dev4_2026-10-20.md
-            docs/prereg/V3F_dev5_2026-10-24.md docs/prereg/V3F_dev6_2026-10-25.md
-            docs/prereg/DS1_2026-10-29.md docs/prereg/DS1_2026-10-29.md.ots docs/prereg/DS1_2026-10-29.stamp.txt
-            docs/prereg/DS1_2026-10-29.stamp.txt.ots)
+            docs/prereg/V3F_dev5_2026-10-24.md docs/prereg/V3F_dev6_2026-10-25.md)
 # DS1 (2026-10-29): the ticker proposes DS1's levers only once the deployed tree holds the amendment's byte copy
 # (docs/prereg/DS1_2026-10-29.md, by its sha256: stream_domains/weed.json "ds1"); the delegate's time-stamp record
 # (inc2.ds1 timestamp, on the login node) reads the two committed proofs and the stamp file beside them
+ROOT_PATHS+=(docs/prereg/DS1_2026-10-29.md docs/prereg/DS1_2026-10-29.md.ots docs/prereg/DS1_2026-10-29.stamp.txt
+             docs/prereg/DS1_2026-10-29.stamp.txt.ots)
 # V3F (2026-10-11): the ticker proposes the family's levers only once the deployed tree holds the amendment's byte
 # copy (docs/prereg/V3F_2026-10-11.md) and its Revisions 29-31's (docs/prereg/V3F_rev29-31_2026-10-11.md), each by
 # its sha256; it reopens the items a recorded deviation names only once the deployed tree holds that deviation's

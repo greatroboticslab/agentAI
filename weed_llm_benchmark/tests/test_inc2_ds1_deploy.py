@@ -31,24 +31,27 @@ def check(name, cond, detail=""):
 
 
 def bash_array(script, name):
-    """The elements of a bash array as the script defines it (`NAME=(` to the line whose closing parenthesis ends it,
-    comments dropped), word-split by bash itself."""
+    """The elements of a bash array as the script defines it (`NAME=(` and every `NAME+=(` to the line whose closing
+    parenthesis ends it, comments dropped), word-split by bash itself; None when the script never defines it."""
     lines = script.read_text().splitlines()
-    start = next((i for i, l in enumerate(lines) if l.startswith("%s=(" % name)), None)
-    if start is None:
+    starts = [i for i, l in enumerate(lines) if re.match(r"%s\+?=\(" % re.escape(name), l)]
+    if not starts:
         return None
-    body = []
-    for i, l in enumerate(lines[start:]):
-        l = re.sub(r"(^|\s)#.*$", "", l)
-        if i == 0:
-            l = l[len(name) + 2:]
-        if l.rstrip().endswith(")"):
-            body.append(l.rstrip()[:-1])
-            break
-        body.append(l)
-    p = subprocess.run(["bash", "-c", "A=(%s)\nprintf '%%s\\n' \"${A[@]}\"" % "\n".join(body)], capture_output=True,
-                       text=True)
-    return [x for x in p.stdout.splitlines() if x]
+    out = []
+    for start in starts:
+        body = []
+        for i, l in enumerate(lines[start:]):
+            l = re.sub(r"(^|\s)#.*$", "", l)
+            if i == 0:
+                l = l[l.index("(") + 1:]
+            if l.rstrip().endswith(")"):
+                body.append(l.rstrip()[:-1])
+                break
+            body.append(l)
+        p = subprocess.run(["bash", "-c", "A=(%s)\nprintf '%%s\\n' \"${A[@]}\"" % "\n".join(body)],
+                           capture_output=True, text=True)
+        out += [x for x in p.stdout.splitlines() if x]
+    return out
 
 
 def main():
