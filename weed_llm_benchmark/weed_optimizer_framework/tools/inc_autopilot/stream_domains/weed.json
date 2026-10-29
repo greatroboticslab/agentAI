@@ -800,6 +800,24 @@
     "sha256": "543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7",
     "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt",
     "why": "DS1 Revision 1 (docs/CONTINUOUS_LOOP.md, Revision (2026-10-29)), before any DS1 data: no DS1 lever is proposed until the deployed tree holds it by this sha256"
+   },
+   {
+    "file": "docs/prereg/DS1_rev2_2026-10-29.md",
+    "sha256": "b9c7350052c720510db4cd3188fc437d8aa54460795a90c8649d2b37d8a2bb13",
+    "stamp_file": "docs/prereg/DS1_rev2_2026-10-29.stamp.txt",
+    "why": "DS1 Revision 2 (docs/CONTINUOUS_LOOP.md, Revision (2026-10-29)), before any DS1 training or score: no DS1 lever is proposed until the deployed tree holds it by this sha256"
+   }
+  ],
+  "reopens": [
+   {
+    "marker": "DS1 Revision 2 (2026-10-29)",
+    "file": "docs/prereg/DS1_rev2_2026-10-29.md",
+    "sha256": "b9c7350052c720510db4cd3188fc437d8aa54460795a90c8649d2b37d8a2bb13",
+    "items": [
+     "score:POWER:draft_r001"
+    ],
+    "before_utc": "2026-10-29T20:06:31Z",
+    "why": "DS1 Revision 2 item 2 (2026-10-29): the power pre-flight on MD-S0's draft_r001 was refused twice (jobs 50015220 and 50015542) by a defect of the pass's weed check, which compared the key-order arrays with the validator-order AP within 1e-9 on tied confidences (item 1), and was recorded failed. The check is fixed; the pre-flight is proposed again under a new id, its earlier GPU-h kept against the family cap."
    }
   ],
   "never_cut": {

@@ -88,13 +88,19 @@ PREREG_SHA256 = "3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d4969
 PREREG_COMMIT = "b60b8ee4763867f03b37f09a35ae808b630f5d28"
 STAMP_COMMIT = "972b3eb92997c2235ebe52d17f0d37866ed74959"
 STAMP_FILE = "docs/prereg/DS1_2026-10-29.stamp.txt"
-# Revisions made before any DS1 data or number (docs/CONTINUOUS_LOOP.md, "Revision (2026-10-29): DS1 Revision 1"),
-# each kept byte for byte under docs/prereg/ and time-stamped as the amendment was (V3F.12); no DS1 job runs before
-# ds1/v1/timestamp.json names each with its proofs
+# Revisions made before any DS1 number (docs/CONTINUOUS_LOOP.md, "Revision (2026-10-29): DS1 Revision 1" and "...
+# DS1 Revision 2"), each kept byte for byte under docs/prereg/ and time-stamped as the amendment was (V3F.12); no DS1
+# job runs before ds1/v1/timestamp.json names each with its proofs, or (a Revision made after it) its own record
+# ds1/v1/timestamp_rev<n>.json does
 REVISIONS = ({"n": 1, "file": "docs/prereg/DS1_rev1_2026-10-29.md",
               "sha256": "543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7",
               "commit": "eb0835695680b4cefa9c3c0cdd94e3970425eaad",
-              "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt"},)
+              "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt"},
+             # Revision 2 (2026-10-29), before any DS1 training or score; named by ds1/v1/timestamp_rev2.json
+             {"n": 2, "file": "docs/prereg/DS1_rev2_2026-10-29.md",
+              "sha256": "b9c7350052c720510db4cd3188fc437d8aa54460795a90c8649d2b37d8a2bb13",
+              "commit": "f022a0b2f6a96dbab163d200191de799815d0e8c",
+              "stamp_file": "docs/prereg/DS1_rev2_2026-10-29.stamp.txt"})
 DELEGATE = "the delegate under the 2026-09-30 owner grant"
 OWNER = "Harry He (owner)"
 DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-29): DS1, scaling verified training data at the weed level "

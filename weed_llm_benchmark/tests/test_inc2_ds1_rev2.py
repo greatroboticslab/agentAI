@@ -626,7 +626,8 @@ def t_registration():
 
 
 def main():
-    for fn in (t_weed_check, t_reopen, t_audit_render, t_supersede, t_audit, t_sheet_label, t_ra_reports):
+    for fn in (t_weed_check, t_reopen, t_audit_render, t_supersede, t_audit, t_sheet_label, t_ra_reports,
+               t_registration):
         try:
             fn()
         except Exception as e:                   # noqa: BLE001
