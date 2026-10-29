@@ -1469,6 +1469,17 @@ def ingest_matches(bdir, bj=None):
     for r in (bj or {}).get("eval_hit_pairs") or []:
         if isinstance(r, dict) and r.get("key") is not None:
             out.setdefault(r["key"], {"guard_match": r.get("match"), "pair_cos": r.get("pair_cos")})
+    # the batch's D28-v2 sidecar (step1_stream/eval_hits/<batch>.json: each dHash hit's match and pair cosine, weighed
+    # again for the batches committed before D28-v2; its keys may carry the pool's prefix, 'v1|<key>')
+    side = _read_json(Path(bdir).parent.parent / "eval_hits" / ("%s.json" % Path(bdir).name)) or {}
+    for r in side.get("pairs") or []:
+        if isinstance(r, dict) and r.get("key") is not None:
+            k = str(r["key"])
+            k = k.split("|", 1)[1] if "|" in k and "__" not in k.split("|", 1)[0] else k
+            got = out.setdefault(k, {"guard_match": None, "pair_cos": None})
+            got["guard_match"] = got.get("guard_match") or r.get("match")
+            if got.get("pair_cos") is None:
+                got["pair_cos"] = r.get("pair_cos")
     return out
 
 

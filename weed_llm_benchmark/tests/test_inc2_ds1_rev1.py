@@ -206,9 +206,14 @@ def t_copy_rules():
         sb = d / "step1_stream" / "batches" / "b0012"
         jl(sb / "ingest.jsonl", [{"key": "q1", "decision": "near_eval_embed", "guard_match": {
             "eval_split": "test", "eval_key": "t9", "cos": 0.96}}, {"key": "q2", "decision": "pool"}])
+        jl(d / "step1_stream" / "eval_hits" / "b0012.json", [])
+        (d / "step1_stream" / "eval_hits" / "b0012.json").write_text(json.dumps({"pairs": [
+            {"key": "v1|q4", "match": {"split": "imageweeds", "key": "iw1"}, "pair_cos": -0.01}]}))
         im = DD.ingest_matches(sb, {"eval_hit_pairs": [{"key": "q3", "match": {"split": "dev"}, "pair_cos": 0.2}]})
-        check("Step 1's copy matches: an ingest row's guard match, b0000's eval_hit_pairs", set(im) == {"q1", "q3"}
-              and im["q1"]["guard_match"]["eval_split"] == "test" and im["q3"]["pair_cos"] == 0.2, im)
+        check("Step 1's copy matches: an ingest row's guard match, b0000's eval_hit_pairs, the batch's D28-v2 sidecar "
+              "(its 'v1|' keys)", set(im) == {"q1", "q3", "q4"} and im["q1"]["guard_match"]["eval_split"] == "test"
+              and im["q3"]["pair_cos"] == 0.2 and im["q4"]["guard_match"]["split"] == "imageweeds" and
+              not DD.copy_hit("near_eval_variant", im["q4"]["guard_match"], im["q4"]["pair_cos"]), im)
         row = DD.candidate_row("q1", {"refusal": "near_eval_embed", "source": "s"}, None,
                                {"label": label(d / "l.txt", [(12, .5, .5, .2, .2)]), "image": "/x.png"}, im["q1"])
         check("  a candidate refused at Step 1 carries its match (D28-v2's input)", row["guard_match"]["eval_split"] ==
