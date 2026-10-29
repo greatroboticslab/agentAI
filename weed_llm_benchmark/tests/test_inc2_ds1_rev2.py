@@ -104,7 +104,7 @@ def jl(path, rows):
 
 
 # ------------------------------------------------------------------ item 1: the weed check
-def tied_world(seed=11, n_img=240):
+def tied_world(seed=11, n_img=240, ties=True):
     """Per-image stage-1 records with fp16-like confidences (multiples of 2**-11, most near the top: E1-A seed 0 on dev
     holds 766 distinct values for 1,693 boxes) and the validator's image order (a shuffle of the exam's keys, as its
     aspect-ratio batches order them)."""
@@ -116,7 +116,7 @@ def tied_world(seed=11, n_img=240):
     for k in keys:
         n_gt = int(rng.integers(1, 5))
         n_p = int(rng.integers(0, 7))
-        q = np.round(rng.beta(12.0, 1.0, n_p) * 2048.0) / 2048.0
+        q = np.round(rng.beta(12.0, 1.0, n_p) * 2048.0) / 2048.0 if ties else rng.random(n_p)
         tp = np.zeros((n_p, 10), dtype=bool)
         hits = 0
         for j in np.argsort(-q, kind="stable"):
@@ -205,10 +205,16 @@ def t_weed_check():
     t2[0, 0] = not t2[0, 0]
     flip[k0] = {"tp": t2, "q": recs[k0][1], "n_gt": recs[k0][2]}
     e_flip = refused(D.weed_check, v, keys, D.weed_arrays(types.SimpleNamespace(d_weed=flip), keys), s1)
-    rord = dict(v.d_weed)
-    rord[k0] = {"tp": recs[k0][0][::-1], "q": recs[k0][1][::-1], "n_gt": recs[k0][2]}
-    w_r = D.weed_arrays(types.SimpleNamespace(d_weed=rord), keys)
-    e_rord = refused(D.weed_check, v, keys, w_r, s1)
+    # rows reordered within an image of an exam without ties: the AP cannot tell, the row-for-row check does
+    keys_u, cap_u, recs_u = tied_world(seed=5, n_img=60, ties=False)
+    v_u = fake_v(cap_u, recs_u)
+    k_u = next(k for k in cap_u if len(recs_u[k][1]) >= 2)
+    rord = dict(v_u.d_weed)
+    rord[k_u] = {"tp": recs_u[k_u][0][::-1], "q": recs_u[k_u][1][::-1], "n_gt": recs_u[k_u][2]}
+    w_r = D.weed_arrays(types.SimpleNamespace(d_weed=rord), keys_u)
+    s1_u = capture_ap(v_u)
+    same_ap = abs(S.collapsed_ap(w_r["tp"], w_r["conf"], int(w_r["n_gt"].sum()))[0] - s1_u[0]) < 1e-15
+    e_rord = refused(D.weed_check, v_u, keys_u, w_r, s1_u) if same_ap else None
     gt = dict(v.d_weed)
     gt[k0] = dict(gt[k0], n_gt=recs[k0][2] + 1)
     e_gt = refused(D.weed_check, v, keys, D.weed_arrays(types.SimpleNamespace(d_weed=gt), keys), s1)
