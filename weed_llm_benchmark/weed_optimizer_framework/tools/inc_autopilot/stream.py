@@ -6594,15 +6594,24 @@ class StreamRun(object):
                                 "DS1 item is proposed until a deploy ships it (deploy/deploy_funnel.sh).", "L30")
             return
         if not st.get("timestamp"):
+            rv = list(cfg.get("revisions") or [])
             revs = " ".join("--revision-proof %s.ots --revision-stamp-proof %s.ots" % (r.get("file"), r.get(
-                "stamp_file")) for r in cfg.get("revisions") or [])
-            self._ds1_card_once("timestamp", "missing", "research", "DS1 waits for its time-stamp record",
+                "stamp_file")) for r in rv)
+            # one card per set of Revisions (Revision 2: a Revision made after the record has its own record, so the
+            # card that asked for the first record is raised again with the step that names the new one)
+            later = "; ".join("%s.ds1 timestamp-revision --revision %d --proof %s.ots --stamp-proof %s.ots" % (
+                mod, i + 1, r.get("file"), r.get("stamp_file")) for i, r in enumerate(rv))
+            self._ds1_card_once("timestamp", "missing:%s" % ",".join(str(r.get("sha256"))[:12] for r in rv),
+                                "research", "DS1 waits for its time-stamp record",
                                 "DS.12 step 0a: on the login node, %s.ds1 timestamp --proof docs/prereg/"
                                 "DS1_2026-10-29.md.ots --stamp-proof docs/prereg/DS1_2026-10-29.stamp.txt.ots %s "
-                                "(ds1/v1/timestamp.json names the prereg's and each Revision's sha256 and proofs). "
+                                "(ds1/v1/timestamp.json names the prereg's and each Revision's sha256 and proofs). If "
+                                "ds1/v1/timestamp.json exists already (it is written once), each Revision it does not "
+                                "name is recorded by its own step: %s (ds1/v1/timestamp_rev<n>.json). "
                                 "Nothing of DS1 is proposed before it. A proof still pending in Bitcoin is upgraded "
                                 "later (ots upgrade; ots verify's output recorded) and committed: the record names "
-                                "what each proof stamps, which the upgrade does not change." % (mod, revs), "L30")
+                                "what each proof stamps, which the upgrade does not change." % (mod, revs, later),
+                                "L30")
             return
         steps = []
         if not st.get("ra"):

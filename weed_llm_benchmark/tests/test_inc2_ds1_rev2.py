@@ -570,6 +570,24 @@ def t_reopen():
           [x["item"] for x in c["maint"]][:1] == ["score:POWER:draft_r001"], [x["item"] for x in c["maint"]])
 
 
+def t_ts_card():
+    print("item 6: the time-stamp card is raised again for a Revision made after the record, naming its own step")
+    st = {"ds1": {"items": {}, "cards": {"timestamp": ST._sha("missing")}}}      # the live mark (raised before)
+    run = fake_run(st)
+    run.cards = []
+    run._card = lambda kind, title, body, **kw: run.cards.append((title, body))
+    run._ds1_card_once = types.MethodType(ST.StreamRun._ds1_card_once, run)
+    ctx = {"stage": {"ds1": {"amendment": True, "never_cut": True, "status": {"timestamp": False}}}}
+    run.ev = types.SimpleNamespace(json=lambda name: ctx)
+    ST.StreamRun._ds1_cards(run, None)
+    body = run.cards[0][1] if run.cards else ""
+    check("the card asked for before is raised again, naming timestamp-revision --revision 2 with Revision 2's proofs",
+          len(run.cards) == 1 and "timestamp-revision --revision 2 --proof docs/prereg/DS1_rev2_2026-10-29.md.ots "
+          "--stamp-proof docs/prereg/DS1_rev2_2026-10-29.stamp.txt.ots" in body, run.cards)
+    ST.StreamRun._ds1_cards(run, None)
+    check("  and only once", len(run.cards) == 1)
+
+
 # ------------------------------------------------------------------ RA's default reports
 def t_ra_reports():
     print("RA's default reports: the stream's segments since its fork")
@@ -627,7 +645,7 @@ def t_registration():
 
 def main():
     for fn in (t_weed_check, t_reopen, t_audit_render, t_supersede, t_audit, t_sheet_label, t_ra_reports,
-               t_registration):
+               t_registration, t_ts_card):
         try:
             fn()
         except Exception as e:                   # noqa: BLE001
