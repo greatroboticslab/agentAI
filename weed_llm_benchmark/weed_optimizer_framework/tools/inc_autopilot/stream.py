@@ -6120,13 +6120,13 @@ class StreamRun(object):
         return False
 
     def _ds1_reopen(self):
-        """A DS1 Revision's reopening (Revision 2, 2026-10-29: the power pre-flight score:POWER:<draft>, refused twice by
-        a defect of the pass's weed check and recorded failed, which held MD-S0's freeze and every training item): each
-        item a block of the domain's ds1.reopens names is proposed again once the deployed tree holds that Revision's
-        file with its sha256, once per marker, and only if its last attempt started before the block's before_utc and
-        it is recorded failed. Its spend so far moves into prior_gpuh (every attempt stays counted against the family
-        cap), its earlier proposal ids into failed_ids (a new proposal takes a new id: the executor runs an id once),
-        its record into reopen_history, its state to missing. Returns the keys reopened now."""
+        """A DS1 Revision's reopening (Revision 2, 2026-10-29: the power pre-flight score:POWER:<draft>, refused twice
+        by a defect of the DS1 pass's stage-1 check and recorded failed, which held MD-S0's freeze and every training
+        item): each item a block of the domain's ds1.reopens names is proposed again once the deployed tree holds that
+        Revision's file with its sha256, once per marker, and only if its last attempt started before the block's
+        before_utc and it is recorded failed. Its spend so far moves into prior_gpuh (every attempt stays counted
+        against the family cap), its earlier proposal ids into failed_ids (a new proposal takes a new id: the executor
+        runs an id once), its record into reopen_history, its state to missing. Returns the keys reopened now."""
         cfg = (self.dom or {}).get("ds1") or {}
         f = self._ds1()
         out = []
@@ -6153,7 +6153,8 @@ class StreamRun(object):
                                dict(before, marker=marker, reopened_utc=self.utc)])
                 rec.pop("why", None)
                 failed = self._failed_ids()
-                self.st["failed_ids"] = (failed + [i for i in ids if i and i not in failed])[-FAILED_IDS_KEEP:]
+                earlier = [i for i in ids if i and i not in failed]
+                self.st["failed_ids"] = (failed + earlier)[-FAILED_IDS_KEEP:]
                 now.append(key)
             if now:
                 self._ledger("ds1_reopened", record_only=True, ds1_items=now, marker=marker, reasons=[
