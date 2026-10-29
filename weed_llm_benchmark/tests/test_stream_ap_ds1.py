@@ -490,6 +490,13 @@ def t_gate():
           and ex and ex[0].get("basis") == "envelope"
           and {"/stage/lock", "/stage/ds1/amendment", "/stage/ds1/never_cut", "/stage/ds1/timestamp"} <= set(cites),
           (seq(w), cites, [e.get("basis") for e in ex]))
+    ws = ds1_world("ds1_gate_screened", fake=False)
+    from weed_optimizer_framework.tools.inc2 import ds1_data as DDm
+    ws._w("splits/ds1/screen/p1_r001.json", {"format": DDm.FMT_SCREEN, "phase": 1, "revision": 1, "candidates": 0,
+                                             "live": 0, "sources": {}, "inputs": {"step1_batches": []}})
+    ws.tick(2)
+    check("  the real status reads the snapshot's INC_DIR: with phase 1 screened there (splits/ds1/screen/p1_r001.json), "
+          "MD-S0's draft comes first, no second screen", seq(ws)[:1] == [("L30", "1:md_s0")], seq(ws))
     snap = json.loads(S.StreamPaths(str(w.lab), "weed").latest(NAME).read_text())
     arts = ((snap.get("stream") or {}).get("decision") or {}).get("artifacts") or snap.get("artifacts") or {}
     rec = items(w).get("data:1:screen") or {}

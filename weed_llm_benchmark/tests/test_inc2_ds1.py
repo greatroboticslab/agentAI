@@ -474,6 +474,7 @@ KW = {"batch": 32, "device": "cpu", "lock_check": True}
 def w_passes():
     print("the world: DS1's pass on E3's fixtures (CPU)")
     from weed_optimizer_framework.tools.inc2 import ds1_data as DD
+    world = W.build_world()
     E3T.setup_world()
     cls, base = D.ds1_validator_class({"mode": "stage1", "nms": "locked"})
     ds1l = [k for k in cls.__mro__ if k.__dict__.get("_ds1_layer")]
@@ -492,7 +493,7 @@ def w_passes():
     check("  equal to V3F's family pass of the same weights (stage-1 agnostic AP, the scorer's result)",
           abs(fp["stage1_agnostic"][0] - ps["stage1_agnostic"][0]) < 1e-12 and
           fp["result"]["map50_95"] == ps["result"]["map50_95"])
-    rows = [dict(r, key="md_%s" % r["key"]) for r in W.WORLD["rows"]["dev"][:6]]
+    rows = [dict(r, key="md_%s" % r["key"]) for r in world["dev"][:6]]
     root = TMP / "md_root_test"
     rr = DD.write_exam_root("md_s0", rows, root, {r["key"]: "g%d" % i for i, r in enumerate(rows)})
     out = D.pass_in_root(w, "md_s0", "identity", "POWER", TMP / "md_out", root_dir=root, plain=True, **KW)
