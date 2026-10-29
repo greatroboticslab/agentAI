@@ -5341,6 +5341,11 @@ class StreamRun(object):
         for exp in list(stale):
             if not any(d.get("exp") == exp for d in by.get("D6") or []):
                 stale[exp] = 0
+        # DS1 (2026-10-29): a DS1 build whose runs are blocked (D5, not transient) or stale (D6) is recorded so its
+        # arm counts as failed in DS1's plan (DS.9.3: a failed arm never holds the other arms); cleared once the
+        # experiment advances again (a person unblocked it)
+        self._ds1_runs_blocked([d for d in by.get("D5") or [] if (d.get("detail") or {}).get("record_only")] +
+                               [d for d in by.get("D6") or [] if int(stale.get(d["exp"]) or 0) >= STALE_TO_PAUSE])
 
     def _zoo_stage(self, payload, r0):
         """/stage/zoo: done once capacity/zoo_<v>.json says complete; partial;
@@ -6121,13 +6126,16 @@ class StreamRun(object):
         status = self._artifact(cfg.get("status") or SR.DS1_STATUS) or {}
         nc = cfg.get("never_cut") or {}
         items = {k: v.get("state") for k, v in f["items"].items()}
+        blocked = f.get("runs_blocked") or {}
         for arm, exp in (cfg.get("build_exps") or {}).items():
             x = exp_status.get(exp)
             own = items.get("build:%s" % arm)
             if x == "done":
                 items["build:%s" % arm] = "done"
             elif own == "done":
-                items["build:%s" % arm] = "running"      # its build job ended; the runs go on
+                # its build job ended; the runs go on, unless they are blocked or stale (a person's card): then the
+                # arm is failed for DS1's plan and verdict until it advances again (DS.9.3, V3F.6.4)
+                items["build:%s" % arm] = "failed" if exp in blocked else "running"
         for arm, stt in (status.get("scores") or {}).items():
             if stt == "complete":
                 items["score:%s" % arm] = "done"
@@ -6143,11 +6151,13 @@ class StreamRun(object):
         for ph, v in (status.get("verdicts") or {}).items():
             if (v or {}).get("status") == "decided":
                 items["verdict:%s" % ph] = "done"
-        out = {"amendment": self._ds1_tree_file(cfg.get("amendment_file") or "", sha=cfg.get("amendment_sha256")),
+        out = {"amendment": self._ds1_tree_file(cfg.get("amendment_file") or "", sha=cfg.get("amendment_sha256"))
+               and all(self._ds1_tree_file(r.get("file") or "", sha=r.get("sha256")) for r in cfg.get("revisions") or []),
                "never_cut": self._ds1_tree_file(nc.get("module") or "", marker=nc.get("marker")),
                "timestamp": bool(status.get("timestamp")), "status": status, "items": items,
                "today": str(self.utc)[:10],
                "phase1_gb": round(float(f.get("phase1_gb") or 0.0), 3),
+               "phase1_charged": sorted(f.get("phase1_charged") or []),
                "audit_render_for": f.get("audit_render_for"),
                "spend_gpuh": round(self._ds1_spend(exp_status, status, payload), 4),
                "cap_gpuh": float(cfg.get("cap_gpu_hours") or 260.0),
@@ -6193,7 +6203,13 @@ class StreamRun(object):
                 return None
             return {"pkg": pkg, "phase": int(pr["phase"]), "step": pr["step"]}, None
         if lever == "L31":
-            return {"kind": pr["kind"], "batch": int(pr["batch"]), "lab_inc": str(self.paths.lab_inc)}, None
+            out = {"kind": pr["kind"], "batch": int(pr["batch"]), "lab_inc": str(self.paths.lab_inc)}
+            if pr["kind"] == "audit":
+                srcs = sorted(pr.get("sources") or [])
+                if not srcs:
+                    return None
+                out["sources"] = ",".join(srcs)
+            return out, None
         if lever == "L32":
             arm = pr.get("arm")
             exp = (cfg.get("build_exps") or {}).get(arm)
@@ -6232,7 +6248,9 @@ class StreamRun(object):
         mine = [k for k in items if k.split(":")[1:2] and k.split(":")[1] in arms and k.split(":")[0] in (
             "build", "score", "long")]
         refused = sorted(k for k in mine if items[k].get("state") == DS1_NOT_RUN_CAP)
-        failed = sorted(k for k in mine if items[k].get("state") == "failed")
+        blocked = (self._ds1().get("runs_blocked") or {})
+        failed = sorted(set(k for k in mine if items[k].get("state") == "failed") | {
+            "build:%s" % a for a, e in (cfg.get("build_exps") or {}).items() if e in blocked and a in arms})
         return dict({"pkg": pkg, "phase": phase}, **({"cap_refused": ",".join(refused)} if refused else {}),
                     **({"ticker_failed": ",".join(failed)} if failed else {})), None
 
@@ -6325,8 +6343,13 @@ class StreamRun(object):
         kind = {"L30": "data:%s" % (p.get("params") or {}).get("step"), "L32": "build",
                 "L32X": "long:%s" % (p.get("params") or {}).get("verb"), "L33": "score", "L34": "verdict"}.get(
             it["lever"])
-        if kind and int(p.get("ds1_phase") or 1) == 1:
+        charged = list(f.get("phase1_charged") or [])
+        if kind and int(p.get("ds1_phase") or 1) == 1 and key not in charged:
+            # each item's nominal bytes once (DS.11's bounds are per item: a data step that runs again, the pools
+            # for sources decided later, writes within the same bound), so lane DATA's floor applies only past 60 GB
+            # of what phase 1 can write, never by repetition
             f["phase1_gb"] = round(float(f.get("phase1_gb") or 0.0) + float(sizes.get(kind) or 0.0), 3)
+            f["phase1_charged"] = sorted(charged + [key])
         rec["fails"] = 0
         if it["lever"] == "L30":
             rec.update(state="missing", last_done_utc=self.utc, runs=int(rec.get("runs") or 0) + 1)
@@ -6449,13 +6472,39 @@ class StreamRun(object):
             "stays held until they end." % (",".join(str(j) for j in it.get("job_ids") or []), DS1_LONG_OVERDUE_H),
             lever="L32X")
 
+    def _ds1_runs_blocked(self, fired):
+        """DS1's build experiments whose runs are blocked (D5, not transient) or stale (D6 on STALE_TO_PAUSE
+        snapshots) this tick: recorded with one card each (the arm counts as failed in DS1's plan and the verdict's
+        argv names it: a failed arm never holds the other arms, DS.9.3); an experiment no longer blocked is cleared."""
+        cfg = (self.dom or {}).get("ds1") or {}
+        if not cfg:
+            return
+        exps = {v: k for k, v in (cfg.get("build_exps") or {}).items()}
+        f = self._ds1()
+        blocked = f.setdefault("runs_blocked", {})
+        now = {d.get("exp"): d for d in fired if d.get("exp") in exps}
+        for exp, d in sorted(now.items()):
+            if exp in blocked:
+                continue
+            blocked[exp] = {"utc": self.utc, "id": d.get("id"), "summary": _short(d.get("summary"), 300)}
+            self._card("escalation", "DS1's %s: its runs are %s (%s)" % (
+                exps[exp], "blocked" if d.get("id") == "D5" else "stale", d.get("id")),
+                "%s. DS1 counts the arm failed (DS.9.3: a failed arm never holds the other arms) and its phase verdict "
+                "names it --ticker-failed build:%s, unless a person unblocks it first (inc.driver unblock --exp %s): "
+                "once its runs advance it is running again." % (_short(d.get("summary"), 400), exps[exp], exp),
+                lever="L32")
+        for exp in list(blocked):
+            if exp not in now:
+                blocked.pop(exp)
+
     def _ds1_sheets_hook(self, params):
         """L31's lab hook: inc2.ds1_sheets render of one batch on the lab (it pulls its bundles from the cluster and
         pushes its render record back), a detached lab process."""
         job = "ds1sheets_%s_%s_%s" % (params.get("kind"), params.get("batch"), _sha([params, self.utc])[:10])
         argv = [sys.executable, "-m", "weed_optimizer_framework.tools.inc2.ds1_sheets", "render", "--kind",
                 str(params.get("kind")), "--batch", str(params.get("batch")), "--lab-inc",
-                str(params.get("lab_inc") or self.paths.lab_inc)]
+                str(params.get("lab_inc") or self.paths.lab_inc)] + (
+            ["--sources", str(params["sources"])] if params.get("sources") else [])
         try:
             got = self.runner.launch(job, argv, timeout=LAB_TIMEOUT_S)
         except Exception as e:
@@ -6490,11 +6539,15 @@ class StreamRun(object):
                                 "DS1 item is proposed until a deploy ships it (deploy/deploy_funnel.sh).", "L30")
             return
         if not st.get("timestamp"):
+            revs = " ".join("--revision-proof %s.ots --revision-stamp-proof %s.ots" % (r.get("file"), r.get(
+                "stamp_file")) for r in cfg.get("revisions") or [])
             self._ds1_card_once("timestamp", "missing", "research", "DS1 waits for its time-stamp record",
                                 "DS.12 step 0a: on the login node, %s.ds1 timestamp --proof docs/prereg/"
-                                "DS1_2026-10-29.md.ots --stamp-proof docs/prereg/DS1_2026-10-29.stamp.txt.ots "
-                                "(ds1/v1/timestamp.json names the prereg's sha256 and both proofs). Nothing of DS1 "
-                                "is proposed before it." % mod, "L30")
+                                "DS1_2026-10-29.md.ots --stamp-proof docs/prereg/DS1_2026-10-29.stamp.txt.ots %s "
+                                "(ds1/v1/timestamp.json names the prereg's and each Revision's sha256 and proofs). "
+                                "Nothing of DS1 is proposed before it. A proof still pending in Bitcoin is upgraded "
+                                "later (ots upgrade; ots verify's output recorded) and committed: the record names "
+                                "what each proof stamps, which the upgrade does not change." % (mod, revs), "L30")
             return
         steps = []
         if not st.get("ra"):
@@ -6503,7 +6556,9 @@ class StreamRun(object):
         sh = st.get("sheets") or {}
         for ph in ("1", "2"):
             srcs = ((st.get("phases") or {}).get(ph) or {}).get("sources") or {}
-            und = sorted(s_ for s_, x in srcs.items() if not x.get("decided"))
+            # a source role C or quarantined whole needs no decision (it enters no DS1 manifest)
+            und = sorted(s_ for s_, x in srcs.items() if not x.get("decided") and not x.get("role_c")
+                         and not x.get("quarantined_whole"))
             if und:
                 steps.append("sheets waiting (phase %s, the delegate): %s; the HTML batches are on the lab under %s, "
                              "to copy to %s; each saved decisions file is stored with %s.ds1_sheets record --file <it> "
@@ -6962,10 +7017,11 @@ class StreamRun(object):
             "\n".join(lines), lever="L23L", trigger=["L23L"])
 
     def _measure_exps(self):
-        """The measurement arms' experiments (baselines marked measure) and V3F's build experiments (2026-10-11):
-        record only, so their D5 and D6 are a person's card, never a pause."""
+        """The measurement arms' experiments (baselines marked measure), V3F's build experiments (2026-10-11) and
+        DS1's (2026-10-29): record only, so their D5 and D6 are a person's card, never a pause."""
         out = {b["exp"] for b in ((self.dom or {}).get("baselines") or {}).get("items") or [] if b.get("measure")}
-        return out | set((((self.dom or {}).get("v3fam") or {}).get("build_exps") or {}).values())
+        out |= set((((self.dom or {}).get("v3fam") or {}).get("build_exps") or {}).values())
+        return out | set((((self.dom or {}).get("ds1") or {}).get("build_exps") or {}).values())
 
     def _e1_items(self):
         """{'A': item, 'B': item} of E1's baselines (stream-domain e1.arms), or {}."""

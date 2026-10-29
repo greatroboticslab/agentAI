@@ -12,7 +12,8 @@ reproductions, the statistics and decisions, the power pre-flight, the re-analys
     python -m weed_optimizer_framework.tools.inc2.ds1 test-read --arm X --exam mtw|cwd12 --read-by owner|delegate
     python -m weed_optimizer_framework.tools.inc2.ds1 score-test --arm X --exam mtw|cwd12   (the job test-read prints)
     python -m weed_optimizer_framework.tools.inc2.ds1 test-report --arm X --exam mtw|cwd12
-    python -m weed_optimizer_framework.tools.inc2.ds1 timestamp --proof FILE --stamp-proof FILE   (the delegate's)
+    python -m weed_optimizer_framework.tools.inc2.ds1 timestamp --proof FILE --stamp-proof FILE
+                                    --revision-proof FILE --revision-stamp-proof FILE   (the delegate's; per Revision)
     python -m weed_optimizer_framework.tools.inc2.ds1 spend                     (read-only: the family's GPU-h)
     python -m weed_optimizer_framework.tools.inc2.ds1 _pass --spec SPEC.json    (internal: a pass in an MD root)
 
@@ -82,6 +83,13 @@ PREREG_SHA256 = "3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d4969
 PREREG_COMMIT = "b60b8ee4763867f03b37f09a35ae808b630f5d28"
 STAMP_COMMIT = "972b3eb92997c2235ebe52d17f0d37866ed74959"
 STAMP_FILE = "docs/prereg/DS1_2026-10-29.stamp.txt"
+# Revisions made before any DS1 data or number (docs/CONTINUOUS_LOOP.md, "Revision (2026-10-29): DS1 Revision 1"),
+# each kept byte for byte under docs/prereg/ and time-stamped as the amendment was (V3F.12); no DS1 job runs before
+# ds1/v1/timestamp.json names each with its proofs
+REVISIONS = ({"file": "docs/prereg/DS1_rev1_2026-10-29.md",
+              "sha256": "543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7",
+              "commit": "eb0835695680b4cefa9c3c0cdd94e3970425eaad",
+              "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt"},)
 DELEGATE = "the delegate under the 2026-09-30 owner grant"
 OWNER = "Harry He (owner)"
 DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-29): DS1, scaling verified training data at the weed level "
@@ -302,11 +310,48 @@ def ots_digest(path):
     return b[len(OTS_MAGIC) + 2:].hex()
 
 
-def timestamp_record(proof, stamp_proof, sha256=None):
+def _proof_pair(proof, stamp_proof, sha256, commit, what):
+    """The checked proof pair of one stamped text: the proof stamps the text's sha256, the stamp proof the stamp file
+    beside it, which names the text's sha256 and its commit."""
+    for p in (proof, stamp_proof):
+        if not Path(p).is_file():
+            raise Ds1Refused("%s does not exist" % p)
+    if ots_digest(proof) != sha256:
+        raise Ds1Refused("%s does not stamp %s's sha256 %s (it stamps %s)" % (proof, what, sha256[:12],
+                                                                             str(ots_digest(proof))[:12]))
+    stamp = Path(str(stamp_proof)[:-len(".ots")]) if str(stamp_proof).endswith(".ots") else None
+    if stamp is None or not stamp.is_file() or ots_digest(stamp_proof) != C.sha256_file(stamp):
+        raise Ds1Refused("%s does not stamp the stamp file beside it (%s)" % (stamp_proof, stamp))
+    text = stamp.read_text(encoding="utf-8", errors="replace")
+    if sha256 not in text or commit not in text:
+        raise Ds1Refused("%s does not name %s's sha256 and commit" % (stamp, what))
+    return [{"file": Path(proof).name, "sha256": C.sha256_file(proof), "stamps": ots_digest(proof)},
+            {"file": Path(stamp_proof).name, "sha256": C.sha256_file(stamp_proof), "stamps": ots_digest(stamp_proof),
+             "stamp_file_sha256": C.sha256_file(stamp)}]
+
+
+def revisions_ok(d):
+    """True when a time-stamp record names every Revision (REVISIONS) by its sha256 with two proofs."""
+    got = {r.get("sha256"): r for r in (d or {}).get("revisions") or [] if isinstance(r, dict)}
+    return all(rv["sha256"] in got and len([p for p in got[rv["sha256"]].get("proofs") or []
+                                            if isinstance(p, dict) and p.get("sha256")]) == 2 for rv in REVISIONS)
+
+
+def timestamp_record(proof, stamp_proof, sha256=None, revisions=None):
     """ds1/v1/timestamp.json (the delegate's, DS.12 step 0a): the prereg's sha256 and its two proofs' names and
-    sha256s, written once. The proofs are the committed .ots files (docs/prereg/DS1_2026-10-29.md.ots and its stamp
-    file's): the first must stamp the prereg's sha256, the second the stamp file beside it, which names the prereg's
-    sha256 and commit (V3F.12's procedure)."""
+    sha256s, and each Revision's (REVISIONS: revisions [(proof, stamp proof)] in their order), written once. The
+    proofs are the committed .ots files (docs/prereg/DS1_2026-10-29.md.ots and its stamp file's): the first must
+    stamp the prereg's sha256, the second the stamp file beside it, which names the prereg's sha256 and commit
+    (V3F.12's procedure); a Revision's likewise. The record names what each proof stamps, which `ots upgrade` never
+    changes (an upgraded proof's own sha256 differs from the one recorded)."""
+    revisions = list(revisions or [])
+    if len(revisions) != len(REVISIONS):
+        raise Ds1Refused("the time stamp names %d Revision proof pair(s); DS1 has %d Revision(s): %s" % (
+            len(revisions), len(REVISIONS), [r["file"] for r in REVISIONS]))
+    rev_docs = []
+    for rv, (rp, rsp) in zip(REVISIONS, revisions):
+        rev_docs.append({"file": rv["file"], "sha256": rv["sha256"], "commit": rv["commit"],
+                         "proofs": _proof_pair(rp, rsp, rv["sha256"], rv["commit"], rv["file"])})
     for p in (proof, stamp_proof):
         if not Path(p).is_file():
             raise Ds1Refused("%s does not exist" % p)
@@ -324,7 +369,7 @@ def timestamp_record(proof, stamp_proof, sha256=None):
            "proofs": [{"file": Path(proof).name, "sha256": C.sha256_file(proof), "stamps": ots_digest(proof)},
                       {"file": Path(stamp_proof).name, "sha256": C.sha256_file(stamp_proof),
                        "stamps": ots_digest(stamp_proof), "stamp_file_sha256": C.sha256_file(stamp)}],
-           "written_utc": _utc()}
+           "revisions": rev_docs, "written_utc": _utc()}
     if doc["sha256"] != PREREG_SHA256:
         raise Ds1Refused("the time stamp names %s, the prereg is %s" % (doc["sha256"][:12], PREREG_SHA256[:12]))
     write_once(timestamp_path(), doc)
@@ -335,7 +380,8 @@ def timestamp_ok(path=None):
     """True when ds1/v1/timestamp.json names this text's sha256 and two proofs (DS.9.3's first condition)."""
     d = _read_json(path or timestamp_path())
     return bool(isinstance(d, dict) and d.get("format") == FMT_TIMESTAMP and d.get("sha256") == PREREG_SHA256
-                and len([p for p in d.get("proofs") or [] if isinstance(p, dict) and p.get("sha256")]) == 2)
+                and len([p for p in d.get("proofs") or [] if isinstance(p, dict) and p.get("sha256")]) == 2
+                and revisions_ok(d))
 
 
 def require_timestamp():
@@ -476,10 +522,12 @@ def h1_reading(rec):
     return {"fires": bool(z is not None and z < H1_Z), "z": z, "bar": H1_Z}
 
 
-def substitution_due(on_date, s2_frozen):
+def substitution_due(on_date, s2_frozen, s2x_walltime=False):
     """DS.0 item 17 and DS.7.2: S1u replaces S2 (S1UX replaces S2X) in P3, P4, N1 and H1 when S2's manifest is not
-    frozen by 2026-12-05; decided by the date alone, without a further decision."""
-    return (not s2_frozen) and str(on_date) > S2_FREEZE_BY
+    frozen by 2026-12-05, decided by the date alone, without a further decision; and when S2x's smoke projects over
+    28.8 h at the pair's compute, so S2x is recorded 'not run (walltime)' (DS.6: "the substitution of DS.7.2
+    applies")."""
+    return bool(s2x_walltime) or ((not s2_frozen) and str(on_date) > S2_FREEZE_BY)
 
 
 def phase2_arms(substituted):
@@ -568,9 +616,12 @@ def read_order(v1, v2, substituted=False):
     sealed test after verdict v2. Each read after the verdict that decides its arm; at most 4."""
     cand = phase2_arms(substituted)[1]
     order = []
-    if isinstance(v2, dict) and v2.get("status") == "decided":
-        order.append({"arm": "S0X", "exam": "mtw", "kind": "reference"})
-        order.append({"arm": cand, "exam": "mtw", "kind": "candidate"})
+    if not (isinstance(v2, dict) and v2.get("status") == "decided"):
+        # no sealed read before verdict v2: DS.12 step 12 takes them in one order after it (S0x, S2x, the confirmed
+        # 1.2 M arm, the cwd12 test), so no MT-W number exists while phase 2's sources and S2 are still chosen
+        return order
+    order.append({"arm": "S0X", "exam": "mtw", "kind": "reference"})
+    order.append({"arm": cand, "exam": "mtw", "kind": "candidate"})
     if isinstance(v1, dict) and v1.get("status") == "decided":
         conf = []
         for pid, arm in (("P1", "S1C"), ("P2", "S1U")):
@@ -1277,10 +1328,15 @@ def source_record(src):
 
 
 def md_exams():
-    """The frozen MD exams: md_s0 first, then every frozen mdn_<source> (splits/ds1/md_v1/<exam>/frozen.json)."""
+    """The frozen MD exams: md_s0 first, then every frozen mdn_<source> of a source still in DS1 (a source rejected,
+    role C or quarantined whole since its freeze leaves MD: ds1_data.sources_out; splits/ds1/md_v1/<exam>/
+    frozen.json)."""
+    from . import ds1_data as DD
     d = splits_dir() / "md_v1"
+    gone = DD.sources_out() if d.is_dir() else set()
     got = sorted(p.parent.name for p in d.glob("*/frozen.json")
-                 if int((_read_json(p) or {}).get("images") or 0) > 0) if d.is_dir() else []
+                 if int((_read_json(p) or {}).get("images") or 0) > 0
+                 and (_read_json(p) or {}).get("source") not in gone) if d.is_dir() else []
     return (["md_s0"] if "md_s0" in got else []) + [e for e in got if e != "md_s0"]
 
 
@@ -1657,20 +1713,37 @@ def tier_s_phase2(arm12, armx):
             ("S0X_over_S0/md_s0", "S0X", "S0", "md_s0"), ("S0X_over_S0/dev", "S0X", "S0", "dev")]
 
 
+VERDICT_ARMS = {"1": ("K0", "KD", "KT", "KF", "S0", "S1CR", "S1C", "S1U"), "2": ("S0X", "S2", "S2X"),
+                "2_substituted": ("S0X", "S1UX")}
+
+
+def _item_arm(item):
+    """The arm an item names (build:S1C, score:K0, long:S2X:train -> S2X)."""
+    return item.split(":")[1]
+
+
 def verdict(phase, arms_state, loader=None, cap_refused=(), ticker_failed=(), on_date=None, s2_frozen=True,
-            write=True):
+            write=True, s2x_walltime=False):
     """L34: verdict v1 (P1, P2; Tier S of the phase-1 arms) or v2 (P3, P4, N1, H1; Tier S), each primary decided
-    once, when its own arms' records are complete or failed. arms_state {ARM: done | failed | not run (...)}.
+    once, when its own arms' records are complete or failed. arms_state {ARM: done | failed | not run (...) |
+    missing}. Refused while an arm of the phase is 'missing' (no score record and not recorded failed or not run): a
+    primary is decided once, when its own records are complete (DS.7.2), never 'not run' because a verdict ran early.
     capacity/ds1_v<phase>.json (dev and MD only) and capacity/ds1_v<phase>_external.json (ood23, ood22, ImageWeeds),
     each written once."""
     loader = loader or (lambda a, e, k: load_runs(a, e, k))
     st = dict(arms_state)
     for it in list(cap_refused or ()):
         if it.startswith(("build:", "score:", "long:")):
-            st[it.split(":", 1)[1]] = NOT_RUN_CAP
+            st[_item_arm(it)] = NOT_RUN_CAP
     for it in list(ticker_failed or ()):
         if it.startswith(("build:", "score:", "long:")):
-            st[it.split(":", 1)[1]] = "failed"
+            st[_item_arm(it)] = "failed"
+    sub = substitution_due(on_date or today(), s2_frozen, s2x_walltime) if int(phase) == 2 else False
+    need = VERDICT_ARMS["2_substituted" if sub else str(int(phase))]
+    missing = [a for a in need if st.get(a) in (None, "missing")]
+    if missing:
+        raise Ds1Refused("verdict v%d waits for %s: no score record, and not recorded failed or not run (DS.7.2: "
+                         "each primary is decided once, when its own records are complete)" % (int(phase), missing))
     platform, external = {}, {}
     if int(phase) == 1:
         prims = {pid: _primary(pid, st, loader) for pid in ("P1", "P2")}
@@ -1679,7 +1752,6 @@ def verdict(phase, arms_state, loader=None, cap_refused=(), ticker_failed=(), on
         external["tier_s"] = tier_s(TIER_S_PHASE1_EXT, st, loader)
         external["note"] = "ood23, ood22 and ImageWeeds readings (S arms on the season exams: season-free)"
     else:
-        sub = substitution_due(on_date or today(), s2_frozen)
         arm12, armx = phase2_arms(sub)
         prims = {"P3": _primary("P3", st, loader, x=armx, y="S0X")}
         p4 = _primary("P4", st, loader, x=armx, y="S0X")
@@ -1692,7 +1764,8 @@ def verdict(phase, arms_state, loader=None, cap_refused=(), ticker_failed=(), on
             n1 = dict(n1_reading(rec), comparison=rec)
             h1 = h1_reading(rec)
         platform.update(primaries=prims, n1=n1, h1=h1, substitution={"applied": sub, "arms": [arm12, armx],
-                                                                     "rule": "DS.0 item 17, DS.7.2"})
+                                                                     "s2x_walltime": bool(s2x_walltime),
+                                                                     "rule": "DS.0 item 17, DS.6, DS.7.2"})
         platform["tier_s"] = tier_s(tier_s_phase2(arm12, armx), st, loader)
         external["primaries"] = {"P4": p4}
         external["tier_s"] = tier_s([("%s_over_S0/ood23" % arm12, arm12, "S0", "ood23"),
@@ -1714,13 +1787,32 @@ def verdict(phase, arms_state, loader=None, cap_refused=(), ticker_failed=(), on
 
 
 def arms_state_from_records():
-    """{ARM: done | failed | not run (...)} from capacity/ds1_score_<arm>.json and the family's cap records."""
+    """{ARM: done | failed | not run (...) | missing} from capacity/ds1_score_<arm>.json, KD's and KT's not-run record
+    (splits/ds1/arms/k_not_run.json: the K supply, or the K source in no manifest) and the long path's smokes (a long
+    arm recorded 'not run (walltime)', DS.6); the ticker's argv adds the items it recorded failed or capped."""
+    from . import ds1_long as LG
     out = {}
     for a in SCORE_ARMS:
         r = _read_json(capacity("ds1_score_%s.json" % a.lower()))
         out[a] = "done" if isinstance(r, dict) and r.get("status") == "complete" else (
             "not run (%s)" % r.get("reason") if isinstance(r, dict) and r.get("status") == "not run" else "missing")
+    knr = _read_json(splits_dir() / "arms" / "k_not_run.json")
+    if isinstance(knr, dict):
+        for a in knr.get("arms") or ():
+            if out.get(a) == "missing":
+                out[a] = str(knr.get("status") or "not run")
+    for a in LONG_ARMS:
+        sm = _read_json(LG.arm_dir(a) / "smoke.json")
+        if isinstance(sm, dict) and str(sm.get("status") or "").startswith("not run") and out.get(a) == "missing":
+            out[a] = str(sm["status"])
     return out
+
+
+def s2x_walltime_not_run():
+    """True when S2x's smoke recorded it 'not run (walltime)' (DS.6): the substitution of DS.7.2 applies."""
+    from . import ds1_long as LG
+    sm = _read_json(LG.arm_dir("S2X") / "smoke.json")
+    return isinstance(sm, dict) and str(sm.get("status") or "").startswith("not run")
 
 
 # ------------------------------------------------------------------ sealed reads (DS.7.5)
@@ -1782,9 +1874,30 @@ def mtw_roots():
     v11 = DD.out_dir() / "mtw_v1_1" / "root"
     if (v11 / "splits" / "v1" / "LOCK.json").is_file():
         out.append(("mtw_v2", v11, "test_v1.1"))
+    gone = DD.sources_out() if DD.out_dir().is_dir() else set()
     for p in sorted(DD.out_dir().glob("mtw_v2/mtw_*/frozen.json")) if DD.out_dir().is_dir() else []:
         d = _read_json(p) or {}
+        if d.get("source") in gone:
+            continue
         out.append(("mtw_v2", Path(d["root"]), "mtw_v2:%s" % d.get("source")))
+    return out
+
+
+def mtw_groups():
+    """{key: capture group} of MT-W's images (DS.7.5's capture-group SE): test v1's rows (base3's holdout lists,
+    their group), each frozen MT-W v2 source's rows (their draw's group)."""
+    from . import base3 as B3
+    from . import ds1_data as DD
+    out = {}
+    for f in sorted((B3.out_dir() / B3.HOLDOUT_DIR).glob("*.jsonl")) if (B3.out_dir() / B3.HOLDOUT_DIR).is_dir() \
+            else []:
+        for r in DD.read_jsonl(f):
+            if r.get("group") is not None:
+                out[str(r["key"])] = "v1:%s" % r["group"]
+    for p in sorted(DD.out_dir().glob("mtw_v2/mtw_*/draft/rows.jsonl")) if DD.out_dir().is_dir() else []:
+        for r in DD.read_jsonl(p):
+            if r.get("group") is not None:
+                out[str(r["key"])] = "v2:%s" % r["group"]
     return out
 
 
@@ -1802,10 +1915,20 @@ def score_test(arm, exam, lock_check=True, batch=S.BATCH, device=None, workers=N
     check_frozen()
     kw = _kw(lock_check, batch, device)
     files = []
+
+    def kept(dd, ex):
+        # a part committed by an earlier submission of this same read (a node failed after it): kept, never scored
+        # twice, so a re-submission completes the read instead of refusing at that file
+        js = Path(dd) / file_names(ex)[0]
+        return entry(js, "kept") if js.exists() else None
     with trees_unchanged():
         for s in SEEDS:
             src = build_source(arm, s)
             if exam == "cwd12":
+                got = kept(d / ("s%d" % s), "test")
+                if got is not None:
+                    files.append(got)
+                    continue
                 ccfg, _r, shas = TS._clf_cfg()
                 with TS._workers(workers) as wk, test_token() as tok:
                     emb = embedder or V.BioclipEmbedder()
@@ -1816,6 +1939,10 @@ def score_test(arm, exam, lock_check=True, batch=S.BATCH, device=None, workers=N
                 continue
             parts = mtw_roots() + [("evalgroups_v1", Z.root_dir("v1"), "evalgroups_v1")]
             for ex, root_, stratum in parts:
+                got = kept(d / ("s%d" % s) / re.sub(r"[^A-Za-z0-9_.-]", "_", stratum), ex)
+                if got is not None:
+                    files.append(got)
+                    continue
                 with tempfile.TemporaryDirectory(prefix="inc2_ds1_sealed_") as tmp:
                     ps = pass_in_root(src["weights"], ex, "stage1", arm, Path(tmp) / "out", root_dir=root_,
                                       read_json=rp, **kw)
@@ -1917,9 +2044,13 @@ def test_report(arm, exam, groups=None, write=True):
             per_seed.append({"pooled": pooled, "value": F.statistic_value(pooled, "agnostic"), "evalgroups_v1": evg,
                              "test_v1_part": v1})
         vals = [p["value"] for p in per_seed]
+        if groups is None:
+            groups = mtw_groups()
         se_img, se = mean_se([p["pooled"] for p in per_seed], groups, "mtw/%s" % arm)
         out.update(values=vals, mean=statistics.fmean(vals), reading=reaches_clears(vals, se), se_image=se_img,
-                   se=se, strata={k: v for k, v in strata.items()}, siu_in_plant_stratum=siu,
+                   se=se, se_rule="max(image, capture-group) of the 3-seed mean (DS.7.5)",
+                   groups=len(set(groups.values())) if groups else 0,
+                   strata={k: v for k, v in strata.items()}, siu_in_plant_stratum=siu,
                    evalgroups_v1=[p["evalgroups_v1"] for p in per_seed], headline="weed AP50-95 on MT-W")
     if write:
         write_once(capacity("ds1_test_%s_%s.json" % (arm.lower(), exam)), json.loads(json.dumps(out, default=str)))
@@ -1960,6 +2091,8 @@ def main(argv=None):
     ap.add_argument("--ticker-failed", default="")
     ap.add_argument("--proof", default=None)
     ap.add_argument("--stamp-proof", default=None)
+    ap.add_argument("--revision-proof", action="append", default=None)
+    ap.add_argument("--revision-stamp-proof", action="append", default=None)
     ap.add_argument("--spec", default=None)
     a = ap.parse_args(argv)
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -1975,7 +2108,8 @@ def main(argv=None):
                 fr = _read_json(splits_dir() / "summary.json") or {}
                 verdict(a.phase, arms_state_from_records(), cap_refused=[x for x in a.cap_refused.split(",") if x],
                         ticker_failed=[x for x in a.ticker_failed.split(",") if x],
-                        s2_frozen=bool(((fr.get("arms") or {}).get("S2") or {}).get("sha256")))
+                        s2_frozen=bool(((fr.get("arms") or {}).get("S2") or {}).get("sha256")),
+                        s2x_walltime=s2x_walltime_not_run())
         elif a.command == "ra":
             paths = a.report or sorted(str(p) for p in C.INC_DIR.glob("*_s[0-9][0-9][0-9]/report.json"))
             ra(paths)
@@ -1992,7 +2126,10 @@ def main(argv=None):
         elif a.command == "test-report":
             print(json.dumps(test_report(a.arm, a.exam), indent=1, default=str)[:4000])
         elif a.command == "timestamp":
-            print(json.dumps(timestamp_record(a.proof, a.stamp_proof), indent=1))
+            rp_, rsp_ = a.revision_proof or [], a.revision_stamp_proof or []
+            if len(rp_) != len(rsp_):
+                raise Ds1Refused("--revision-proof and --revision-stamp-proof come in pairs")
+            print(json.dumps(timestamp_record(a.proof, a.stamp_proof, revisions=list(zip(rp_, rsp_))), indent=1))
         elif a.command == "spend":
             print(json.dumps(spend(), indent=1, sort_keys=True))
         else:

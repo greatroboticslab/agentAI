@@ -126,28 +126,43 @@ def t_registration():
     (pr / "b.ots").write_bytes(b"proof-b")
     real = [str(HERE.parents[1] / "docs" / "prereg" / n) for n in ("DS1_2026-10-29.md.ots",
                                                                     "DS1_2026-10-29.stamp.txt.ots")]
-    e0 = refused(D.timestamp_record, str(pr / "a.ots"), str(pr / "b.ots"))
-    e1 = refused(D.timestamp_record, real[1], real[1])
-    e2 = refused(D.timestamp_record, real[0], real[0])
+    revs = [(str(HERE.parents[1] / (r["file"] + ".ots")), str(HERE.parents[1] / (r["stamp_file"] + ".ots")))
+            for r in D.REVISIONS]
+    e0 = refused(D.timestamp_record, str(pr / "a.ots"), str(pr / "b.ots"), revisions=revs)
+    e1 = refused(D.timestamp_record, real[1], real[1], revisions=revs)
+    e2 = refused(D.timestamp_record, real[0], real[0], revisions=revs)
     check("proofs that do not stamp the prereg (a.ots), the stamp file's proof given as the prereg's, or the "
           "prereg's as the stamp file's are refused", e0 is not None and e1 is not None and e2 is not None,
           (e0, e1, e2))
     check("  the committed proofs' headers stamp the prereg's sha256 and the stamp file's",
           D.ots_digest(real[0]) == D.PREREG_SHA256 and D.ots_digest(real[1]) == C.sha256_file(real[1][:-4]))
-    e = refused(D.timestamp_record, real[0], real[1], sha256="0" * 64)
+    e = refused(D.timestamp_record, real[0], real[1], sha256="0" * 64, revisions=revs)
     check("a record naming another sha256 is refused", e is not None, e)
-    rec = D.timestamp_record(real[0], real[1])
-    check("the record names the prereg's sha256 and both proofs (what each stamps); timestamp_ok and "
-          "require_timestamp pass", D.timestamp_ok() and D.require_timestamp() == C.sha256_file(D.timestamp_path())
-          and rec["proofs"][0]["stamps"] == D.PREREG_SHA256, rec.get("proofs"))
-    check("  and it is written once", refused(D.timestamp_record, real[0], real[1]))
+    rv = D.REVISIONS[0]
+    check("DS1's Revision 1: its byte copy hashes to the pinned sha256, its proofs stamp it and its stamp file (which "
+          "names its sha256 and commit)", hashlib.sha256((HERE.parents[1] / rv["file"]).read_bytes()).hexdigest() ==
+          rv["sha256"] and D.ots_digest(revs[0][0]) == rv["sha256"] and D.ots_digest(revs[0][1]) ==
+          C.sha256_file(HERE.parents[1] / rv["stamp_file"]) and rv["commit"] in (HERE.parents[1] / rv[
+              "stamp_file"]).read_text())
+    e_nr = refused(D.timestamp_record, real[0], real[1])
+    e_sw = refused(D.timestamp_record, real[0], real[1], revisions=[(revs[0][1], revs[0][0])])
+    check("  a record without the Revision's proofs, or with them swapped, is refused", e_nr is not None and
+          e_sw is not None, (e_nr, e_sw))
+    rec = D.timestamp_record(real[0], real[1], revisions=revs)
+    check("the record names the prereg's sha256 and both proofs (what each stamps), and the Revision's; timestamp_ok "
+          "and require_timestamp pass", D.timestamp_ok() and D.require_timestamp() == C.sha256_file(D.timestamp_path())
+          and rec["proofs"][0]["stamps"] == D.PREREG_SHA256 and rec["revisions"][0]["sha256"] == rv["sha256"],
+          rec.get("proofs"))
+    check("  and it is written once", refused(D.timestamp_record, real[0], real[1], revisions=revs))
     other = TMP / "ts_other.json"
     d_ = json.loads(D.timestamp_path().read_text())
     other.write_text(json.dumps(dict(d_, sha256="0" * 64)))
     one = TMP / "ts_one.json"
     one.write_text(json.dumps(dict(d_, proofs=d_["proofs"][:1])))
-    check("  a record naming another sha256, or one proof, does not open the gate (timestamp_ok)",
-          not D.timestamp_ok(other) and not D.timestamp_ok(one) and D.timestamp_ok())
+    norev = TMP / "ts_norev.json"
+    norev.write_text(json.dumps(dict(d_, revisions=[])))
+    check("  a record naming another sha256, one proof, or no Revision does not open the gate (timestamp_ok)",
+          not D.timestamp_ok(other) and not D.timestamp_ok(one) and not D.timestamp_ok(norev) and D.timestamp_ok())
 
 
 def t_constants():
@@ -241,8 +256,8 @@ def t_reads():
     o2 = D.read_order({"status": "decided", "primaries": {"P1": {"confirmed": False, "diff": 0.01}}}, v2, True)
     check("no confirmed primary: no challenger read; the substitution reads S1ux", [r["arm"] for r in o2] ==
           ["S0X", "S1UX", "S1UX"], o2)
-    check("before verdict v2 no read is in the order", D.read_order(v1, None) ==
-          [{"arm": "S1U", "exam": "mtw", "kind": "challenger", "primary": "P2"}])
+    check("before verdict v2 no read is in the order, not even a confirmed phase-1 arm's (DS.12 step 12: S0x, S2x, "
+          "the confirmed 1.2 M arm, then cwd12)", D.read_order(v1, None) == [])
     check("a read out of turn is refused", refused(D.check_read, "S2X", "mtw", o, {}))
     check("  a read not in the order is refused", refused(D.check_read, "S1C", "mtw", o, {}))
     check("  a read taken once", refused(D.check_read, "S0X", "mtw", o, {("S0X", "mtw"): "read"}))

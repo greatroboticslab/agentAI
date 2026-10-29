@@ -23,14 +23,17 @@ cannot take; intake the rows lane DATA's intake commits before the phase-1 freez
 
 The rules, in order, each counted with its reason code (DS.5.1):
   1 eligibility: role C (cwd12, 3SeasonWeedDet10 and 2SeasonWeedDet8 copies: the D28 sources, cwp10, vanpe, the
-    domain config's never-fetch and never-train sources) out; any guard hit of a source against cwd12 dev or test at
-    the calibrated copy threshold quarantines it whole (D28-v2); a source whose file names carry cwd12 or
-    3SeasonWeedDet10 capture names goes to role C once its sheet shows the pairs (name_hits); evaluation groups by
-    name; off-goal (role X); a queue row holding funnel_F9, join_conflict or h6_scan, and a row refused at intake or
-    admission (a copy, an exam, a hold-out, a licence, EXIF) out; a row only not admitted at species level stays;
-  2 names to roles: each box's class unit (SIU: its video's EPPO code; else its INC class id) has the role its
-    source's decided sheet gives it: weed (class 12), crop, plant part or non-plant (dropped as background), or
-    unresolved (the image is held, never admitted); species identity is kept per box;
+    domain config's never-fetch and never-train sources) out; any copy of a cwd12 dev or test image at the
+    calibrated copy threshold quarantines its source whole (D28-v2): its intake's and Step 1's refusals as copies
+    and DS1's guard on its rows, a dHash hit counting where the DINOv2 detector confirms it (fail closed without
+    it); a source whose file names carry cwd12 or 3SeasonWeedDet10 capture names is role C, whatever its sheet says,
+    the sheet showing the pairs; evaluation groups by name; off-goal (role X); a queue row holding funnel_F9,
+    join_conflict or h6_scan, and a row refused at intake or admission (a copy, an exam, a hold-out, a licence,
+    EXIF) out; a row only not admitted at species level stays; phase 2 reads only the named sources;
+  2 names to roles: each box's class unit (SIU: its video's EPPO code; else its source class, traced from the
+    source's own label files where its INC class stands for several, Revision 1 item 2; else its INC class id) has
+    the role its source's decided sheet gives it: weed (class 12), crop, plant part or non-plant (dropped as
+    background), or unresolved (the image is held, never admitted); species identity is kept per box;
   3 base3's box and image rules (CLOOP:2912-2913): the source rule, boxes under 8 px masked, images dropped;
   4 the model audit (E1-A) per source: a source over train_core's missing-label rate by more than 0.15 enters only
     as 'accept for training only' with predicted unlabelled plants masked (inc2.mask);
@@ -52,7 +55,9 @@ the same export stem, the same intake capture group, or a calibrated DINOv2 link
 its members' sorted sha256s; per source, groups in the order stable_int("inc2/ds1/md_v1/<source>/<digest>"): MD
 until about 5 % of the source's admitted images (15 to 500), then, for new sources, MT-W v2 until about 10 % more
 (30 to 1,000), both together at most 30 % of the source; never SIU, an evaluation group, a cwd12 copy, a test v1
-group or companion, or a group of more than 500 images; MT-W v2 also obeys MT.2 item 2. MD-S0 (base B's external
+group or companion, or a group of more than 500 images; never a group near a built manifest's row (6-bit dHash or
+the DINOv2 detector: the guard's direction to a manifest built before the exam, Revision 1 item 1); MT-W v2 also
+obeys MT.2 item 2 (no group near base B or a stream pool). MD-S0 (base B's external
 sources, base_v2 and SIU excluded) is drawn, sized by the power pre-flight (enlarged in the same order while its
 MDE is over 0.02, within the 30 % cap) and frozen before B'o is built; each new source's MD-N is frozen at its draw,
 its MT-W v2 after the person's check. Every exam row and group enters splits/ds1/never_train.jsonl at its draw.
@@ -63,7 +68,7 @@ the order stable_int("inc2/ds1/cap/siu/<video>")); S1c-R (S1c's composition at S
 order stable_int("inc2/ds1/r/<key>")); S1u (no cap); S2 (S1c and phase 2, every family capped at 35 %); KD, KT and
 KF (base A plus N_K = min(15,000, each K pool's supply) rows, draws stable_int("inc2/ds1/k/<arm>/<series or row>")).
 The cwd12 exposure floor: each train_core row listed r = round_half_up((N - C) / (N_S0 - C)) times in every S arm
-larger than S0 (repeat keys <key>__r<j>, the same files), N counted before repeats. Each larger S manifest holds
+larger than S0 (repeat keys <key>__ds1rep<j>, the same files), N counted before repeats. Each larger S manifest holds
 every row of each smaller one, bytes unchanged. Every manifest record prints images, distinct photos (6-bit
 components) and capture groups, and the gap to the owner's scale rule.
 
@@ -117,7 +122,14 @@ ROLE_C = ("rf_karthikeya-c8pvy__weed-detection-cwp10", "rf_zig-zag-lnodr__weed-d
           "rf_school-wevfc__weeddec2-sqnot", "rf_priyankas-workspace-o43oc__weeds1-dsqzl",
           "rf_weedtown__weedsv2-46hkh")
 NEVER_FETCHED = ("zenodo_10762138",)                # 2SeasonWeedDet8 (Amendment 2026-10-28)
+# phase 2 reads only the sources DS.5.2 names (DS.0 item 2, DS.9.2: "their source ids given explicitly"); a named
+# source's id is listed here once lane DATA's fetch names it (a recorded code change, deployed before its screen)
+PHASE2_SOURCES = {"MFWD full": ("mediatum_1717366",), "CropAndWeed": (), "PhenoBench": (), "Sugar Beets 2016": ()}
 EXCLUDED_HOLDS = ("funnel_F9", "join_conflict", "h6_scan")
+# the refusals that name a copy of an evaluation image (intake's and Step 1's, masked or not): D28-v2's input
+EVAL_COPY_REASONS = ("near_eval_v2", "near_eval_variant", "near_eval_embed")
+DHASH_COPY_REASONS = ("near_eval_v2", "near_eval_variant")
+CWD12_SPLITS = ("dev", "test")
 NOT_ADMITTED_OK = ("not_admitted",)                 # admission outcomes that leave a weed-level candidate
 # the capture names of cwd12 and 3SeasonWeedDet10 (date, camera and initials stems: iPhoneSE_YL, NIKOND3300_YL,
 # iPhone11Pro_BT, CanonEOS4000D_EO, ...), DS.5.1 item 1(b)
@@ -155,6 +167,11 @@ FLOOR_ARMS = ("S1C", "S1CR", "S1U", "S2")
 
 class DataRefused(D.Ds1Refused):
     pass
+
+
+def phase2_ids():
+    """The source ids phase 2 may read (PHASE2_SOURCES)."""
+    return {s for ids in PHASE2_SOURCES.values() for s in ids}
 
 
 def log(msg):
@@ -353,20 +370,29 @@ def siu_video(text):
     return "%s_week_%s_IMG_%s" % (m.group("eppo"), m.group("week"), m.group("img")), m.group("eppo")
 
 
-def unit_of(row, cls):
-    """The class unit a box's role is decided on: SIU's video's EPPO code (per EPPO code, from its own metadata),
-    else the source's INC class id."""
+def unit_of(row, cls, i=None):
+    """The class unit a box's role is decided on (DS.5.1 item 2: each source class one role): SIU's video's EPPO code
+    (per EPPO code, from its own metadata); else the box's source class ('src:<id>', from the source's own label files:
+    row['box_src'][i], the class of box i) where it was traced; else the source's INC class id ('inc:<id>'), which is
+    one source class unless several map to it (the sheet lists every name a unit stands for)."""
     if row["source"] == SIU:
         _v, eppo = siu_video(row.get("rel") or row["key"])
         return "eppo:%s" % (eppo or "?")
+    bs = row.get("box_src")
+    if bs is not None and i is not None and 0 <= int(i) < len(bs) and bs[int(i)] is not None:
+        return "src:%s" % bs[int(i)]
     return "inc:%d" % int(cls)
 
 
-def suggest_role(source, unit):
+def suggest_role(source, unit, inc_of=None):
     """The sheet's pre-filled suggestion for a unit (never a decision): the twelve target species are weeds; an
-    SIU crop code is a crop; OtherPlant and the unmapped id are unresolved until the sheet decides."""
+    SIU crop code is a crop; OtherPlant and the unmapped id are unresolved until the sheet decides. A source class
+    ('src:<id>') is suggested as the INC class it maps to (inc_of {src id: INC id})."""
     if unit.startswith("eppo:"):
         return "crop" if unit[5:] in CROP_EPPO_SUGGEST else "weed"
+    if unit.startswith("src:"):
+        i = (inc_of or {}).get(unit[4:])
+        return "weed" if i is not None and 0 <= int(i) < 12 else "unresolved"
     i = int(unit[4:])
     if 0 <= i < 12:
         return "weed"
@@ -377,8 +403,8 @@ def weed_boxes(row, roles):
     """(boxes [(cx, cy, w, h)] of class 12, species [unit per kept box], dropped {role: n}, unresolved units) of a
     candidate under its source's decided roles."""
     keep, species, dropped, unres = [], [], collections.Counter(), set()
-    for b in row["boxes"]:
-        u = unit_of(row, b[0])
+    for i, b in enumerate(row["boxes"]):
+        u = unit_of(row, b[0], i)
         role = (roles or {}).get(u, "unresolved")
         if role == "weed":
             keep.append(tuple(float(x) for x in b[1:5]))
@@ -761,12 +787,13 @@ def capture_groups(rows, links=(), bits=GROUP_BITS):
 
 
 def draw_exams(rows_by_source, groups, digests, admitted, new_sources, md_frozen=None, md_target=None,
-               excluded_groups=()):
+               excluded_groups=(), mtw_excluded_groups=()):
     """MD and (new sources only) MT-W v2 per source (DS.5.4): groups in the order stable_int("inc2/ds1/md_v1/
     <source>/<digest>"); MD until about 5 % of the source's admitted images (at least 15, at most 500; md_target
     {source: n} replaces the 5 % when MD-S0 is enlarged), then MT-W v2 until about 10 % more (30 to 1,000); both
-    together at most 30 %; a group of more than 500 images, or one in excluded_groups, never; md_frozen {source:
-    [groups]} keeps an earlier draw's groups first (an enlargement keeps the order). Returns {source: {"md":
+    together at most 30 %; a group of more than 500 images, or one in excluded_groups, never; one in
+    mtw_excluded_groups never in MT-W v2 (MT.2 item 2); md_frozen {source: [groups]} keeps an earlier draw's groups
+    first (an enlargement keeps the order). A group not drawn stays a training candidate. Returns {source: {"md":
     [groups], "mtw": [groups], "md_images", "mtw_images", "admitted"}}."""
     out = {}
     for s in sorted(rows_by_source):
@@ -790,6 +817,8 @@ def draw_exams(rows_by_source, groups, digests, admitted, new_sources, md_frozen
             if s in new_sources:
                 mtw_goal = min(MTW_MAX, max(MTW_MIN, int(round(MTW_SHARE * n_adm))))
                 if n_mtw < mtw_goal:
+                    if g in mtw_excluded_groups:
+                        continue
                     mtw.append(g)
                     n_mtw += size[g]
                     continue
@@ -813,13 +842,26 @@ def floor_repeats(n_rows, n_s0, c):
     return max(1, int(B3.round_half_up((float(n_rows) - c) / (float(n_s0) - c))))
 
 
+REPEAT_FMT = "%s__ds1rep%d"
+REPEAT_RE = re.compile(r"__ds1rep\d+\Z")
+
+
+def is_repeat(key):
+    """True for a repeat row of the cwd12 exposure floor (<key>__ds1rep<j>; a source's own keys may hold '__r')."""
+    return bool(REPEAT_RE.search(str(key)))
+
+
+def repeat_base(key):
+    return REPEAT_RE.sub("", str(key))
+
+
 def repeat_rows(tc_rows, r):
     """The repeat rows of the cwd12 exposure floor: each train_core row listed r times (the row itself and r - 1
-    rows <key>__r<j> naming the same files)."""
+    rows <key>__ds1rep<j> naming the same files)."""
     out = []
     for row in tc_rows:
         for j in range(1, int(r)):
-            out.append(dict(row, key="%s__r%d" % (row["key"], j)))
+            out.append(dict(row, key=REPEAT_FMT % (row["key"], j)))
     return out
 
 
@@ -946,7 +988,7 @@ def manifest_bytes(rows):
 def arm_record(arm, rows, path, sha, extra=None):
     from . import recipes as RC
     n = len(rows)
-    base_rows = [r for r in rows if "__r" not in r["key"]]
+    base_rows = [r for r in rows if not is_repeat(r["key"])]
     rec = {"format": FMT_ARM, "arm": arm, "manifest": str(path), "sha256": sha, "images": n,
            "rows_before_repeats": len(base_rows), "counts": three_counts(base_rows),
            "recipe": RC.cold_budget("m640", n) if arm in D.BUILD_ARMS else None,
@@ -994,7 +1036,7 @@ def write_arm(arm, rows, extra=None):
         return old
     rec = arm_record(arm, rows, p, sha, extra)
     if PROJECT_LOADER and arm in ("S1C", "S1U", "S2", "S1CR", "S0"):
-        rec["loader_projection"] = loader_projection([r for r in rows if "__r" not in r["key"]])
+        rec["loader_projection"] = loader_projection([r for r in rows if not is_repeat(r["key"])])
     write_once(rp, rec)
     return rec
 
@@ -1064,6 +1106,8 @@ def append_never_train(rows, exam, groups):
             continue
         new.append({"exam": exam, "key": r["key"], "source": r["source"], "sha256": r.get("sha256"),
                     "original_sha256": r.get("original_sha256") or r.get("sha256"),
+                    # the file DS1's own DINOv2 index describes (own_exam_rows): the exam row's image as scored
+                    "image": r.get("train_image") or r.get("image"),
                     "train_sha256": r.get("train_sha256"), "dhash": r.get("dhash"), "variants": r.get("variants"),
                     "group": groups.get(r["key"]), "capture_keys": [list(k) for k in capture_keys(r)],
                     "drawn_utc": D._utc()})
@@ -1117,7 +1161,13 @@ class Inputs(object):
         self.hasher = kw.get("hasher")                  # inc2.guard.image_hashes (tests: a stub)
         self.consumed = set(kw.get("consumed") or ())   # keys a stream consumed (an increment or a pool)
         self.base_b_man = kw.get("base_b_man") or {}    # {key: manifest row} of base B (KF's rows)
-        self.links = kw.get("links")                    # DINOv2 links among rows (capture groups)
+        self.links = kw.get("links")                    # DINOv2 links among rows (capture groups), given
+        self.link_fn = kw.get("link_fn")                # (rows, tag) -> [(key, key)]: DINOv2 links computed
+        self.ref_scan_fn = kw.get("ref_scan_fn")        # (rows, ref_rows, tag) -> {key: [hit]}: DINOv2 copies of rows
+        self.box_src_fn = kw.get("box_src_fn")          # (source, rows) -> ({key: [src id per box]}, record)
+        self.pool_ref_fn = kw.get("pool_ref_fn")        # () -> [{key, dhash, variants}] of the stream's pools
+        self.intake_hits = kw.get("intake_hits")        # {source: [cwd12 copies intake refused]} (D28-v2's input)
+        self.class_map = kw.get("class_map") or {}      # {source: {src id: {"name", "inc_id"}}} (intake's classes)
         self.read_orientation = kw.get("read_orientation")
         self.record = kw.get("record") or {}
         self.production = bool(kw.get("production", False))
@@ -1176,6 +1226,10 @@ def load_inputs(phase, procs=5, embedder=None):
                   eval_sources={s for g in (conf.get("evaluation_groups") or {}).get("groups", {}).values() for s in g},
                   quarantined=stream_quarantined(), never=domain_never(),
                   families=families(conf), production=True,
+                  link_fn=lambda rows, tag: dino_links(rows, tag, embedder),
+                  ref_scan_fn=lambda rows, ref, tag: dino_ref_hits(rows, ref, tag, embedder),
+                  box_src_fn=lambda source, rows: recover_box_src(source, rows),
+                  pool_ref_fn=stream_pool_hash_rows,
                   record={"step1_batches": step1_batches(),
                           "splits_v3_summary_sha256": C.sha256_file(B3.out_dir() / B3.SUMMARY),
                           "v3fam_summary_sha256": C.sha256_file(VD.out_dir() / VD.SUMMARY),
@@ -1207,6 +1261,28 @@ def stream_consumed():
         return out
     except Exception:  # noqa: BLE001
         return set()
+
+
+def stream_pool_hash_rows():
+    """[{key, dhash, variants}] of every stream version's current pool (its dHash map), what MT-W v2 keeps away from
+    (MAIN_TEST.md MT.2 item 2). Fail closed: a stream that cannot be folded refuses (DataRefused)."""
+    from . import stream as ST
+    out = []
+    sd = C.INC_DIR / "stream"
+    for sid in sorted(p.name for p in sd.iterdir() if p.is_dir()) if sd.is_dir() else []:
+        try:
+            f = ST.Stream(sid, quiet=True).load(repair=False)
+            if not f.pool:
+                continue
+            hs = f.pool_hashes(f.pool)
+        except Exception as e:  # noqa: BLE001
+            raise DataRefused("stream %s's pool cannot be read (%s: %s): MT-W v2 cannot be kept apart from it "
+                              "(fail closed)" % (sid, type(e).__name__, str(e)[:200]))
+        for k, v in hs.items():
+            v = [int(x) for x in v]
+            out.append({"key": "pool|%s|%s" % (sid, k), "dhash": v[0] if v else None,
+                        "variants": v if len(v) == len(B3.VARIANTS) else None})
+    return out
 
 
 def e1a_predictor(conf=0.25):
@@ -1301,6 +1377,7 @@ def load_candidates(phase, base_b, inc_dir=None):
         bj = _read_json(bdir / "batch.json") or {}
         if bj.get("kind") == "knowntruth":
             continue
+        im = ingest_matches(bdir, bj)
         for a in read_jsonl(bdir / "admission.jsonl"):
             k = a["key"]
             if k in seen:
@@ -1310,14 +1387,35 @@ def load_candidates(phase, base_b, inc_dir=None):
             f = files.get(k)
             if f is None:
                 continue
-            row = candidate_row(k, a, q, f)
+            row = candidate_row(k, a, q, f, im.get(k))
             if row is not None:
                 out.append(row)
     return out
 
 
-def candidate_row(key, adm, q, f):
-    """One candidate from its admission record, its queue row (None when not admitted) and its original file."""
+def ingest_matches(bdir, bj=None):
+    """{key: {"guard_match", "pair_cos"}} of a Step 1 batch's copy refusals (D28-v2's input: which evaluation split
+    each copy matched, and the dHash hits' pair cosines): its ingest.jsonl rows refused as copies of an evaluation
+    image, and b0000's eval_hit_pairs (b0000 writes no ingest.jsonl)."""
+    out = {}
+    p = Path(bdir) / "ingest.jsonl"
+    if p.is_file():
+        with open(p) as fh:
+            for line in fh:
+                if "near_eval" not in line:
+                    continue
+                r = json.loads(line)
+                if str(r.get("decision") or "").replace("masked_", "") in EVAL_COPY_REASONS:
+                    out[r["key"]] = {"guard_match": r.get("guard_match"), "pair_cos": r.get("pair_cos")}
+    for r in (bj or {}).get("eval_hit_pairs") or []:
+        if isinstance(r, dict) and r.get("key") is not None:
+            out.setdefault(r["key"], {"guard_match": r.get("match"), "pair_cos": r.get("pair_cos")})
+    return out
+
+
+def candidate_row(key, adm, q, f, im=None):
+    """One candidate from its admission record, its queue row (None when not admitted), its original file and its
+    Step 1 batch's copy-refusal match (im: ingest_matches)."""
     try:
         boxes = read_inc_label(f["label"])
     except (OSError, ValueError, DataRefused):
@@ -1336,7 +1434,11 @@ def candidate_row(key, adm, q, f):
             "research_only": bool((q or {}).get("research_only") or f.get("research_only")),
             "holds": list((q or {}).get("holds") or f.get("holds") or []), "refused": (q or {}).get("refused")
             or adm.get("refusal"), "admission": adm.get("admission"), "test_v1": (q or {}).get("test_v1"),
-            "batch": adm.get("batch") or f.get("batch"), "kind_q": (q or {}).get("kind")}
+            "batch": adm.get("batch") or f.get("batch"), "kind_q": (q or {}).get("kind"),
+            # Step 1's guard match and pair cosine of a refused copy (D28-v2's input: DS.5.1 item 1(a))
+            "guard_match": adm.get("guard_match") or (im or {}).get("guard_match"),
+            "pair_cos": adm.get("pair_cos", (im or {}).get("pair_cos", (q or {}).get("pair_cos"))),
+            "box_src": None}
 
 
 def _stem(rel):
@@ -1364,8 +1466,15 @@ def exam_hashes():
     if nt:
         H, ok, _h = B3.hash_matrix(nt)
         out["ds1_exams"] = {"keys": ["%s|%s" % (r["exam"], r["key"]) for r in nt], "H": H, "ok": ok}
+    # the evaluation groups (evalgroups_v1 and the OOD-dev groups, base3's evaluation_groups): every image's 8
+    # variants (the Step 1 pool's stored hashes, else hashed here), as base3's 6-bit guard reads them
+    egs, egrec = eval_group_hashes()
+    for g, (HG, okG) in sorted(egs.items()):
+        if len(HG):
+            out["evalgroup:%s" % g] = {"keys": ["%s#%d" % (g, i) for i in range(len(HG))], "H": HG, "ok": okG}
     h10 = C.INC_DIR / "step1_r1" / "domain_dev.jsonl"
-    rec = {"zoo": zrec, "ood": orec, "prior_test": prec, "ds1_never_train": len(nt), "h10d": h10.is_file()}
+    rec = {"zoo": zrec, "ood": orec, "prior_test": prec, "ds1_never_train": len(nt), "h10d": h10.is_file(),
+           "evaluation_groups": egrec}
     if h10.is_file():
         from ..inc import verify as V
         meta = {m["key"]: m for m in V._read_jsonl(V.POOL_META)} if Path(V.POOL_META).is_file() else {}
@@ -1398,9 +1507,60 @@ def scanners(embedder=None):
     return out
 
 
+def _registry():
+    """The dataset registry base3 reads (its evaluation groups' image folders), or None when it cannot be read."""
+    try:
+        with open(B3.registry_path()) as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def eval_group_hashes():
+    """({group: (H [n, 8], ok [n])}, record) of the evaluation groups (evalgroups_v1 and the OOD-dev groups, base3's
+    evaluation_groups by name), base3's own reader: the Step 1 pool's stored hashes, else hashed here. Fail closed: a
+    registry that cannot be read, or a group image that cannot be hashed, refuses."""
+    _rules, conf = load_rules()
+    reg = _registry()
+    if reg is None:
+        raise DataRefused("the dataset registry %s cannot be read: the guard cannot clear against the evaluation "
+                          "groups (fail closed)" % B3.registry_path())
+    egs, rec = B3.eval_group_hashes(conf, reg, stored=B3.pool_hashes()[0])
+    bad = {g: v for g, v in (rec.get("groups") or {}).items() if any(int((s or {}).get("unhashed") or 0)
+                                                                     for s in (v.get("slugs") or {}).values())}
+    if bad:
+        raise DataRefused("evaluation group images that cannot be hashed (%s): the guard cannot clear against them "
+                          "(fail closed)" % sorted(bad))
+    return egs, rec
+
+
+def eval_group_rows():
+    """{group: [{key, image}]} of the evaluation groups' images (DS1's own DINOv2 index)."""
+    _rules, conf = load_rules()
+    reg = _registry()
+    if reg is None:
+        raise DataRefused("the dataset registry %s cannot be read (fail closed)" % B3.registry_path())
+    imgs, _missing = B3.eval_group_images(conf, reg)
+    out = {}
+    for g, slugs in sorted(imgs.items()):
+        out["evalgroup:%s" % g] = [{"key": "%s#%s#%d" % (g, slug, i), "image": p}
+                                   for slug, paths in sorted(slugs.items()) for i, p in enumerate(paths)]
+    return out
+
+
+def h10d_rows():
+    """[{key, image, sha256}] of the funnel's H10d hold-out once F9 wrote it (step1_r1/domain_dev.jsonl), else []."""
+    h10 = C.INC_DIR / "step1_r1" / "domain_dev.jsonl"
+    if not h10.is_file():
+        return []
+    return [{"key": "h10d|%s" % r["key"], "image": r["image"], "sha256": r.get("sha256")}
+            for r in C.read_manifest(h10)]
+
+
 def own_exam_rows():
     """{split: [{key, image, sha256}]} of DS1's own guard index: test v1 and its companions, MD v1 and MT-W v2 (their
-    files), H10d."""
+    files, from DS1's never-train list), the evaluation groups (evalgroups_v1, the OOD-dev groups) and H10d once F9
+    wrote it."""
     out = collections.defaultdict(list)
     prior, _rec = B3.prior_test_lists()
     for p in prior:
@@ -1411,10 +1571,17 @@ def own_exam_rows():
         if r.get("train_image") or r.get("image"):
             out["ds1_exams"].append({"key": "%s|%s" % (r["exam"], r["key"]), "image": r.get("train_image") or
                                      r.get("image"), "sha256": r.get("train_sha256") or r.get("sha256")})
+    for g, rows in eval_group_rows().items():
+        out[g] += rows
+    hr = h10d_rows()
+    if hr:
+        out["h10d"] = hr
     return dict(out)
 
 
-def own_scanner(rows_by_split, embedder=None):
+def own_scanner(rows_by_split, embedder=None, prefix="own"):
+    """The calibrated DINOv2 detector (LOCK v2's calibration and embedder) over an index of rows_by_split, its
+    descriptors cached under ds1/v1/leak/<prefix>_<the rows' tag>.npz."""
     from ..funnel import embed as FE
     from . import embed_calibration as EC
     from . import guard as G
@@ -1425,97 +1592,332 @@ def own_scanner(rows_by_split, embedder=None):
     emb = embedder or FE.LazyEmbedder(model, pooling)
     tag = hashlib.sha256(json.dumps({s: sorted(r["key"] for r in rs) for s, rs in rows_by_split.items()},
                                     sort_keys=True).encode("utf-8")).hexdigest()[:16]
-    return G.EmbedScanner(G.eval_index(rows_by_split, emb, D.root() / "leak" / ("own_%s.npz" % tag)), cal)
+    return G.EmbedScanner(G.eval_index(rows_by_split, emb, D.root() / "leak" / ("%s_%s.npz" % (prefix, tag))), cal)
+
+
+def dino_links(rows, tag, embedder=None):
+    """[(key, key)] of the calibrated DINOv2 detector's copies among rows (DS.5.4: capture groups join images it
+    links): an index over the rows and the rows scanned against it, a row's match with itself left out. Fail closed:
+    a row it cannot describe refuses."""
+    if len(rows) < 2:
+        return []
+    items = [{"key": r["key"], "image": r.get("train_image") or r["image"], "sha256": r.get("sha256")} for r in rows]
+    sc = own_scanner({"self": items}, embedder, prefix="links_%s" % slug(tag))
+    hits = embed_hits(items, sc, D.root() / "leak" / ("links_%s_q.npz" % slug(tag)))
+    return sorted({tuple(sorted((k, str(h["exam_key"])))) for k, hs in hits.items() for h in hs
+                   if str(h.get("exam_key")) != str(k)})
+
+
+def dino_ref_hits(rows, ref_rows, tag, embedder=None):
+    """{key: [hit]} of rows the calibrated DINOv2 detector calls copies of ref_rows' images (an index over ref_rows,
+    its descriptors cached by tag and the rows' keys, so an arm's index is described once). Fail closed on a file it
+    cannot describe."""
+    if not rows or not ref_rows:
+        return {}
+    ref = [{"key": r["key"], "image": r.get("train_image") or r["image"], "sha256": r.get("sha256")} for r in ref_rows]
+    sc = own_scanner({"ref": ref}, embedder, prefix="ref_%s" % slug(tag))
+    q = hashlib.sha256("\n".join(sorted(str(r["key"]) for r in rows)).encode("utf-8")).hexdigest()[:16]
+    return embed_hits(rows, sc, D.root() / "leak" / ("query_%s.npz" % q))
+
+
+# ------------------------------------------------------------------ the intake's records of a source
+def _intake_batches(source, inc=None):
+    """The committed intake batch directories of a source (intake/i<nnnn>_<source>), in order."""
+    idir = (Path(inc) if inc else C.INC_DIR) / "intake"
+    return [d for d in sorted(idir.glob("i0*")) if idir.is_dir() and _batch_source(d) == source]
+
+
+_BATCH_SOURCE = {}
+
+
+def _batch_source(d):
+    """The source of an intake batch: its summary's, else its manifest's first row's (read once per process)."""
+    key = str(d)
+    if key in _BATCH_SOURCE:
+        return _BATCH_SOURCE[key]
+    got = None
+    m = _read_json(d / "summary.json")
+    if isinstance(m, dict) and m.get("source"):
+        got = str(m["source"])
+    elif (d / "manifest.jsonl").is_file():
+        with open(d / "manifest.jsonl") as fh:
+            for line in fh:
+                if line.strip():
+                    got = str(json.loads(line).get("source"))
+                    break
+    _BATCH_SOURCE[key] = got
+    return got
+
+
+def _decision_lines(d, needle):
+    p = d / "decisions.jsonl"
+    if not p.is_file():
+        return
+    with open(p) as fh:
+        for line in fh:
+            if needle in line:
+                yield json.loads(line)
+
+
+def intake_class_map(source, inc=None):
+    """{src id: {"name", "inc_id", "status"}} of a source's classes as its intake batches mapped them (decisions.jsonl
+    kind 'class')."""
+    out = {}
+    for d in _intake_batches(source, inc):
+        for r in _decision_lines(d, '"class"'):
+            if r.get("kind") == "class" and r.get("source") == source and r.get("src_id") is not None:
+                out[str(r["src_id"])] = {"name": r.get("name"), "inc_id": r.get("inc_id"), "status": r.get("status")}
+    return out
+
+
+def intake_cwd12_hits(source, inc=None, copy_cos=COPY_COS):
+    """[{key, reason, split, pair_cos}] of the source's images its intake refused as copies of a cwd12 dev or test
+    image at the calibrated copy threshold (DS.5.1 item 1(a), D28-v2 unchanged): an embedding hit (its cosine is over
+    the threshold by construction), or a dHash hit whose pair cosine reaches it, or one with no pair cosine (D28-v2:
+    fail closed; the batch's eval_hits sidecar consulted first)."""
+    out = []
+    for d in _intake_batches(source, inc):
+        side = _read_json(d / "eval_hits.json") or {}
+        pc = {str(p.get("key")): p.get("pair_cos") for p in side.get("pairs") or [] if isinstance(p, dict)}
+        for r in _decision_lines(d, '"near_eval'):
+            if r.get("kind") != "image" or r.get("decision") != "rejected" or r.get("source") != source:
+                continue
+            hit = copy_hit(r.get("reason"), r.get("match"), r.get("pair_cos", pc.get(str(r.get("key")))), copy_cos)
+            if hit:
+                out.append(dict(hit, key=r.get("key"), where="intake"))
+    return out
+
+
+def copy_hit(reason, match, pair_cos, copy_cos=COPY_COS):
+    """{reason, split, pair_cos} when a refusal names a copy of a cwd12 dev or test image at the calibrated copy
+    threshold (D28-v2), else None: an embedding hit; a dHash hit at pair cosine >= the threshold, or without one
+    (fail closed)."""
+    r = str(reason or "")
+    base = r[len("masked_"):] if r.startswith("masked_") else r
+    if base not in EVAL_COPY_REASONS:
+        return None
+    m = match if isinstance(match, dict) else {}
+    split = m.get("eval_split") or m.get("split")
+    if split is None:
+        split = "unknown"            # the refusal's match was not kept: fail closed (D28-v2), counted as a copy
+    elif split not in CWD12_SPLITS:
+        return None
+    if base == "near_eval_embed":
+        return {"reason": r, "split": split, "pair_cos": m.get("cos")}
+    if pair_cos is None or float(pair_cos) >= float(copy_cos):
+        return {"reason": r, "split": split, "pair_cos": pair_cos}
+    return None
+
+
+def recover_box_src(source, rows, inc=None, cfg_name="weed"):
+    """({key: [src id per box]}, record): each candidate's boxes traced to their source classes by reading the
+    source's own label files again (DS.5.1 item 2: each source class one role), through the collector's own reader
+    (collect.intake's tree from the staging blobs, collect.normalize.read with the fetch's options) in a temporary
+    directory; a row is traced only when its boxes, mapped by the source's class map, equal its intake label's
+    classes box for box. Rows not traced keep their INC class as their unit (the record says why)."""
+    import tempfile
+    from ..collect import config as CC
+    from ..collect import intake as CI
+    from ..collect import normalize as NZ
+    from .. import collect as CL
+    rec = {"source": source, "rows": len(rows), "traced": 0}
+    try:
+        cfg = CC.load(cfg_name)
+        sdir = CL.staging_dir(source, inc)
+        fetch_doc, fetch_sha = CI.read_fetch(sdir)
+        missing = [f["name"] for f in fetch_doc.get("files") or [] if not (sdir / "blobs" / f["sha256"]).is_file()]
+        if missing:
+            return {}, dict(rec, why="%d staging blob(s) gone (e.g. %s)" % (len(missing), missing[:2]))
+        cmap = intake_class_map(source, inc)
+        inc_of = {k: v.get("inc_id") for k, v in cmap.items()}
+        with tempfile.TemporaryDirectory(prefix="ds1_srcclass_", dir=os.environ.get("LOCAL") or None) as tmp:
+            root = Path(tmp) / "x"
+            CI.materialise(sdir, fetch_doc, root)
+            _tree, res = NZ.read(root, CI._read_options(cfg, fetch_doc), out_images=Path(tmp) / "parquet_images")
+            parsed = {it["rel"]: [str(b[0]) for b in it["boxes"]] for it in res.items}
+    except Exception as e:  # noqa: BLE001 - a source that cannot be read again keeps its INC units, recorded
+        return {}, dict(rec, why="%s: %s" % (type(e).__name__, str(e)[:300]))
+    out, bad = {}, collections.Counter()
+    for r in rows:
+        got = parsed.get(r.get("rel"))
+        if got is None:
+            bad["rel not in the source as read now"] += 1
+            continue
+        if len(got) != len(r["boxes"]):
+            bad["another number of boxes"] += 1
+            continue
+        if any(inc_of.get(s) is not None and int(inc_of[s]) != int(b[0]) for s, b in zip(got, r["boxes"])):
+            bad["a box's class maps to another INC class"] += 1
+            continue
+        out[r["key"]] = got
+    return out, dict(rec, traced=len(out), not_traced=dict(bad), fetch_sha256=fetch_sha)
 
 
 # ------------------------------------------------------------------ the steps
+def ambiguous_ids(cmap):
+    """The INC class ids that several source classes of a source map to (each source class one role, DS.5.1 item 2:
+    their boxes must be traced to their source classes)."""
+    by = collections.defaultdict(set)
+    for sid, v in (cmap or {}).items():
+        if v.get("inc_id") is not None:
+            by[int(v["inc_id"])].add(str(sid))
+    return {i for i, ss in by.items() if len(ss) > 1}
+
+
+def set_box_src(rows, cmap, traced):
+    """Each row's source class per box (row['box_src']): its traced classes (traced {key: [src id per box]}), else for
+    each box the one source class its INC class stands for, None where several do (that box's unit stays its INC
+    class: one unit for all the names it stands for, shown on the sheet). No class map: nothing set."""
+    if not cmap:
+        return
+    one = {}
+    for sid, v in cmap.items():
+        if v.get("inc_id") is not None:
+            one.setdefault(int(v["inc_id"]), set()).add(str(sid))
+    uniq = {i: next(iter(ss)) for i, ss in one.items() if len(ss) == 1}
+    for r in rows:
+        if r["key"] in traced:
+            r["box_src"] = [str(x) for x in traced[r["key"]]]
+        else:
+            r["box_src"] = [uniq.get(int(b[0])) for b in r["boxes"]]
+
+
 def screen(phase, inputs, revision=None, write=True):
-    """Step 'screen' (L30): every candidate of the phase not covered by an earlier screen revision, per source:
-    eligibility counts, the class units with their source names and suggested roles, the capture-name scan, the
-    guard against cwd12 dev and test (a hit quarantines the source whole, D28-v2), the model audit, the box
-    convention; the candidates written for the next steps; the sheets' bundles (inc2.ds1_sheets.bundle)."""
+    """Step 'screen' (L30): every candidate of the phase not covered by an earlier screen revision (phase 2: only the
+    sources DS.5.2 names, PHASE2_SOURCES), per source: eligibility counts; the class units (each box's source class,
+    traced from the source's own label files where its INC class stands for several), their source names and
+    suggested roles; the capture-name scan of every file name (a source with a cwd12 or 3SeasonWeedDet10 capture name
+    is role C, DS.5.1 item 1(b), its sheet showing the pairs); the cwd12 copy screen (D28-v2 unchanged: any copy of a
+    cwd12 dev or test image at the calibrated copy threshold quarantines the source whole: its intake's and Step 1's
+    refusals as copies and DS1's guard on its live rows, a dHash hit counting only where the DINOv2 detector
+    confirms it, fail closed without the detector); the model audit, the box convention; the candidates written for
+    the next steps; the sheets' bundles (inc2.ds1_sheets.bundle). A revision is written whenever it screens new rows
+    or a Step 1 batch came since the last one (its record names the batches it saw), so the platform's plan sees
+    the screen done even when no row is new."""
     from . import ds1_sheets as SH
     prior = screened_keys(phase)
-    rows = [r for r in inputs.candidates if r["key"] not in prior]
+    named = phase2_ids()
+    rows = [r for r in inputs.candidates if r["key"] not in prior and (int(phase) == 1 or r["source"] in named)]
     ctx = eligibility_ctx(inputs)
     per = collections.defaultdict(lambda: {"rows": 0, "out": collections.Counter(), "units": collections.Counter(),
                                            "pools": collections.Counter()})
     live = []
     outs = collections.defaultdict(list)
+    refusal_hits = collections.defaultdict(list)
+    names_by = collections.defaultdict(list)
     for r in rows:
         why = eligibility(r, ctx)
         p = per[r["source"]]
         p["rows"] += 1
         p["pools"][r.get("pool")] += 1
+        names_by[r["source"]].append(r.get("rel") or r["key"])
+        h = copy_hit(r.get("refused"), r.get("guard_match"), r.get("pair_cos"))
+        if h:
+            refusal_hits[r["source"]].append(dict(h, key=r["key"], where="step1"))
         if why:
             p["out"][why] += 1
             if why != "in_base_b":
                 outs[r["source"]].append(dict(r, why=why))
             continue
-        for b in r["boxes"]:
-            p["units"][unit_of(r, b[0])] += 1
         live.append(r)
+    # each box's source class: traced from the source's own files where its INC class stands for several
+    cmaps, traces = {}, {}
+    for s in sorted({r["source"] for r in live}):
+        if s == SIU:
+            continue
+        cm = inputs.class_map.get(s) if s in inputs.class_map else (intake_class_map(s) if inputs.production else {})
+        cmaps[s] = cm or {}
+        amb = ambiguous_ids(cm)
+        srows = [r for r in live if r["source"] == s]
+        traced = {}
+        if amb:
+            need = [r for r in srows if any(int(b[0]) in amb for b in r["boxes"])]
+            if inputs.box_src_fn is not None and need:
+                traced, trec = inputs.box_src_fn(s, need)
+            else:
+                trec = {"source": s, "rows": len(need), "traced": 0, "why": "no reader of the source's files"}
+            traces[s] = dict(trec, ambiguous_inc_ids=sorted(amb))
+        set_box_src(srows, cm, traced)
+        set_box_src(outs.get(s, []), cm, {})
+    for r in live:
+        for i, b in enumerate(r["boxes"]):
+            per[r["source"]]["units"][unit_of(r, b[0], i)] += 1
     hash_rows(live, hasher=inputs.hasher)
     live = [r for r in live if not r.get("drop")]
-    # the guard against cwd12 dev and test: a hit quarantines the source whole (D28-v2, unchanged)
-    cwd = {k: v for k, v in inputs.exams.items() if k in ("dev", "test")}
+    # DS1's guard against cwd12 dev and test on the live rows: an embedding hit is a copy at the calibrated threshold;
+    # a dHash hit only where the detector confirms it (its pair cosine reaches the threshold, D28-v2), every dHash hit
+    # when no detector ran (fail closed); the dHash hits still drop their images at the pools' guard
+    cwd = {k: v for k, v in inputs.exams.items() if k in CWD12_SPLITS}
     dh = dhash_hits(live, cwd)
-    eh = embed_hits(live, inputs.scanners.get("eval"), D.root() / "leak" / ("screen_p%d.npz" % phase)) \
-        if inputs.scanners.get("eval") else {}
-    cwd_hits = merge_hits(dh, {k: [h for h in v if h["exam"] in ("dev", "test")] for k, v in eh.items()})
+    scanner = inputs.scanners.get("eval")
+    eh = embed_hits(live, scanner, D.root() / "leak" / ("screen_p%d.npz" % phase)) if scanner else {}
+    eh = {k: [h for h in v if h["exam"] in CWD12_SPLITS] for k, v in eh.items()}
+    guard_hits = {k for k, v in eh.items() if v} | (set(dh) if scanner is None else set())
+    unconfirmed = {k for k in dh if k not in guard_hits}
     by_src = collections.defaultdict(list)
     for r in live:
         by_src[r["source"]].append(r)
     rec = {}
-    for s, rs in sorted(by_src.items()):
-        hits = sorted({k for k in (r["key"] for r in rs) if cwd_hits.get(k)})
-        names = capture_name_hits([r.get("rel") or r["key"] for r in rs])
+    for s in sorted(per):
+        rs = by_src.get(s, [])
+        hits = sorted({r["key"] for r in rs if r["key"] in guard_hits})
+        ih = (intake_cwd12_hits(s) if inputs.production else list((inputs.intake_hits or {}).get(s) or []))
+        copies = [{"key": k, "where": "ds1_guard"} for k in hits] + refusal_hits.get(s, []) + ih
+        names = capture_name_hits(names_by.get(s, []))
+        base = {"rows": per[s]["rows"], "live": len(rs), "out": dict(per[s]["out"]), "pools": dict(per[s]["pools"]),
+                "cwd12_hits": len(copies), "cwd12_hit_keys": [str(c.get("key")) for c in copies][:20],
+                "cwd12_copies": {"ds1_guard": len(hits), "step1_refusals": len(refusal_hits.get(s, [])),
+                                 "intake_refusals": len(ih),
+                                 "dhash_unconfirmed": sum(1 for r in rs if r["key"] in unconfirmed)},
+                "quarantine_whole": bool(copies),
+                "capture_names": {"hits": len(names), "examples": names[:12]}, "role_c": bool(names)}
+        if not rs:
+            rec[s] = base
+            continue
         audit = None
         if inputs.predict is not None and inputs.audit_ref is not None:
             audit = audit_verdict(audit_rates(audit_sample(rs, s), inputs.predict), inputs.audit_ref)
-        rec[s] = {"rows": per[s]["rows"], "live": len(rs), "out": dict(per[s]["out"]), "pools": dict(per[s]["pools"]),
-                  "units": {u: {"boxes": n, "suggested": suggest_role(s, u)} for u, n in sorted(per[s]["units"].items())},
-                  "cwd12_hits": len(hits), "cwd12_hit_keys": hits[:20], "quarantine_whole": bool(hits),
-                  "capture_names": {"hits": len(names), "examples": names[:12]}, "audit_verdict": audit,
-                  "convention": B3.source_convention([dict(r, boxes=[b[1:5] for b in r["boxes"]]) for r in rs],
-                                                     load_rules()[0]["source"]),
-                  "family": inputs.families.get(s), "series": bool(any(r.get("series") for r in rs)),
-                  "unit_names": unit_names(s, sorted(per[s]["units"]))}
-    for s, p in per.items():
-        if s not in rec:
-            rec[s] = {"rows": p["rows"], "live": 0, "out": dict(p["out"]), "pools": dict(p["pools"])}
-    revision = revision or (len(screen_revisions(phase)) + 1)
+        inc_of = {k: v.get("inc_id") for k, v in (cmaps.get(s) or {}).items()}
+        rec[s] = dict(base, units={u: {"boxes": n, "suggested": suggest_role(s, u, inc_of)}
+                                   for u, n in sorted(per[s]["units"].items())},
+                      audit_verdict=audit, source_classes=traces.get(s),
+                      convention=B3.source_convention([dict(r, boxes=[b[1:5] for b in r["boxes"]]) for r in rs],
+                                                      load_rules()[0]["source"]),
+                      family=inputs.families.get(s), series=bool(any(r.get("series") for r in rs)),
+                      unit_names=unit_names(s, sorted(per[s]["units"]), cmaps.get(s)))
+    revs = screen_revisions(phase)
+    revision = revision or (len(revs) + 1)
+    seen = ((inputs.record or {}).get("step1_batches"))
+    last_seen = ((_read_json(revs[-1]) or {}).get("inputs") or {}).get("step1_batches") if revs else None
     doc = {"format": FMT_SCREEN, "phase": int(phase), "revision": int(revision), "candidates": len(rows),
            "live": len(live), "sources": rec, "inputs": inputs.record, "decided_by": D.DECIDED_BY,
            "written_utc": D._utc()}
-    if write and rows:
-        base = out_dir() / "screen" / ("p%d_r%03d" % (int(phase), int(revision)))
-        write_jsonl_once(Path(str(base) + "_candidates.jsonl"), [_cand_out(r) for r in rows])
-        write_once(Path(str(base) + ".json"), json.loads(json.dumps(doc, default=str)))
+    if write and (rows or not revs or sorted(seen or []) != sorted(last_seen or [])):
+        base_p = out_dir() / "screen" / ("p%d_r%03d" % (int(phase), int(revision)))
+        write_jsonl_once(Path(str(base_p) + "_candidates.jsonl"), [_cand_out(r) for r in rows])
+        write_once(Path(str(base_p) + ".json"), json.loads(json.dumps(doc, default=str)))
         if inputs.production:
-            SH.bundle_sources(phase, revision, by_src, rec, out_rows=outs)
+            if by_src:
+                SH.bundle_sources(phase, revision, by_src, rec, out_rows=outs)
             if int(phase) == 1 and int(revision) == 1:
                 bundle_ln(inputs)
                 bundle_mtw_v1()
+    else:
+        doc["status"] = "unchanged: no new row and no new Step 1 batch since revision %d" % len(revs)
     return doc
 
 
-def unit_names(source, units):
-    """{unit: [source class names]} for the sheet: the intake's class decisions (each source class name and the INC id
-    it took), and SIU's EPPO codes' binomials from the collector's pinned EPPO table."""
+def unit_names(source, units, cmap=None):
+    """{unit: [source class names]} for the sheet: a source class's own name ('src:<id>'); every name an INC class
+    stands for ('inc:<id>': the intake's class map, several names when several source classes map to it); SIU's EPPO
+    codes' binomials from the collector's pinned EPPO table."""
     out = collections.defaultdict(set)
-    idir = C.INC_DIR / "intake"
-    for d in sorted(idir.glob("i0*")) if idir.is_dir() else []:
-        p = d / "decisions.jsonl"
-        if not p.is_file():
-            continue
-        with open(p) as fh:
-            for line in fh:
-                if '"class"' not in line or source not in line:
-                    continue
-                r = json.loads(line)
-                if r.get("kind") == "class" and r.get("source") == source and r.get("inc_id") is not None:
-                    out["inc:%d" % int(r["inc_id"])].add(str(r.get("name")))
+    if cmap is None:
+        cmap = intake_class_map(source) if source != SIU else {}
+    for sid, v in (cmap or {}).items():
+        out["src:%s" % sid].add(str(v.get("name")))
+        if v.get("inc_id") is not None:
+            out["inc:%d" % int(v["inc_id"])].add(str(v.get("name")))
     eppo = {}
     if any(u.startswith("eppo:") for u in units):
         try:
@@ -1630,18 +2032,48 @@ def screened_rows(phase):
 
 
 def screen_records(phase):
+    """{source: record} over every screen revision of a phase: the latest revision's record of the source, with the
+    counts summed and the flags that settle a source taken from any revision (a cwd12 copy quarantines it whole
+    whichever revision found it; a capture name sends it to role C)."""
     out = {}
     for p in screen_revisions(phase):
         d = _read_json(p) or {}
         for s, v in (d.get("sources") or {}).items():
-            out[s] = v
+            old = out.get(s)
+            if old is None:
+                out[s] = dict(v)
+                continue
+            new = dict(old)
+            new.update({k: x for k, x in v.items() if k in ("audit_verdict", "convention", "family", "series",
+                                                            "source_classes") and x is not None})
+            for k in ("rows", "live", "cwd12_hits"):
+                new[k] = int(old.get(k) or 0) + int(v.get(k) or 0)
+            new["quarantine_whole"] = bool(old.get("quarantine_whole") or v.get("quarantine_whole"))
+            new["role_c"] = bool(old.get("role_c") or v.get("role_c"))
+            cn_o, cn_v = old.get("capture_names") or {}, v.get("capture_names") or {}
+            new["capture_names"] = {"hits": int(cn_o.get("hits") or 0) + int(cn_v.get("hits") or 0),
+                                    "examples": (list(cn_o.get("examples") or []) + list(cn_v.get("examples") or []))[:12]}
+            units = dict(old.get("units") or {})
+            for u, x in (v.get("units") or {}).items():
+                units[u] = dict(x, boxes=int((units.get(u) or {}).get("boxes") or 0) + int(x.get("boxes") or 0))
+            new["units"] = units
+            names = dict(old.get("unit_names") or {})
+            names.update(v.get("unit_names") or {})
+            new["unit_names"] = names
+            out[s] = new
     return out
 
 
 def source_ready(source, decisions, screen_rec):
-    """(ok, why) for a source's rows to enter a manifest (DS.0 item 4, DS.5.1 items 1 and 2): its sheet decided
-    accept or accept for training only (never reject), audited where the owner's audit applies, not quarantined
-    whole by the cwd12 guard, no unresolved unit it has boxes of left to the names round."""
+    """(ok, why) for a source's rows to enter a manifest (DS.0 item 4, DS.5.1 items 1 and 2): not role C by its
+    capture names (DS.5.1 item 1(b)) and not quarantined whole by the cwd12 copy screen (item 1(a)), whatever its
+    sheet says; its sheet decided accept or accept for training only (never reject), audited where the owner's audit
+    applies."""
+    srec = screen_rec or {}
+    if srec.get("role_c") or int((srec.get("capture_names") or {}).get("hits") or 0):
+        return False, "role C: its file names carry cwd12 or 3SeasonWeedDet10 capture names (DS.5.1 item 1(b))"
+    if srec.get("quarantine_whole"):
+        return False, "quarantined whole (a copy of a cwd12 dev or test image, D28-v2)"
     d = decisions.get(source)
     if not d:
         return False, "sheet pending"
@@ -1651,9 +2083,30 @@ def source_ready(source, decisions, screen_rec):
         return False, "decision %r" % d.get("decision")
     if d.get("audit_required") and not d.get("audited"):
         return False, "owner audit pending"
-    if (screen_rec or {}).get("quarantine_whole"):
-        return False, "quarantined whole (a cwd12 dev or test guard hit, D28-v2)"
     return True, ""
+
+
+def settled_out(source, decisions, screen_rec):
+    """True for a source that enters no DS1 manifest whatever happens next: role C by its capture names, quarantined
+    whole, or rejected (its last decision governs: the owner's after his audit)."""
+    srec = screen_rec or {}
+    if srec.get("role_c") or int((srec.get("capture_names") or {}).get("hits") or 0) or srec.get("quarantine_whole"):
+        return True
+    return (decisions.get(source) or {}).get("decision") == "reject"
+
+
+def sources_out(decisions=None):
+    """The screened sources that enter no DS1 manifest, MD or MT-W now (DS.0 item 4: a source the owner rejects
+    leaves every DS1 manifest, MD and MT-W; role C and wholly quarantined sources likewise), whatever was frozen
+    before: their MD-N and MT-W v2 are never scored and never in MT-W's headline (their rows stay never-train)."""
+    from . import ds1_sheets as SH
+    decs = decisions if decisions is not None else SH.decided_sources()
+    out = set()
+    for ph in PHASES:
+        for s, v in screen_records(ph).items():
+            if settled_out(s, decs, v):
+                out.add(s)
+    return out
 
 
 def pools(phase, inputs, s0_rows=None, write=True):
@@ -1805,7 +2258,7 @@ def md_s0(inputs, power_rec=None, write=True):
             st = next((c for c in r["capture_keys"] if c[0] == "stem"), None)
             if st:
                 r["stem"], r["family"] = st[2], st[1]
-    groups, digests = capture_groups(rows, inputs.links or ())
+    groups, digests = capture_groups(rows, exam_links(inputs, rows, "md_s0_universe"))
     by = collections.defaultdict(list)
     for r in rows:
         by[r["source"]].append(r)
@@ -1879,17 +2332,103 @@ def _append_groups(exam, rows):
                 fh.write(json.dumps({"exam": exam, "key": r["key"], "group": r["group"]}, sort_keys=True) + "\n")
 
 
+def exam_links(inputs, rows, tag):
+    """The DINOv2 links among rows that join capture groups (DS.5.4): computed (inputs.link_fn: the calibrated
+    detector over the rows) or given (inputs.links)."""
+    if inputs.link_fn is not None:
+        return inputs.link_fn(rows, tag)
+    return inputs.links or ()
+
+
+def built_arms(inputs):
+    """{arm: (manifest sha256, [unique rows with their hashes])} of every built arm (a floor's repeats dropped); each
+    row's dHash and variants from base B's provenance or DS1's pools."""
+    pool_by = {r["key"]: r for ph in PHASES for rs in pool_rows(ph).values() for r in rs}
+    out = {}
+    for a in D.BUILD_ARMS:
+        if not arm_record_path(a).is_file():
+            continue
+        rows, rec = arm_rows(a)
+        uniq = {}
+        for r in rows:
+            k = repeat_base(r["key"])
+            if k in uniq:
+                continue
+            src = inputs.base_b.get(k) or pool_by.get(k) or {}
+            uniq[k] = dict(r, key=k, dhash=src.get("dhash"), variants=src.get("variants"))
+        out[a] = (rec.get("sha256"), list(uniq.values()))
+    return out
+
+
+def _hash_exam(name, rows):
+    rs = [r for r in rows if r.get("dhash") is not None or r.get("variants") is not None]
+    if not rs:
+        return {}
+    H, ok, _h = B3.hash_matrix(rs)
+    import numpy as np
+    return {name: {"keys": [r["key"] for r in rs], "H": H, "ok": np.asarray(ok, dtype=bool)}}
+
+
+def draw_exclusions(rows, groups, inputs, tag):
+    """(groups never drawn into MD-N or MT-W v2, groups never drawn into MT-W v2, record) of a source's rows
+    (Revision 1 of DS1, item 1): a manifest built before the draw (S0 = B'o, KF, the K arms, later S1's) never
+    changes, so the guard's direction from these exams to it (DS.5.1 item 7) is kept at the draw: a group with an
+    image within 6 dHash bits (8 variants, both directions) of a built manifest's row, or one the calibrated DINOv2
+    detector calls a copy of it, is drawn into neither; MT-W v2 also obeys MAIN_TEST.md MT.2 item 2: no group with an
+    image within 6 bits of a row of base B (base_v2 among them) or of a stream's pool, or holding a file of base B."""
+    arms = built_arms(inputs)
+    ref = {}
+    for a, (_sha, rs) in sorted(arms.items()):
+        for r in rs:
+            ref.setdefault(r["key"], r)
+    hit_any = set(dhash_hits(rows, _hash_exam("manifests", list(ref.values()))))
+    dino = {}
+    if inputs.ref_scan_fn is not None:
+        for a, (sha, rs) in sorted(arms.items()):
+            got = inputs.ref_scan_fn(rows, rs, "arm_%s_%s" % (a.lower(), str(sha)[:12]))
+            for k in got:
+                dino.setdefault(k, a)
+    hit_any |= set(dino)
+    base = [{"key": k, "dhash": v.get("dhash"), "variants": v.get("variants")} for k, v in inputs.base_b.items()]
+    base += list(inputs.pool_ref_fn() if inputs.pool_ref_fn is not None else [])
+    base_shas = {v.get("original_sha256") for v in inputs.base_b.values()} | {v.get("sha256") for v in
+                                                                           inputs.base_b.values()}
+    hit_mtw = set(dhash_hits(rows, _hash_exam("base_b", base))) | {r["key"] for r in rows
+                                                                    if r.get("sha256") in base_shas or
+                                                                    r.get("original_sha256") in base_shas}
+    ex = {groups[k] for k in hit_any if k in groups}
+    ex_mtw = {groups[k] for k in hit_mtw if k in groups} - ex
+    rec = {"tag": tag, "built_arms": {a: sha for a, (sha, _r) in sorted(arms.items())},
+           "rows_near_built_manifests": len(hit_any), "rows_dinov2_copies": len(dino),
+           "rows_near_base_b": len(hit_mtw), "groups_excluded": len(ex), "groups_excluded_mtw": len(ex_mtw)}
+    return ex, ex_mtw, rec
+
+
+def corrected_label(chk, key):
+    """The corrected class-12 boxes of an MT-W image the person's check corrected (the image's shown boxes without
+    the ones the person removed, with the ones drawn), or None."""
+    got = (chk.get("corrected_labels") or {})
+    if key not in got:
+        return None
+    return [tuple(float(x) for x in b[-4:]) for b in got[key]]
+
+
 def draw(phase, inputs, checks=None, write=True):
-    """Step 'draw' (L30): MD-N and MT-W v2 for every new non-SIU source decided 'accept' (never 'accept for
-    training only'), audited where required, whose pool is written: capture groups over its thinned rows, the draw
-    in the source's order; MD-N frozen at once (its own root and LOCK), MT-W v2 written as a draft and frozen only
-    after the person's check (checks {source: the recorded check}); every drawn row enters the never-train list."""
+    """Step 'draw' (L30): MD-N and MT-W v2 for every new non-SIU source whose sheet is 'accept' (never 'accept for
+    training only') and which is ready now (audited where required, not rejected since, not role C, not quarantined)
+    and whose pool is written: capture groups over its thinned rows (6-bit dHash, capture relations and the
+    calibrated DINOv2 detector's links), the draw in the source's order with the groups that touch a built manifest
+    (both) or base B (MT-W v2, MT.2 item 2) left out (draw_exclusions); MD-N frozen at once (its own root and LOCK),
+    MT-W v2 written as a draft and frozen only after the person's check (checks {source: the recorded check}), its
+    corrected labels the person's whole corrected boxes; every drawn row enters the never-train list."""
     pr = pool_rows(phase)
+    srec = screen_records(phase)
     out = {}
     for s, rows in sorted(pr.items()):
         dec = inputs.decisions.get(s) or {}
-        if s == SIU or dec.get("decision") != "accept":
-            out[s] = {"status": "not drawn (%s)" % ("SIU" if s == SIU else dec.get("decision"))}
+        ok, why = source_ready(s, inputs.decisions, srec.get(s))
+        if s == SIU or dec.get("decision") != "accept" or not ok:
+            out[s] = {"status": "not drawn (%s)" % ("SIU" if s == SIU else (why or dec.get("decision")))}
             continue
         mdn, mtw = mdn_exam(s), mtw_exam(s)
         if frozen(mdn) and (frozen(mtw) or not (exam_dir(mtw) / "draft").is_dir()):
@@ -1904,32 +2443,37 @@ def draw(phase, inputs, checks=None, write=True):
                                                            "frozen_utc": D._utc()})
             out[s] = {"status": "frozen (empty pool)"}
             continue
-        groups, digests = capture_groups(thin_rows_, inputs.links or ())
-        d = draw_exams({s: thin_rows_}, groups, digests, {s: len(rows)}, new_sources={s})[s]
-        md_keys = {r["key"] for r in thin_rows_ if groups[r["key"]] in set(d["md"])}
-        mt_keys = {r["key"] for r in thin_rows_ if groups[r["key"]] in set(d["mtw"])}
-        rec = {"md": len(md_keys), "mtw": len(mt_keys), "groups": len(set(groups.values())), "draw": d}
-        if write and not frozen(mdn):
-            mrows = [dict(r, group=groups[r["key"]]) for r in thin_rows_ if r["key"] in md_keys]
-            if mrows:
-                rr = write_exam_root(mdn, mrows, exam_dir(mdn) / "root", groups)
-                freeze_record(mdn, rr, {"source": s})
-                append_never_train(mrows, mdn, groups)
-                _append_groups(mdn, mrows)
-            else:
-                # a source with no group to draw (every group over 500 images or past the 30 % cap): recorded so,
-                # an empty exam that no arm is scored on
-                write_once(exam_dir(mdn) / "frozen.json", {"format": FMT_EXAM, "exam": mdn, "frozen": True,
-                                                           "images": 0, "root": None, "source": s,
-                                                           "frozen_utc": D._utc()})
-            rec["md_status"] = "frozen"
-        if write and not (exam_dir(mtw) / "draft").is_dir():
-            trows = [dict(r, group=groups[r["key"]]) for r in thin_rows_ if r["key"] in mt_keys]
-            if trows:
-                write_jsonl_once(exam_dir(mtw) / "draft" / "rows.jsonl", trows)
-                append_never_train(trows, mtw, groups)
-                bundle_mtw_v2(s, trows)
-            rec["mtw_status"] = "draft (waits for the person's check)"
+        rec = {}
+        if not frozen(mdn) or not (exam_dir(mtw) / "draft").is_dir():
+            groups, digests = capture_groups(thin_rows_, exam_links(inputs, thin_rows_, "draw_%s" % s))
+            ex, ex_mtw, xrec = draw_exclusions(thin_rows_, groups, inputs, s)
+            d = draw_exams({s: thin_rows_}, groups, digests, {s: len(rows)}, new_sources={s}, excluded_groups=ex,
+                           mtw_excluded_groups=ex_mtw)[s]
+            md_keys = {r["key"] for r in thin_rows_ if groups[r["key"]] in set(d["md"])}
+            mt_keys = {r["key"] for r in thin_rows_ if groups[r["key"]] in set(d["mtw"])}
+            rec = {"md": len(md_keys), "mtw": len(mt_keys), "groups": len(set(groups.values())), "draw": d,
+                   "exclusions": xrec}
+            if write and not frozen(mdn):
+                mrows = [dict(r, group=groups[r["key"]]) for r in thin_rows_ if r["key"] in md_keys]
+                if mrows:
+                    rr = write_exam_root(mdn, mrows, exam_dir(mdn) / "root", groups)
+                    freeze_record(mdn, rr, {"source": s, "exclusions": xrec})
+                    append_never_train(mrows, mdn, groups)
+                    _append_groups(mdn, mrows)
+                else:
+                    # a source with no group to draw (every group over 500 images, past the 30 % cap or left out):
+                    # recorded so, an empty exam that no arm is scored on
+                    write_once(exam_dir(mdn) / "frozen.json", {"format": FMT_EXAM, "exam": mdn, "frozen": True,
+                                                               "images": 0, "root": None, "source": s,
+                                                               "exclusions": xrec, "frozen_utc": D._utc()})
+                rec["md_status"] = "frozen"
+            if write and not (exam_dir(mtw) / "draft").is_dir():
+                trows = [dict(r, group=groups[r["key"]]) for r in thin_rows_ if r["key"] in mt_keys]
+                if trows:
+                    write_jsonl_once(exam_dir(mtw) / "draft" / "rows.jsonl", trows)
+                    append_never_train(trows, mtw, groups)
+                    bundle_mtw_v2(s, trows)
+                rec["mtw_status"] = "draft (waits for the person's check)"
         chk = (checks or {}).get(s)
         if write and chk and chk.get("verdict") == "fail" and not (exam_dir(mtw) / "left.json").is_file():
             # DS.10 item 4: a failing source leaves MT-W unless a person checks it image by image; its rows stay
@@ -1940,10 +2484,13 @@ def draw(phase, inputs, checks=None, write=True):
         if write and chk and chk.get("verdict") == "pass" and not frozen(mtw) and (exam_dir(mtw) / "draft").is_dir():
             trows = read_jsonl(exam_dir(mtw) / "draft" / "rows.jsonl")
             for r in trows:
-                if (chk.get("corrected_labels") or {}).get(r["key"]):
-                    r["label"], r["label_sha256"] = write_label([tuple(b) for b in chk["corrected_labels"][r["key"]]])
+                cb = corrected_label(chk, r["key"])
+                if cb is not None:
+                    r["label"], r["label_sha256"] = write_label(cb)
+                    r["corrected"] = True
             rr = write_exam_root("mtw_v2", trows, exam_dir(mtw) / "root", {r["key"]: r["group"] for r in trows})
-            freeze_record(mtw, rr, {"source": s, "check": chk.get("sha256")})
+            freeze_record(mtw, rr, {"source": s, "check": chk.get("sha256"),
+                                    "corrected": sum(1 for r in trows if r.get("corrected"))})
             rec["mtw_status"] = "frozen"
         out[s] = rec
     if write and int(phase) == 1:
@@ -1952,9 +2499,11 @@ def draw(phase, inputs, checks=None, write=True):
 
 
 def freeze_mtw_v1_1(checks):
-    """MT-W v1.1 (DS.4): once every test v1 source but SIU has a recorded check, test v1's labels the person
-    corrected are frozen in their own root and LOCK (test v1's own files never change); a failing source leaves
-    MT-W (listed; its rows stay never-train). Written once."""
+    """MT-W v1.1 (DS.4, DS.10 item 4): once every test v1 source but SIU has a recorded check, test v1 without SIU
+    as checked is frozen in its own root and LOCK whenever the check changed anything (test v1's own files never
+    change): the labels the person corrected (each image's whole corrected boxes) and no row of a source that failed
+    its check (it leaves MT-W; its rows stay never-train). MT-W's headline then reads v1.1, test v1 a stratum beside
+    it. Written once."""
     d = out_dir() / "mtw_v1_1"
     if (d / "status.json").is_file():
         return _read_json(d / "status.json")
@@ -1967,20 +2516,24 @@ def freeze_mtw_v1_1(checks):
     if not srcs or any(s not in checks for s in srcs):
         return {"status": "waiting for the MT-W check of %s" % sorted(s for s in srcs if s not in checks)}
     left = sorted(s for s in srcs if checks[s].get("verdict") != "pass")
-    corrected = {k: v for s in srcs for k, v in (checks[s].get("corrected_labels") or {}).items()}
+    corrected = {}
+    for s in srcs:
+        for k in (checks[s].get("corrected_labels") or {}):
+            corrected[k] = corrected_label(checks[s], k)
     rec = {"format": FMT_EXAM, "exam": "mtw_v1_1", "left_mtw": left, "corrections": len(corrected),
            "checks": {s: checks[s].get("sha256") for s in srcs}, "written_utc": D._utc()}
-    if corrected:
+    if corrected or left:
         rows = []
         for s, rs in sorted(srcs.items()):
             if s in left:
                 continue
             for r in rs:
                 if r["key"] in corrected:
-                    lab, lsha = write_label([tuple(b) for b in corrected[r["key"]]])
+                    lab, lsha = write_label(corrected[r["key"]])
                     r = dict(r, label=lab, label_sha256=lsha)
                 rows.append(dict({k: r.get(k) for k in C.MANIFEST_KEYS}, session=r.get("session") or ""))
         rec["root"] = write_exam_root("mtw_v2", rows, d / "root", {r["key"]: r["key"] for r in rows})
+        rec["images"] = len(rows)
     write_once(d / "status.json", rec)
     return rec
 
@@ -2028,11 +2581,35 @@ def b_prime_o(inputs, md_rows, exam_rows, write=True):
     return kept, {"removed": dict(out), "base_v2_kept_with_hits": listed, "rows": len(kept)}
 
 
+def ready_pools(phase, inputs):
+    """{source: rows} of a phase's written pools whose source is ready now (DS.0 item 4: a source the owner rejects,
+    or one role C or quarantined whole, leaves every DS1 manifest whatever was pooled before)."""
+    srec = screen_records(phase)
+    return {s: rs for s, rs in pool_rows(phase).items() if source_ready(s, inputs.decisions, srec.get(s))[0]}
+
+
+def base_a_hits(inputs, base_a):
+    """{key: [hits]} of base A's rows the guard flags against the exams (the dHash guard on every exam the inputs
+    hold, DS1's own MD and MT-W lists among them, and the DINOv2 detector of DS1's own index): kept in every K arm and
+    listed (Revision 1 of DS1, item 4: K0 = E1-A trained on exactly base A, so every K arm holds them alike)."""
+    rows = []
+    for r in base_a:
+        p = inputs.base_b.get(r["key"]) or {}
+        rows.append(dict(r, dhash=p.get("dhash"), variants=p.get("variants")))
+    hits = dhash_hits(rows, inputs.exams)
+    sc = inputs.scanners.get("own")
+    if sc is not None:
+        hits = merge_hits(hits, embed_hits(rows, sc, D.root() / "leak" / "base_a_own.npz"))
+    return {k: v[:5] for k, v in hits.items()}
+
+
 def manifests(phase, inputs, write=True, on_date=None):
     """Step 'manifests' (L30): every arm whose conditions hold and whose manifest is not written: S0 and KF once
-    MD-S0 is frozen; KD and KT once SIU's species-role table is decided and audited; S1c, S1c-R and S1u once every
-    phase-1 source with candidates is decided and frozen; S2 in phase 2. Each written once (row bytes of every
-    smaller manifest unchanged in the larger ones)."""
+    MD-S0 is frozen; KD and KT once SIU's species-role table is decided and audited (not run, recorded, when SIU
+    is rejected, role C or quarantined, or a K supply is under N_K); S1c, S1c-R and S1u once every phase-1 source
+    with candidates is settled and every accepted one's MD-N frozen; S2 in phase 2. Only sources ready now enter
+    (ready_pools); the K arms' added rows and every S arm's new rows pass the guard against DS1's own exams first
+    (guard_new). Each written once (row bytes of every smaller manifest unchanged in the larger ones)."""
     if not frozen("md_s0"):
         return {"status": "MD-S0 is not frozen: no manifest is built before it (DS.5.4)"}
     md_rows = read_jsonl(Path(frozen("md_s0")["root"]).parent / "rows.jsonl")
@@ -2052,54 +2629,71 @@ def manifests(phase, inputs, write=True, on_date=None):
     # the K arms (base A plus N_K rows each; DS.5.3): KF from base B's thinned Field and Turf external rows (outside
     # MD-S0, test v1 and its companions), KD and KT from SIU's frames once its table is decided and audited; N_K =
     # min(15,000, each K pool's supply), the same in every K arm: KF records it, KD and KT take it or are not built
-    pr = pool_rows(1)
-    siu = [r for r in pr.get(SIU, [])]
+    pr = ready_pools(1, inputs)
     md_keys = {r["key"] for r in md_rows}
     companions = {str(r.get("key")) for r in B3.prior_test_lists()[0]} if inputs.production else set()
     kf_rows = []
     for k, v in inputs.base_b.items():
         if inputs.setting.get(k) in ("Field", "Turf") and v.get("kind") != B3.BASE_KIND and k not in md_keys \
                 and k not in companions and k in inputs.base_b_man:
-            kf_rows.append(dict(inputs.base_b_man[k], series=None, thin=True))
+            kf_rows.append(dict(inputs.base_b_man[k], series=None, thin=True, dhash=v.get("dhash"),
+                                variants=v.get("variants"), group=v.get("group"),
+                                capture=next((c_[1] for c_ in v.get("capture_keys") or () if c_[0] == "capture"),
+                                             None)))
+    kf_rows = guard_new(_phase_rows({"base_b": kf_rows}, md_keys, exam_rows, set()), inputs)
     siu_dec = inputs.decisions.get(SIU) or {}
-    siu_ready = source_ready(SIU, inputs.decisions, screen_records(1).get(SIU))[0]
+    siu_srec = screen_records(1).get(SIU)
+    siu_ready = source_ready(SIU, inputs.decisions, siu_srec)[0]
+    siu_out = siu_srec is not None and settled_out(SIU, inputs.decisions, siu_srec)
     crop = tuple(u[5:] for u, role in (siu_dec.get("roles") or {}).items() if u.startswith("eppo:") and role != "weed")
-    kpools, t, n_k = k_pools(siu if siu_ready else [], kf_rows, crop)
+    siu = guard_new(_phase_rows({SIU: pr.get(SIU, [])}, md_keys, exam_rows, set()), inputs) if siu_ready else []
+    kpools, t, n_k = k_pools(siu, kf_rows, crop)
     base_a = [dict(v, key=k) for k, v in inputs.base_a.items()]
+    ahits = base_a_hits(inputs, base_a) if write and (not arm_record_path("KF").is_file() or siu_ready) else {}
     if write and not arm_record_path("KF").is_file() and kf_rows:
         nk_f = min(N_K_MAX, kpools["supplies"]["KF"]) if not siu_ready else n_k
         built["KF"] = write_arm("KF", base_a + [_man(r) for r in kf_draw(kpools, nk_f)],
-                                {"n_k": nk_f, "pool": "base B Field and Turf, thinned", "supplies": kpools["supplies"]})
+                                {"n_k": nk_f, "pool": "base B Field and Turf, thinned", "supplies": kpools["supplies"],
+                                 "base_a_kept_with_hits": ahits})
+    k_nr = out_dir() / "arms" / "k_not_run.json"
+    if write and siu_out and not k_nr.is_file():
+        # SIU rejected, role C or quarantined whole: KD and KT have no supply; recorded not run, so verdict v1 is
+        # never held by them (DS.9.3)
+        why = "not run (the K source %s enters no DS1 manifest: %s)" % (SIU, source_ready(SIU, inputs.decisions,
+                                                                                         siu_srec)[1])
+        built["k_waits"] = why
+        write_once(k_nr, {"format": FMT_ARM, "arms": ["KD", "KT"], "status": why, "written_utc": D._utc()})
     if write and siu_ready and arm_record_path("KF").is_file():
         nk = int((_read_json(arm_record_path("KF")) or {}).get("n_k") or 0)
         short = k_short(kpools["supplies"], nk)
         if short:
             why = "not run (supply under N_K %d: %s): N_K is the same in every K arm" % (nk, short)
             built["k_waits"] = why
-            if not (out_dir() / "arms" / "k_not_run.json").is_file():
-                write_once(out_dir() / "arms" / "k_not_run.json", {"format": FMT_ARM, "arms": ["KD", "KT"],
-                                                                   "status": why, "written_utc": D._utc()})
+            if not k_nr.is_file():
+                write_once(k_nr, {"format": FMT_ARM, "arms": ["KD", "KT"], "status": why, "written_utc": D._utc()})
         else:
             tt = min(t, nk)
             if not arm_record_path("KD").is_file():
                 built["KD"] = write_arm("KD", base_a + [_man(r) for r in kd_draw(kpools, tt, nk)],
-                                        {"n_k": nk, "t": tt, "supplies": kpools["supplies"]})
+                                        {"n_k": nk, "t": tt, "supplies": kpools["supplies"],
+                                         "base_a_kept_with_hits": ahits})
             if not arm_record_path("KT").is_file():
                 built["KT"] = write_arm("KT", base_a + [_man(r) for r in kt_draw(kpools, tt, nk)],
-                                        {"n_k": nk, "t": tt, "supplies": kpools["supplies"]})
-    # the S arms of phase 1
-    pending = [s for s, v in screen_records(1).items() if v.get("live") and not v.get("quarantine_whole")
-               and not source_ready(s, inputs.decisions, v)[0]
-               and (inputs.decisions.get(s) or {}).get("decision") != "reject"]
-    unfrozen = [s for s, v in pool_rows(1).items() if s != SIU and (inputs.decisions.get(s) or {}).get(
-        "decision") == "accept" and not frozen(mdn_exam(s))]
+                                        {"n_k": nk, "t": tt, "supplies": kpools["supplies"],
+                                         "base_a_kept_with_hits": ahits})
+    # the S arms of phase 1: every screened source settled (role C, quarantined or rejected sources are settled out;
+    # the others decided, audited where required), every accepted source's MD-N frozen
+    srec1 = screen_records(1)
+    pending = [s for s, v in srec1.items() if v.get("live") and not settled_out(s, inputs.decisions, v)
+               and not source_ready(s, inputs.decisions, v)[0]]
+    unfrozen = [s for s in pr if s != SIU and (inputs.decisions.get(s) or {}).get("decision") == "accept"
+                and not frozen(mdn_exam(s))]
     if pending or unfrozen:
         built["phase1_waits"] = {"sheets": sorted(pending), "md_n": sorted(unfrozen)}
     elif write and not arm_record_path("S1U").is_file():
         new = guard_new(_phase_rows(pr, md_keys, exam_rows, s0_keys), inputs)
         siu_new = [r for r in new if r["source"] == SIU and r.get("thin")]
         other = [r for r in new if r["source"] != SIU and r.get("thin")]
-        n_u = n_s0 + len(siu_new) + len(other)
         s1u = s0_rows + [_man(r) for r in siu_new + other]
         siu_base = sum(1 for r in s0_rows if r["source"] == SIU)
         kept, dropped, crec = family_cap(siu_new, siu_base, len(s0_rows) - siu_base + len(other), SIU_FAMILY)
@@ -2111,21 +2705,22 @@ def manifests(phase, inputs, write=True, on_date=None):
         if not nested_ok({json.dumps(r, sort_keys=True) for r in s0_rows},
                          {json.dumps(_man(r), sort_keys=True) for r in s1c_full}):
             raise DataRefused("S1c does not hold every S0 row byte for byte")
-        built["S1C"] = write_arm("S1C", s1c_full, {"repeats": r_c, "family_cap": crec, "dropped_videos": dropped})
-        built["S1U"] = write_arm("S1U", s1u_full, {"repeats": r_u})
+        built["S1C"] = write_arm("S1C", s1c_full, {"repeats": r_c, "family_cap": crec, "dropped_videos": dropped,
+                                                   "sources": sorted(pr)})
+        built["S1U"] = write_arm("S1U", s1u_full, {"repeats": r_u, "sources": sorted(pr)})
         built["S1CR"] = write_arm("S1CR", s1cr, {"repeats": 1, "of": "S1C"})
     if int(phase) == 2 and write and not arm_record_path("S2").is_file() and arm_record_path("S1C").is_file():
-        p2 = pool_rows(2)
-        p2_pending = [s for s, v in screen_records(2).items() if v.get("live") and not v.get("quarantine_whole")
-                      and not source_ready(s, inputs.decisions, v)[0]
-                      and (inputs.decisions.get(s) or {}).get("decision") != "reject"]
+        p2 = ready_pools(2, inputs)
+        srec2 = screen_records(2)
+        p2_pending = [s for s, v in srec2.items() if v.get("live") and not settled_out(s, inputs.decisions, v)
+                      and not source_ready(s, inputs.decisions, v)[0]]
         p2_unfrozen = [s for s in p2 if (inputs.decisions.get(s) or {}).get("decision") == "accept"
                        and not frozen(mdn_exam(s))]
         if p2_pending or p2_unfrozen:
             built["phase2_waits"] = {"sheets": sorted(p2_pending), "md_n": sorted(p2_unfrozen)}
         else:
             s1c_rows, _r = arm_rows("S1C")
-            s1c_base = [r for r in s1c_rows if "__r" not in r["key"]]
+            s1c_base = [r for r in s1c_rows if not is_repeat(r["key"])]
             new = guard_new(_phase_rows(p2, md_keys, exam_rows, {r["key"] for r in s1c_base}), inputs)
             fams = collections.defaultdict(list)
             for r in new:
@@ -2144,7 +2739,8 @@ def manifests(phase, inputs, write=True, on_date=None):
                     kept = members
                 rows2 += [_man(r) for r in kept]
             r2 = floor_repeats(len(rows2), n_s0, c)
-            built["S2"] = write_arm("S2", rows2 + repeat_rows(tc_rows, r2), {"repeats": r2, "family_caps": caps})
+            built["S2"] = write_arm("S2", rows2 + repeat_rows(tc_rows, r2), {"repeats": r2, "family_caps": caps,
+                                                                            "sources": sorted(p2)})
     return built
 
 
@@ -2162,9 +2758,10 @@ def guard_new(rows, inputs):
     """The pools' rows against MD v1 and MT-W v2 (drawn after the pools' guard ran), both directions: the 8-variant
     6-bit dHash and the calibrated DINOv2 detector (DS1's own index); a hit is dropped (DS.5.1 item 7)."""
     ex = {k: v for k, v in inputs.exams.items() if k == "ds1_exams"}
+    q = hashlib.sha256("\n".join(sorted(str(r["key"]) for r in rows)).encode("utf-8")).hexdigest()[:16]
     hits = merge_hits(dhash_hits(rows, ex) if ex else {},
-                      embed_hits(rows, inputs.scanners.get("own"), D.root() / "leak" / "new_rows_own.npz")
-                      if inputs.scanners.get("own") else {})
+                      embed_hits(rows, inputs.scanners.get("own"), D.root() / "leak" / ("new_rows_own_%s.npz" % q))
+                      if inputs.scanners.get("own") and rows else {})
     return [r for r in rows if not hits.get(r["key"])]
 
 
@@ -2203,7 +2800,11 @@ def plan_state(inc_dir=None):
                        .is_file(), "md_n": bool(frozen(mdn_exam(s))), "mtw_draft": (exam_dir(mtw_exam(s)) / "draft")
                        .is_dir(), "mtw": bool(frozen(mtw_exam(s))) or (exam_dir(mtw_exam(s)) / "left.json").is_file(),
                        "checked": s in checks,
-                       "quarantined_whole": bool(v.get("quarantine_whole"))}
+                       "quarantined_whole": bool(v.get("quarantine_whole")),
+                       # role C by its capture names (DS.5.1 item 1(b)); settled out (role C, quarantined or
+                       # rejected: in no manifest, no MD-N, no MT-W v2); SIU is never drawn into an exam
+                       "role_c": bool(v.get("role_c") or int((v.get("capture_names") or {}).get("hits") or 0)),
+                       "settled_out": settled_out(s, decs, v), "exam_draw": s != SIU}
         out["phases"][str(ph)] = {"revisions": len(revs), "new_batches": len(batches - seen) if revs else None,
                                   "sources": srcs}
     drafts = sorted(exam_dir("md_s0").glob("draft_r[0-9][0-9][0-9]")) if exam_dir("md_s0").is_dir() else []
@@ -2230,6 +2831,8 @@ def plan_state(inc_dir=None):
                      "ln_recorded": bool(SH.ln_marks(inc))}
     out["mtw_v1_1"] = (_read_json(out_dir() / "mtw_v1_1" / "status.json") or {}).get("format") is not None
     out["k_not_run"] = (out_dir() / "arms" / "k_not_run.json").is_file()
+    srec1 = screen_records(1)
+    out["k_source_out"] = SIU in srec1 and settled_out(SIU, decs, srec1.get(SIU))
     out["ra"] = isinstance(_read_json(D.capacity("ds1_ra_gate.json")), dict)
     out["power_final"] = isinstance(_read_json(D.capacity("ds1_power.json")), dict)
     return out

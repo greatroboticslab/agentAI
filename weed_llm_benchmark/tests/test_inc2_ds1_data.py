@@ -230,8 +230,10 @@ def t_thin_cap_floor():
     check("  where the ratio is whole, train_core's image-epochs equal S0's (30 epochs a row at 1.2 M)",
           r2 == 2 and ep0 == 30 and ep2 * r2 == ep0, (ep0, ep2, r2))
     reps = DD.repeat_rows([{"key": "tc_a", "image": "/a.png"}], 3)
-    check("  repeat rows name the same files under <key>__r<j>", [x["key"] for x in reps] == ["tc_a__r1", "tc_a__r2"]
-          and all(x["image"] == "/a.png" for x in reps))
+    check("  repeat rows name the same files under <key>__ds1rep<j>; a source's own key holding '__r' is no repeat",
+          [x["key"] for x in reps] == ["tc_a__ds1rep1", "tc_a__ds1rep2"] and all(x["image"] == "/a.png" for x in reps)
+          and DD.is_repeat("tc_a__ds1rep2") and not DD.is_repeat("rf_ws__proj__rice_001") and
+          DD.repeat_base("tc_a__ds1rep2") == "tc_a")
     s1c = [{"key": "tc%d" % i} for i in range(5)] + [{"key": "x%03d" % i} for i in range(60)]
     s1cr = DD.s1cr_draw(s1c, 30, {"tc%d" % i for i in range(5)})
     check("S1c-R: exactly S0's size, every train_core row kept, the rest by stable_int(inc2/ds1/r/<key>)",
@@ -411,8 +413,10 @@ def build_world():
                       "holds": list(holds), "refused": refused, "admission": admission, "test_v1": None,
                       "batch": "b0009"})
     for i in range(200):
+        # every fourth row a near copy (5 bits) of a base B row: its capture group never enters MT-W v2 (MT.2 item 2)
+        near = flip(base_b["rf_field_a__img%03d" % (i // 4)]["dhash"], 5) if i % 4 == 0 else None
         cand("src_field__p%03d" % i, "src_field", 2000 + i, [(12, 0.5, 0.5, 0.2, 0.2), (12, 0.25, 0.3, 0.1, 0.12)],
-             capture="src_field|pair%03d" % (i // 2))
+             capture="src_field|pair%03d" % (i // 2), h=near)
     cand("src_field__held", "src_field", 2300, [(12, 0.5, 0.5, 0.2, 0.2)], holds=["funnel_F9"])
     cand("src_field__lic", "src_field", 2301, [(12, 0.5, 0.5, 0.2, 0.2)], holds=["licence"])
     cand("src_field__ood_dino", "src_field", 2302, [(12, 0.5, 0.5, 0.2, 0.2)])
@@ -455,7 +459,7 @@ def build_world():
         "src_field": {"decision": "accept", "setting": "Field", "roles": {"inc:12": "weed"}, "audit_required": True,
                       "audited": True},
         "src_crop": {"decision": "accept", "setting": "Field", "roles": {"inc:12": "crop"}},
-        "src_reup": {"decision": "reject", "setting": "Field", "roles": {}},
+        "src_reup": {"decision": "accept", "setting": "Field", "roles": {"inc:4": "weed"}},
         "src_devcopy": {"decision": "accept", "setting": "Field", "roles": {"inc:12": "weed"}},
         SIU: {"decision": "accept_training_only", "setting": "Indoor", "audit_required": True, "audited": True,
               "roles": {"eppo:AMAPA": "weed", "eppo:AMATA": "weed", "eppo:ABUTH": "weed", "eppo:CHEAL": "weed",
@@ -472,19 +476,18 @@ def build_world():
 def t_world():
     print("the world end to end: screen, pools, MD-S0, draw, manifests")
     inp = build_world()
-    pr = TMP / "proofs"
-    pr.mkdir(parents=True, exist_ok=True)
-    (pr / "a.ots").write_bytes(b"a")
-    (pr / "b.ots").write_bytes(b"b")
-    D.timestamp_record(*[str(pathlib.Path(__file__).resolve().parents[2] / "docs" / "prereg" / n) for n in (
-        "DS1_2026-10-29.md.ots", "DS1_2026-10-29.stamp.txt.ots")])
+    D.write_json(D.timestamp_path(), {"format": D.FMT_TIMESTAMP, "sha256": D.PREREG_SHA256, "proofs": [
+        {"file": "a.ots", "sha256": "a" * 64}, {"file": "b.ots", "sha256": "b" * 64}], "revisions": [
+        {"file": r["file"], "sha256": r["sha256"], "proofs": [{"file": "c", "sha256": "c" * 64},
+                                                             {"file": "d", "sha256": "d" * 64}]} for r in D.REVISIONS]})
     scr = DD.screen(1, inp)
     srcs = scr["sources"]
     check("the screen records every candidate source with its units and counts", set(srcs) >= {
         "src_field", "src_reup", "src_crop", "src_devcopy", SIU} and srcs["src_field"]["out"].get("held:funnel_F9") == 1,
           {k: v.get("out") for k, v in srcs.items()})
-    check("  the capture-name scan flags the re-upload (role C once its sheet shows the pairs)",
-          srcs["src_reup"]["capture_names"]["hits"] == 30 and srcs["src_field"]["capture_names"]["hits"] == 0)
+    check("  the capture-name scan flags the re-upload: role C, its sheet showing the pairs",
+          srcs["src_reup"]["capture_names"]["hits"] == 30 and srcs["src_reup"]["role_c"] and
+          srcs["src_field"]["capture_names"]["hits"] == 0 and not srcs["src_field"]["role_c"])
     check("  one dHash copy of a cwd12 dev image quarantines its source whole (D28-v2)",
           srcs["src_devcopy"]["quarantine_whole"] and not srcs["src_field"]["quarantine_whole"])
     check("  SIU's units are EPPO codes, SORVU among them", "eppo:SORVU" in srcs[SIU]["units"] and
@@ -493,9 +496,9 @@ def t_world():
           not DD.screen(1, inp)["candidates"])
     doc, pooled = DD.pools(1, inp)
     out_field = doc["sources"]["src_field"]["out"]
-    check("pools: only ready sources (a reject and a quarantined source are not)", set(pooled) == {
-        "src_field", SIU} and doc["not_ready"].get("src_reup") == "rejected" and "quarantined" in
-          doc["not_ready"].get("src_devcopy", ""), (sorted(pooled), doc["not_ready"]))
+    check("pools: only ready sources (the re-upload, though its sheet says accept, is role C; a quarantined source "
+          "is out)", set(pooled) == {"src_field", SIU} and "role C" in doc["not_ready"].get("src_reup", "") and
+          "quarantined" in doc["not_ready"].get("src_devcopy", ""), (sorted(pooled), doc["not_ready"]))
     check("  src_crop's images hold only crop boxes: every one dropped (no weed box)", doc["sources"]["src_crop"][
         "admitted"] == 0)
     check("  the guard dropped the DINOv2-only ood23 copy and the H10d near copy; EXIF refused after the guard; "
@@ -540,10 +543,27 @@ def t_world():
           DD.frozen(mdn) and not DD.frozen(mtw) and (DD.exam_dir(mtw) / "draft" / "rows.jsonl").is_file() and
           "SIU" in dr[SIU]["status"], dr.get("src_field"))
     nt = DD.never_train_rows()
-    check("  every MD-N and MT-W v2 row on the never-train list at its draw", {r["exam"] for r in nt} >= {
-        "md_s0", mdn, mtw})
-    dr2 = DD.draw(1, inp, checks={"src_field": {"verdict": "pass", "sha256": "c" * 64, "corrected_labels": {}}})
-    check("  after the person's check MT-W v2 is frozen in its own root", DD.frozen(mtw) is not None, dr2)
+    check("  every MD-N and MT-W v2 row on the never-train list at its draw, with the file DS1's own DINOv2 index "
+          "describes", {r["exam"] for r in nt} >= {"md_s0", mdn, mtw} and all(r.get("image") for r in nt))
+    base_ex = {"base": {"keys": list(inp.base_b), "H": np.asarray([v["variants"] for v in inp.base_b.values()],
+                                                                  dtype=np.uint64),
+                        "ok": np.ones(len(inp.base_b), dtype=bool)}}
+    mt_rows = [dict(r, variants=r.get("variants")) for r in DD.read_jsonl(DD.exam_dir(mtw) / "draft" / "rows.jsonl")]
+    xr = dr.get("src_field", {}).get("exclusions") or {}
+    check("  MT-W v2 holds no group with an image within 6 bits of a base B row (MT.2 item 2): the 50 planted near "
+          "copies' groups left out, recorded", mt_rows and not DD.dhash_hits(mt_rows, base_ex) and
+          xr.get("rows_near_base_b", 0) >= 50 and xr.get("groups_excluded_mtw", 0) >= 50, xr)
+    draft = DD.read_jsonl(DD.exam_dir(mtw) / "draft" / "rows.jsonl")
+    ck = draft[0]["key"]
+    fix = [[0.5, 0.5, 0.2, 0.2], [0.25, 0.3, 0.1, 0.12], [0.8, 0.8, 0.1, 0.1]]
+    dr2 = DD.draw(1, inp, checks={"src_field": {"verdict": "pass", "sha256": "c" * 64, "corrected_labels": {
+        ck: fix}}})
+    froot = pathlib.Path(DD.frozen(mtw)["root"])
+    got = next(r for r in C.read_manifest(froot / "splits" / "v1" / "mtw_v2.jsonl") if r["key"] == ck)
+    check("  after the person's check MT-W v2 is frozen in its own root; a corrected image's label is its whole "
+          "corrected label (all three boxes)", DD.frozen(mtw) is not None and len(pathlib.Path(got["label"])
+                                                                                  .read_text().splitlines()) == 3,
+          (dr2, got.get("label")))
     # manifests
     built = DD.manifests(1, inp)
     rows = {a: DD.arm_rows(a)[0] for a in ("S0", "KF", "S1C", "S1U", "S1CR") if DD.arm_record_path(a).is_file()}
@@ -559,23 +579,25 @@ def t_world():
     lines = {a: {json.dumps(r, sort_keys=True) for r in rs} for a, rs in rows.items()}
     check("S0 in S1c in S1u, row bytes unchanged", lines["S0"] <= lines["S1C"] <= lines["S1U"])
     s1c = rows["S1C"]
-    reps = [r for r in s1c if "__r" in r["key"]]
+    reps = [r for r in s1c if DD.is_repeat(r["key"])]
     r_c = DD.arm_rows("S1C")[1]["repeats"]
     check("the cwd12 floor: train_core rows repeated r - 1 more times in S1c (r from the rows before repeats)",
-          len(reps) == (r_c - 1) * 6 and all(r["key"].split("__r")[0] in inp.tc_keys for r in reps), r_c)
+          len(reps) == (r_c - 1) * 6 and all(DD.repeat_base(r["key"]) in inp.tc_keys for r in reps), r_c)
     exam_keys = {r["key"] for r in nt}
     check("no MD or MT-W row in any manifest; no row sharing their capture groups", not any(r["key"] in exam_keys
                                                                                            for rs in rows.values()
                                                                                            for r in rs))
-    siu_c = sum(1 for r in s1c if r["source"] == SIU and "__r" not in r["key"])
-    n_c = sum(1 for r in s1c if "__r" not in r["key"])
-    siu_u = sum(1 for r in rows["S1U"] if r["source"] == SIU and "__r" not in r["key"])
+    siu_c = sum(1 for r in s1c if r["source"] == SIU and not DD.is_repeat(r["key"]))
+    n_c = sum(1 for r in s1c if not DD.is_repeat(r["key"]))
+    siu_u = sum(1 for r in rows["S1U"] if r["source"] == SIU and not DD.is_repeat(r["key"]))
     check("SIU capped at 35 % of S1c's rows before repeats (S0's frames never dropped), not in S1u",
           siu_c <= 0.35 * n_c + 1e-9 or siu_c == sum(1 for r in rows["S0"] if r["source"] == SIU), (siu_c, n_c))
     check("  S1u holds every thinned SIU frame", siu_u >= siu_c)
     check("S1c-R: S0's size, train_core kept whole, drawn from S1c's rows", len(rows["S1CR"]) == len(rows["S0"]) and
           inp.tc_keys <= {r["key"] for r in rows["S1CR"]} and {r["key"] for r in rows["S1CR"]} <= {r["key"] for r in
                                                                                                    s1c})
+    check("the K arms keep base A whole and list its guard hits (Revision 1, item 4)", "base_a_kept_with_hits" in
+          DD.arm_rows("KF")[1])
     check("each arm's record prints images, distinct photos and capture groups, and its recipe from its final count",
           all(set(DD.arm_rows(a)[1]["counts"]) >= {"images", "distinct_photos", "capture_groups"} for a in rows) and
           DD.arm_rows("S1C")[1]["recipe"]["epochs"] == RC.budget_epochs(len(s1c)))

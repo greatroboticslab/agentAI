@@ -198,10 +198,12 @@ def t_audit():
                                                                    "spec_sha256": r["spec_sha256"]},
                              "decider": "Harry", "saved_utc": "2026-11-11T00:00:00Z", "sources": decs}))
     check("an audit file decided by the delegate is refused", refused(SH.record, str(f), "delegate"))
-    SH.record(str(f), "human:harry567566")
+    check("  an audit file recorded under another person's id is refused", refused(SH.record, str(f),
+                                                                                   "human:someone@else.org"))
+    SH.record(str(f), SH.OWNER_HUMAN)
     fd2 = SH.fold()
     check("a reversal is recorded as the owner's and governs", fd2[first]["decision"] == "reject" and
-          fd2[first]["reversed"] and fd2[first]["decided_by"] == "human:harry567566")
+          fd2[first]["reversed"] and fd2[first]["decided_by"] == SH.OWNER_HUMAN)
     check("  and widens the audit to every decided sheet", all(v["audit_required"] for v in fd2.values() if
                                                                v.get("delegate_decision")))
     check("  the audited sources are done; the others now wait for him", all(fd2[s]["audited"] for s in r["sources"])
@@ -241,15 +243,18 @@ def t_folds():
                                  "removed": [], "added": [], "total": 400}) + "\n")
         for i in range(20):
             fh.write(json.dumps({"kind": "mtw", "source": "src_w", "item": "mtw|src_w|k%d" % i, "error": i == 0,
+                                 "verdict": "error" if i == 0 else "correct",
                                  "removed": [0] if i == 0 else [], "added": [[0.5, 0.5, 0.1, 0.1]] if i == 0 else [],
+                                 "corrected_boxes": [[0.2, 0.2, 0.1, 0.1], [0.5, 0.5, 0.1, 0.1]] if i == 0 else None,
                                  "total": 20}) + "\n")
         for g, n in (("siu_increments", 3), ("train_core", 2)):
             for i in range(n):
                 fh.write(json.dumps({"kind": "ln", "group": g, "marks": ["correct", "loose"], "missing": 1}) + "\n")
     m = SH.mtw_checks()
     check("MT-W: 1 error in 60 passes, 2 fail", m["src_m"]["verdict"] == "pass" and m["src_f"]["verdict"] == "fail")
-    check("  a source checked whole passes once its errors are corrected (the correction logged)",
-          m["src_w"]["verdict"] == "pass" and m["src_w"]["corrections"] == 1 and m["src_w"]["corrected_labels"])
+    check("  a source checked whole passes once its errors are corrected (the correction logged: the image's whole "
+          "corrected label)", m["src_w"]["verdict"] == "pass" and m["src_w"]["corrections"] == 1 and
+          m["src_w"]["corrected_labels"] == {"k0": [[0.2, 0.2, 0.1, 0.1], [0.5, 0.5, 0.1, 0.1]]})
     ln = SH.ln_marks()
     check("LN's marks folded per group", len(ln["siu_increments"]) == 3 and len(ln["train_core"]) == 2)
     st = SH.status()

@@ -3072,7 +3072,7 @@
       "description": "Lever L30 (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29: DS1, scaling verified training data at the weed level, pre-registered): inc2.ds1_data build writes DS1's records under splits/ds1/ and ds1/v1/ (a screen revision and its sheets' bundles, MD-S0's draft or freeze, the weed-level pools, MD-N and MT-W v2, the arms' manifests). Record only: nothing switches."
     },
     "inc_ds1_sheets": {
-      "template": "lab: python -m weed_optimizer_framework.tools.inc2.ds1_sheets render --kind {kind} --batch {batch} --lab-inc {lab_inc}",
+      "template": "lab: python -m weed_optimizer_framework.tools.inc2.ds1_sheets render --kind {kind} --batch {batch} --lab-inc {lab_inc} [--sources {sources}]",
       "param_bounds": {
         "kind": {
           "type": "enum",
@@ -3092,6 +3092,10 @@
         "lab_inc": {
           "type": "str",
           "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}$"
+        },
+        "sources": {
+          "type": "str",
+          "pattern": "^[A-Za-z0-9_./-]{1,160}(,[A-Za-z0-9_./-]{1,160}){0,199}$"
         }
       },
       "risk": "R0",

@@ -73,6 +73,21 @@ def main():
     check("  the proofs stamp the amendment and the stamp file (OpenTimestamps headers)",
           D.ots_digest(GIT / files[1]) == D.PREREG_SHA256
           and D.ots_digest(GIT / files[3]) == hashlib.sha256((GIT / files[2]).read_bytes()).hexdigest())
+    revs = cfg.get("revisions") or []
+    rfiles = [x for r in D.REVISIONS for x in (r["file"], r["file"] + ".ots", r["stamp_file"],
+                                               r["stamp_file"] + ".ots")]
+    check("the git-root paths ship DS1's Revisions, their proofs and stamp files", revs and all(f in root for f in
+                                                                                             rfiles),
+          [f for f in rfiles if f not in root])
+    check("  each Revision's file hashes to the sha256 the gate pins (stream_domains/weed.json) and inc2.ds1 records; "
+          "its proofs stamp it and its stamp file, which names its sha256 and commit",
+          [(r["file"], r["sha256"]) for r in revs] == [(r["file"], r["sha256"]) for r in D.REVISIONS] and
+          all(hashlib.sha256((GIT / r["file"]).read_bytes()).hexdigest() == r["sha256"] and
+              D.ots_digest(GIT / (r["file"] + ".ots")) == r["sha256"] and
+              D.ots_digest(GIT / (r["stamp_file"] + ".ots")) == hashlib.sha256(
+                  (GIT / r["stamp_file"]).read_bytes()).hexdigest() and
+              r["sha256"] in (GIT / r["stamp_file"]).read_text() and r["commit"] in (GIT / r["stamp_file"]).read_text()
+              for r in D.REVISIONS))
     check("the package paths ship inc2 (DS1's modules), run_inc2_long.sh and tests/fixtures/ds1",
           "weed_optimizer_framework/tools/inc2" in pkg and "run_inc2_long.sh" in pkg and "tests/fixtures/ds1" in pkg
           and all((PKG / "weed_optimizer_framework" / "tools" / "inc2" / n).is_file()
@@ -86,6 +101,10 @@ def main():
     rp = (TESTS / "test_stream_ap_replay.py").read_text()
     check("the deploy's pre-flight runs the stream replay, which holds S30 (executor.STREAM_REPLAY_CASES)",
           "tests/test_stream_ap_replay.py" in pre and "S30" in X.STREAM_REPLAY_CASES and '("S30", s30)' in rp)
+    check("  and this check of what ships for DS1, before anything is copied", "tests/test_inc2_ds1_deploy.py" in pre)
+    text = df.read_text()
+    check("the deploy record names whether HEAD descends from DS1's amendment commit (ds1_amendment_ancestor)",
+          "DS1_COMMIT=%s" % D.PREREG_COMMIT in text and '"ds1_amendment_ancestor": $DS1_ANCESTOR' in text)
     print("\n%d failure(s)" % len(FAILURES))
     for x in FAILURES:
         print("  FAILED: %s" % x)

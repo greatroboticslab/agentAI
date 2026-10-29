@@ -100,12 +100,10 @@ def t_recipe():
 
 def t_smoke_train():
     print("the smokes, the pair's compute and the seeds (a stub trainer)")
-    pr = TMP / "proofs"
-    pr.mkdir(parents=True, exist_ok=True)
-    (pr / "a.ots").write_bytes(b"a")
-    (pr / "b.ots").write_bytes(b"b")
-    D.timestamp_record(*[str(pathlib.Path(__file__).resolve().parents[2] / "docs" / "prereg" / n) for n in (
-        "DS1_2026-10-29.md.ots", "DS1_2026-10-29.stamp.txt.ots")])
+    D.write_json(D.timestamp_path(), {"format": D.FMT_TIMESTAMP, "sha256": D.PREREG_SHA256, "proofs": [
+        {"file": "a.ots", "sha256": "a" * 64}, {"file": "b.ots", "sha256": "b" * 64}], "revisions": [
+        {"file": r["file"], "sha256": r["sha256"], "proofs": [{"file": "c", "sha256": "c" * 64},
+                                                             {"file": "d", "sha256": "d" * 64}]} for r in D.REVISIONS]})
     write_arm("S0", 400)
     check("no seed before its smoke", refused(LG.train, "S0X", 0, trainer=stub_trainer(10)))
     # 400 rows at 3.6 M: 9,000 epochs; an epoch of 10 s projects 25.5 h > 19.2: the pair falls back to 2.4 M

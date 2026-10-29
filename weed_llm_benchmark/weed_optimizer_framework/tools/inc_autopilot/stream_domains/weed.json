@@ -794,6 +794,14 @@
   "amendment_commit": "b60b8ee4763867f03b37f09a35ae808b630f5d28",
   "amendment_file": "docs/prereg/DS1_2026-10-29.md",
   "amendment_sha256": "3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699",
+  "revisions": [
+   {
+    "file": "docs/prereg/DS1_rev1_2026-10-29.md",
+    "sha256": "543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7",
+    "stamp_file": "docs/prereg/DS1_rev1_2026-10-29.stamp.txt",
+    "why": "DS1 Revision 1 (docs/CONTINUOUS_LOOP.md, Revision (2026-10-29)), before any DS1 data: no DS1 lever is proposed until the deployed tree holds it by this sha256"
+   }
+  ],
   "never_cut": {
    "module": "weed_optimizer_framework/tools/inc2/step1_stream.py",
    "marker": "DS1_NEVER_TRAIN",

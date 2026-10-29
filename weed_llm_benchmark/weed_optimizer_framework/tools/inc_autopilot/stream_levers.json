@@ -1031,9 +1031,16 @@
     "--batch",
     "{batch}",
     "--lab-inc",
-    "{lab_inc}"
+    "{lab_inc}",
+    {
+     "if": "sources",
+     "tokens": [
+      "--sources",
+      "{sources}"
+     ]
+    }
    ],
-   "control": "The bundles the cluster's L30 wrote, each file checked against its bundle.json before it is drawn.",
+   "control": "The bundles the cluster's L30 wrote (the cluster's sheets state pulled first), each file checked against its bundle.json before it is drawn; an audit batch names its sources (the cluster's audit set).",
    "success": "ds1/v1/sheets/html/ds1_<kind>_<batch>.html and its render record (the sheet's sha256, the HTML's), the record pushed to the cluster for `record`.",
    "falsifier": "A bundle file that does not hash as recorded refuses the render.",
    "estimator": "zero",

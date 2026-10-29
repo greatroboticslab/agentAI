@@ -82,6 +82,9 @@ SETTING_LABELS = {"Field": "田间 Field", "Turf": "草坪 Turf", "Indoor": "室
 LN_MARKS = {"correct": "正确 correct", "not_plant": "不是植物 not a plant", "loose": "松散或不全 loose or partial",
             "two_plants": "一框两株 two plants in one box"}
 DECIDED_BY_RE = re.compile(r"(human:[A-Za-z0-9_.@+-]{1,80}|delegate)\Z")
+# the owner's audit sheets are his (DS.0 item 4: "a reversal is recorded as his"): recorded under his id only
+OWNER_HUMAN = "human:harry567566@gmail.com"
+MTW_VERDICTS = ("correct", "error")
 CLUSTER_DATA_SSH = "byler@data.bridges2.psc.edu"
 CLUSTER_INC = "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc"
 
@@ -152,8 +155,8 @@ def source_sample(source, admitted, removed, unit_of):
     items += [("removed", r) for r in seeded(removed, source, SAMPLE_REMOVED)]
     units = collections.defaultdict(list)
     for r in admitted + removed:
-        for b in r.get("boxes") or ():
-            units[unit_of(r, b[0])].append(r)
+        for i, b in enumerate(r.get("boxes") or ()):
+            units[unit_of(r, b[0], i)].append(r)
     for u in sorted(units):
         uniq = {r["key"]: r for r in units[u]}
         items += [("unit:%s" % u, r) for r in seeded(list(uniq.values()), "%s/%s" % (source, u), SAMPLE_UNIT)]
@@ -164,6 +167,18 @@ def audit_sample(sources, n=AUDIT_SAMPLE):
     """The owner's seeded audit sample (DS.0 item 4): the n sources with the lowest stable_int("inc2/ds1/audit/
     <source>") (ties by name)."""
     return sorted(sources, key=lambda s: (C.stable_int("inc2/ds1/audit/%s" % s), s))[:int(n)]
+
+
+def sticky_audit_sample(revisions, n=AUDIT_SAMPLE):
+    """The owner's seeded audit sample of a phase over its screen revisions (Revision 1 of DS1, item 3): after each
+    revision, the n sources with the lowest stable_int among the sources screened so far (revisions: [[sources of
+    revision 1], [of revision 2], ...], role C and wholly quarantined sources left out by the caller); a source once
+    drawn stays drawn, so a later revision never takes the audit away from a source it was drawn for."""
+    seen, out = [], set()
+    for srcs in revisions:
+        seen += [s for s in srcs if s not in seen]
+        out |= set(audit_sample(seen, n))
+    return out
 
 
 def ln_draw(groups):
@@ -222,13 +237,16 @@ def write_bundle(name, items, meta, inc=None):
         if not (d / fn).is_file():
             C2.write_bytes_atomic(d / fn, data)
         out.append(dict({k: v for k, v in it.items() if k != "image"}, file=fn, sha256=sha, wh=list(wh)))
-    doc = {"format": FMT_BUNDLE, "name": name, "items": out, "meta": meta, "written_utc": D._utc()}
+    # seq: the bundles written before this one (each L30 step writes its bundles one after another), so LN and MT-W
+    # batches keep their numbers when a later bundle is written (bundles)
+    seq = sum(1 for p in d.parent.iterdir() if p.is_dir() and (p / "bundle.json").is_file())
+    doc = {"format": FMT_BUNDLE, "name": name, "items": out, "meta": meta, "seq": seq, "written_utc": D._utc()}
     C2.write_json_atomic(d / "bundle.json", doc)
     return doc
 
 
 def _boxes_units(row, unit_of):
-    return [[unit_of(row, b[0])] + [float(x) for x in b[1:5]] for b in row.get("boxes") or ()]
+    return [[unit_of(row, b[0], i)] + [float(x) for x in b[1:5]] for i, b in enumerate(row.get("boxes") or ())]
 
 
 def bundle_sources(phase, revision, by_src, rec, out_rows=None, inc=None):
@@ -251,14 +269,24 @@ def bundle_sources(phase, revision, by_src, rec, out_rows=None, inc=None):
 
 # ------------------------------------------------------------------ the batches
 def bundles(kind, inc=None):
+    """The bundles of a kind: source bundles by name (source_chunks keeps each screen revision's batches apart);
+    LN and MT-W bundles in the order they were written (bundle.json's seq, then its time and name), so a bundle
+    written later (a new source's MT-W v2) never renumbers an earlier batch."""
     d = sheets_dir(inc) / "bundles"
     pre = {"source": "source_", "audit": "source_", "ln": "ln_", "mtw": "mtw_"}[kind]
-    return sorted(p.name for p in d.iterdir() if p.is_dir() and p.name.startswith(pre)) if d.is_dir() else []
+    names = sorted(p.name for p in d.iterdir() if p.is_dir() and p.name.startswith(pre)) if d.is_dir() else []
+    if kind in ("ln", "mtw"):
+        def order(n):
+            b = _read_json(d / n / "bundle.json") or {}
+            return (int(b.get("seq") if b.get("seq") is not None else 10 ** 9), str(b.get("written_utc") or "9999"), n)
+        names = sorted(names, key=order)
+    return names
 
 
-def batch_bundles(kind, batch, inc=None, decisions=None):
+def batch_bundles(kind, batch, inc=None, decisions=None, sources=None):
     """The bundles a batch renders: source sheets in chunks of BATCH_SOURCES in bundle order (batch 1 = the
-    first chunk); the audit batch the audit set at render time; ln and mtw one bundle per batch."""
+    first chunk); the audit batch the sources the platform names (sources: the cluster's audit set, which the
+    ticker passes) or else the audit set the decisions give; ln and mtw one bundle per batch."""
     names = bundles(kind, inc)
     if kind == "source":
         chunks = source_chunks(names)
@@ -266,7 +294,8 @@ def batch_bundles(kind, batch, inc=None, decisions=None):
             raise SheetRefused("source batch %s does not exist (%d batches)" % (batch, len(chunks)))
         return chunks[int(batch) - 1]
     if kind == "audit":
-        want = audit_sources(decisions if decisions is not None else fold(inc))
+        want = set(sources) if sources is not None else audit_sources(
+            decisions if decisions is not None else fold(inc))
         return [n for n in names if (_read_json(bundle_dir(n, inc) / "bundle.json") or {}).get("meta", {}).get(
             "source") in want]
     if not 1 <= int(batch) <= len(names):
@@ -318,6 +347,21 @@ def push_render(kind, batch, lab_inc, runner=None):
         CLUSTER_DATA_SSH, CLUSTER_INC, D.NAME)], capture_output=True, text=True, env=_rsync_env(), timeout=600)
     if p.returncode != 0:
         raise SheetRefused("the push of %s exited %d: %s" % (src.name, p.returncode, (p.stderr or "")[-300:]))
+    return True
+
+
+def pull_state(lab_inc, runner=None):
+    """The lab's copy of the cluster's sheets state before a render: every bundle and the decisions recorded so far
+    (rsync of ds1/v1/sheets/ from the data-transfer node, the lab's own renders and HTML left as they are). A render
+    lists its batch's bundles only after this pull, so a batch the cluster wrote is never 'missing' on the lab."""
+    run = runner or subprocess.run
+    dst = sheets_dir(lab_inc)
+    dst.mkdir(parents=True, exist_ok=True)
+    p = run(["setsid", "-w", "rsync", "-a", "--exclude", "rendered/", "--exclude", "html/", "-e", RSH,
+             "%s:%s/ds1/%s/sheets/" % (CLUSTER_DATA_SSH, CLUSTER_INC, D.NAME), str(dst) + "/"],
+            capture_output=True, text=True, env=_rsync_env(), timeout=3600)
+    if p.returncode != 0:
+        raise SheetRefused("the pull of the sheets' state exited %d: %s" % (p.returncode, (p.stderr or "")[-300:]))
     return True
 
 
@@ -386,18 +430,23 @@ function collect(){
   const out={format:'inc2-ds1-sheet-decisions/1',sheet:{kind:SPEC.kind,batch:SPEC.batch,spec_sha256:SPEC.spec_sha256},
     decider:document.getElementById('decider').value.trim(),saved_utc:new Date().toISOString().replace(/\.\d+Z$/,'Z')};
   if(!out.decider){alert('请填写决定人 / Fill in who decides'); return null;}
+  const missing=[];
   if(SPEC.kind==='source'||SPEC.kind==='audit'){out.sources={};
     for(const s of SPEC.sources){const d={decision:val('dec|'+s.source),setting:val('set|'+s.source),
       family:val('fam|'+s.source)||null,series:val('ser|'+s.source)===true,note:val('note|'+s.source)||'',roles:{}};
-      for(const u of s.units){d.roles[u]=val('role|'+s.source+'|'+u);}
-      if(!d.decision){alert('未决定 / no decision for '+s.source);return null;} out.sources[s.source]=d;}}
+      for(const u of s.units){d.roles[u]=val('role|'+s.source+'|'+u); if(!d.roles[u])missing.push(s.source+' '+u);}
+      if(!d.decision)missing.push(s.source+': decision'); if(!d.setting)missing.push(s.source+': setting');
+      out.sources[s.source]=d;}}
   else {out.images={};
     for(const it of SPEC.items){const r={};
       if(SPEC.kind==='ln'){r.marks=it.boxes.map((b,i)=>val('mark|'+it.id+'|'+i)||'correct');
-        r.missing=parseInt(val('miss|'+it.id)||'0',10)||0;}
-      else {r.error=val('err|'+it.id)===true; r.removed=(corr[it.id]||{}).removed||[]; r.added=(corr[it.id]||{}).added||[];
-        r.note=val('note|'+it.id)||'';}
+        r.missing=parseInt(val('miss|'+it.id)||'0',10)||0; r.checked=val('seen|'+it.id)===true;
+        if(!r.checked)missing.push(it.id);}
+      else {r.verdict=val('ok|'+it.id); r.error=r.verdict==='error'; r.removed=(corr[it.id]||{}).removed||[];
+        r.added=(corr[it.id]||{}).added||[]; r.note=val('note|'+it.id)||''; if(!r.verdict)missing.push(it.id);}
       out.images[it.id]=r;}}
+  if(missing.length){alert('尚未作答 / not answered yet ('+missing.length+'): '+missing.slice(0,8).join('; '));
+    return null;}
   return out;}
 function save(){const d=collect(); if(!d)return;
   const b=new Blob([JSON.stringify(d,null,1)],{type:'application/json'});const a=document.createElement('a');
@@ -428,10 +477,12 @@ def _radio(name, opts, chosen=None):
         html.escape(name), html.escape(k), " checked" if k == chosen else "", html.escape(v)) for k, v in opts.items())
 
 
-def _select(name, opts, chosen=None):
-    return '<select name="%s">%s</select>' % (html.escape(name), "".join(
-        '<option value="%s"%s>%s</option>' % (html.escape(k), " selected" if k == chosen else "", html.escape(v))
-        for k, v in opts.items()))
+def _select(name, opts, chosen=None, blank=False):
+    """A select; blank: an empty first option chosen (the person must choose: an untouched sheet does not save)."""
+    first = '<option value="" selected>— 请选择 choose —</option>' if blank else ""
+    return '<select name="%s">%s%s</select>' % (html.escape(name), first, "".join(
+        '<option value="%s"%s>%s</option>' % (html.escape(k), " selected" if (k == chosen and not blank) else "",
+                                              html.escape(v)) for k, v in opts.items()))
 
 
 def render_html(spec, files):
@@ -465,13 +516,21 @@ def render_html(spec, files):
                                "examples") or [])[:600]), html.escape(json.dumps((scr.get("convention") or {}).get(
                                    "fails") or "passes")), html.escape(json.dumps(scr.get("audit_verdict"))[:300])))
             prev = s.get("delegate") or {}
-            out.append('<div class="decide"><b>决定 Decision</b><br>%s' % _radio("dec|" + src, DECISION_LABELS,
-                                                                                 prev.get("decision") if kind ==
-                                                                                 "audit" else None))
+            if scr.get("role_c") or scr.get("quarantine_whole"):
+                out.append('<div class="delegate"><b>%s</b></div>' % html.escape(
+                    "角色C：文件名含 cwd12 / 3SeasonWeedDet10 拍摄名 role C: its file names carry cwd12 or 3SeasonWeedDet10 "
+                    "capture names (DS.5.1 1(b)); the pairs are listed above" if scr.get("role_c") else
+                    "整源隔离：cwd12 dev/test 副本 quarantined whole: a copy of a cwd12 dev or test image (D28-v2)") +
+                    " — this source enters no DS1 manifest whatever is decided</div>")
+            # every answer is given on the sheet: nothing is pre-selected on the owner's audit (the delegate's
+            # decision is shown beside each box), so a sheet saved untouched cannot pass
+            out.append('<div class="decide"><b>决定 Decision</b><br>%s' % _radio("dec|" + src, DECISION_LABELS, None))
             if prev:
                 out.append('<div class="delegate">代理人的决定 The delegate decided: %s</div>' % html.escape(
                     json.dumps(prev, ensure_ascii=False)))
-            out.append('<br><b>场景 Setting</b> %s' % _select("set|" + src, SETTING_LABELS, prev.get("setting")))
+            blank = kind == "audit"
+            out.append('<br><b>场景 Setting</b> %s' % _select("set|" + src, SETTING_LABELS, None if blank else
+                                                              prev.get("setting"), blank=blank))
             out.append(' <b>族 Family</b> <input type="text" name="fam|%s" value="%s" size="10">' % (
                 html.escape(src), html.escape(prev.get("family") or s.get("family") or "")))
             out.append(' <label><input type="checkbox" name="ser|%s"%s> 视频或托盘系列 video or tray series</label>' % (
@@ -480,10 +539,12 @@ def render_html(spec, files):
                        '<th>角色 Role</th></tr>')
             for u in s["units"]:
                 info = (s.get("unit_info") or {}).get(u) or {}
-                out.append('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' % (
+                dr = (prev.get("roles") or {}).get(u)
+                out.append('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s%s</td></tr>' % (
                     html.escape(u), html.escape(", ".join(info.get("names") or [])), info.get("boxes", ""),
-                    _select("role|%s|%s" % (src, u), ROLE_LABELS, (prev.get("roles") or {}).get(u)
-                            or info.get("suggested"))))
+                    _select("role|%s|%s" % (src, u), ROLE_LABELS, None if blank else (dr or info.get("suggested")),
+                            blank=blank),
+                    (' <span class="delegate">delegate: %s</span>' % html.escape(str(dr))) if blank and dr else ""))
             out.append('</table><br>备注 Note <input type="text" name="note|%s" size="60"></div>' % html.escape(src))
             groups = collections.OrderedDict()
             for it in s["items"]:
@@ -516,10 +577,12 @@ def render_html(spec, files):
                                                                        "correct")))
                 cell.append('<div>漏标株数 Plants unboxed <input type="text" name="miss|%s" size="3" value="0"></div>'
                             % html.escape(it["id"]))
+                cell.append('<div><label><input type="checkbox" name="seen|%s"> 已检查此图 I checked this image'
+                            '</label></div>' % html.escape(it["id"]))
             else:
-                cell.append('<div><label><input type="checkbox" name="err|%s"> 有错 In error</label> '
-                            '<input type="text" name="note|%s" size="22" placeholder="note"></div>' % (
-                                html.escape(it["id"]), html.escape(it["id"])))
+                cell.append('<div>%s <input type="text" name="note|%s" size="22" placeholder="note"></div>' % (
+                    _radio("ok|" + it["id"], {"correct": "正确 correct", "error": "有错 in error"}, None),
+                    html.escape(it["id"])))
                 if it.get("flagged"):
                     cell.append('<div class="delegate">verifier flag</div>')
             cell.append('<div class="cap">%s</div></div>' % html.escape(it.get("caption") or ""))
@@ -560,15 +623,20 @@ def sheet_spec(kind, batch, names, inc=None, decisions=None):
     return spec, files
 
 
-def render(kind, batch, inc=None, pull=False, runner=None, out_html=None):
-    """L31: render one batch (pulling its bundles from the cluster first when asked), write the HTML and its render
-    record (the spec's and the file's sha256)."""
+def render(kind, batch, inc=None, pull=False, runner=None, out_html=None, sources=None):
+    """L31: render one batch (with pull: the cluster's sheets state copied to the lab first, pull_state, so the batch's
+    bundles are listed from what the cluster wrote; every file checked against its bundle.json), write the HTML and
+    its render record (the spec's and the file's sha256), and push the record back. sources: the audit batch's
+    sources as the platform names them (the cluster's audit set)."""
     if kind not in KINDS:
         raise SheetRefused("--kind %s, not %r" % ("|".join(KINDS), kind))
+    if kind == "audit" and pull and sources is None:
+        raise SheetRefused("an audit batch rendered on the lab names its sources (--sources, the cluster's audit set)")
     if pull:
-        for n in batch_bundles(kind, batch, inc):
-            pull_bundle(n, inc, runner)
-    names = batch_bundles(kind, batch, inc)
+        pull_state(inc, runner)
+    names = batch_bundles(kind, batch, inc, sources=sources)
+    for n in names:
+        verify_bundle(n, inc)
     if not names:
         raise SheetRefused("the %s batch %s has no bundle" % (kind, batch))
     spec, files = sheet_spec(kind, batch, names, inc)
@@ -581,6 +649,7 @@ def render(kind, batch, inc=None, pull=False, runner=None, out_html=None):
            "sources": [s["source"] for s in spec["sources"]], "items": [it["id"] for it in spec["items"]],
            "item_boxes": {it["id"]: it.get("boxes") for it in spec["items"]},
            "item_groups": {it["id"]: it.get("ln_group") or it.get("source") for it in spec["items"]},
+           "item_totals": {it["id"]: it.get("total") for it in spec["items"] if it.get("total") is not None},
            "rendered_utc": spec["rendered_utc"]}
     C2.write_json_atomic(rendered_path(kind, batch, inc), rec)
     if pull:
@@ -618,6 +687,11 @@ def record(path, decided_by, inc=None):
     kind = rend["kind"]
     if kind == "audit" and decided_by == "delegate":
         raise SheetRefused("the audit sheets are the owner's: decided_by must name him (human:<id>)")
+    if kind == "audit" and decided_by != OWNER_HUMAN:
+        raise SheetRefused("the audit sheets are the owner's (DS.0 item 4): decided_by must be %s, not %r"
+                           % (OWNER_HUMAN, decided_by))
+    if not str(doc.get("decider") or "").strip():
+        raise SheetRefused("%s names no decider" % path)
     file_sha = hashlib.sha256(raw).hexdigest()
     have = _jsonl(decisions_path(inc))
     if any(r.get("file_sha256") == file_sha for r in have):
@@ -653,12 +727,30 @@ def record(path, decided_by, inc=None):
                 if len(marks) != nb or any(m not in LN_MARKS for m in marks) or int(d.get("missing") or 0) < 0:
                     raise SheetRefused("LN image %s: %d marks for %d boxes, or a mark outside %s" % (
                         i, len(marks), nb, sorted(LN_MARKS)))
+                if d.get("checked") is not True:
+                    raise SheetRefused("LN image %s is not marked checked: every image of the sheet is looked at "
+                                       "(a sheet saved untouched is not a measurement)" % i)
                 rows.append(dict(base, item=i, group=(rend.get("item_groups") or {}).get(i), marks=marks,
                                  missing=int(d.get("missing") or 0)))
             else:
-                rows.append(dict(base, item=i, source=(rend.get("item_groups") or {}).get(i),
-                                 error=bool(d.get("error")), removed=list(d.get("removed") or []),
-                                 added=[list(map(float, b)) for b in d.get("added") or []], note=d.get("note") or ""))
+                if d.get("verdict") not in MTW_VERDICTS or bool(d.get("error")) != (d.get("verdict") == "error"):
+                    raise SheetRefused("MT-W image %s: its answer is %r, not one of %s (every image is answered)" % (
+                        i, d.get("verdict"), list(MTW_VERDICTS)))
+                shown = list((rend.get("item_boxes") or {}).get(i) or [])
+                removed = sorted({int(j) for j in d.get("removed") or []})
+                if any(not 0 <= j < len(shown) for j in removed):
+                    raise SheetRefused("MT-W image %s: a removed box index outside its %d boxes" % (i, len(shown)))
+                added = [[float(x) for x in b] for b in d.get("added") or []]
+                if any(len(b) != 4 or not all(0.0 <= x <= 1.0 for x in b) for b in added):
+                    raise SheetRefused("MT-W image %s: an added box is not (cx, cy, w, h) in [0, 1]" % i)
+                row = dict(base, item=i, source=(rend.get("item_groups") or {}).get(i), verdict=d["verdict"],
+                           error=d["verdict"] == "error", removed=removed, added=added, note=d.get("note") or "",
+                           total=(rend.get("item_totals") or {}).get(i))
+                if removed or added:
+                    # the image's whole corrected label: the boxes shown without the ones removed, with the ones drawn
+                    row["corrected_boxes"] = [[float(x) for x in b[-4:]] for j, b in enumerate(shown)
+                                              if j not in removed] + added
+                rows.append(row)
     p = decisions_path(inc)
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "a", encoding="utf-8") as fh:
@@ -692,7 +784,8 @@ def fold(inc=None):
     reversed_any = any(_reversed(v) for v in out.values())
     sample = set()
     for ph, ss in by_phase.items():
-        sample |= set(audit_sample(_phase_sources(ph, inc) or ss))
+        revs = _phase_revisions(ph, inc)
+        sample |= sticky_audit_sample(revs) if revs else set(audit_sample(ss))
     for s, v in out.items():
         own, dele = v.get("owner_decision"), v.get("delegate_decision")
         gov = own or dele or {}
@@ -727,13 +820,16 @@ def _phase_of(sheet_sha, inc=None):
     return 1
 
 
-def _phase_sources(phase, inc=None):
-    from . import ds1_data as DD
-    out = set()
-    for p in DD.screen_revisions(phase):
-        d = _read_json(p) or {}
-        out |= {s for s, v in (d.get("sources") or {}).items() if v.get("live")}
-    return sorted(out)
+def _phase_revisions(phase, inc=None):
+    """[[sources of revision 1], ...] of a phase's screen revisions (splits/ds1/screen/p<phase>_r<nnn>.json under inc):
+    each revision's live sources, role C and wholly quarantined ones left out (they enter no manifest)."""
+    d = (Path(inc) if inc else C.INC_DIR) / "splits" / "ds1" / "screen"
+    out = []
+    for p in sorted(d.glob("p%d_r[0-9][0-9][0-9].json" % int(phase))) if d.is_dir() else []:
+        doc = _read_json(p) or {}
+        out.append(sorted(s for s, v in (doc.get("sources") or {}).items() if v.get("live") and not (
+            v.get("role_c") or int((v.get("capture_names") or {}).get("hits") or 0) or v.get("quarantine_whole"))))
+    return out
 
 
 def _names_round_sources(inc=None):
@@ -762,12 +858,13 @@ def mtw_checks(inc=None):
     out = {}
     for s, rs in by.items():
         errors = sum(1 for r in rs if r.get("error"))
-        corrected = {r["item"].split("|")[-1]: r for r in rs if r.get("removed") or r.get("added")}
+        corrected = {r["item"].split("|")[-1]: r for r in rs if r.get("corrected_boxes") is not None}
+        uncorrected = [r["item"] for r in rs if r.get("error") and r.get("corrected_boxes") is None]
         total = int(max([r.get("total") or 0 for r in rs] + [len(rs)]))
-        v = D.mtw_source_verdict(len(rs), total, errors, corrected=bool(corrected) and errors <= len(corrected),
+        v = D.mtw_source_verdict(len(rs), total, errors, corrected=bool(corrected) and not uncorrected,
                                  whole=None)
         v.update(source=s, sha256=hashlib.sha256(canon(rs)).hexdigest(), corrections=len(corrected),
-                 corrected_labels={k: r.get("added") for k, r in corrected.items()})
+                 corrected_labels={k: r["corrected_boxes"] for k, r in corrected.items()})
         out[s] = v
     return out
 
@@ -805,12 +902,14 @@ def main(argv=None):
     ap.add_argument("--no-pull", action="store_true")
     ap.add_argument("--file", default=None)
     ap.add_argument("--decided-by", default=None)
+    ap.add_argument("--sources", default=None, help="render --kind audit: the sources of the batch (comma list)")
     a = ap.parse_args(argv)
     try:
         if a.command == "render":
             if a.kind is None or a.batch is None:
                 raise SheetRefused("render needs --kind and --batch")
-            print(json.dumps(render(a.kind, a.batch, inc=a.lab_inc, pull=not a.no_pull), indent=1))
+            srcs = [x for x in a.sources.split(",") if x] if a.sources else None
+            print(json.dumps(render(a.kind, a.batch, inc=a.lab_inc, pull=not a.no_pull, sources=srcs), indent=1))
         elif a.command == "record":
             rows = record(a.file, a.decided_by, inc=a.lab_inc)
             print(json.dumps({"recorded": len(rows)}))

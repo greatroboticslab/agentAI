@@ -23,7 +23,10 @@ guarded as inc2.train checks every run (check_manifest, guard_rows, materialise_
 checkpoint, the cold recipe with the budget's epochs (round_half_up(I / N), N with the cwd12 floor's repeats),
 warm-up fixed at 640 iterations and close_mosaic 10 % of the epochs (inc2.recipes' budget functions), seed k,
 final-epoch weights (inc2.train.train_full's checks), exported once as ds1/v1/long/<ARM>/s<k>/final_ema.pt with
-train.json (sha256, epochs, image-epochs, seconds). No checkpoint selection, no evaluation image read.
+train.json (sha256, epochs, image-epochs, seconds). No checkpoint selection, no evaluation image read. Afterwards the
+run's work directory keeps its train logs (results.csv, args.yaml) and manifest; its materialised data and
+Ultralytics' .pt checkpoints are removed, as inc2.train._finish removes them, and listed in the record
+(cleanup_removed). An earlier attempt's work directory is moved aside (<work>.attempt<k>), never deleted.
 
 A refusal raises LongRefused; the CLI prints "[inc2.ds1_long] ERROR: ..." and exits 2.
 """
@@ -33,7 +36,6 @@ import argparse
 import json
 import math
 import os
-import shutil
 import sys
 import time
 from pathlib import Path
@@ -137,6 +139,39 @@ def _rows(arm):
     return rows, rec
 
 
+def tidy(work):
+    """What a run's work directory holds that is reproducible and large, removed as inc2.train._finish removes it:
+    the materialised data (moved aside, then purged) and Ultralytics' .pt checkpoints (the final weights are
+    exported before this); the train logs (results.csv, args.yaml, the per-epoch metrics) and the manifest stay.
+    Returns the paths removed (recorded in the smoke's or the seed's record)."""
+    from . import train as T
+    work = Path(work)
+    removed = []
+    if not work.is_dir():
+        return removed
+    trash = T.move_aside(work / "data", removed)
+    for wd in sorted(p for p in work.rglob("weights") if p.is_dir()):
+        T.drop_train_weights(wd.parent, removed)
+    if trash is not None:
+        T.purge_dir(trash)
+    return removed
+
+
+def set_aside(work):
+    """An earlier attempt's work directory (a seed proposed again after a failure): tidied and renamed
+    <work>.attempt<k>, its logs kept for the diagnosis, never deleted. None when there is none."""
+    work = Path(work)
+    if not work.exists():
+        return None
+    removed = tidy(work)
+    k = 1
+    while work.with_name("%s.attempt%d" % (work.name, k)).exists():
+        k += 1
+    dst = work.with_name("%s.attempt%d" % (work.name, k))
+    os.rename(str(work), str(dst))
+    return {"moved_to": str(dst), "removed": removed}
+
+
 def _train_one(rows, rcp, out_dir, rec, epoch_times=None):
     """inc2.train's library steps on one seed: check_manifest, guard_rows, materialise_run, choose_cache and
     train_full (YOLO(init).train with the final-epoch checks); epoch_times gets each epoch's (start, end) monotonic
@@ -186,8 +221,7 @@ def smoke(arm, trainer=None):
     times = []
     one = dict(recipe(n, D.BUDGET_IMAGE_EPOCHS, seed=0), epochs=1, close_mosaic=0)
     work = arm_dir(arm) / "smoke_work"
-    if work.exists():
-        shutil.rmtree(str(work))
+    earlier = set_aside(work)
     (trainer or _train_one)(rows, one, work, rec, times)
     total = time.monotonic() - t0
     if not times or times[0][0] is None:
@@ -195,7 +229,7 @@ def smoke(arm, trainer=None):
     ep_s = float(times[0][1] - times[0][0])
     out = {"format": FMT_SMOKE, "arm": arm, "manifest_arm": manifest_arm(arm), "images": n,
            "manifest_sha256": arec["sha256"], "epoch_seconds": ep_s, "setup_seconds": round(total - ep_s, 1),
-           "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
+           "work": str(work), "earlier_attempt": earlier, "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
     if arm == "S0X":
         p36 = projection(ep_s, recipe(n, D.PAIR_IMAGE_EPOCHS)["epochs"])
         ie = pair_decision(p36)
@@ -208,9 +242,8 @@ def smoke(arm, trainer=None):
     proj = projection(ep_s, recipe(n, budget)["epochs"])
     wall, why = walltime_branch(arm, proj)
     out.update(image_epochs=budget, epochs=recipe(n, budget)["epochs"], projection_h=proj, walltime_h=wall,
-               status="complete" if wall is not None else NOT_RUN_WALLTIME, why=why)
+               status="complete" if wall is not None else NOT_RUN_WALLTIME, why=why, cleanup_removed=tidy(work))
     D.write_once(sp, out)
-    shutil.rmtree(str(work), ignore_errors=True)
     log("%s smoke: epoch %.0f s, %d epochs at %d image-epochs -> %.2f h (%s)" % (
         arm, ep_s, out["epochs"], budget, proj, why))
     return out
@@ -238,8 +271,7 @@ def train(arm, seed, walltime_h=None, trainer=None):
     budget = image_epochs(arm)
     rcp = recipe(len(rows), budget, seed=seed)
     work = d / "work"
-    if work.exists():
-        shutil.rmtree(str(work))
+    earlier = set_aside(work)
     rec = {"warnings": []}
     t0 = time.time()
     weights, _sd = (trainer or _train_one)(rows, rcp, work, rec, [])
@@ -250,9 +282,9 @@ def train(arm, seed, walltime_h=None, trainer=None):
            "manifest_sha256": arec["sha256"], "images": len(rows), "image_epochs": budget, "recipe": rcp,
            "weights": str(dst), "weights_sha256": sha, "seconds": round(time.time() - t0, 1),
            "weights_epoch": rec.get("weights_epoch"), "warnings": rec.get("warnings"),
-           "research_only": bool(arec.get("research_only")), "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
+           "research_only": bool(arec.get("research_only")), "work": str(work), "earlier_attempt": earlier,
+           "cleanup_removed": tidy(work), "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
     D.write_once(d / "train.json", doc)
-    shutil.rmtree(str(work), ignore_errors=True)
     log("%s seed %d trained: %s (%d epochs, %.0f s)" % (arm, seed, dst, rcp["epochs"], doc["seconds"]))
     return doc
 

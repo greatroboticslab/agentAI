@@ -2220,10 +2220,11 @@ def _ds1_gate(v, st, cfg):
     return True, [v.ccite("/stage/ds1/amendment"), v.ccite("/stage/ds1/never_cut"), v.ccite("/stage/ds1/timestamp")]
 
 
-def _ds1_floor_short(v, cfg, item_gb, phase, phase1_gb):
+def _ds1_floor_short(v, cfg, item_gb, phase, phase1_gb, charged=False):
     """'' when /ocean keeps the floor this item needs free after its bytes (DS.0 item 21), else why not: a phase-1
     item within phase 1's 60 GB V3F's floor (3 % + 30 GiB), any later byte-adding item lane DATA's floor (3 % +
-    200 GB) too, every other item V3F's floor."""
+    200 GB) too, every other item V3F's floor. charged: the item's bytes are counted in phase1_gb already (a data
+    step that runs again writes within its first run's bound)."""
     qu = v.c("/quota") or {}
     quota, free = _num(qu.get("quota_gb")), _num(qu.get("free_gb"))
     if quota is None or free is None:
@@ -2234,7 +2235,8 @@ def _ds1_floor_short(v, cfg, item_gb, phase, phase1_gb):
     data = float((fl.get("data") or {}).get("share", 0.03)) * quota + float((fl.get("data") or {}).get(
         "margin_gb", 200.0))
     gb = float(item_gb or 0.0)
-    within = int(phase) == 1 and float(phase1_gb or 0.0) + gb <= float(cfg.get("phase1_bytes_gb") or 60.0) + 1e-9
+    within = int(phase) == 1 and float(phase1_gb or 0.0) + (0.0 if charged else gb) <= \
+        float(cfg.get("phase1_bytes_gb") or 60.0) + 1e-9
     need = v3f if (within or gb <= 0) else max(v3f, data)
     left = free - gb
     if left < need:
@@ -2244,14 +2246,18 @@ def _ds1_floor_short(v, cfg, item_gb, phase, phase1_gb):
 
 
 def _ds1_sources_settled(ph):
-    """(settled, waiting {why: [sources]}) of a phase's screened sources: every source decided (a reject settles it),
-    every ready source pooled, every 'accept' source's MD-N drawn (DS.5.4)."""
+    """(settled, waiting {why: [sources]}) of a phase's screened sources: a source role C (capture names) or
+    quarantined whole is settled with no decision, a rejected one by its decision; every other one decided, audited
+    where required, pooled, and, if 'accept' and drawn into exams (never the source the derived status marks
+    exam_draw false), its MD-N drawn (DS.5.4)."""
     waits = collections.defaultdict(list)
     for s_, x in sorted((ph.get("sources") or {}).items()):
+        if x.get("role_c") or x.get("quarantined_whole") or x.get("settled_out"):
+            continue
         if not x.get("decided"):
             waits["sheets"].append(s_)
             continue
-        if x.get("decision") == "reject" or x.get("quarantined_whole"):
+        if x.get("decision") == "reject":
             continue
         if x.get("audit_required") and not x.get("audited"):
             waits["audit"].append(s_)
@@ -2259,7 +2265,7 @@ def _ds1_sources_settled(ph):
         if not x.get("pooled"):
             waits["pools"].append(s_)
             continue
-        if x.get("decision") == "accept" and not x.get("md_n"):
+        if x.get("decision") == "accept" and x.get("exam_draw", True) and not x.get("md_n"):
             waits["draw"].append(s_)
     return not waits, dict(waits)
 
@@ -2287,7 +2293,8 @@ def ds1_plan(cfg, fs):
     scores = st.get("scores") or {}
     verdicts = st.get("verdicts") or {}
     dates = cfg.get("dates") or {}
-    sub = (not arms.get("S2")) and str(fs.get("today") or "") > str(dates.get("s2_freeze_by") or "9999")
+    s2x_wall = str(((long_.get("S2X") or {}).get("smoke")) or "").startswith("not run")
+    sub = s2x_wall or ((not arms.get("S2")) and str(fs.get("today") or "") > str(dates.get("s2_freeze_by") or "9999"))
     waits, maint, train = {}, [], []
 
     def state(key):
@@ -2321,7 +2328,7 @@ def ds1_plan(cfg, fs):
         nb = 1 + len([x for x in rendered if x.startswith("audit_")])
         key = "sheets:audit:%d" % nb
         if due(key) and fs.get("audit_render_for") != sorted(pend):
-            add(maint, {"lever": "L31", "kind": "audit", "batch": nb, "item": key})
+            add(maint, {"lever": "L31", "kind": "audit", "batch": nb, "item": key, "sources": sorted(pend)})
     # ---- 3. MD-S0: drawn, its power, enlarged or frozen
     if not md.get("frozen"):
         if (not md.get("drafts") or md.get("power")) and due("data:1:md_s0"):
@@ -2335,8 +2342,9 @@ def ds1_plan(cfg, fs):
         srcs = ph.get("sources") or {}
         if any(x.get("ready") and not x.get("pooled") for x in srcs.values()) and due("data:%s:pools" % phn):
             add(maint, {"lever": "L30", "phase": int(phn), "step": "pools", "item": "data:%s:pools" % phn})
-        if any(x.get("pooled") and x.get("decision") == "accept" and (not x.get("md_n") or (
-                x.get("checked") and x.get("mtw_draft") and not x.get("mtw"))) for x in srcs.values()) \
+        if any(x.get("pooled") and x.get("decision") == "accept" and x.get("exam_draw", True)
+               and not x.get("settled_out") and x.get("ready", True) and (not x.get("md_n") or (
+                   x.get("checked") and x.get("mtw_draft") and not x.get("mtw"))) for x in srcs.values()) \
                 and due("data:%s:draw" % phn):
             add(maint, {"lever": "L30", "phase": int(phn), "step": "draw", "item": "data:%s:draw" % phn})
     # ---- 5. the manifests (S0 and KF; KD and KT; S1c, S1c-R, S1u; S2)
@@ -2346,8 +2354,11 @@ def ds1_plan(cfg, fs):
         if not arms.get("S0") or not arms.get("KF"):
             want.append("S0/KF")
         siu = (p1.get("sources") or {}).get(cfg.get("k_source") or "", {}) if cfg.get("k_source") else {}
-        if (not arms.get("KD") or not arms.get("KT")) and siu.get("pooled") and not st.get("k_not_run"):
+        if (not arms.get("KD") or not arms.get("KT")) and siu.get("pooled") and not st.get("k_not_run") \
+                and not st.get("k_source_out"):
             want.append("KD/KT")
+        if st.get("k_source_out") and not st.get("k_not_run") and not arms.get("KD"):
+            want.append("KD/KT not run")
         if settled1 and not arms.get("S1U"):
             want.append("S1")
         settled2, w2 = _ds1_sources_settled(p2)
@@ -2431,7 +2442,8 @@ def ds1_plan(cfg, fs):
         # (k_not_run.json: DS.5.7's supply rule)
         pending = [a for a in va if scores.get(a) != "complete" and not ds1_terminal(state("score:%s" % a))
                    and not _ds1_unscored(state("build:%s" % a)) and not _ds1_unscored(state("long:%s:train" % a))
-                   and not (a in ("KD", "KT") and st.get("k_not_run"))]
+                   and not _ds1_unscored(state("long:%s:smoke" % a))
+                   and not (a in ("KD", "KT") and (st.get("k_not_run") or st.get("k_source_out")))]
         if not pending:
             add(maint, {"lever": "L34", "phase": int(phn), "item": "verdict:%s" % phn})
         elif any(scores.get(a) == "complete" for a in va):
@@ -2781,7 +2793,8 @@ def r0(v, d28=None):
                     kind = {"L30": "data:%s" % it.get("step"), "L32": "build", "L32X": "long:%s" % it.get("verb"),
                             "L33": "score", "L34": "verdict"}.get(it["lever"])
                     short = _ds1_floor_short(v, ds1c, sizes.get(kind) if kind else 0.0, it.get("phase") or 1,
-                                             dfs.get("phase1_gb")) if kind else ""
+                                             dfs.get("phase1_gb"), it["item"] in (dfs.get("phase1_charged") or [])) \
+                        if kind else ""
                     if short:
                         dwait[it["item"]] = "storage: %s" % short
                         continue

@@ -80,9 +80,10 @@ def ds1_world(tag, amendment=True, never_cut=True, timestamp=True, fake=True):
     (w.scripts / "run_inc2_long.sh").write_text("#!/bin/bash\n")
     w.ready_r0()
     if amendment:
-        dst = w.dir / CFG["amendment_file"]
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(str(REPO_ROOT / CFG["amendment_file"]), str(dst))
+        for f in [CFG["amendment_file"]] + [r["file"] for r in CFG.get("revisions") or []]:
+            dst = w.dir / f
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(str(REPO_ROOT / f), str(dst))
     nc = w.lab / CFG["never_cut"]["module"]
     nc.parent.mkdir(parents=True, exist_ok=True)
     if never_cut:
@@ -92,7 +93,10 @@ def ds1_world(tag, amendment=True, never_cut=True, timestamp=True, fake=True):
     if timestamp:
         w._w("ds1/v1/timestamp.json", {"format": D.FMT_TIMESTAMP, "sha256": D.PREREG_SHA256, "proofs": [
             {"file": "DS1_2026-10-29.md.ots", "sha256": "a" * 64},
-            {"file": "DS1_2026-10-29.stamp.txt.ots", "sha256": "b" * 64}]})
+            {"file": "DS1_2026-10-29.stamp.txt.ots", "sha256": "b" * 64}], "revisions": [
+            {"file": r["file"], "sha256": r["sha256"], "proofs": [{"file": "c", "sha256": "c" * 64},
+                                                                 {"file": "d", "sha256": "d" * 64}]}
+            for r in D.REVISIONS]})
     else:
         (w.inc / "ds1" / "v1").mkdir(parents=True, exist_ok=True)
     w.ds1 = REAL_STATUS(w.inc) if fake else None
@@ -105,7 +109,7 @@ def ds1_world(tag, amendment=True, never_cut=True, timestamp=True, fake=True):
 def source(**kw):
     out = {"decided": False, "decision": None, "audit_required": False, "audited": False, "ready": False,
            "why": "no decision", "pooled": False, "md_n": False, "mtw_draft": False, "mtw": False, "checked": False,
-           "quarantined_whole": False}
+           "quarantined_whole": False, "role_c": False, "settled_out": False, "exam_draw": True}
     out.update(kw)
     return out
 
@@ -126,7 +130,8 @@ def data_step(w, phase, step):
         ph["new_batches"] = 0
         names = ("src_alpha", "src_beta", K_SOURCE) if phase == 1 else ("src_gamma",)
         for s_ in names:
-            ph["sources"].setdefault(s_, source())
+            # the K source (SIU) is never drawn into an exam (ds1_data.plan_state: exam_draw False)
+            ph["sources"].setdefault(s_, source(exam_draw=s_ != K_SOURCE))
         sh["source_batches"] += 1
         if phase == 1 and ph["revisions"] == 1:
             sh["ln_batches"], sh["mtw_batches"] = 1, sh["mtw_batches"] + 1
@@ -142,7 +147,7 @@ def data_step(w, phase, step):
                 x["pooled"] = True
     elif step == "draw":
         for x in ph["sources"].values():
-            if x["pooled"] and x["decision"] == "accept" and not x["md_n"]:
+            if x["pooled"] and x["decision"] == "accept" and x.get("exam_draw", True) and not x["md_n"]:
                 x.update(md_n=True, mtw_draft=True)
                 sh["mtw_batches"] += 1
             elif x["checked"] and x["mtw_draft"] and not x["mtw"]:
@@ -155,8 +160,8 @@ def data_step(w, phase, step):
             if (ph["sources"].get(K_SOURCE) or {}).get("pooled"):
                 for a in ("KD", "KT"):
                     arms.setdefault(a, {"images": IMAGES[a], "sha256": a.lower() * 4, "over_line": False})
-            if all(x["decided"] and (x["decision"] == "reject" or (x["pooled"] and (x["decision"] != "accept" or
-                                                                                   x["md_n"])))
+            if all(x["decided"] and (x["decision"] == "reject" or (x["pooled"] and (
+                    x["decision"] != "accept" or x["md_n"] or not x.get("exam_draw", True))))
                    for x in ph["sources"].values()):
                 for a in ("S1CR", "S1C", "S1U"):
                     arms.setdefault(a, {"images": IMAGES[a], "sha256": a.lower() * 4, "over_line": False})
@@ -283,7 +288,7 @@ def decide(w, phase, decisions, audit=()):
     for s_, d in decisions.items():
         x = w.ds1["phases"][str(phase)]["sources"][s_]
         x.update(decided=True, decision=d, ready=d != "reject" and s_ not in audit, why="" if d != "reject" else
-                 "rejected", audit_required=s_ in audit, audited=False)
+                 "rejected", audit_required=s_ in audit, audited=False, settled_out=d == "reject")
     w.ds1["sheets"]["audit_pending"] = sorted(audit)
 
 
@@ -874,10 +879,117 @@ def t_plan():
           and "RA" in str(w10.get("training")), (w10, c10))
 
 
+def t_plan_rev1():
+    section("ds1_plan (pure), Revision 1: SIU never drawn, settled sources, the K source out, S2x's walltime, the bytes")
+    arms1 = {a: {"images": IMAGES[a], "sha256": "x", "over_line": False} for a in ("S0", "KF")}
+    fs = _fs(arms=copy.deepcopy(arms1))
+    fs["status"]["phases"]["1"]["sources"] = {
+        K_SOURCE: source(decided=True, decision="accept", ready=True, pooled=True, exam_draw=False),
+        "src_alpha": source(decided=True, decision="accept", ready=True, pooled=True, md_n=True, mtw_draft=True,
+                            mtw=True, checked=True),
+        "src_cap": source(role_c=True, settled_out=True), "src_q": source(quarantined_whole=True, settled_out=True)}
+    _o, w1, c1 = DS.ds1_plan(CFG, fs)
+    items1 = [x["item"] for x in c1["maint"]]
+    check("SIU accepted and pooled is never drawn (no L30 draw), and phase 1 is settled without it; a role C and a "
+          "quarantined source settle with no decision: S1's manifests are due", "data:1:draw" not in items1
+          and "data:1:manifests" in items1 and not any(k.startswith("sheets:1") for k in w1), (items1, w1))
+    fs2 = copy.deepcopy(fs)
+    fs2["status"]["phases"]["1"]["sources"][K_SOURCE].update(decision="reject", settled_out=True, ready=False)
+    fs2["status"]["k_source_out"] = True
+    arms_all = {a: {"images": IMAGES[a], "sha256": "x", "over_line": False} for a in
+                ("S0", "KF", "S1CR", "S1C", "S1U")}
+    fs2["status"]["arms"] = arms_all
+    fs2["status"]["scores"].update({a: "complete" for a in ("K0", "KF", "S0", "S1CR", "S1C", "S1U")})
+    fs2["items"] = {"build:%s" % a: "done" for a in arms_all}
+    _o, w2, c2 = DS.ds1_plan(CFG, fs2)
+    check("the K source rejected (k_source_out): KD and KT never hold verdict v1, and the manifests step is due once "
+          "to record them not run", "verdict:1" in [x["item"] for x in c2["maint"]] and "data:1:manifests" in
+          [x["item"] for x in c2["maint"]], ([x["item"] for x in c2["maint"]], w2))
+    fs2["status"]["k_not_run"] = True
+    _o, _w, c2b = DS.ds1_plan(CFG, fs2)
+    check("  once k_not_run.json is written the manifests step is not proposed again",
+          "data:1:manifests" not in [x["item"] for x in c2b["maint"]], [x["item"] for x in c2b["maint"]])
+    fs3 = _fs(arms={a: {"images": IMAGES[a], "sha256": "x", "over_line": False} for a in ("S0", "S1U", "S2")})
+    fs3["status"]["long"]["pair"] = {"image_epochs": D.PAIR_IMAGE_EPOCHS}
+    fs3["status"]["long"]["arms"]["S2X"].update(smoke="not run (walltime)")
+    fs3["today"] = "2026-11-20"
+    _o, _w, c3 = DS.ds1_plan(CFG, fs3)
+    check("S2x recorded not run (walltime) before the date: the substitution applies, S1ux's smoke on TRAIN (DS.6)",
+          c3["substituted"] and ("L32X", "S1UX", "smoke") in [(x["lever"], x.get("arm"), x.get("verb"))
+                                                              for x in c3["train"]], c3["train"])
+    fs4 = _fs()
+    fs4["status"]["sheets"]["audit_pending"] = ["src_b", "src_a"]
+    _o, _w, c4 = DS.ds1_plan(CFG, fs4)
+    au = [x for x in c4["maint"] if x["item"].startswith("sheets:audit")]
+    check("the audit batch's item names its sources (the cluster's audit set, passed to the lab's render)",
+          au and au[0].get("sources") == ["src_a", "src_b"], au)
+
+
+def t_review():
+    section("the ticker, Revision 1's fixes: a DS1 build's blocked runs (a card, no pause, the arm failed), phase 1's "
+            "bytes counted once, the audit render's sources, a second screen when nothing is new")
+    w = ds1_world("ds1_blocked")
+    d = w.ds1
+    d.update(ra=True, power_final=True, k_not_run=True)
+    d["md_s0"].update(drafts=1, draft="draft_r001", power=True, enlarge=False, frozen=True)
+    d["phases"]["1"].update(revisions=1, new_batches=0)
+    built = ("S0", "KF", "S1CR", "S1C", "S1U")
+    d["arms"] = {a: {"images": IMAGES[a], "sha256": "x", "over_line": False} for a in built}
+    d["scores"].update({a: "complete" for a in ("K0", "KF", "S1CR", "S1C", "S1U")})
+    w.tick(1)
+    st = json.loads(S.StreamPaths(str(w.lab), "weed").state(NAME).read_text())
+    for a in built:
+        st.setdefault("ds1", {"items": {}, "cards": {}})["items"]["build:%s" % a] = {
+            "state": "done", "spend": "settled", "settled": 0.0, "lever": "L32", "exp": CFG["build_exps"][a]}
+        st["exps"] = list(st.get("exps") or []) + [CFG["build_exps"][a]]      # as L32's start records it
+    state_write(w, st)
+    for a in built:
+        exp = CFG["build_exps"][a]
+        if a == "S0":
+            w.experiment(exp, done=False, blocked={"base:s1": {"cause": {"kind": "failed_run"},
+                                                               "error": "2 failed attempts (CUDA out of memory)"}})
+        else:
+            w.experiment(exp, final=[w.final_row("base", 0.85, 0.002, 3)])
+    run(w, ticks=14, until=lambda: bool(pro(w, "L34")))
+    stt = w.state()
+    v = pro(w, "L34")
+    check("S0's runs blocked (D5, not transient): no pause, one DS1 card, the arm failed for DS1 (no other arm held): "
+          "verdict v1 proposed naming --ticker-failed build:S0",
+          not stt.get("paused") and w.config().get("enabled") is True and cards(w, "DS1's S0: its runs are blocked")
+          and v and "build:S0" in (v[0].get("argv") or [])[(v[0].get("argv") or []).index("--ticker-failed") + 1]
+          if v and "--ticker-failed" in (v[0].get("argv") or []) else False,
+          (stt.get("paused"), [c["title"] for c in cards(w)][-4:], [e.get("argv") for e in v]))
+    # phase 1's bytes: a data step that runs again is counted once
+    w2 = ds1_world("ds1_bytes")
+    run(w2, ticks=6, until=lambda: w2.ds1["phases"]["1"]["revisions"] == 1)
+    w2.ds1["phases"]["1"]["new_batches"] = 2
+    run(w2, ticks=6, until=lambda: w2.ds1["phases"]["1"]["revisions"] == 2)
+    run(w2, ticks=2)
+    f = (w2.state() or {}).get("ds1") or {}
+    n_screens = len([x for x in seq(w2) if x == ("L30", "1:screen")])
+    kind_of = {"data:1:screen": "data:screen", "data:1:md_s0": "data:md_s0", "data:1:pools": "data:pools",
+               "data:1:draw": "data:draw", "data:1:manifests": "data:manifests"}
+    want_gb = sum(float(CFG["storage_gb"].get(kind_of.get(k) or ("score" if k.startswith("score") else "build"), 0))
+                  for k in f.get("phase1_charged") or [])
+    check("phase 1's bytes: two screens charged once (each item's nominal bytes once, DS.11's bounds per item)",
+          n_screens == 2 and (f.get("phase1_charged") or []).count("data:1:screen") == 1 and
+          abs(float(f.get("phase1_gb") or 0) - want_gb) < 1e-9, (n_screens, f.get("phase1_gb"),
+                                                                  f.get("phase1_charged")))
+    # the audit render: the lab process gets the sources
+    w3 = ds1_world("ds1_audit_sources")
+    data_step(w3, 1, "screen")
+    w3.ds1["sheets"]["rendered"] = ["source_001", "ln_001", "mtw_001"]
+    w3.ds1["sheets"]["audit_pending"] = ["src_beta", "src_alpha"]
+    run(w3, ticks=6, until=lambda: any(l["job"].startswith("ds1sheets_audit") for l in w3.runner.launched))
+    la = [l["argv"] for l in w3.runner.launched if l["job"].startswith("ds1sheets_audit")]
+    check("the owner's audit batch rendered on the lab with --sources (the cluster's audit set)",
+          la and la[0][la[0].index("--sources") + 1] == "src_alpha,src_beta", la)
+
+
 def main():
     want = [x for x in os.environ.get("DS1_WORLD", "").split(",") if x]
     try:
-        for fn in (t_static, t_plan, t_gate, t_path, t_storage, t_cap, t_fail, t_lost):
+        for fn in (t_static, t_plan, t_plan_rev1, t_gate, t_path, t_storage, t_cap, t_fail, t_lost, t_review):
             if want and fn.__name__[2:] not in want:
                 continue
             try:

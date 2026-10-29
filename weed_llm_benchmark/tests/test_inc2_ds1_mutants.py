@@ -60,6 +60,46 @@ must occur exactly once in its file), runs its target against the copy and requi
   DP15  stream_remote     DS1's status reads the default INC_DIR, not the snapshot's
   DP16  stream            a DS1 card waiting for a person is never raised
   DP17  deploy_funnel     the amendment's file is not shipped
+  Revision 1 (2026-10-29) and the fixes made with it:
+  DR1   ds1_data          the draw ignores the groups near base B (MT-W v2 not kept apart, MT.2 item 2)
+  DR2   ds1_data          a near copy of base B's rows is not looked for at the draw
+  DR3   ds1_data          a source with cwd12 capture names is ready when accepted (role C not enforced)
+  DR4   ds1_data          the intake's and Step 1's copy refusals never quarantine a source
+  DR5   ds1_data          a dHash hit the DINOv2 detector does not confirm quarantines its source
+  DR6   ds1_data          a rejected source's pool still enters the manifests
+  DR7   ds1_data          MT-W v1.1 only when a label was corrected (a failing source stays in the headline)
+  DR8   ds1_data          a screen with no new row writes no revision (the plan proposes it for ever)
+  DR9   ds1_data          phase 2 reads every source, not only the named ones
+  DR10  ds1_data          traced source classes are ignored (every box keeps its INC class)
+  DR11  ds1_data          the never-train list keeps no file (DS1's DINOv2 index misses MD and MT-W)
+  DR12  ds1_data          a re-read whose classes do not match the intake label is traced anyway
+  DR13  ds1_data          the DINOv2 copies of a built manifest's rows are not left out of the draw
+  DR14  ds1_data          a group near a built manifest's row is drawn into the exams
+  DH4   ds1_sheets        the owner's sample is recomputed on the latest screen only (a drawn source drops out)
+  DH5   ds1_sheets        any person's id records an audit sheet
+  DH6   ds1_sheets        an LN image not marked checked is recorded
+  DH7   ds1_sheets        an MT-W image not answered is recorded
+  DH8   ds1_sheets        an MT-W correction keeps only the boxes drawn
+  DH9   ds1_sheets        a lab render lists its batch before pulling the cluster's sheets state
+  DH10  ds1_sheets        the owner's audit sheet pre-selects the delegate's decision
+  DC9   ds1               a sealed read before verdict v2 (the challenger out of DS.7.5's order)
+  DC10  ds1               S2x not run (walltime) does not apply the substitution
+  DC11  ds1               a verdict is written while an arm of its phase is missing
+  DC12  ds1               the 0.90 interval takes the image SE only
+  DC13  ds1               a sealed read re-submitted after a partial failure scores its parts again
+  DC14  ds1               a rejected source's MD-N is still scored
+  DC15  ds1               a time-stamp record without the Revision opens the gate
+  DL5   ds1_long          the long path removes its train logs with its data
+  DL6   ds1_long          an earlier attempt's work is deleted, not moved aside
+  DP18  stream            a DS1 build's blocked runs pause the stream (not a measurement arm)
+  DP19  stream            a DS1 build whose runs are blocked stays running (the verdict waits for ever)
+  DP20  stream            phase 1's bytes charged on every run of a data step
+  DP21  diagnose_stream   SIU is waited on for an exam draw it never gets
+  DP22  diagnose_stream   KD and KT hold verdict v1 when the K source is out
+  DP23  diagnose_stream   S2x not run (walltime) does not substitute S1ux
+  DP24  diagnose_stream   a role C or quarantined source waits for a decision
+  DP25  diagnose_stream   the audit batch names no sources (the lab cannot render it)
+  DP26  deploy_funnel     the deploy's pre-flight does not check what ships for DS1
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -97,6 +137,9 @@ AP_STORAGE = "tests/test_stream_ap_ds1.py?DS1_WORLD=storage"
 AP_CAP = "tests/test_stream_ap_ds1.py?DS1_WORLD=cap"
 AP_FAIL = "tests/test_stream_ap_ds1.py?DS1_WORLD=fail"
 DEPLOY = "tests/test_inc2_ds1_deploy.py"
+REV1 = "tests/test_inc2_ds1_rev1.py"
+AP_PLANR1 = "tests/test_stream_ap_ds1.py?DS1_WORLD=plan_rev1"
+AP_REVIEW = "tests/test_stream_ap_ds1.py?DS1_WORLD=review"
 MUTANTS = {
     "DM1": (DD, "        if d > bits:\n            kept.append(k)\n", "        if True:\n            kept.append(k)\n",
             DATA),
@@ -175,8 +218,8 @@ MUTANTS = {
     "DP9": (DSM, '        if arm in ("S1C", "S1U", "S1CR") and blocked_mtw:\n', "        if False:\n", AP_PATH),
     "DP10": (ST, '        last = walltime or rec["fails"] >= int(cfg.get("max_failures") or 2)\n', "        last = True\n",
              AP_FAIL),
-    "DP11": (DSM, '    sub = (not arms.get("S2")) and str(fs.get("today") or "") > str(dates.get("s2_freeze_by") or '
-                  '"9999")\n', "    sub = False\n", AP_STATIC),
+    "DP11": (DSM, '    sub = s2x_wall or ((not arms.get("S2")) and str(fs.get("today") or "") > str(dates.get("s2_freeze_by") '
+                  'or "9999"))\n', "    sub = False\n", AP_STATIC),
     "DP12": (DSM, '        if not pending:\n            add(maint, {"lever": "L34"',
              '        if True:\n            add(maint, {"lever": "L34"', AP_STATIC),
     "DP13": (EV, '"stream", "step1_stream", "intake", "twostage", "v3fam", "ds1")',
@@ -187,6 +230,72 @@ MUTANTS = {
                  'self._ds1_card_once("steps"', AP_PATH),
     "DP17": (DF, "ROOT_PATHS+=(docs/prereg/DS1_2026-10-29.md docs/prereg/DS1_2026-10-29.md.ots",
              "ROOT_PATHS+=(docs/prereg/DS1_2026-10-29.md.ots", DEPLOY),
+    # Revision 1 (2026-10-29) and the fixes made with it
+    "DR1": (DD, "                           mtw_excluded_groups=ex_mtw)[s]\n", "                           "
+            "mtw_excluded_groups=())[s]\n", DATA),
+    "DR2": (DD, '    hit_mtw = set(dhash_hits(rows, _hash_exam("base_b", base))) | {', "    hit_mtw = set() | {", REV1),
+    "DR3": (DD, '    if srec.get("role_c") or int((srec.get("capture_names") or {}).get("hits") or 0):\n        return False, '
+                '"role C', '    if False:\n        return False, "role C', REV1),
+    "DR4": (DD, '        copies = [{"key": k, "where": "ds1_guard"} for k in hits] + refusal_hits.get(s, []) + ih\n',
+            '        copies = [{"key": k, "where": "ds1_guard"} for k in hits]\n', REV1),
+    "DR5": (DD, "    guard_hits = {k for k, v in eh.items() if v} | (set(dh) if scanner is None else set())\n",
+            "    guard_hits = {k for k, v in eh.items() if v} | set(dh)\n", REV1),
+    "DR6": (DD, "    return {s: rs for s, rs in pool_rows(phase).items() if source_ready(s, inputs.decisions, "
+                "srec.get(s))[0]}\n", "    return pool_rows(phase)\n", REV1),
+    "DR7": (DD, "    if corrected or left:\n", "    if corrected:\n", REV1),
+    "DR8": (DD, "    if write and (rows or not revs or sorted(seen or []) != sorted(last_seen or [])):\n",
+            "    if write and rows:\n", REV1),
+    "DR9": (DD, '    rows = [r for r in inputs.candidates if r["key"] not in prior and (int(phase) == 1 or r["source"] in '
+                'named)]\n', '    rows = [r for r in inputs.candidates if r["key"] not in prior]\n', REV1),
+    "DR10": (DD, '        if r["key"] in traced:\n            r["box_src"] = [str(x) for x in traced[r["key"]]]\n',
+             '        if False:\n            r["box_src"] = [str(x) for x in traced[r["key"]]]\n', REV1),
+    "DR11": (DD, '                    "image": r.get("train_image") or r.get("image"),\n', "", REV1),
+    "DR12": (DD, "        if any(inc_of.get(s) is not None and int(inc_of[s]) != int(b[0]) for s, b in zip(got, "
+                 'r["boxes"])):\n', "        if False:\n", REV1),
+    "DR13": (DD, "    hit_any |= set(dino)\n", "    hit_any |= set()\n", REV1),
+    "DR14": (DD, "    ex = {groups[k] for k in hit_any if k in groups}\n", "    ex = set()\n", REV1),
+    "DH4": (DH, "        sample |= sticky_audit_sample(revs) if revs else set(audit_sample(ss))\n",
+            "        sample |= set(audit_sample(revs[-1])) if revs else set(audit_sample(ss))\n", REV1),
+    "DH5": (DH, "    if kind == \"audit\" and decided_by != OWNER_HUMAN:\n", "    if False:\n", REV1),
+    "DH6": (DH, '                if d.get("checked") is not True:\n', "                if False:\n", REV1),
+    "DH7": (DH, '                if d.get("verdict") not in MTW_VERDICTS or bool(d.get("error")) != (d.get("verdict") '
+                '== "error"):\n', "                if False:\n", REV1),
+    "DH8": (DH, '                    row["corrected_boxes"] = [[float(x) for x in b[-4:]] for j, b in enumerate(shown)\n'
+                '                                              if j not in removed] + added\n',
+            '                    row["corrected_boxes"] = added\n', REV1),
+    "DH9": (DH, "    if pull:\n        pull_state(inc, runner)\n", "    if False:\n        pull_state(inc, runner)\n",
+            REV1),
+    "DH10": (DH, '_radio("dec|" + src, DECISION_LABELS, None))', '_radio("dec|" + src, DECISION_LABELS, '
+                                                                 'prev.get("decision")))', REV1),
+    "DC9": (DC, "    if not (isinstance(v2, dict) and v2.get(\"status\") == \"decided\"):\n        # no sealed read",
+            "    if False:\n        # no sealed read", REV1),
+    "DC10": (DC, "    return bool(s2x_walltime) or ((not s2_frozen) and str(on_date) > S2_FREEZE_BY)\n",
+             "    return ((not s2_frozen) and str(on_date) > S2_FREEZE_BY)\n", REV1),
+    "DC11": (DC, "    if missing:\n        raise Ds1Refused(\"verdict v%d waits for %s", "    if False:\n        raise "
+                 "Ds1Refused(\"verdict v%d waits for %s", REV1),
+    "DC12": (DC, "        if groups is None:\n            groups = mtw_groups()\n", "        if False:\n            "
+                 "groups = mtw_groups()\n", REV1),
+    "DC13": (DC, '        return entry(js, "kept") if js.exists() else None\n', "        return None\n", REV1),
+    "DC14": (DC, "    gone = DD.sources_out() if d.is_dir() else set()\n", "    gone = set()\n", REV1),
+    "DC15": (DC, "                and revisions_ok(d))\n", "                )\n", CORE),
+    "DL5": (DL, '    trash = T.move_aside(work / "data", removed)\n', "    trash = T.move_aside(work, removed)\n", REV1),
+    "DL6": (DL, "    os.rename(str(work), str(dst))\n", '    __import__("shutil").rmtree(str(work))\n', REV1),
+    "DP18": (ST, '        return out | set((((self.dom or {}).get("ds1") or {}).get("build_exps") or {}).values())\n',
+             "        return out\n", AP_REVIEW),
+    "DP19": (ST, '                items["build:%s" % arm] = "failed" if exp in blocked else "running"\n',
+             '                items["build:%s" % arm] = "running"\n', AP_REVIEW),
+    "DP20": (ST, '        if kind and int(p.get("ds1_phase") or 1) == 1 and key not in charged:\n',
+             '        if kind and int(p.get("ds1_phase") or 1) == 1:\n', AP_REVIEW),
+    "DP21": (DSM, '        if x.get("decision") == "accept" and x.get("exam_draw", True) and not x.get("md_n"):\n',
+             '        if x.get("decision") == "accept" and not x.get("md_n"):\n', AP_PLANR1),
+    "DP22": (DSM, '                   and not (a in ("KD", "KT") and (st.get("k_not_run") or st.get("k_source_out")))]',
+             '                   and not (a in ("KD", "KT") and st.get("k_not_run"))]', AP_PLANR1),
+    "DP23": (DSM, '    s2x_wall = str(((long_.get("S2X") or {}).get("smoke")) or "").startswith("not run")\n',
+             "    s2x_wall = False\n", AP_PLANR1),
+    "DP24": (DSM, '        if x.get("role_c") or x.get("quarantined_whole") or x.get("settled_out"):\n            continue\n',
+             "        if False:\n            continue\n", AP_PLANR1),
+    "DP25": (DSM, '"item": key, "sources": sorted(pend)})', '"item": key})', AP_PLANR1),
+    "DP26": (DF, "PREFLIGHT+=(tests/test_inc2_ds1_deploy.py)", "PREFLIGHT+=()", DEPLOY),
 }
 
 
