@@ -436,8 +436,12 @@ def experiment_budget(exp, arm):
     if not _is_int(n) or n < 1:
         return name, None, probs + ["exp.json's base records no image count for %s" % name] + e2p
     probs += RC.check_budget_record(data.get("budget"), arm["id"], n)
-    # V3F (amendment 2026-10-11): a family build names cold_budget under its v3fam record, never an e1 one
-    probs += v3fam_problems(data) if "v3fam" in data else e1_problems(data)
+    # V3F (amendment 2026-10-11): a family build names cold_budget under its v3fam record, never an e1 one; DS1
+    # (amendment 2026-10-29) under its ds1 record
+    if "ds1" in data:
+        probs += ds1_problems(data)
+    else:
+        probs += v3fam_problems(data) if "v3fam" in data else e1_problems(data)
     return name, n, probs + e2p
 
 
@@ -592,6 +596,31 @@ def v3fam_problems(data):
     elif a.get("sha256") != msha or v.get("manifest_sha256") != msha:
         probs.append("its base manifest %s is not arm %s's %s in %s" % (str(msha)[:12], v["arm"],
                                                                          str(a.get("sha256"))[:12], sp))
+    return probs
+
+
+def ds1_problems(data):
+    """How an exp.json naming cold_budget under a ds1 record fails to be one of DS1's 1.2 M arms (docs/
+    CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.6): the record names one of inc2.recipes.DS1_ARMS under its
+    experiment, its base manifest (by sha256) is that arm's in splits/ds1/arms/<arm>.json, and that record still
+    hashes as the ds1 record says. [] when it is one."""
+    from . import ds1_data as DD
+    v = data.get("ds1")
+    if not isinstance(v, dict) or v.get("arm") not in RC.DS1_ARMS:
+        return ["exp.json names %s under a ds1 record that names none of DS1's arms %s" % (RC.BUDGET_NAME,
+                                                                                         list(RC.DS1_ARMS))]
+    probs = []
+    if data.get("exp") != RC.DS1_EXPS[v["arm"]]:
+        probs.append("DS1's %s is built as %s, not %s" % (v["arm"], RC.DS1_EXPS[v["arm"]], data.get("exp")))
+    rp = DD.arm_record_path(v["arm"])
+    cur = C.sha256_file(rp) if rp.is_file() else None
+    if v.get("record_sha256") != cur:
+        probs.append("exp.json was built from the arm record %s; %s is now %s" % (str(v.get("record_sha256"))[:12],
+                                                                                 rp, str(cur)[:12]))
+    rec = _read_json(rp) if rp.is_file() else None
+    msha = (data.get("base") or {}).get("manifest_sha256")
+    if not isinstance(rec, dict) or rec.get("sha256") != msha or v.get("manifest_sha256") != msha:
+        probs.append("its base manifest %s is not arm %s's in %s" % (str(msha)[:12], v["arm"], rp))
     return probs
 
 

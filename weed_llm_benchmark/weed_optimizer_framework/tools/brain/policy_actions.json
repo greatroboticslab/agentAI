@@ -3020,6 +3020,339 @@
         "human"
       ],
       "description": "Lever LV (R1): record an R0 verdict by its pre-registered rule, dev only: inc2.baseline canary-verdict (canary.json), capacity-verdict (capacity/capacity_v1.json, L-4) and inc2.pilot4 verdict (pilot_v4/stage_a.json)."
+    },
+    "inc_build_ds1_data": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.ds1_data build --phase {phase} --step {step}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "phase": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            1,
+            2
+          ]
+        },
+        "step": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "screen",
+            "md_s0",
+            "pools",
+            "draw",
+            "manifests"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 2.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) of one DS1 data step: the hashes and DINOv2 descriptors of new rows, the model audit by E1-A, the guard, the draws and the manifests; it trains nothing. est_gpu_hours is levers_stream.price's 'ds1_data' estimate per step (3.0 GPU-h a phase over five steps, each under its cap; DS.9.2), settled from sacct."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L30 (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29: DS1, scaling verified training data at the weed level, pre-registered): inc2.ds1_data build writes DS1's records under splits/ds1/ and ds1/v1/ (a screen revision and its sheets' bundles, MD-S0's draft or freeze, the weed-level pools, MD-N and MT-W v2, the arms' manifests). Record only: nothing switches."
+    },
+    "inc_ds1_sheets": {
+      "template": "lab: python -m weed_optimizer_framework.tools.inc2.ds1_sheets render --kind {kind} --batch {batch} --lab-inc {lab_inc}",
+      "param_bounds": {
+        "kind": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "source",
+            "audit",
+            "ln",
+            "mtw"
+          ]
+        },
+        "batch": {
+          "type": "int",
+          "min": 1,
+          "max": 999
+        },
+        "lab_inc": {
+          "type": "str",
+          "pattern": "^(?!.*\\.\\.)/[A-Za-z0-9_./-]{1,400}$"
+        }
+      },
+      "risk": "R0",
+      "reversible": true,
+      "est_su": {
+        "fixed_su": 0.0,
+        "why": "A lab-side render of bundles the cluster wrote (pulled from the data-transfer node and checked by sha256); no cluster allocation."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L31 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29: DS1, scaling verified training data at the weed level, pre-registered): one batch of DS1's sheets as one self-contained HTML file on the lab (headings in Chinese and English, every image with its boxes and classes, a decision box per source), its render record pushed to the cluster; a person's decisions come back through inc2.ds1_sheets record."
+    },
+    "inc_build_ds1": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.baseline build --exp {exp} --ds1 {arm} --seeds {seeds} --role {role}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "exp": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "ds1_kd_m640",
+            "ds1_kt_m640",
+            "ds1_kf_m640",
+            "ds1_s0_m640",
+            "ds1_s1cr_m640",
+            "ds1_s1c_m640",
+            "ds1_s1u_m640",
+            "ds1_s2_m640"
+          ]
+        },
+        "arm": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "KD",
+            "KT",
+            "KF",
+            "S0",
+            "S1CR",
+            "S1C",
+            "S1U",
+            "S2"
+          ]
+        },
+        "seeds": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "0,1,2"
+          ]
+        },
+        "role": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "baseline"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 20.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "A DS1 build: the build job (one V100) plus the three seeds' base runs and dev finals it defines (run_inc2_job.sh): est_gpu_hours is levers_stream.price's 'ds1_build' estimate (seeds x 1.2 M image-epochs x 14.2 ms + finals + the build job, cap 20; DS.9.2), settled from sacct and the experiment's report."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L32 (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29: DS1, scaling verified training data at the weed level, pre-registered): inc2.baseline build --ds1 ARM trains one of DS1's 1.2 M arms (KD, KT, KF, S0, S1c-R, S1c, S1u, S2) at equal compute. Record only: nothing switches."
+    },
+    "inc_build_ds1_long": {
+      "template": "sbatch -p GPU-shared run_inc2_long.sh {pkg}.ds1_long {verb} --arm {arm} [--seed K for each of {seeds}] [--walltime-h {walltime_h}]",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "verb": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "smoke",
+            "train"
+          ]
+        },
+        "arm": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "S0X",
+            "S2X",
+            "S1UX",
+            "S1C",
+            "S1U",
+            "S2",
+            "S1CR",
+            "S0",
+            "KD",
+            "KT",
+            "KF"
+          ]
+        },
+        "seeds": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "0,1,2",
+            "0,1",
+            "0,2",
+            "1,2",
+            "0",
+            "1",
+            "2"
+          ]
+        },
+        "walltime_h": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            24,
+            36
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 86.4
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "DS1's long-path jobs (run_inc2_long.sh, one V100-32 each, 24 h walltime; 36 h only for S2x's one re-submission): the smoke (0.5 GPU-h, cap 1), then one job per seed (14.2 GPU-h each, cap 19.2 at the decided compute, 28.8 for the 36 h re-submission; DS.9.2), on the TRAIN lane; settled from sacct."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L32X (R3, envelope-eligible, TRAIN lane; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29: DS1, scaling verified training data at the weed level, pre-registered): inc2.ds1_long smoke times one epoch and, for S0x, fixes the pair's compute once (3.6 M or 2.4 M); train --seed k trains one seed of S0x, S2x or S1ux at the pair's compute (or a moved 1.2 M arm at 1.2 M) and exports its final EMA weights once. Record only: nothing switches."
+    },
+    "inc_score_ds1": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.ds1 score --arm {arm}",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "arm": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "POWER",
+            "K0",
+            "KD",
+            "KT",
+            "KF",
+            "S0",
+            "S1CR",
+            "S1C",
+            "S1U",
+            "S2",
+            "S0X",
+            "S2X",
+            "S1UX"
+          ]
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 2.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that scores one DS1 arm through DS1's pass (MD in its own root, dev two-stage, ood23 and ood22 under deviation 6's loader, ImageWeeds): est_gpu_hours is levers_stream.price's 'ds1_score' estimate per arm (cap 2; DS.9.2), settled from sacct."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L33 (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29: DS1, scaling verified training data at the weed level, pre-registered): inc2.ds1 score --arm X writes capacity/ds1_score_<arm>.json (dev and MD only); POWER takes the three reproductions and the power pre-flight (capacity/ds1_power.json). Never a sealed exam. Record only: nothing switches."
+    },
+    "inc_verdict_ds1": {
+      "template": "sbatch -p GPU-shared run_inc2_build.sh {pkg}.ds1 verdict --phase {phase} [--cap-refused {cap_refused}] [--ticker-failed {ticker_failed}]",
+      "param_bounds": {
+        "pkg": {
+          "type": "enum",
+          "value_type": "str",
+          "values": [
+            "inc2"
+          ]
+        },
+        "phase": {
+          "type": "enum",
+          "value_type": "int",
+          "values": [
+            1,
+            2
+          ]
+        },
+        "cap_refused": {
+          "type": "str",
+          "pattern": "^(data:[12]:(screen|md_s0|pools|draw|manifests)|build:[A-Z0-9]{2,5}|long:[A-Z0-9]{2,5}:(smoke|train)|score:[A-Z0-9]{2,5})(,(data:[12]:(screen|md_s0|pools|draw|manifests)|build:[A-Z0-9]{2,5}|long:[A-Z0-9]{2,5}:(smoke|train)|score:[A-Z0-9]{2,5})){0,39}$"
+        },
+        "ticker_failed": {
+          "type": "str",
+          "pattern": "^(data:[12]:(screen|md_s0|pools|draw|manifests)|build:[A-Z0-9]{2,5}|long:[A-Z0-9]{2,5}:(smoke|train)|score:[A-Z0-9]{2,5})(,(data:[12]:(screen|md_s0|pools|draw|manifests)|build:[A-Z0-9]{2,5}|long:[A-Z0-9]{2,5}:(smoke|train)|score:[A-Z0-9]{2,5})){0,39}$"
+        },
+        "est_gpu_hours": {
+          "type": "float",
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      "risk": "R3",
+      "reversible": true,
+      "est_su": {
+        "gpu_type": "v100-32",
+        "gpu_count": 1,
+        "hours_param": "est_gpu_hours",
+        "why": "One GPU-shared job (run_inc2_build.sh, one V100) that reads DS1's committed per-image arrays and runs the image, capture-group and session bootstraps (CPU): no pass. est_gpu_hours is levers_stream.price's 'ds1_verdict' estimate (0.5 GPU-h, cap 1), settled from sacct."
+      },
+      "dry_run_variant": null,
+      "allowed_tiers": [
+        "round-scheduler",
+        "human"
+      ],
+      "description": "Lever L34 (R3, envelope-eligible; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29: DS1, scaling verified training data at the weed level, pre-registered): inc2.ds1 verdict --phase 1|2 records capacity/ds1_v<phase>.json (dev and MD only) and its external record, written once; --cap-refused names the items the ticker recorded 'not run (family cap)', --ticker-failed those it recorded failed after their second failure. Record only: nothing switches."
     }
   }
 }

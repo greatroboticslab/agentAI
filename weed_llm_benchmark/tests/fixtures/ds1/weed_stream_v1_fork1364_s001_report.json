@@ -1,0 +1,739 @@
+{
+ "arm": {
+  "gflops": 68.24,
+  "gflops_at_640": 68.24,
+  "id": "m640",
+  "imgsz": 640,
+  "model": "yolo11m.pt",
+  "weights_sha256": "d5ffc1a674953a08e11a8d21e022781b1b23a19b730afc309290bd9fb5305b95"
+ },
+ "blocked": {},
+ "chains": {
+  "r0": {
+   "accepted": [],
+   "final_incumbent": "base__s0",
+   "neutral": [
+    "inc0002"
+   ],
+   "phase": "done",
+   "quarantined": [
+    "inc0001",
+    "inc0003",
+    "inc0004"
+   ],
+   "recipe": {
+    "batch": 32,
+    "cache": "ram",
+    "close_mosaic": 10,
+    "cos_lr": true,
+    "deterministic": true,
+    "epochs": 30,
+    "freeze": null,
+    "imgsz": 640,
+    "lora": null,
+    "lr0": 0.002,
+    "lrf": 0.01,
+    "momentum": 0.937,
+    "optimizer": "SGD",
+    "trainer": "full",
+    "warmup_bias_lr": 0.002,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0005,
+    "workers": 5
+   }
+  }
+ },
+ "code": {
+  "modules": {
+   "tools/cwd12_species.py": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+   "tools/inc/__init__.py": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+   "tools/inc/common.py": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+   "tools/inc/driver.py": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c",
+   "tools/inc/gate.py": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546",
+   "tools/inc/splits.py": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+  },
+  "package_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework",
+  "pinned_utc": "2026-10-04T19:54:34Z",
+  "reason": "init"
+ },
+ "done": true,
+ "done_utc": "2026-10-05T04:16:05Z",
+ "exams": [
+  "dev",
+  "imageweeds"
+ ],
+ "exp": "weed_stream_v1_fork1364_s001",
+ "final": [
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8749627814161632,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.8628357817592233,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.10511832442042915,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.050601179488396875,
+      "n": 1,
+      "sd": null
+     }
+    }
+   },
+   "model": "chain r0: final incumbent",
+   "runs": [
+    "final__r0__incumbent"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8728524513558197,
+      "n": 3,
+      "sd": 0.006150536054079184
+     },
+     "twelve": {
+      "mean": 0.8627413966486518,
+      "n": 3,
+      "sd": 0.007560804941384908
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.11734762572537032,
+      "n": 3,
+      "sd": 0.011305614370049104
+     },
+     "twelve": {
+      "mean": 0.06311961613917359,
+      "n": 3,
+      "sd": 0.011034986880823104
+     }
+    }
+   },
+   "model": "base P_0",
+   "runs": [
+    "final__base__s0",
+    "final__base__s1",
+    "final__base__s2"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+     },
+     "twelve": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+     },
+     "twelve": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+     }
+    }
+   },
+   "model": "T_final (union of clean data)",
+   "runs": [
+    "final__Tfinal__s0",
+    "final__Tfinal__s1",
+    "final__Tfinal__s2"
+   ]
+  }
+ ],
+ "gate": {
+  "block": {
+   "flips_mode": "net"
+  },
+  "config": {
+   "attr_drop_sd_mult": 2.0,
+   "flips_mode": "net",
+   "flips_sd_mult": 2.0,
+   "flips_slack_images": 3.0,
+   "metric": "map50_95",
+   "min_seeds": 3,
+   "min_species_gt": 30,
+   "p_accept": 0.75,
+   "p_recipe_flag": 0.25,
+   "p_reject": 0.25,
+   "regression_sd_mult": 2.0,
+   "require_production": true,
+   "species_min_drop": 0.03,
+   "species_sd_mult": 3.0
+  },
+  "exp_json_changes": {},
+  "flips_mode": "net",
+  "ledger_checked": {
+   "gate": 4,
+   "gate_pin": 1,
+   "truth": 4
+  },
+  "ledger_mismatches": [],
+  "pinned": true
+ },
+ "generated_utc": "2026-10-05T04:34:04Z",
+ "gpu_hours": {
+  "base": {
+   "hours": 8.716944444444444,
+   "runs": 3
+  },
+  "chain:r0": {
+   "hours": 28.19005555555556,
+   "runs": 24
+  },
+  "final": {
+   "hours": 0.12508333333333332,
+   "runs": 4
+  },
+  "truth": {
+   "hours": 40.97075,
+   "runs": 12
+  }
+ },
+ "gpu_hours_total": 78.00283333333334,
+ "interventions": [],
+ "notes": [],
+ "protocol": "v3",
+ "replay_mode": "full",
+ "research_only": true,
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "steps": [
+  {
+   "chains": {
+    "r0": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.002698185047615098,
+      "blame": "data",
+      "class_vs_loc": "labels",
+      "map_delta": -0.003749876431478949,
+      "recipe_flag": false,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.8607813045473502,
+     "cand_sd": 0.0018733829921684629,
+     "d_images": 1364,
+     "guards": {
+      "flips": true,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.8628357817592234,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.8645311809788292,
+     "null_sd": 0.0017887729719059686,
+     "p_data": 0.0,
+     "p_recipe": 1.0,
+     "pool_images": 7493,
+     "reason": "REJECT: P_data=0.000 (cand 0.8608+-0.0019 vs null 0.8645+-0.0018, inc 0.8628); P_data <= 0.25, guards pass; P_recipe=1.000; class_vs_loc=labels",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "zenodo_15808623"
+     ],
+     "train_images": {
+      "cand": 8857,
+      "null": 7493
+     },
+     "truth_equivalent": "hurts",
+     "v1_agree": false,
+     "v1_counterfactual": "REJECT",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.0,
+      "null": 1.0
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 1,
+   "step": "inc0001",
+   "tag": "s01_inc0001",
+   "truth": {
+    "p": 0.3333333333333333,
+    "species_failed": [],
+    "verdict": "neutral",
+    "with_mean": 0.8603164410003834,
+    "with_sd": 0.006692662015987713,
+    "without_mean": 0.8627413966486518,
+    "without_sd": 0.007560804941384854
+   }
+  },
+  {
+   "chains": {
+    "r0": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.0019177390345815892,
+      "blame": null,
+      "class_vs_loc": "domain/localisation",
+      "map_delta": -0.004342747915935363,
+      "recipe_flag": false,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.8601884330628938,
+     "cand_sd": 0.005997987631036425,
+     "d_images": 1364,
+     "guards": {
+      "flips": true,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.8628357817592234,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.8645311809788292,
+     "null_sd": 0.0017887729719059686,
+     "p_data": 0.3333333333333333,
+     "p_recipe": 1.0,
+     "pool_images": 7493,
+     "reason": "HOLD: P_data=0.333 (cand 0.8602+-0.0060 vs null 0.8645+-0.0018, inc 0.8628); effect not detectable, guards pass; P_recipe=1.000; class_vs_loc=domain/localisation",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "zenodo_15808623"
+     ],
+     "train_images": {
+      "cand": 8857,
+      "null": 7493
+     },
+     "truth_equivalent": "neutral",
+     "v1_agree": true,
+     "v1_counterfactual": "HOLD",
+     "verdict": "HOLD",
+     "warmup_epochs_effective": {
+      "cand": 1.0,
+      "null": 1.0
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 2,
+   "step": "inc0002",
+   "tag": "s02_inc0002",
+   "truth": {
+    "p": 0.4444444444444444,
+    "species_failed": [],
+    "verdict": "neutral",
+    "with_mean": 0.8603768194176556,
+    "with_sd": 0.004302952518842808,
+    "without_mean": 0.8627413966486518,
+    "without_sd": 0.007560804941384854
+   }
+  },
+  {
+   "chains": {
+    "r0": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": -0.00016258519619150036,
+      "blame": "data",
+      "class_vs_loc": "labels",
+      "map_delta": -0.006326364084909053,
+      "recipe_flag": false,
+      "species_failed": [
+       "Sicklepod"
+      ]
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.8582048168939201,
+     "cand_sd": 0.0014873358203177983,
+     "d_images": 1364,
+     "guards": {
+      "flips": true,
+      "regression": false,
+      "species": false
+     },
+     "inc": 0.8628357817592234,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.8645311809788292,
+     "null_sd": 0.0017887729719059686,
+     "p_data": 0.0,
+     "p_recipe": 1.0,
+     "pool_images": 7493,
+     "reason": "REJECT: P_data=0.000 (cand 0.8582+-0.0015 vs null 0.8645+-0.0018, inc 0.8628); guard failed: regression (cand 0.8582 < 0.8593); species (Sicklepod -0.037 < -0.030); P_recipe=1.000; class_vs_loc=labels",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "zenodo_15808623"
+     ],
+     "train_images": {
+      "cand": 8857,
+      "null": 7493
+     },
+     "truth_equivalent": "hurts",
+     "v1_agree": false,
+     "v1_counterfactual": "REJECT",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.0,
+      "null": 1.0
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 3,
+   "step": "inc0003",
+   "tag": "s03_inc0003",
+   "truth": {
+    "p": 0.3333333333333333,
+    "species_failed": [],
+    "verdict": "neutral",
+    "with_mean": 0.8613989668746077,
+    "with_sd": 0.0021218416328219205,
+    "without_mean": 0.8627413966486518,
+    "without_sd": 0.007560804941384854
+   }
+  },
+  {
+   "chains": {
+    "r0": {
+     "agree": true,
+     "attribution": {
+      "agnostic_delta": -0.0011633880667978325,
+      "blame": "data",
+      "class_vs_loc": "none",
+      "map_delta": -0.0026296750895618004,
+      "recipe_flag": false,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit"
+     ],
+     "cand_mean": 0.8619015058892674,
+     "cand_sd": 0.0027777568222921577,
+     "d_images": 1364,
+     "guards": {
+      "flips": true,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.8628357817592234,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.8645311809788292,
+     "null_sd": 0.0017887729719059686,
+     "p_data": 0.2222222222222222,
+     "p_recipe": 1.0,
+     "pool_images": 7493,
+     "reason": "REJECT: P_data=0.222 (cand 0.8619+-0.0028 vs null 0.8645+-0.0018, inc 0.8628); P_data <= 0.25, guards pass; P_recipe=1.000; class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "zenodo_15808623"
+     ],
+     "train_images": {
+      "cand": 8857,
+      "null": 7493
+     },
+     "truth_equivalent": "hurts",
+     "v1_agree": true,
+     "v1_counterfactual": "REJECT",
+     "verdict": "REJECT",
+     "warmup_epochs_effective": {
+      "cand": 1.0,
+      "null": 1.0
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 4,
+   "step": "inc0004",
+   "tag": "s04_inc0004",
+   "truth": {
+    "p": 0.1111111111111111,
+    "species_failed": [
+     "PricklySida",
+     "Goosegrass"
+    ],
+    "verdict": "hurts",
+    "with_mean": 0.8567625840515191,
+    "with_sd": 0.004431844479176775,
+    "without_mean": 0.8627413966486518,
+    "without_sd": 0.007560804941384854
+   }
+  }
+ ],
+ "stream": {
+  "k_built": 4,
+  "k_requested": 4,
+  "pool": "P_0",
+  "protocol_gate": "v3 (L-3), read at commit",
+  "research_only": {
+   "increments_research_only_rows": 5456,
+   "models": true,
+   "pool": true,
+   "pool_research_only_rows": 7444
+  },
+  "segment": 1,
+  "sid": "weed_stream_v1_fork1364",
+  "stage_b": false,
+  "stream_json_sha256": "5eb08104ad11a0f4a12e10050eadf2ad159591d4f9528bd13488e20599a48bb9",
+  "truth_policy": {
+   "arm": "m640",
+   "cost_basis": "inc2.recipes.step_cost (high bound) for the arm x the measured multiplier of the capacity grid",
+   "cost_multiplier": 0.18006846914844865,
+   "estimate": false,
+   "every": 1,
+   "every_requested": null,
+   "every_stream": 1,
+   "granularity": "segment (the pinned driver's truth arm is per experiment)",
+   "on": true,
+   "segment_ordinal": 0,
+   "step_cost_gpu_h": 15.596
+  }
+ },
+ "stream_commit": {
+  "choice": {
+   "rule": "one recipe",
+   "table": null
+  },
+  "chosen": "r0",
+  "counted": {
+   "inc0001": false,
+   "inc0002": true,
+   "inc0003": false,
+   "inc0004": false
+  },
+  "d30": {
+   "fires": false,
+   "recipe_caused": 0,
+   "rejects": 3
+  },
+  "d33": {
+   "rejects": 3,
+   "species": [],
+   "species_fail_counts": {}
+  },
+  "discordant": [],
+  "dispositions": {
+   "inc0001": "data",
+   "inc0002": "hold",
+   "inc0003": "data",
+   "inc0004": "data"
+  },
+  "pool": {
+   "dhash": {
+    "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/pool/P_1.78fd299a3c3a1c51.dhash.json",
+    "sha256": "db798f604c6c8caf7563ca3b4d5ee5269c4fc8a7c6f2bae65536ad7ca5e18db4"
+   },
+   "n_images": 7493,
+   "name": "P_1",
+   "parent": "P_0",
+   "parts": [
+    "P_0"
+   ],
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/pool/P_1.78fd299a3c3a1c51.jsonl",
+   "research_only": true,
+   "research_only_known": true,
+   "research_only_rows": 7444,
+   "segment": 1,
+   "sha256": "78fd299a3c3a1c514e74f41f090f54dc2060d09027d37e403763867dd2d65f2d"
+  },
+  "research_only": true,
+  "stale_base": false,
+  "steps": {
+   "r0": [
+    {
+     "disposition": "data",
+     "increment": "inc0001",
+     "k": 1,
+     "pinned": {
+      "blame": "data",
+      "guards": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      },
+      "p_data": 0.0,
+      "p_recipe": 1.0,
+      "species_failed": [],
+      "verdict": "REJECT"
+     },
+     "truth": "neutral",
+     "v3": {
+      "blame": "data",
+      "cand_mean": 0.8607813045473502,
+      "guards": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      },
+      "inc": 0.8628357817592234,
+      "null_mean": 0.8645311809788292,
+      "null_sd": 0.0017887729719059686,
+      "p_data": 0.0,
+      "p_recipe": 1.0,
+      "recipe_flag": false,
+      "species_failed": [],
+      "species_se": {},
+      "species_tolerance": {},
+      "v3_applied": true,
+      "v3_unavailable_reason": null,
+      "verdict": "REJECT"
+     }
+    },
+    {
+     "disposition": "hold",
+     "increment": "inc0002",
+     "k": 2,
+     "pinned": {
+      "blame": null,
+      "guards": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      },
+      "p_data": 0.3333333333333333,
+      "p_recipe": 1.0,
+      "species_failed": [],
+      "verdict": "HOLD"
+     },
+     "truth": "neutral",
+     "v3": {
+      "blame": null,
+      "cand_mean": 0.8601884330628938,
+      "guards": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      },
+      "inc": 0.8628357817592234,
+      "null_mean": 0.8645311809788292,
+      "null_sd": 0.0017887729719059686,
+      "p_data": 0.3333333333333333,
+      "p_recipe": 1.0,
+      "recipe_flag": false,
+      "species_failed": [],
+      "species_se": {},
+      "species_tolerance": {},
+      "v3_applied": true,
+      "v3_unavailable_reason": null,
+      "verdict": "HOLD"
+     }
+    },
+    {
+     "disposition": "data",
+     "increment": "inc0003",
+     "k": 3,
+     "pinned": {
+      "blame": "data",
+      "guards": {
+       "flips": true,
+       "regression": false,
+       "species": false
+      },
+      "p_data": 0.0,
+      "p_recipe": 1.0,
+      "species_failed": [
+       "Sicklepod"
+      ],
+      "verdict": "REJECT"
+     },
+     "truth": "neutral",
+     "v3": {
+      "blame": "data",
+      "cand_mean": 0.8582048168939201,
+      "guards": {
+       "flips": true,
+       "regression": false,
+       "species": true
+      },
+      "inc": 0.8628357817592234,
+      "null_mean": 0.8645311809788292,
+      "null_sd": 0.0017887729719059686,
+      "p_data": 0.0,
+      "p_recipe": 1.0,
+      "recipe_flag": false,
+      "species_failed": [],
+      "species_se": {},
+      "species_tolerance": {},
+      "v3_applied": true,
+      "v3_unavailable_reason": null,
+      "verdict": "REJECT"
+     }
+    },
+    {
+     "disposition": "data",
+     "increment": "inc0004",
+     "k": 4,
+     "pinned": {
+      "blame": "data",
+      "guards": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      },
+      "p_data": 0.2222222222222222,
+      "p_recipe": 1.0,
+      "species_failed": [],
+      "verdict": "REJECT"
+     },
+     "truth": "hurts",
+     "v3": {
+      "blame": "data",
+      "cand_mean": 0.8619015058892674,
+      "guards": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      },
+      "inc": 0.8628357817592234,
+      "null_mean": 0.8645311809788292,
+      "null_sd": 0.0017887729719059686,
+      "p_data": 0.2222222222222222,
+      "p_recipe": 1.0,
+      "recipe_flag": false,
+      "species_failed": [],
+      "species_se": {},
+      "species_tolerance": {},
+      "v3_applied": true,
+      "v3_unavailable_reason": null,
+      "verdict": "REJECT"
+     }
+    }
+   ]
+  },
+  "utc": "2026-10-05T04:34:04Z"
+ },
+ "testing": false,
+ "type": "chain"
+}

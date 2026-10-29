@@ -176,6 +176,13 @@ D8S, D8M) train the cold table. v3fam_recipe(arm, n) writes either, and
 cold_budget is admitted under a v3fam record for the budget arms only
 (inc2.train.v3fam_problems).
 
+DS1's builds (docs/CONTINUOUS_LOOP.md, "Amendment (2026-10-29): DS1, scaling
+verified training data at the weed level", DS.6): inc2.baseline build --ds1
+ARM trains one of DS1_ARMS under DS1_EXPS, YOLO11m at 640, E1's cold_budget
+recomputed from the arm's final count (the cwd12 exposure floor's repeats
+included); cold_budget is admitted under a ds1 record for these arms only
+(inc2.train.ds1_problems).
+
 Cost (estimates, V100, 1 SU per GPU-hour). The measured rates are YOLO11n at
 640 px (docs/CONTINUOUS_LOOP.md §5.6): cold 6.0-7.0 ms per image-epoch
 (realloop_v1 base 1.974 h / 3 / 3,927 / 100 = 6.0; b0_v1 base 1.768 h / 3 /
@@ -320,6 +327,13 @@ V3FAM_EXPS = {"D1A1": "v3_d1_a1_m640", "D1B1": "v3_d1_b1_m640", "D1A12": "v3_d1_
               "D4F": "v3_d4_f_m640", "D4N": "v3_d4_n_m640", "D4R15": "v3_d4_r15_m640",
               "D5B0": "v3_d5b_0_m640", "D5B25": "v3_d5b_25_m640", "D5B100": "v3_d5b_100_m640",
               "D8S": "v3_d8_s640_tc", "D8M": "v3_d8_m640_tc", "D0BCLEAN": "v3_d0_bclean_m640"}
+# DS1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.6, DS.9.1): inc2.baseline build --ds1 ARM trains one of
+# DS1's 1.2 M arms under its experiment name, YOLO11m at 640, E1's cold_budget recomputed from the arm's final count
+# (the cwd12 floor's repeats included); nothing else names cold_budget under a ds1 record
+DS1_ARMS = ("KD", "KT", "KF", "S0", "S1CR", "S1C", "S1U", "S2")
+DS1_DETECTOR = "m640"
+DS1_EXPS = {"KD": "ds1_kd_m640", "KT": "ds1_kt_m640", "KF": "ds1_kf_m640", "S0": "ds1_s0_m640",
+            "S1CR": "ds1_s1cr_m640", "S1C": "ds1_s1c_m640", "S1U": "ds1_s1u_m640", "S2": "ds1_s2_m640"}
 # the E1 arm each E2 arm starts from (E1's verdict names B as its `exp` and A as its `reference`)
 E2_INIT_ARM = {"W": "B", "S": "B", E2C_ARM: "A"}
 E2C_DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-04, later): E2-C, the attribution control "
@@ -508,6 +522,18 @@ def v3fam_recipe(arm, n_images):
     if arm in V3FAM_BUDGET_ARMS:
         return cold_budget(det, n_images)
     return cold(det)
+
+
+def ds1_arm(arm):
+    if arm not in DS1_ARMS:
+        raise RecipeError("DS1's 1.2 M build arms are %s (pre-registered), not %r" % (list(DS1_ARMS), arm))
+    return arm
+
+
+def ds1_recipe(arm, n_images):
+    """The base runs' recipe of DS1's arm on a base of n_images (exp.json's form, no seed): cold_budget(m640, n)."""
+    ds1_arm(arm)
+    return cold_budget(DS1_DETECTOR, n_images)
 
 
 def _diff(recipe, want):

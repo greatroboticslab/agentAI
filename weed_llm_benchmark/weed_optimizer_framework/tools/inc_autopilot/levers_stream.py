@@ -408,6 +408,8 @@ def price(lid, params, dom, info=None):
         return h, dict(detail, job_hours=h, why="E3's verdict: the paired bootstraps on the dev files, no pass")
     if kind and kind.startswith("v3fam_"):
         return price_v3fam(kind, p, dom, info, detail)
+    if kind and kind.startswith("ds1_"):
+        return price_ds1(kind, p, dom, info, detail)
     factor = arm_factor(dom, p.get("arm") or info.get("arm"))
     recipes = tuple(x for x in str(p.get("recipes") or info.get("recipes") or "r0").split(",") if x)
     finals = float(cost(dom, "finals_hours"))
@@ -532,6 +534,76 @@ def price_v3fam(kind, p, dom, info, detail):
                             ms_per_image_epoch=ms, runs=round(runs, 3), finals=finals, build_job_hours=job),
                        "seeds x image-epochs x the detector's measured rate, the finals and the build job")
     raise LeverError("no v3fam estimator %r" % kind)
+
+
+def ds1_cost(dom, key):
+    """A cost of the stream domain's ds1 block (stream_domains/<d>.json "ds1" -> costs). Raises LeverError."""
+    c = ((dom.get("ds1") or {}).get("costs") or {})
+    if key not in c:
+        raise LeverError("the stream domain's ds1 block prices no %r" % key)
+    return c[key]
+
+
+def _capped_ds1(h, cap, detail, why):
+    if h > float(cap) + 1e-9:
+        raise LeverError("the estimate %.3f GPU-h is above its cap of %g (DS.9.2)" % (h, float(cap)))
+    return round(h, 3), dict(detail, cap=float(cap), why=why)
+
+
+def price_ds1(kind, p, dom, info, detail):
+    """DS1's estimators (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.2; V100, 1 SU per GPU-h, est.), each under
+    its cap: ds1_data per step (3.0 a phase over five steps, <= 6); ds1_build seeds x 1.2 M image-epochs x 14.2 ms +
+    finals + the build job (<= 20); ds1_long the smoke 0.5 (<= 1) or per seed submitted its smoke's projection
+    (14.2 before a smoke; <= 19.2, 28.8 for S2x's one 36 h re-submission); ds1_score per arm (<= 2); ds1_verdict 0.5
+    (<= 1). Every job is settled from sacct, a build's runs from its experiment's report."""
+    detail = dict(detail, rates="DS1's domain block (DS.9.2, est.)")
+    if kind == "ds1_data":
+        step = p.get("step")
+        table, caps = ds1_cost(dom, "data_hours"), ds1_cost(dom, "data_cap")
+        if step not in table:
+            raise LeverError("no price for DS1's data step %r" % (step,))
+        return _capped_ds1(float(table[step]), caps[step], dict(detail, step=step, phase=p.get("phase")),
+                           "one DS1 data step (hashes, DINOv2 descriptors, the guard, the draws, the manifests)")
+    if kind == "ds1_score":
+        arm = p.get("arm")
+        table = ds1_cost(dom, "score_hours")
+        if arm not in table:
+            raise LeverError("no price for DS1's score arm %r" % (arm,))
+        return _capped_ds1(float(table[arm]), ds1_cost(dom, "score_cap"), dict(detail, arm=arm),
+                           "one DS1 arm's passes")
+    if kind == "ds1_verdict":
+        return _capped_ds1(float(ds1_cost(dom, "verdict_hours")), ds1_cost(dom, "verdict_cap"), detail,
+                           "DS1's bootstraps on its committed arrays, no pass")
+    if kind == "ds1_long":
+        verb = p.get("verb")
+        if verb == "smoke":
+            return _capped_ds1(float(ds1_cost(dom, "long_smoke_hours")), ds1_cost(dom, "long_smoke_cap"), detail,
+                               "the long path's smoke: one epoch")
+        if verb == "train":
+            n = len([x for x in str(p.get("seeds") or "0,1,2").split(",") if x != ""])
+            if not 1 <= n <= 3:
+                raise LeverError("L32X's train submits 1-3 seeds, not %r" % (p.get("seeds"),))
+            per = float(info.get("projection_h") or ds1_cost(dom, "long_train_hours"))
+            cap = float(ds1_cost(dom, "long_resubmit_cap" if int(p.get("walltime_h") or 24) == 36
+                                 else "long_train_cap"))
+            return _capped_ds1(per * n, cap * n, dict(detail, seeds=n, hours_per_seed=round(per, 3)),
+                               "the long path's seed jobs, %d x the smoke's projection" % n)
+        raise LeverError("L32X's verb is smoke or train, not %r" % (verb,))
+    if kind == "ds1_build":
+        n = info.get("images")
+        if not n:
+            raise LeverError("DS1's build %r has no image count (its arm record's)" % (p.get("arm"),))
+        seeds = len([x for x in str(p.get("seeds") or "0,1,2").split(",") if x != ""])
+        ms = float(ds1_cost(dom, "build_ms_per_image_epoch"))
+        epochs = max(1, int(math.floor(float(ds1_cost(dom, "budget_image_epochs")) / int(n) + 0.5)))
+        runs = _hours(seeds * int(n), epochs, ms)
+        finals = seeds * float(ds1_cost(dom, "finals_hours_per_run"))
+        job = float(ds1_cost(dom, "build_job_hours"))
+        return _capped_ds1(runs + finals + job, ds1_cost(dom, "build_cap"),
+                           dict(detail, arm=p.get("arm"), images=int(n), epochs=epochs, seeds=seeds,
+                                ms_per_image_epoch=ms, runs=round(runs, 3), finals=finals, build_job_hours=job),
+                           "seeds x 1.2 M image-epochs x the measured rate, the finals and the build job")
+    raise LeverError("no ds1 estimator %r" % kind)
 
 
 def _sha(obj):

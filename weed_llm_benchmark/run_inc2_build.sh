@@ -29,6 +29,10 @@
 #   python -m weed_optimizer_framework.tools.inc2.v3fam_sweep run
 #   python -m weed_optimizer_framework.tools.inc2.baseline build --exp E --v3fam ARM --seeds 0,1,2 --role baseline
 #   python -m weed_optimizer_framework.tools.inc2.base3    build --stream SID
+#   python -m weed_optimizer_framework.tools.inc2.ds1_data build --phase 1|2 --step screen|md_s0|pools|draw|manifests
+#   python -m weed_optimizer_framework.tools.inc2.ds1      score --arm X | verdict --phase 1|2 [...] |
+#                                                          score-test --arm X --exam mtw|cwd12
+#   python -m weed_optimizer_framework.tools.inc2.baseline build --exp E --ds1 ARM --seeds 0,1,2 --role baseline
 #   python -m weed_optimizer_framework.tools.inc2.pilot4   build --exp E [...]
 #   python -m weed_optimizer_framework.tools.inc2.stream   init | build | milestone | fork | feasibility | bisect
 #                                                          --stream SID [...]
@@ -73,7 +77,14 @@
 # (D0-S) v3fam_sweep; none is advanced; they run with HF_HUB_OFFLINE=1,
 # YOLO_OFFLINE=true and YOLO_AUTOINSTALL=false after an import check of torch,
 # ultralytics, scikit-learn, open_clip, transformers, timm, ensemble_boxes and
-# cv2. inc2.base3 build (L23V,
+# cv2. DS1 (2026-10-29, docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.1) builds
+# nothing either but through inc2.baseline build --ds1 ARM (L32: the experiment is
+# named after --exp and advanced as every build): inc2.ds1_data build --phase P
+# --step S (L30) is named ds1_data_p<P>_<S>, inc2.ds1 score --arm X (L33)
+# ds1_score_<x in lower case>, inc2.ds1 verdict --phase P (L34) ds1_v<P>, a person's
+# inc2.ds1 score-test --arm X --exam E ds1test_<x>_<e>; none is advanced; they run
+# with HF_HUB_OFFLINE=1, YOLO_OFFLINE=true and YOLO_AUTOINSTALL=false after the same
+# import check as V3F's. inc2.base3 build (L23V,
 # 2026-10-03: splits v3, E1's base) builds no experiment: no advance, its
 # provenance and lock are named base3_v3; it runs with HF_HUB_OFFLINE=1 (its
 # embedding check loads DINOv2 from the Hugging Face cache; compute nodes have
@@ -146,6 +157,8 @@ usage() {
          "inc2.v3fam_data build | inc2.v3fam score --arm X | verdict | score-test --arm X | reanalyse-test |" \
          "inc2.v3fam_verdict verdict |" \
          "inc2.v3fam_sweep run |" \
+         "inc2.ds1_data build --phase 1|2 --step S | inc2.ds1 score --arm X | verdict --phase 1|2 |" \
+         "score-test --arm X --exam mtw|cwd12 |" \
          "inc2.stream init|build|milestone|fork|feasibility|bisect} [flags ...]" >&2
     exit 2
 }
@@ -165,6 +178,7 @@ case "$MOD $CMD" in
     "v3fam_data build"|"v3fam score"|"v3fam verdict"|"v3fam score-test"|"v3fam reanalyse-test"|"v3fam_sweep run")
         shift 2 ;;
     "v3fam_verdict verdict") shift 2 ;;
+    "ds1_data build"|"ds1 score"|"ds1 verdict"|"ds1 score-test") shift 2 ;;
     "pilot4 build"|"base3 build") shift 2 ;;
     "stream init"|"stream build"|"stream milestone"|"stream fork"|"stream feasibility"|"stream bisect") shift 2 ;;
     *) usage ;;
@@ -172,12 +186,19 @@ esac
 EXP=""
 SID=""
 ARM=""
+DPHASE=""
+STEP=""
+DEXAM=""
 prev=""
 for a in "$@"; do
-    case "$a" in --exp=*) EXP="${a#--exp=}" ;; --stream=*) SID="${a#--stream=}" ;; --arm=*) ARM="${a#--arm=}" ;; esac
+    case "$a" in --exp=*) EXP="${a#--exp=}" ;; --stream=*) SID="${a#--stream=}" ;; --arm=*) ARM="${a#--arm=}" ;;
+        --phase=*) DPHASE="${a#--phase=}" ;; --step=*) STEP="${a#--step=}" ;; --exam=*) DEXAM="${a#--exam=}" ;; esac
     [ "$prev" = "--exp" ] && EXP="$a"
     [ "$prev" = "--stream" ] && SID="$a"
     [ "$prev" = "--arm" ] && ARM="$a"
+    [ "$prev" = "--phase" ] && DPHASE="$a"
+    [ "$prev" = "--step" ] && STEP="$a"
+    [ "$prev" = "--exam" ] && DEXAM="$a"
     prev="$a"
 done
 NAME_RE='^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'
@@ -207,6 +228,29 @@ elif [ "$MOD $CMD" = "v3fam verdict" ] || [ "$MOD $CMD" = "v3fam_verdict verdict
     NAME="v3fam_v1"
 elif [ "$MOD $CMD" = "v3fam reanalyse-test" ]; then
     NAME="v3fam_retest"
+elif [ "$MOD $CMD" = "ds1_data build" ]; then
+    # DS1's data steps (L30)
+    case "$DPHASE" in 1|2) ;; *) echo "FATAL: inc2.ds1_data build needs --phase 1|2" >&2; usage ;; esac
+    case "$STEP" in screen|md_s0|pools|draw|manifests) ;;
+        *) echo "FATAL: inc2.ds1_data build needs --step screen|md_s0|pools|draw|manifests" >&2; usage ;; esac
+    NAME="ds1_data_p${DPHASE}_${STEP}"
+elif [ "$MOD $CMD" = "ds1 verdict" ]; then
+    case "$DPHASE" in 1|2) ;; *) echo "FATAL: inc2.ds1 verdict needs --phase 1|2" >&2; usage ;; esac
+    NAME="ds1_v$DPHASE"
+elif [ "$MOD" = ds1 ]; then
+    # DS1's score arms (inc2.ds1.SCORE_ARMS) and, for score-test, the arms a read may name
+    case "$ARM" in
+        POWER|K0|KD|KT|KF|S0|S1CR|S1C|S1U|S2|S0X|S2X|S1UX) ;;
+        *) echo "FATAL: inc2.ds1 $CMD needs --arm, one of DS1's arms" >&2
+           usage ;;
+    esac
+    ARM_LC="$(echo "$ARM" | tr '[:upper:]' '[:lower:]')"
+    if [ "$CMD" = score ]; then
+        NAME="ds1_score_$ARM_LC"
+    else
+        case "$DEXAM" in mtw|cwd12) ;; *) echo "FATAL: inc2.ds1 score-test needs --exam mtw|cwd12" >&2; usage ;; esac
+        NAME="ds1test_${ARM_LC}_$DEXAM"
+    fi
 elif [ "$MOD" = v3fam ]; then
     # V3F's score arms (inc2.v3fam.SCORE_ARMS) and, for score-test, the arms a read may name
     case "$ARM" in
@@ -332,6 +376,7 @@ MODULES=(tools/inc/__init__.py tools/inc/common.py tools/inc/driver.py tools/inc
          tools/inc2/v3fam_wbf.py tools/inc2/v3fam_detr.py tools/inc2/v3fam_systems.py tools/inc2/v3fam_trained.py
          tools/inc2/v3fam_verdict.py tools/inc2/v3fam_supersede.py tools/inc2/v3fam_loader.py
          tools/inc2/v3fam_detr_env.txt
+         tools/inc2/ds1.py tools/inc2/ds1_data.py tools/inc2/ds1_sheets.py tools/inc2/ds1_long.py
          tools/inc_autopilot/stream_thresholds.json)
 export INCB_NAME="$NAME" INCB_MODULES="${MODULES[*]}"
 
@@ -453,7 +498,8 @@ if [ "$MOD $CMD" = "base3 build" ]; then
     python -u -c "import torch, transformers, ultralytics, scipy, cv2; print('torch', torch.__version__, 'transformers', transformers.__version__, 'ultralytics', ultralytics.__version__)" \
         || { prov update status=env_failed finish; exit 1; }
 fi
-if [ "$MOD" = v3fam ] || [ "$MOD" = v3fam_data ] || [ "$MOD" = v3fam_sweep ] || [ "$MOD" = v3fam_verdict ]; then
+if [ "$MOD" = v3fam ] || [ "$MOD" = v3fam_data ] || [ "$MOD" = v3fam_sweep ] || [ "$MOD" = v3fam_verdict ] \
+        || [ "$MOD" = ds1 ] || [ "$MOD" = ds1_data ]; then
     # V3F: the backbones from the Hugging Face cache (no internet on compute nodes; another snapshot refuses);
     # Ultralytics installs and fetches nothing; ensemble_boxes for D3, timm for ResNet-50, cv2 for D0-S's SIFT
     export HF_HUB_OFFLINE=1 YOLO_OFFLINE=true YOLO_AUTOINSTALL=false
@@ -508,7 +554,7 @@ fi
 if [ "$MOD $CMD" = "baseline rescore-native" ] || [ "$MOD $CMD" = "baseline rescore-agnostic" ] \
         || [ "$MOD $CMD" = "baseline rescore-e2" ] || [ "$MOD $CMD" = "baseline rescore-e2-attr" ] \
         || [ "$MOD" = twostage ] || [ "$MOD" = v3fam ] || [ "$MOD" = v3fam_data ] || [ "$MOD" = v3fam_sweep ] \
-        || [ "$MOD" = v3fam_verdict ]; then
+        || [ "$MOD" = v3fam_verdict ] || [ "$MOD" = ds1 ] || [ "$MOD" = ds1_data ]; then
     # scores only (V3F's data builder and sweep write records, no experiment): nothing was built, nothing is
     # advanced
     prov update status=scored build_rc=0 finish

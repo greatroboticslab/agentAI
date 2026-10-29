@@ -988,6 +988,178 @@
    "success": "Held rows released; stream models lose H10d comparability.",
    "falsifier": "-",
    "estimator": "zero"
+  },
+  "L30": {
+   "name": "ds1_data",
+   "title": "DS1's data builds (inc2.ds1_data build --phase P --step S): the source screen and its sheets' bundles, MD-S0 drawn, sized and frozen, the weed-level pools, MD-N and MT-W v2 drawn, every arm's manifest",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_build_ds1_data",
+   "risk": "R3",
+   "lever": "L30",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.ds1_data",
+    "build",
+    "--phase",
+    "{phase}",
+    "--step",
+    "{step}"
+   ],
+   "control": "Base B (splits/v3) and D1's B' (splits/v3fam's D1B1): every DS1 manifest is a filter of its parents plus the pools' rows, row bytes unchanged in every larger manifest.",
+   "success": "The step's records written once under splits/ds1/ and ds1/v1/ (a screen revision, an MD draft or freeze, a source's pool, an exam root, an arm's manifest and record) and splits/ds1/summary.json rewritten.",
+   "falsifier": "A rule of DS.5.1 that cannot be applied refuses the step (fail closed); a guard hit is dropped and counted; nothing under splits/v1, v2, v3, v3fam, _zoo or twostage is written.",
+   "estimator": "ds1_data",
+   "note": "Record only (DS.12 steps 1, 2, 5, 9): proposed in DS.12's order once the gate holds; a failure is one card and it is proposed once more; after a second failure it is recorded failed."
+  },
+  "L31": {
+   "name": "ds1_sheets",
+   "title": "Render one batch of DS1's sheets on the lab (inc2.ds1_sheets render): one self-contained HTML file, every image with its boxes, a decision box per source",
+   "lane": "MAINT",
+   "follow": "lab",
+   "policy_action": "inc_ds1_sheets",
+   "risk": "R0",
+   "lever": "L31",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.inc2.ds1_sheets",
+    "render",
+    "--kind",
+    "{kind}",
+    "--batch",
+    "{batch}",
+    "--lab-inc",
+    "{lab_inc}"
+   ],
+   "control": "The bundles the cluster's L30 wrote, each file checked against its bundle.json before it is drawn.",
+   "success": "ds1/v1/sheets/html/ds1_<kind>_<batch>.html and its render record (the sheet's sha256, the HTML's), the record pushed to the cluster for `record`.",
+   "falsifier": "A bundle file that does not hash as recorded refuses the render.",
+   "estimator": "zero",
+   "note": "0 SU: the lab renders, the delegate copies the HTML to the owner's folder; a person's decisions come back through `inc2.ds1_sheets record` on the login node."
+  },
+  "L32": {
+   "name": "build_ds1",
+   "title": "Build one of DS1's 1.2 M arms (inc2.baseline build --ds1: the arm's manifest, YOLO11m at 640, E1's cold_budget from its final count); its three seeds' runs follow",
+   "lane": "MAINT",
+   "follow": "build",
+   "policy_action": "inc_build_ds1",
+   "risk": "R3",
+   "lever": "L32",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.baseline",
+    "build",
+    "--exp",
+    "{exp}",
+    "--ds1",
+    "{arm}",
+    "--seeds",
+    "{seeds}",
+    "--role",
+    "{role}"
+   ],
+   "control": "S0 (B'o) at the same compute, never retrained after its runs.",
+   "success": "The experiment built (exp.json with its ds1 record; inc2.train.ds1_problems) and, later, its three base runs and the dev finals done.",
+   "falsifier": "Nothing is decided here: the arm is scored by L33 and judged in DS1's verdicts (L34).",
+   "estimator": "ds1_build",
+   "note": "Record only (DS.12 steps 3, 6, 10): one build per MAINT item; a lane item ends when its build job ends and the seeds' runs overlap; an arm whose loader projection is over the cold line moves to L32X at 1.2 M (recorded)."
+  },
+  "L32X": {
+   "name": "long_ds1",
+   "title": "DS1's long path on TRAIN (run_inc2_long.sh inc2.ds1_long): the smoke (one epoch, the projection; S0x's decides the pair's compute), then the seeds",
+   "lane": "TRAIN",
+   "follow": "job",
+   "policy_action": "inc_build_ds1_long",
+   "risk": "R3",
+   "lever": "L32X",
+   "argv": [
+    "bash",
+    "run_inc2_long.sh",
+    "weed_optimizer_framework.tools.{pkg}.ds1_long",
+    "{verb}",
+    "--arm",
+    "{arm}",
+    {
+     "if": "seeds",
+     "tokens": [
+      "--seeds",
+      "{seeds}"
+     ]
+    },
+    {
+     "if": "walltime_h",
+     "tokens": [
+      "--walltime-h",
+      "{walltime_h}"
+     ]
+    }
+   ],
+   "control": "S0x against S2x (or S1ux) at the same compute, decided once from S0x's smoke.",
+   "success": "ds1/v1/long/<ARM>/smoke.json within its walltime rule (pair.json from S0x's), then s<k>/train.json and final_ema.pt of seeds 0, 1 and 2.",
+   "falsifier": "A projection over the rule records the arm 'not run (walltime)' (S2x over 28.8 h: the substitution of DS.7.2); a seed killed at its walltime fails the arm and is not retried.",
+   "estimator": "ds1_long",
+   "note": "Record only (DS.6, DS.12 steps 3 and 10): on TRAIN so that the 14-19 h seeds never hold MAINT; S2x's one 36 h re-submission names --walltime-h 36."
+  },
+  "L33": {
+   "name": "score_ds1",
+   "title": "Score one DS1 arm (inc2.ds1 score --arm X): MD in its own root, cwd12 dev two-stage, ood23 and ood22 under deviation 6's loader, ImageWeeds; POWER takes the reproductions and the power pre-flight",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_score_ds1",
+   "risk": "R3",
+   "lever": "L33",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.ds1",
+    "score",
+    "--arm",
+    "{arm}"
+   ],
+   "control": "The same DS1 pass for both sides of every comparison (DS.7.1).",
+   "success": "capacity/ds1_score_<arm>.json complete (dev and MD only); POWER: the reproductions and capacity/ds1_power.json.",
+   "falsifier": "A reproduction beyond 0.002 refuses every DS1 score; nothing switches.",
+   "estimator": "ds1_score",
+   "note": "Record only (DS.12 steps 2, 7, 11)."
+  },
+  "L34": {
+   "name": "verdict_ds1",
+   "title": "Record DS1's phase verdict (inc2.ds1 verdict --phase 1|2): P1 and P2 (v1), P3, P4, N1 and H1 (v2), Tier S with its MDEs, the sealed reads' order",
+   "lane": "MAINT",
+   "follow": "job",
+   "policy_action": "inc_verdict_ds1",
+   "risk": "R3",
+   "lever": "L34",
+   "argv": [
+    "python",
+    "-m",
+    "weed_optimizer_framework.tools.{pkg}.ds1",
+    "verdict",
+    "--phase",
+    "{phase}",
+    {
+     "if": "cap_refused",
+     "tokens": [
+      "--cap-refused",
+      "{cap_refused}"
+     ]
+    },
+    {
+     "if": "ticker_failed",
+     "tokens": [
+      "--ticker-failed",
+      "{ticker_failed}"
+     ]
+    }
+   ],
+   "control": "Every comparison's two sides through the one DS1 pass.",
+   "success": "capacity/ds1_v<phase>.json decided (dev and MD only) and capacity/ds1_v<phase>_external.json, each written once.",
+   "falsifier": "DS.7.1's rules: confirmed = qualifies and z over its exam's Bonferroni bar; nothing switches.",
+   "estimator": "ds1_verdict",
+   "note": "Record only (DS.12 steps 7 and 11): each primary decided once, when its arms' records are complete or failed."
   }
  },
  "cards": {
@@ -1130,8 +1302,13 @@
    "L25",
    "L27",
    "L28",
-   "LI"
+   "LI",
+   "L30",
+   "L32",
+   "L32X",
+   "L33",
+   "L34"
   ],
-  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04; L23D, E2-C's attribution rescore, one GPU job, 2026-10-04, later; L23Z, the zoo audit, one held-free chain of five GPU-shared jobs within its 40 GPU-h cap, 2026-10-04; L23F, one E3 arm's scores, and L23G, E3's verdict, one GPU job each, 2026-10-05; L23H, L23I, L23J, L23K (on TRAIN) and L23L, the v3 family's data build, builds, scores, D6's RF-DETR jobs and verdict, record only within the family cap of 260 GPU-h, 2026-10-11). L23's splits build and lock always wait for a person (D-A's exact command)."
+  "why": "Contract 6.5 and review: the R3 builds the envelope may approve (L21 only when its target is the rollback the last 'hurts' milestone recommended; LI, the stream's creation, only with Stage A's recorded arms; L23N, a done measurement arm's native-resolution rescore, one GPU job, 2026-10-01; L23V, E1's base v3 build, and L23E, E1's agnostic rescore, one GPU job each, 2026-10-03; L23C, E2's rescore and verdict, one GPU job, 2026-10-04; L23D, E2-C's attribution rescore, one GPU job, 2026-10-04, later; L23Z, the zoo audit, one held-free chain of five GPU-shared jobs within its 40 GPU-h cap, 2026-10-04; L23F, one E3 arm's scores, and L23G, E3's verdict, one GPU job each, 2026-10-05; L23H, L23I, L23J, L23K (on TRAIN) and L23L, the v3 family's data build, builds, scores, D6's RF-DETR jobs and verdict, record only within the family cap of 260 GPU-h, 2026-10-11). L23's splits build and lock always wait for a person (D-A's exact command). DS1 (2026-10-29): L30, L32, L32X (on TRAIN), L33 and L34, record only within DS1's family cap of 260 GPU-h and its phase reserve; L31 is the lab's (R0)."
  }
 }

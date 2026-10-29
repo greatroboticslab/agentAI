@@ -27,6 +27,9 @@ B_v2, its capacity arms, the canary, B0 u tsw and the stream's milestones.
     python -m weed_optimizer_framework.tools.inc2.baseline e2-attr-verdict [--out-dir DIR]
     python -m weed_optimizer_framework.tools.inc2.baseline build --exp v3_d4_f_m640 --v3fam D4F --seeds 0,1,2
         --role baseline
+    python -m weed_optimizer_framework.tools.inc2.baseline build --exp ds1_s0_m640 --ds1 S0 --seeds 0,1,2
+        --role baseline      (DS1, docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29: the arm's manifest, YOLO11m at
+                             640, cold_budget from its final count, the finals dev only; ds1_args)
 
 build writes a 'baseline' experiment for the pinned driver (inc/driver.py,
 unchanged): one cold base run per seed (the arm's Protocol v3 cold recipe,
@@ -897,6 +900,67 @@ def v3fam_args(v3fam, exp, manifest=None, union=None, seeds=None, arm=None, fina
     return kw["manifest"], kw["seeds"], kw["arm"], kw["final_exams"], kw["role"], kw["extra"]["v3fam"]
 
 
+def ds1_args(ds1, exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None, role=None,
+             arch=None, imgsz=None, e2=None, extra=None):
+    """DS1 (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.6, DS.9.1): build --ds1 ARM takes the manifest (the
+    arm's in splits/ds1/arms/, by its record's sha256), YOLO11m at 640, seeds 0-2, role baseline and the finals (dev
+    only: the pinned driver's minimum; DS1 scores its arms itself, inc2.ds1 score) from DS1's definition, under the
+    arm's pre-registered experiment name. An arm whose loader projection is over the cold line (0.8 x 8 h) moves
+    to the long path (inc2.ds1_long) and is refused here. Returns (manifest, seeds, arm, final_exams, role, ds1
+    record)."""
+    from . import ds1 as DS
+    from . import ds1_data as DD
+    given = [f for f, v in (("--manifest", manifest), ("--union", union), ("--arm", arm), ("--arch", arch),
+                            ("--imgsz", imgsz), ("--e2", e2)) if v is not None]
+    if given:
+        raise BaselineError("--ds1 %s takes the manifest, the detector and the finals from DS1's definition: %s not "
+                            "taken" % (ds1, ", ".join(given)))
+    if extra and ("ds1" in extra or "v3fam" in extra):
+        raise BaselineError("a ds1 record comes from --ds1 only")
+    try:
+        RC.ds1_arm(ds1)
+    except RC.RecipeError as e:
+        raise BaselineError(str(e))
+    if exp != RC.DS1_EXPS[ds1]:
+        raise BaselineError("DS1's %s is built as %s, not %s" % (ds1, RC.DS1_EXPS[ds1], exp))
+    if seeds is not None and [int(x) for x in seeds] != list(DS.SEEDS):
+        raise BaselineError("a DS1 arm trains seeds %s" % list(DS.SEEDS))
+    if role not in (None, "baseline"):
+        raise BaselineError("a DS1 arm is role baseline")
+    if final_exams is not None and list(final_exams) != ["dev"]:
+        raise BaselineError("a DS1 arm's finals are dev only (the pinned driver's minimum)")
+    try:
+        path, sha, n = DD.arm_manifest(ds1)
+    except DS.Ds1Refused as e:
+        raise BaselineError("--ds1 %s: %s" % (ds1, e))
+    rp = DD.arm_record_path(ds1)
+    rec = _read_json(rp) or {}
+    lp = rec.get("loader_projection") or {}
+    if lp.get("over_line"):
+        raise BaselineError("DS1's %s projects %s h at 1.2 M, over the cold line %s h: it moves to the long path "
+                            "(inc2.ds1_long, recorded; DS.6)" % (ds1, lp.get("projected_base_run_h"), lp.get("line_h")))
+    ds1rec = {"format": "inc2-ds1-build/1", "arm": ds1, "manifest": str(path), "manifest_sha256": sha, "images": int(n),
+              "record": str(rp), "record_sha256": _sha(rp), "recipe": RC.BUDGET_NAME, "decided_by": DS.DECIDED_BY}
+    return path, list(DS.SEEDS), RC.DS1_DETECTOR, ["dev"], "baseline", ds1rec
+
+
+def ds1_claim(manifest, manifest_sha):
+    """Why a manifest is one of DS1's (it lies under splits/ds1, or an arm record there records its sha256), or None.
+    Such a manifest trains only through build --ds1 (or inc2.ds1_long)."""
+    from . import ds1_data as DD
+    try:
+        if Path(os.path.abspath(str(manifest))).resolve().is_relative_to(DD.out_dir().resolve()):
+            return "it lies under %s" % DD.out_dir()
+    except (OSError, ValueError):
+        pass
+    d = DD.out_dir() / "arms"
+    for p in sorted(d.glob("*.json")) if d.is_dir() else []:
+        a = _read_json(p)
+        if isinstance(a, dict) and a.get("sha256") == manifest_sha:
+            return "%s records it as arm %s" % (p, a.get("arm"))
+    return None
+
+
 def v3fam_claim(manifest, manifest_sha):
     """Why a manifest is one of V3F's (it lies under splits/v3fam, or the family summary records its sha256 as
     an arm's), or None. Such a manifest trains only through build --v3fam (V3F.6.1)."""
@@ -914,13 +978,19 @@ def v3fam_claim(manifest, manifest_sha):
 
 
 def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None,
-                     role=None, testing=False, extra=None, arch=None, imgsz=None, e2=None, v3fam=None):
+                     role=None, testing=False, extra=None, arch=None, imgsz=None, e2=None, v3fam=None, ds1=None):
     """Check every input and write the manifest copy and the summary; returns
     (definition, summary). Nothing is written before every check passed.
     role None infers it (module docstring). e2 'W' or 'S' builds that arm of
     E2 (module docstring, build --e2). v3fam ARM builds that arm of V3F
     (v3fam_args)."""
-    v3rec = None
+    v3rec = ds1rec = None
+    if v3fam is not None and ds1 is not None:
+        raise BaselineError("a build is V3F's or DS1's, never both")
+    if ds1 is not None:
+        manifest, seeds, arm, final_exams, role, ds1rec = ds1_args(
+            ds1, exp, manifest=manifest, union=union, seeds=seeds, arm=arm, final_exams=final_exams, role=role,
+            arch=arch, imgsz=imgsz, e2=e2, extra=extra)
     if v3fam is not None:
         manifest, seeds, arm, final_exams, role, v3rec = v3fam_args(
             v3fam, exp, manifest=manifest, union=union, seeds=seeds, arm=arm, final_exams=final_exams, role=role,
@@ -968,6 +1038,9 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
             claim = v3fam_claim(p, _sha(p))
             if claim:
                 raise BaselineError("%s is a V3F manifest (%s): it trains only through build --v3fam" % (p, claim))
+            claim = ds1_claim(p, _sha(p))
+            if claim:
+                raise BaselineError("%s is a DS1 manifest (%s): it trains only through build --ds1" % (p, claim))
         rows, guard, parts = check_union(srcs, production=production)
         name = sanitise("%s_union" % exp)
         dst = paths.manifests / ("%s.jsonl" % name)
@@ -994,6 +1067,14 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         if fclaim and v3rec is None:
             raise BaselineError("%s is a V3F manifest (%s): it trains only through build --v3fam (V3F.6.1)"
                                 % (src, fclaim))
+        dclaim = ds1_claim(src, sha)
+        if dclaim and ds1rec is None:
+            raise BaselineError("%s is a DS1 manifest (%s): it trains only through build --ds1 (DS.9.1)" % (src, dclaim))
+        if ds1rec is not None:
+            if e1 is not None or claim or fclaim:
+                raise BaselineError("%s is an E1 or V3F manifest: no DS1 arm trains it" % src)
+            if sha != ds1rec["manifest_sha256"] or len(rows) != int(ds1rec["images"]):
+                raise BaselineError("%s changed since DS1's arm record recorded it" % src)
         if v3rec is not None:
             if e1 is not None or claim:
                 raise BaselineError("%s is an E1 manifest: no V3F arm trains it" % src)
@@ -1017,7 +1098,7 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
             raise BaselineError("copy of %s does not hash like the manifest that was checked" % src)
         source = {"source_manifest": str(src), "source_locked": locked_name(sha, lock)}
     v3budget = v3rec is not None and v3rec.get("arm") in RC.V3FAM_BUDGET_ARMS
-    if e1 is not None or v3budget:
+    if e1 is not None or v3budget or ds1rec is not None:
         recipe = RC.cold_budget(arm_rec["id"], len(rows))
         cost = RC.budget_cost(len(rows), seeds, exams, arm_rec["id"])
     elif e2rec is not None:
@@ -1040,6 +1121,12 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         # V3F's one-class arms at equal compute: E1's cold_budget recomputed from the arm's final count, under the
         # v3fam record (inc2.train.v3fam_problems checks it)
         defn.update(recipe_name=RC.BUDGET_NAME, budget=RC.budget_record(arm_rec["id"], len(rows)))
+    if ds1rec is not None:
+        # DS1's arms at equal compute: E1's cold_budget recomputed from the arm's final count (the floor's repeats
+        # included), under the ds1 record (inc2.train.ds1_problems checks it)
+        if recipe != RC.ds1_recipe(ds1rec["arm"], len(rows)):
+            raise BaselineError("DS1's %s trains %s" % (ds1rec["arm"], RC.BUDGET_NAME))
+        defn.update(recipe_name=RC.BUDGET_NAME, budget=RC.budget_record(arm_rec["id"], len(rows)), ds1=ds1rec)
     if v3rec is not None:
         if v3rec["recipe"] != RC.v3fam_recipe_name(v3rec["arm"]) or recipe != RC.v3fam_recipe(v3rec["arm"], len(rows)):
             raise BaselineError("V3F's %s trains %s, not this recipe" % (v3rec["arm"],
@@ -1067,6 +1154,11 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         if probs:
             shutil.rmtree(str(paths.manifests), ignore_errors=True)
             raise BaselineError("the V3F definition fails inc2.train's own check: %s" % "; ".join(probs))
+    if ds1rec is not None:
+        probs = T.ds1_problems(json.loads(json.dumps(defn)))
+        if probs:
+            shutil.rmtree(str(paths.manifests), ignore_errors=True)
+            raise BaselineError("the DS1 definition fails inc2.train's own check: %s" % "; ".join(probs))
     try:
         D.validate_definition(json.loads(json.dumps(defn)))
         D.check_definition_data(defn)
@@ -1085,6 +1177,8 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
         summary["variant_drops"] = drops
     if e1 is not None:
         summary.update(recipe_name=RC.BUDGET_NAME, budget=defn["budget"], e1=e1)
+    if ds1rec is not None:
+        summary.update(ds1=ds1rec, recipe_name=RC.BUDGET_NAME, budget=defn["budget"])
     if v3rec is not None:
         summary["v3fam"] = v3rec
         if v3budget:
@@ -1099,12 +1193,12 @@ def build_definition(exp, manifest=None, union=None, seeds=None, arm=None, final
 
 def build(exp, manifest=None, union=None, seeds=None, arm=None, final_exams=None, role=None,
           testing=False, backend=None, init=True, quiet=False, extra=None, arch=None, imgsz=None, e2=None,
-          v3fam=None):
+          v3fam=None, ds1=None):
     """build_definition, then driver init through run_inc2_job.sh. Returns
     (summary, definition, init result or None)."""
     defn, summary = build_definition(exp, manifest=manifest, union=union, seeds=seeds, arm=arm,
                                      final_exams=final_exams, role=role, testing=testing, extra=extra,
-                                     arch=arch, imgsz=imgsz, e2=e2, v3fam=v3fam)
+                                     arch=arch, imgsz=imgsz, e2=e2, v3fam=v3fam, ds1=ds1)
     log("%s (%s): baseline on %s, %d images, arm %s, seeds %s, finals %s; est. %s-%s GPU-h"
         % (exp, role, defn["base"]["manifest"], defn["base"]["n_images"], defn["arm"]["id"], defn["seeds"],
            defn["final_exams"], defn["cost_estimate"]["total_gpu_h"][0], defn["cost_estimate"]["total_gpu_h"][1]))
@@ -3307,6 +3401,9 @@ def main(argv=None):
     ap.add_argument("--v3fam", default=None, choices=RC.V3FAM_ARMS,
                     help="build: this experiment's V3F build arm (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-11, "
                          "V3F.6.1): the manifest, detector, finals and role come from the family's definition")
+    ap.add_argument("--ds1", default=None, choices=RC.DS1_ARMS,
+                    help="build: this experiment's DS1 arm (docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.6): "
+                         "the manifest, detector, finals and role come from DS1's definition")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
     if a.command in ("rescore-native", "native-verdict", "rescore-agnostic", "agnostic-verdict", "rescore-e2",
@@ -3323,7 +3420,7 @@ def main(argv=None):
             build(a.exp, manifest=a.manifest, union=a.union.split(",") if a.union else None,
                   seeds=a.seeds, arm=a.arm, arch=a.arch, imgsz=a.imgsz, role=a.role, testing=testing,
                   init=not a.no_init, quiet=a.quiet, final_exams=a.final_exams.split(",") if a.final_exams else None,
-                  e2=a.e2, v3fam=a.v3fam)
+                  e2=a.e2, v3fam=a.v3fam, ds1=a.ds1)
         elif a.command in ("rescore-e2", "e2-verdict"):
             if a.exp:
                 raise BaselineError("E2's six experiments are pre-registered (inc2.recipes.E2_EXPS); --exp is not "

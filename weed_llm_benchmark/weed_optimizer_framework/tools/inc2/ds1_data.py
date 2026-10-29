@@ -1,0 +1,2350 @@
+"""DS1's data builds (lever L30): the weed-level pools, the source screen and its sheets' bundles, MD v1 and MT-W v2,
+the leakage guard on every manifest, and the manifests of every arm (docs/CONTINUOUS_LOOP.md, "Amendment
+(2026-10-29): DS1, scaling verified training data at the weed level (pre-registered)", DS.0, DS.5, DS.9.1;
+docs/prereg/DS1_2026-10-29.md).
+
+    python -m weed_optimizer_framework.tools.inc2.ds1_data build --phase 1|2 --step screen|md_s0|pools|draw|manifests
+                                                                  [--procs N]
+    python -m weed_optimizer_framework.tools.inc2.ds1_data rehearse --phase 1|2 [--out FILE]   (read-only, DS.9.5)
+    python -m weed_optimizer_framework.tools.inc2.ds1_data status                               (read-only)
+
+Every output lives under INC_DIR/splits/ds1/ and INC_DIR/ds1/v1/ (nothing under splits/v1, v2, v3, v3fam, _zoo or
+twostage is written; LOCK v2's never-train index is never changed: intake fails closed when it does not hash as
+recorded). Each step is idempotent: a record written once is read back, never rewritten; summary.json is the index
+the steps rewrite (atomically) and the snapshot ships.
+
+The rows. A candidate is an image of a source new to DS1 (never in base B by key or original bytes) with its
+original file and its intake label (INC class ids per box, the original boxes: a masked admission's original, never
+its masked copy), from Step 1's stream (inc2.step1_stream): the queue's admitted rows (whole or masked; kind other
+too: DS1 is at the weed level) and the rows a batch's admission did not admit at species level (admission.jsonl,
+no refusal), their files from the intake batch's manifest or the v1 pool (b0000). Pools (DS.0 item 2, Q's names):
+p1 SIU's video frames; p3 the class-name failures; p5 the species-gate rejects and the eligible rows the cutter
+cannot take; intake the rows lane DATA's intake commits before the phase-1 freeze; phase 2 the named sources.
+
+The rules, in order, each counted with its reason code (DS.5.1):
+  1 eligibility: role C (cwd12, 3SeasonWeedDet10 and 2SeasonWeedDet8 copies: the D28 sources, cwp10, vanpe, the
+    domain config's never-fetch and never-train sources) out; any guard hit of a source against cwd12 dev or test at
+    the calibrated copy threshold quarantines it whole (D28-v2); a source whose file names carry cwd12 or
+    3SeasonWeedDet10 capture names goes to role C once its sheet shows the pairs (name_hits); evaluation groups by
+    name; off-goal (role X); a queue row holding funnel_F9, join_conflict or h6_scan, and a row refused at intake or
+    admission (a copy, an exam, a hold-out, a licence, EXIF) out; a row only not admitted at species level stays;
+  2 names to roles: each box's class unit (SIU: its video's EPPO code; else its INC class id) has the role its
+    source's decided sheet gives it: weed (class 12), crop, plant part or non-plant (dropped as background), or
+    unresolved (the image is held, never admitted); species identity is kept per box;
+  3 base3's box and image rules (CLOOP:2912-2913): the source rule, boxes under 8 px masked, images dropped;
+  4 the model audit (E1-A) per source: a source over train_core's missing-label rate by more than 0.15 enters only
+    as 'accept for training only' with predicted unlabelled plants masked (inc2.mask);
+  5 dedupe (base3's copy rule; never at 4-6 bits): the same bytes; 3 bits plus an 80 % box match; an identical
+    label layout; base B rows win over copies;
+  6 thin(10) per capture series (an SIU video, an MFWD tray): frames in the series' seeded order
+    (stable_int("inc2/ds1/thin/<series>")) kept when their dHash is more than 10 bits from every frame kept,
+    S0's frames of the series counted as kept (KD is not thinned);
+  7 the leakage guard, both directions, on every manifest including B'o: the 8-variant 6-bit dHash and the
+    calibrated DINOv2 detector (cosine 0.946384) against cwd12 dev and test, ImageWeeds, ood22, ood23, test v1 and
+    its companions, evalgroups_v1, MD v1, MT-W v2 and, once F9 wrote it, the H10d hold-out; and every manifest's
+    rows against MD and MT-W at the capture-group level; a hit is dropped and counted, in B'o too;
+  8 EXIF orientation 2-8 refused (exif_orientation), after the guard;
+  9 licence: research-only allowed and flagged; the permissive-only subset counted per manifest;
+  10 writes: a PNG only when a mask fill changes the pixels; every other row by its original path.
+
+The exams (DS.5.4): capture groups join images within 6 bits under the 8 variants (both directions), copy edges,
+the same export stem, the same intake capture group, or a calibrated DINOv2 link; a group is named by the sha256 of
+its members' sorted sha256s; per source, groups in the order stable_int("inc2/ds1/md_v1/<source>/<digest>"): MD
+until about 5 % of the source's admitted images (15 to 500), then, for new sources, MT-W v2 until about 10 % more
+(30 to 1,000), both together at most 30 % of the source; never SIU, an evaluation group, a cwd12 copy, a test v1
+group or companion, or a group of more than 500 images; MT-W v2 also obeys MT.2 item 2. MD-S0 (base B's external
+sources, base_v2 and SIU excluded) is drawn, sized by the power pre-flight (enlarged in the same order while its
+MDE is over 0.02, within the 30 % cap) and frozen before B'o is built; each new source's MD-N is frozen at its draw,
+its MT-W v2 after the person's check. Every exam row and group enters splits/ds1/never_train.jsonl at its draw.
+
+The manifests (DS.5.3): S0 = B'o (D1's B' minus MD-S0's groups, base_v2's 66 NDSU rows and the guard's hits); S1c
+(S0 and the phase-1 pools, the SIU family capped at 35 % of the rows before repeats, whole thinned videos dropped in
+the order stable_int("inc2/ds1/cap/siu/<video>")); S1c-R (S1c's composition at S0's size, train_core kept whole,
+order stable_int("inc2/ds1/r/<key>")); S1u (no cap); S2 (S1c and phase 2, every family capped at 35 %); KD, KT and
+KF (base A plus N_K = min(15,000, each K pool's supply) rows, draws stable_int("inc2/ds1/k/<arm>/<series or row>")).
+The cwd12 exposure floor: each train_core row listed r = round_half_up((N - C) / (N_S0 - C)) times in every S arm
+larger than S0 (repeat keys <key>__r<j>, the same files), N counted before repeats. Each larger S manifest holds
+every row of each smaller one, bytes unchanged. Every manifest record prints images, distinct photos (6-bit
+components) and capture groups, and the gap to the owner's scale rule.
+
+A refusal raises DataRefused (an inc2.ds1.Ds1Refused); the CLI prints "[inc2.ds1_data] ERROR: ..." and exits 2.
+"""
+from __future__ import annotations
+
+import argparse
+import collections
+import hashlib
+import json
+import math
+import os
+import re
+import sys
+import time
+from pathlib import Path
+
+from ..inc import common as C
+from . import base3 as B3
+from . import common as C2
+from . import ds1 as D
+
+# ------------------------------------------------------------------ constants (pre-registered)
+FORMAT = "inc2-ds1-data/1"
+FMT_ARM = "inc2-ds1-arm/1"
+FMT_SCREEN = "inc2-ds1-screen/1"
+FMT_POOL = "inc2-ds1-pool/1"
+FMT_EXAM = "inc2-ds1-exam/1"
+FMT_LOCK = "inc2-ds1-exam-lock/1"
+STEPS = ("screen", "md_s0", "pools", "draw", "manifests")
+PHASES = (1, 2)
+SUMMARY = "summary.json"
+NEVER_TRAIN = "never_train.jsonl"
+CLASS_WEED = 12                                     # every weed box (E1's class 12, DS.0 item 1)
+ROLES = ("weed", "crop", "part", "nonplant", "unresolved")
+DROP_ROLES = ("crop", "part", "nonplant")
+DECISIONS = ("accept", "accept_training_only", "reject")
+SETTINGS = ("Field", "Turf", "Indoor", "Aerial")
+# sources (DS.0 item 2, DS.5.1 item 1)
+SIU = "zenodo_15808623"
+SIU_FAMILY = "siu"
+SIU_VIDEO_RE = re.compile(r"(?P<eppo>[A-Z]{5})_week_(?P<week>\d+)_IMG_(?P<img>\d+)_frame_")
+SIU_TARGET_EPPO = ("AMAPA", "AMATA", "SIDSP")       # Palmer amaranth, waterhemp, prickly sida: KD/KT's T
+CROP_EPPO_SUGGEST = ("SORVU", "ZEAMX", "GLXMA", "TRZAX", "HORVU", "BEAVA", "GOSHI", "ORYSA")
+MFWD_SOURCES = ("mediatum_1717366",)
+TRAIN_CORE = "cottonweeddet12/train"
+TSW = ("3seasonweeddet10/data2022", "3seasonweeddet10/data2023")
+SEASON_SESSION = "20220129_CanonEOS4000D_EO"
+ROLE_C = ("rf_karthikeya-c8pvy__weed-detection-cwp10", "rf_zig-zag-lnodr__weed-detection-vanpe",
+          "rf_school-wevfc__weeddec2-sqnot", "rf_priyankas-workspace-o43oc__weeds1-dsqzl",
+          "rf_weedtown__weedsv2-46hkh")
+NEVER_FETCHED = ("zenodo_10762138",)                # 2SeasonWeedDet8 (Amendment 2026-10-28)
+EXCLUDED_HOLDS = ("funnel_F9", "join_conflict", "h6_scan")
+NOT_ADMITTED_OK = ("not_admitted",)                 # admission outcomes that leave a weed-level candidate
+# the capture names of cwd12 and 3SeasonWeedDet10 (date, camera and initials stems: iPhoneSE_YL, NIKOND3300_YL,
+# iPhone11Pro_BT, CanonEOS4000D_EO, ...), DS.5.1 item 1(b)
+CAPTURE_NAME_RE = re.compile(r"(?i)(?:^|[^a-z0-9])(?:\d{8}_)?(iphone ?(?:se|x[rs]?|\d{1,2}(?:pro(?:max)?)?)|"
+                             r"nikon ?d\d{3,4}|canon ?eos ?\w{2,6}d?|htrc_iphone\d{1,2})[_ ]([a-z]{2})(?=[^a-z]|$)")
+# rule numbers (base3_v2.json's, read at build; the copy rule never at 4-6 bits)
+THIN_BITS = 10
+COPY_BITS = 3
+GROUP_BITS = 6
+GUARD_BITS = 6
+COPY_COS = 0.946384
+PARTIAL_MISSING_EXCESS = 0.15
+AUDIT_SAMPLE = 200
+AUDIT_CONF = 0.5
+AUDIT_IOU = 0.5
+FAMILY_CAP = 0.35
+MD_SHARE, MD_MIN, MD_MAX = 0.05, 15, 500
+MTW_SHARE, MTW_MIN, MTW_MAX = 0.10, 30, 1000
+EXAM_SHARE_MAX = 0.30
+GROUP_MAX = 500
+N_K_MAX = 15000
+EXIF_OK = (None, 0, 1)
+SCALE_RULE = 10000                                  # the owner's scale rule: tens to hundreds of thousands
+# seed texts
+SEED_THIN = "inc2/ds1/thin/%s"
+SEED_CAP = "inc2/ds1/cap/%s/%s"
+SEED_R = "inc2/ds1/r/%s"
+SEED_K = "inc2/ds1/k/%s/%s"
+SEED_MD = "inc2/ds1/md_v1/%s/%s"
+SEED_SAMPLE = "inc2/ds1/sheet/%s/%s"
+# the arms built here (inc2.ds1.BUILD_ARMS) and what each holds
+S_NEST = (("S0", "S1C"), ("S1C", "S1U"), ("S1C", "S2"))
+FLOOR_ARMS = ("S1C", "S1CR", "S1U", "S2")
+
+
+class DataRefused(D.Ds1Refused):
+    pass
+
+
+def log(msg):
+    print("[inc2.ds1_data] %s" % msg, flush=True)
+
+
+# ------------------------------------------------------------------ paths and small helpers
+def out_dir():
+    return D.splits_dir()
+
+
+def summary_path():
+    return out_dir() / SUMMARY
+
+
+def never_train_path():
+    return out_dir() / NEVER_TRAIN
+
+
+def arm_path(arm):
+    return out_dir() / "arms" / ("%s.jsonl" % arm.lower())
+
+
+def arm_record_path(arm):
+    return out_dir() / "arms" / ("%s.json" % arm.lower())
+
+
+def exam_dir(exam):
+    return out_dir() / ("mtw_v2" if exam.startswith("mtw_") else "md_v1") / exam
+
+
+def slug(source):
+    s = re.sub(r"[^a-z0-9]+", "_", str(source).lower()).strip("_")
+    return (s[:40] + "_" + hashlib.sha256(str(source).encode("utf-8")).hexdigest()[:8]) if len(s) > 48 else s
+
+
+def mdn_exam(source):
+    return "mdn_%s" % slug(source)
+
+
+def mtw_exam(source):
+    return "mtw_%s" % slug(source)
+
+
+def stable(text):
+    return C.stable_int(text)
+
+
+def _read_json(path):
+    return D._read_json(path)
+
+
+def write_once(path, data):
+    try:
+        return D.write_once(path, data)
+    except D.Ds1Refused as e:
+        raise DataRefused(str(e))
+
+
+def read_jsonl(path):
+    out = []
+    p = Path(path)
+    if not p.is_file():
+        return out
+    with open(p) as fh:
+        for line in fh:
+            if line.strip():
+                out.append(json.loads(line))
+    return out
+
+
+def write_jsonl_once(path, rows):
+    data = "".join(json.dumps(r, sort_keys=True) + "\n" for r in rows).encode("utf-8")
+    return write_once(path, data) and C.sha256_file(path)
+
+
+def manifest_line(row):
+    return (json.dumps({k: row[k] for k in C.MANIFEST_KEYS}, sort_keys=True) + "\n").encode("utf-8")
+
+
+def list_sha256(keys):
+    return hashlib.sha256("\n".join(sorted(keys)).encode("utf-8")).hexdigest()
+
+
+def label_text(boxes):
+    return "".join("%d %.6f %.6f %.6f %.6f\n" % (CLASS_WEED, b[0], b[1], b[2], b[3]) for b in boxes)
+
+
+def write_label(boxes, root=None):
+    """(path, sha256) of a class-12 label, content-addressed under splits/ds1/labels/, written once."""
+    text = label_text(boxes)
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    p = Path(root or out_dir()) / "labels" / sha[:2] / ("%s.txt" % sha)
+    if not p.is_file():
+        C2.write_bytes_atomic(p, text.encode("utf-8"))
+    elif C.sha256_file(p) != sha:
+        raise DataRefused("%s exists with other bytes" % p)
+    return str(p), sha
+
+
+def read_inc_label(path):
+    """[(cls, cx, cy, w, h)] of an INC label file (a polygon line becomes its bounding box, clipped to [0, 1])."""
+    out = []
+    with open(path) as fh:
+        for line in fh:
+            t = line.split()
+            if not t:
+                continue
+            c = int(float(t[0]))
+            v = [float(x) for x in t[1:]]
+            if len(v) == 4:
+                cx, cy, w, h = v
+            elif len(v) >= 6 and len(v) % 2 == 0:
+                xs, ys = v[0::2], v[1::2]
+                x0, x1, y0, y1 = max(0.0, min(xs)), min(1.0, max(xs)), max(0.0, min(ys)), min(1.0, max(ys))
+                cx, cy, w, h = (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0
+            else:
+                raise DataRefused("%s: a label line of %d values" % (path, len(v)))
+            x0, x1 = max(0.0, cx - w / 2), min(1.0, cx + w / 2)
+            y0, y1 = max(0.0, cy - h / 2), min(1.0, cy + h / 2)
+            out.append((c, (x0 + x1) / 2, (y0 + y1) / 2, max(0.0, x1 - x0), max(0.0, y1 - y0)))
+    return out
+
+
+def load_rules():
+    """base3_v2.json's rule numbers (the source, box, image and dedupe rules DS.5.1 items 3 and 5 take)."""
+    conf = json.loads(B3.CONFIG.read_text())
+    return conf["rules"], conf
+
+
+def three_counts(rows):
+    """{images, distinct_photos (6-bit components), capture_groups} of a row set (DS.5.2): every status line prints
+    them, with the gap to the owner's scale rule."""
+    n = len(rows)
+    if not n:
+        return {"images": 0, "distinct_photos": 0, "capture_groups": 0, "scale_rule": SCALE_RULE}
+    hashed = [r for r in rows if r.get("dhash") is not None]
+    comps = len(set(B3.hash_components([_hashrow(r) for r in hashed], GROUP_BITS).tolist())) if hashed else 0
+    comps += n - len(hashed)
+    groups = len({r.get("group") or r["key"] for r in rows})
+    return {"images": n, "distinct_photos": comps, "capture_groups": groups, "scale_rule": SCALE_RULE,
+            "gap_to_scale_rule": max(0, SCALE_RULE - n)}
+
+
+def _hashrow(r):
+    return {"dhash": r.get("dhash"), "variants": r.get("variants")}
+
+
+# ------------------------------------------------------------------ 1. eligibility (DS.5.1 item 1, DS.0 item 2)
+def capture_name_hits(names):
+    """[(name, matched stem)] of file names carrying a cwd12 or 3SeasonWeedDet10 capture name (camera and
+    initials stems: iPhoneSE_YL, NIKOND3300_YL, iPhone11Pro_BT, ...): DS.5.1 item 1(b)."""
+    out = []
+    for n in names:
+        m = CAPTURE_NAME_RE.search(str(n))
+        if m:
+            out.append((str(n), "%s_%s" % (m.group(1), m.group(2))))
+    return out
+
+
+def eligibility(row, ctx):
+    """The first reason a candidate row is out (DS.5.1 item 1, DS.0 item 2), or None. ctx: role_c (sources),
+    quarantined (sources the D28-v2 rule quarantines whole), eval_sources (evaluation groups by name), never
+    (the domain config's never-fetch and never-train sources), base_keys and base_shas (base B's rows)."""
+    s = row["source"]
+    if s in ctx.get("role_c", ()) or s in ROLE_C or s in NEVER_FETCHED:
+        return "role_c"
+    if s in ctx.get("never", ()):
+        return "never_train_source"
+    if s in ctx.get("quarantined", ()):
+        return "quarantined_d28"
+    if s in ctx.get("eval_sources", ()):
+        return "evaluation_group"
+    if row.get("refused"):
+        return "refused:%s" % row["refused"]
+    held = [h for h in row.get("holds") or () if h in EXCLUDED_HOLDS]
+    if held:
+        return "held:%s" % held[0]
+    if row.get("test_v1"):
+        return "test_v1"
+    if row.get("admission") not in (None, "whole", "masked") + NOT_ADMITTED_OK:
+        return "admission:%s" % row.get("admission")
+    if row["key"] in ctx.get("base_keys", ()) or row.get("sha256") in ctx.get("base_shas", ()):
+        return "in_base_b"
+    if row["key"] in ctx.get("consumed", ()):
+        return "stream_consumed"
+    return None
+
+
+# ------------------------------------------------------------------ 2. names to roles (DS.5.1 item 2)
+def siu_video(text):
+    """(video, EPPO code) of an SIU frame's original name or key, or (None, None)."""
+    m = SIU_VIDEO_RE.search(str(text or ""))
+    if not m:
+        return None, None
+    return "%s_week_%s_IMG_%s" % (m.group("eppo"), m.group("week"), m.group("img")), m.group("eppo")
+
+
+def unit_of(row, cls):
+    """The class unit a box's role is decided on: SIU's video's EPPO code (per EPPO code, from its own metadata),
+    else the source's INC class id."""
+    if row["source"] == SIU:
+        _v, eppo = siu_video(row.get("rel") or row["key"])
+        return "eppo:%s" % (eppo or "?")
+    return "inc:%d" % int(cls)
+
+
+def suggest_role(source, unit):
+    """The sheet's pre-filled suggestion for a unit (never a decision): the twelve target species are weeds; an
+    SIU crop code is a crop; OtherPlant and the unmapped id are unresolved until the sheet decides."""
+    if unit.startswith("eppo:"):
+        return "crop" if unit[5:] in CROP_EPPO_SUGGEST else "weed"
+    i = int(unit[4:])
+    if 0 <= i < 12:
+        return "weed"
+    return "unresolved"
+
+
+def weed_boxes(row, roles):
+    """(boxes [(cx, cy, w, h)] of class 12, species [unit per kept box], dropped {role: n}, unresolved units) of a
+    candidate under its source's decided roles."""
+    keep, species, dropped, unres = [], [], collections.Counter(), set()
+    for b in row["boxes"]:
+        u = unit_of(row, b[0])
+        role = (roles or {}).get(u, "unresolved")
+        if role == "weed":
+            keep.append(tuple(float(x) for x in b[1:5]))
+            species.append(u)
+        elif role in DROP_ROLES:
+            dropped[role] += 1
+        else:
+            unres.add(u)
+    return keep, species, dict(dropped), sorted(unres)
+
+
+# ------------------------------------------------------------------ 3. box and image rules (base3's)
+def apply_rules(rows, rules):
+    """base3's source rule (over each source's weed boxes as delivered) and its per-box and per-image rules; sets
+    row['drop'], row['mask'] and row['masked_area']. Returns {source: convention record}."""
+    by = collections.defaultdict(list)
+    for r in rows:
+        if not r.get("drop"):
+            by[r["source"]].append(r)
+    conv = {}
+    for s, rs in sorted(by.items()):
+        conv[s] = B3.source_convention(rs, rules["source"])
+        if not conv[s]["passes"]:
+            for r in rs:
+                r["drop"] = "source_convention"
+    for r in rows:
+        if r.get("drop"):
+            continue
+        r["kind"] = "ds1"
+        r.setdefault("mask", [])
+        r.setdefault("masked_area", 0.0)
+        B3.image_rules(r, rules)
+    return conv
+
+
+# ------------------------------------------------------------------ 4. the model audit (DS.5.1 item 4)
+def _iou_xywh(a, b):
+    return B3.box_iou(a, b)
+
+
+def audit_rates(rows, predict, conf=AUDIT_CONF, iou=AUDIT_IOU):
+    """{images, predictions, missing_rate, false_box_rate, convention} of a detector's predictions on labelled
+    rows: missing = confident predictions (conf >= 0.5) matching no labelled box at IoU 0.5 (unlabelled plants),
+    false boxes = labelled boxes no prediction (conf >= 0.25) matches; convention = the median of log(predicted
+    area / labelled area) over matched pairs. predict(row) -> [(cx, cy, w, h, conf)]."""
+    n_pred = n_miss = n_gt = n_false = 0
+    logs = []
+    for r in rows:
+        gt = list(r.get("boxes") or ())
+        pr = [p for p in predict(r)]
+        conf_p = [p for p in pr if p[4] >= conf]
+        n_pred += len(conf_p)
+        for p in conf_p:
+            best = max([_iou_xywh(p[:4], g) for g in gt] or [0.0])
+            if best < iou:
+                n_miss += 1
+        n_gt += len(gt)
+        for g in gt:
+            ious = [(_iou_xywh(p[:4], g), p) for p in pr if p[4] >= 0.25]
+            if not ious or max(ious)[0] < iou:
+                n_false += 1
+            else:
+                p = max(ious)[1]
+                if g[2] * g[3] > 0 and p[2] * p[3] > 0:
+                    logs.append(math.log((p[2] * p[3]) / (g[2] * g[3])))
+    logs.sort()
+    return {"images": len(rows), "predictions": n_pred, "gt_boxes": n_gt,
+            "missing_rate": n_miss / float(n_pred) if n_pred else 0.0,
+            "false_box_rate": n_false / float(n_gt) if n_gt else 0.0,
+            "convention_log_area": logs[len(logs) // 2] if logs else None}
+
+
+def audit_sample(rows, source, n=AUDIT_SAMPLE):
+    return sorted(rows, key=lambda r: (stable("inc2/ds1/audit/sample/%s/%s" % (source, r["key"])), r["key"]))[:n]
+
+
+def audit_verdict(rates, ref):
+    """Partially labelled (DS.5.1 item 4) when the source's missing-label rate exceeds train_core's by > 0.15."""
+    excess = float(rates["missing_rate"]) - float(ref["missing_rate"])
+    return {"partial": excess > PARTIAL_MISSING_EXCESS, "excess": excess, "threshold": PARTIAL_MISSING_EXCESS,
+            "source": rates, "train_core": ref}
+
+
+def unlabelled_masks(row, predict, conf=AUDIT_CONF, iou=AUDIT_IOU):
+    """The predicted unlabelled plants of a partially labelled source's row (confident predictions matching no
+    labelled box), masked as inc2.mask does (DS.5.1 item 4)."""
+    out = []
+    for p in predict(row):
+        if p[4] >= conf and max([_iou_xywh(p[:4], g) for g in row["boxes"]] or [0.0]) < iou:
+            out.append(tuple(float(x) for x in p[:4]))
+    return out
+
+
+# ------------------------------------------------------------------ 5. dedupe (base3's copy rule)
+def dedupe(rows, base_rows, dd):
+    """Copies among the candidates and against base B (base3's copy rule: the same bytes; 3 bits plus an 80 % box
+    match under a variant; an identical label layout): base B rows win, then base3's rank (tier, pixels, source,
+    key). Sets drop 'copy_of_base' or 'duplicate' and dup_of on the losers. Returns counts."""
+    live = []
+    for r in base_rows:
+        live.append(dict(_dd_row(r), _base=True, kind=B3.BASE_KIND))
+    cands = [r for r in rows if not r.get("drop")]
+    for r in cands:
+        live.append(dict(_dd_row(r), _base=False, kind="ds1"))
+    uf, rec = B3.copy_components(live, dd)
+    groups = uf.groups(range(len(live)))
+    counts = collections.Counter()
+    for _root, mem in groups.items():
+        if len(mem) < 2:
+            continue
+        best = min(mem, key=lambda i: (0 if live[i]["_base"] else 1,) + B3._rank(live[i])[1:])
+        for i in mem:
+            if i == best or live[i]["_base"]:
+                continue
+            r = cands[i - len(base_rows)]
+            r["drop"] = "copy_of_base" if live[best]["_base"] else "duplicate"
+            r["dup_of"] = live[best]["key"]
+            counts[r["drop"]] += 1
+    return dict(counts, **rec)
+
+
+def _dd_row(r):
+    return {"key": r["key"], "source": r["source"], "sha256": r.get("sha256"), "dhash": r.get("dhash"),
+            "variants": r.get("variants"), "boxes": [tuple(b[-4:]) for b in r.get("boxes") or ()],
+            "W": r.get("W"), "H": r.get("H"), "bytes": r.get("bytes"), "tier": r.get("tier", 3)}
+
+
+# ------------------------------------------------------------------ 6. thin(10) (DS.0 item 3)
+def series_order(series, keys):
+    """The seeded order of a series' frames: numpy's default_rng(stable_int("inc2/ds1/thin/<series>")) permutation
+    of its keys sorted."""
+    import numpy as np
+    ks = sorted(keys)
+    perm = np.random.default_rng(stable(SEED_THIN % series)).permutation(len(ks))
+    return [ks[i] for i in perm]
+
+
+def thin(frames, series, seeded_hashes=(), bits=THIN_BITS):
+    """thin(10) on one capture series: frames [{key, dhash}] taken in the series' seeded order; a frame is kept
+    when its dHash is more than `bits` bits from every frame already kept, the series' frames S0 already holds
+    (seeded_hashes) counted as kept. Returns (kept keys in order, dropped {key: nearest kept distance})."""
+    kept_h = [int(h) for h in seeded_hashes if h is not None]
+    by = {f["key"]: f for f in frames}
+    kept, dropped = [], {}
+    for k in series_order(series, list(by)):
+        h = by[k].get("dhash")
+        if h is None:
+            dropped[k] = None
+            continue
+        h = int(h)
+        d = min([bin(h ^ x).count("1") for x in kept_h] or [65])
+        if d > bits:
+            kept.append(k)
+            kept_h.append(h)
+        else:
+            dropped[k] = d
+    return kept, dropped
+
+
+def thin_rows(rows, s0_by_series, bits=THIN_BITS):
+    """thin(10) on every series of the rows (rows without a series pass): sets row['thin'] True (kept) or False.
+    s0_by_series {series: [dHash of S0's frames]}. Returns {series: (kept, dropped)} counts."""
+    by = collections.defaultdict(list)
+    for r in rows:
+        if r.get("drop"):
+            continue
+        if r.get("series"):
+            by[r["series"]].append(r)
+        else:
+            r["thin"] = True
+    out = {}
+    for s, rs in sorted(by.items()):
+        kept, dropped = thin([{"key": r["key"], "dhash": r.get("dhash")} for r in rs], s, s0_by_series.get(s, ()),
+                             bits)
+        ks = set(kept)
+        for r in rs:
+            r["thin"] = r["key"] in ks
+        out[s] = {"frames": len(rs), "kept": len(kept), "dropped": len(dropped)}
+    return out
+
+
+# ------------------------------------------------------------------ hashes (the original files)
+def hash_rows(rows, procs=5, hasher=None):
+    """Every row's dHash and its 8 variants (inc2.guard.image_hashes on its original file) where they are not
+    stored; a file that cannot be hashed is dropped ('unhashable': a row the guard cannot compare is one it cannot
+    clear)."""
+    from concurrent.futures import ThreadPoolExecutor
+    if hasher is None:
+        from . import guard as G
+        hasher = G.image_hashes
+    todo = [r for r in rows if not r.get("drop") and r.get("variants") is None]
+
+    def one(r):
+        return r, hasher(r["image"])
+    with ThreadPoolExecutor(max_workers=max(1, int(procs))) as ex:
+        for r, (h, v) in ex.map(one, todo):
+            if h is None or v is None:
+                r["drop"] = "unhashable"
+                continue
+            r["dhash"] = int(h)
+            r["variants"] = [int(v[k]) for k in B3.VARIANTS] if isinstance(v, dict) else [int(x) for x in v]
+    return len(todo)
+
+
+# ------------------------------------------------------------------ 7. the leakage guard (DS.5.1 item 7)
+def dhash_hits(rows, exams, bits=GUARD_BITS):
+    """{key: [{exam, exam_key, bits, how}]}: each row within `bits` of an exam image under the 8 variants in both
+    directions (inc2.base3's pair search, on stored hashes). exams {name: {"keys", "H", "ok"}}."""
+    import numpy as np
+    hits = collections.defaultdict(list)
+    rs = [r for r in rows if r.get("variants") is not None or r.get("dhash") is not None]
+    if not rs:
+        return hits
+    HA, okA, _has = B3.hash_matrix(rs)
+    for name, ex in sorted(exams.items()):
+        if not len(ex["keys"]):
+            continue
+        Q1, T1, D1_, _v = B3.near_pairs_between(HA, okA, ex["H"], int(bits))
+        T2, Q2, D2_, _w = B3.near_pairs_between(ex["H"], ex["ok"], HA, int(bits))
+        best = {}
+        for a, e, d in zip(np.r_[Q1, Q2].tolist(), np.r_[T1, T2].tolist(), np.r_[D1_, D2_].tolist()):
+            k = (int(a), int(e))
+            if k not in best or d < best[k]:
+                best[k] = int(d)
+        for (a, e), d in sorted(best.items()):
+            hits[rs[a]["key"]].append({"exam": name, "exam_key": ex["keys"][e], "bits": d, "how": "dhash"})
+    return hits
+
+
+def embed_hits(rows, scanner, desc_path=None, procs=1):
+    """{key: [{exam, exam_key, cos, how}]} of the calibrated DINOv2 detector on rows (fail closed on a file it cannot
+    describe)."""
+    hits = collections.defaultdict(list)
+    if not rows or scanner is None:
+        return hits
+    items = [{"key": r["key"], "image": r.get("train_image") or r["image"], "sha256": r.get("sha256")} for r in rows]
+    copies, unscannable = scanner.scan(items, desc_path=desc_path, procs=procs)
+    if unscannable:
+        raise DataRefused("%d file(s) the DINOv2 detector cannot describe (e.g. %s): fail closed"
+                          % (len(unscannable), sorted(unscannable)[:3]))
+    for k, es in copies.items():
+        for e in es:
+            hits[k].append({"exam": e.get("eval_split") or e.get("split"), "exam_key": e.get("eval_key"),
+                            "cos": e.get("cos"), "how": "embed"})
+    return hits
+
+
+def merge_hits(*ds):
+    out = collections.defaultdict(list)
+    for d in ds:
+        for k, v in d.items():
+            out[k].extend(v)
+    return out
+
+
+def group_hits(rows, exam_rows):
+    """{key: [{exam, group, how 'capture'}]}: rows sharing a capture relation (export stem, intake capture group,
+    series) or a capture group with an MD or MT-W row (DS.5.1 item 7, last line)."""
+    caps = {}
+    for e in exam_rows:
+        for c in e.get("capture_keys") or ():
+            caps.setdefault(tuple(c), (e.get("exam"), e.get("group")))
+        if e.get("group"):
+            caps.setdefault(("group", e["group"]), (e.get("exam"), e.get("group")))
+        for s in (e.get("sha256"), e.get("original_sha256")):
+            if s:
+                caps.setdefault(("sha", s), (e.get("exam"), e.get("group")))
+    out = collections.defaultdict(list)
+    for r in rows:
+        ks = [tuple(c) for c in capture_keys(r)] + ([("group", r["group"])] if r.get("group") else []) + \
+            [("sha", s) for s in (r.get("sha256"), r.get("train_sha256")) if s]
+        for k in ks:
+            if k in caps:
+                ex, g = caps[k]
+                out[r["key"]].append({"exam": ex, "group": g, "how": "capture", "relation": list(k)})
+                break
+    return out
+
+
+def capture_keys(r):
+    ks = []
+    if r.get("stem"):
+        ks.append(("stem", r.get("family") or r["source"], r["stem"]))
+    if r.get("capture"):
+        ks.append(("capture", r["capture"]))
+    if r.get("series"):
+        ks.append(("series", r["series"]))
+    return ks
+
+
+# ------------------------------------------------------------------ 8. EXIF (DS.5.1 item 8)
+def exif_refusal(row, read_orientation=None):
+    """'exif_orientation' when the image's EXIF orientation is 2-8 (refused, never turned; after the guard)."""
+    if read_orientation is None:
+        from . import twostage as TS
+        def read_orientation(p):  # noqa: E306
+            try:
+                return TS.header(p)[0]
+            except Exception:  # noqa: BLE001 - an unreadable header is refused as unreadable
+                return "unreadable"
+    ori = read_orientation(row["image"])
+    if ori == "unreadable":
+        return "unreadable"
+    return None if ori in EXIF_OK else "exif_orientation"
+
+
+# ------------------------------------------------------------------ 10. writes (DS.5.1 item 10)
+def materialise(row, root=None):
+    """The file a row trains on: a lossless 640 px PNG (Ultralytics' load_image, then inc2.mask's fill) only when
+    the mask fill changes its pixels, content-addressed under splits/ds1/images/; else its original path."""
+    from . import guard as G
+    from . import mask as MK
+    if not row.get("mask"):
+        row["train_image"], row["train_sha256"] = row["image"], row.get("sha256")
+        return row
+    import cv2
+    im, _hw = B3._load_640(row["image"])
+    if im is None:
+        row["drop"] = "unreadable"
+        return row
+    out, _region, _kept, _mean = MK.masked_array(im.copy(), row["mask"], row["boxes"])
+    if not (out != im).any():
+        row["train_image"], row["train_sha256"] = row["image"], row.get("sha256")
+        row["mask_no_change"] = True
+        return row
+    ok, buf = cv2.imencode(".png", out)
+    if not ok:
+        raise DataRefused("PNG encoding failed for %s" % row["image"])
+    data = buf.tobytes()
+    psha = hashlib.sha256(data).hexdigest()
+    dst = Path(root or out_dir()) / "images" / psha[:2] / ("%s.png" % psha)
+    if not dst.is_file():
+        C2.write_bytes_atomic(dst, data)
+    back, _ = B3._load_640(dst)
+    if back is None or back.shape != out.shape or not (back == out).all():
+        raise DataRefused("%s does not read back as the pixels it was written from" % dst)
+    row["train_image"], row["train_sha256"] = str(dst), psha
+    h, v = G.image_hashes(str(dst))
+    row["train_dhash"], row["train_variants"] = h, None if v is None else [int(v[k]) for k in B3.VARIANTS]
+    return row
+
+
+# ------------------------------------------------------------------ capture groups and the exam draws (DS.5.4)
+def capture_groups(rows, links=(), bits=GROUP_BITS):
+    """{key: group name} and {group name: digest}: 6-bit components under the 8 variants (both directions), the
+    same capture relation (export stem, intake capture group, series), a DINOv2 link (links: [(key, key)]); a group
+    named by the sha256 of its members' sorted sha256s (their keys without one)."""
+    n = len(rows)
+    uf = B3.UnionFind(n)
+    idx = {r["key"]: i for i, r in enumerate(rows)}
+    first = {}
+    hashed = [i for i, r in enumerate(rows) if r.get("dhash") is not None]
+    if hashed:
+        comp = B3.hash_components([_hashrow(rows[i]) for i in hashed], bits).tolist()
+        for i, c in zip(hashed, comp):
+            k = ("hash", c)
+            if k in first:
+                uf.union(first[k], i)
+            else:
+                first[k] = i
+    for i, r in enumerate(rows):
+        for k in capture_keys(r):
+            if k in first:
+                uf.union(first[k], i)
+            else:
+                first[k] = i
+    for a, b in links:
+        if a in idx and b in idx:
+            uf.union(idx[a], idx[b])
+    names, digests = {}, {}
+    for _root, mem in uf.groups(range(n)).items():
+        ident = sorted(("sha:%s" % rows[i]["sha256"]) if rows[i].get("sha256") else ("key:%s" % rows[i]["key"])
+                       for i in mem)
+        dg = hashlib.sha256("\n".join(ident).encode("utf-8")).hexdigest()
+        name = "g%s" % dg[:16]
+        digests[name] = dg
+        for i in mem:
+            names[rows[i]["key"]] = name
+    return names, digests
+
+
+def draw_exams(rows_by_source, groups, digests, admitted, new_sources, md_frozen=None, md_target=None,
+               excluded_groups=()):
+    """MD and (new sources only) MT-W v2 per source (DS.5.4): groups in the order stable_int("inc2/ds1/md_v1/
+    <source>/<digest>"); MD until about 5 % of the source's admitted images (at least 15, at most 500; md_target
+    {source: n} replaces the 5 % when MD-S0 is enlarged), then MT-W v2 until about 10 % more (30 to 1,000); both
+    together at most 30 %; a group of more than 500 images, or one in excluded_groups, never; md_frozen {source:
+    [groups]} keeps an earlier draw's groups first (an enlargement keeps the order). Returns {source: {"md":
+    [groups], "mtw": [groups], "md_images", "mtw_images", "admitted"}}."""
+    out = {}
+    for s in sorted(rows_by_source):
+        rs = rows_by_source[s]
+        size = collections.Counter(groups[r["key"]] for r in rs)
+        n_adm = int(admitted.get(s) or len(rs))
+        order = sorted(size, key=lambda g: (stable(SEED_MD % (s, digests[g])), g))
+        cap = int(math.floor(EXAM_SHARE_MAX * n_adm))
+        md_goal = int(md_target.get(s)) if md_target and s in md_target else \
+            min(MD_MAX, max(MD_MIN, int(round(MD_SHARE * n_adm))))
+        md, mtw, n_md, n_mtw = [], [], 0, 0
+        for g in order:
+            if size[g] > GROUP_MAX or g in excluded_groups:
+                continue
+            if n_md + n_mtw + size[g] > cap:
+                continue
+            if n_md < md_goal:
+                md.append(g)
+                n_md += size[g]
+                continue
+            if s in new_sources:
+                mtw_goal = min(MTW_MAX, max(MTW_MIN, int(round(MTW_SHARE * n_adm))))
+                if n_mtw < mtw_goal:
+                    mtw.append(g)
+                    n_mtw += size[g]
+                    continue
+            break
+        out[s] = {"md": md, "mtw": mtw, "md_images": n_md, "mtw_images": n_mtw, "admitted": n_adm,
+                  "cap_images": cap}
+    return out
+
+
+def enlarge_targets(draw, factor):
+    """{source: MD images} for an enlargement of MD-S0 (DS.5.4): each source's MD scaled by the same factor, within
+    its 30 % cap; the same order (draw_exams keeps the earlier groups first by construction)."""
+    return {s: min(int(math.ceil(d["md_images"] * float(factor))), d["cap_images"]) for s, d in draw.items()}
+
+
+# ------------------------------------------------------------------ the manifests (DS.5.3)
+def floor_repeats(n_rows, n_s0, c):
+    """r = round_half_up((N - C) / (N_S0 - C)), N the arm's rows before repeats (DS.0 item 15); 1 for S0's size."""
+    if n_s0 <= c:
+        raise DataRefused("S0 holds %d rows, no more than its %d train_core rows" % (n_s0, c))
+    return max(1, int(B3.round_half_up((float(n_rows) - c) / (float(n_s0) - c))))
+
+
+def repeat_rows(tc_rows, r):
+    """The repeat rows of the cwd12 exposure floor: each train_core row listed r times (the row itself and r - 1
+    rows <key>__r<j> naming the same files)."""
+    out = []
+    for row in tc_rows:
+        for j in range(1, int(r)):
+            out.append(dict(row, key="%s__r%d" % (row["key"], j)))
+    return out
+
+
+def family_cap(new_rows, base_count, other_count, family, cap=FAMILY_CAP):
+    """(kept new rows, dropped videos): a family's new rows capped so that the family holds at most `cap` of the
+    manifest's rows before repeats (family <= floor(cap / (1 - cap) x the other rows)), whole thinned videos dropped
+    in the order stable_int("inc2/ds1/cap/<family>/<video>"), last first; base_count the family's rows the manifest
+    holds already (never dropped: each larger manifest holds every row of the smaller ones)."""
+    allowed = int(math.floor(cap / (1.0 - cap) * other_count)) - int(base_count)
+    by = collections.defaultdict(list)
+    for r in new_rows:
+        by[r.get("series") or r["key"]].append(r)
+    order = sorted(by, key=lambda v: (stable(SEED_CAP % (family, v)), v))
+    kept, dropped, n = [], [], 0
+    for v in order:
+        if n + len(by[v]) <= max(0, allowed):
+            kept += by[v]
+            n += len(by[v])
+        else:
+            dropped.append(v)
+    return kept, dropped, {"allowed_new": max(0, allowed), "kept_new": n, "family_base": int(base_count),
+                           "other_rows": int(other_count), "dropped_videos": len(dropped)}
+
+
+def s1cr_draw(s1c_rows, n_s0, tc_keys):
+    """S1c-R (DS.5.3): exactly S0's size from S1c's rows before repeats, the train_core rows kept whole, the rest in
+    the order stable_int("inc2/ds1/r/<key>")."""
+    tc = [r for r in s1c_rows if r["key"] in tc_keys]
+    rest = sorted((r for r in s1c_rows if r["key"] not in tc_keys), key=lambda r: (stable(SEED_R % r["key"]), r["key"]))
+    need = int(n_s0) - len(tc)
+    if need < 0 or need > len(rest):
+        raise DataRefused("S1c-R needs %d rows beside train_core, S1c has %d" % (need, len(rest)))
+    return tc + rest[:need]
+
+
+def k_pools(siu_rows, kf_rows, crop_eppo=()):
+    """The K arms' supplies (DS.5.3): SIU's target and non-target videos (no crop video), dense (3-bit deduped) and
+    thinned, and KF's thinned Field and Turf rows. Returns (pools, T, N_K)."""
+    tgt = [r for r in siu_rows if r.get("eppo") in SIU_TARGET_EPPO]
+    non = [r for r in siu_rows if r.get("eppo") not in SIU_TARGET_EPPO and r.get("eppo") not in crop_eppo]
+    t = sum(1 for r in tgt if r.get("thin"))
+    supplies = {"KD": len(tgt) + len(non), "KT": sum(1 for r in tgt + non if r.get("thin")),
+                "KF": sum(1 for r in kf_rows if r.get("thin"))}
+    n_k = min([N_K_MAX] + list(supplies.values()))
+    return {"target": tgt, "nontarget": non, "kf": kf_rows, "supplies": supplies}, t, n_k
+
+
+def _videos(rows):
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[r.get("series") or r["key"]].append(r)
+    return by
+
+
+def kd_draw(pools, t, n_k):
+    """KD: whole target-species videos in seeded order until T frames, then whole non-target videos until N_K;
+    every frame that passed the 3-bit dedupe (the last video cut in its own seeded order)."""
+    out = []
+    for part, goal in ((pools["target"], t), (pools["nontarget"], n_k)):
+        vids = _videos(part)
+        for v in sorted(vids, key=lambda v: (stable(SEED_K % ("KD", v)), v)):
+            if len(out) >= goal:
+                break
+            for k in series_order(v, [r["key"] for r in vids[v]]):
+                if len(out) >= goal:
+                    break
+                out.append(next(r for r in vids[v] if r["key"] == k))
+    if len(out) != n_k:
+        raise DataRefused("KD drew %d rows, N_K is %d" % (len(out), n_k))
+    return out
+
+
+def kt_draw(pools, t, n_k):
+    """KT: T thinned target-species frames round-robin across all target videos, then N_K - T thinned non-target
+    frames round-robin across all non-target videos."""
+    out = []
+    for part, goal in ((pools["target"], t), (pools["nontarget"], n_k - t)):
+        vids = {v: [r for r in rs if r.get("thin")] for v, rs in _videos(part).items()}
+        queues = {v: [next(r for r in rs if r["key"] == k) for k in series_order(v, [r["key"] for r in rs])]
+                  for v, rs in vids.items() if rs}
+        order = sorted(queues, key=lambda v: (stable(SEED_K % ("KT", v)), v))
+        taken = 0
+        while taken < goal and any(queues[v] for v in order):
+            for v in order:
+                if taken >= goal:
+                    break
+                if queues[v]:
+                    out.append(queues[v].pop(0))
+                    taken += 1
+    if len(out) != n_k:
+        raise DataRefused("KT drew %d rows, N_K is %d" % (len(out), n_k))
+    return out
+
+
+def kf_draw(pools, n_k):
+    """KF: N_K thinned Field and Turf rows of base B in the order stable_int("inc2/ds1/k/KF/<row>")."""
+    rows = sorted((r for r in pools["kf"] if r.get("thin")), key=lambda r: (stable(SEED_K % ("KF", r["key"])),
+                                                                           r["key"]))
+    if len(rows) < n_k:
+        raise DataRefused("KF's supply %d is under N_K %d" % (len(rows), n_k))
+    return rows[:n_k]
+
+
+def nested_ok(small, large):
+    """True when every line of the smaller manifest is a line of the larger one, byte for byte (DS.5.3)."""
+    return set(small) <= set(large)
+
+
+def manifest_bytes(rows):
+    """(bytes, keys) of manifest rows in key order; refuses a repeated key."""
+    rows = sorted(rows, key=lambda r: r["key"])
+    keys = [r["key"] for r in rows]
+    if len(set(keys)) != len(keys):
+        raise DataRefused("a manifest repeats a key")
+    return b"".join(manifest_line(r) for r in rows), keys
+
+
+def arm_record(arm, rows, path, sha, extra=None):
+    from . import recipes as RC
+    n = len(rows)
+    base_rows = [r for r in rows if "__r" not in r["key"]]
+    rec = {"format": FMT_ARM, "arm": arm, "manifest": str(path), "sha256": sha, "images": n,
+           "rows_before_repeats": len(base_rows), "counts": three_counts(base_rows),
+           "recipe": RC.cold_budget("m640", n) if arm in D.BUILD_ARMS else None,
+           "research_only": any(r.get("research_only") for r in rows),
+           "permissive_only_rows": sum(1 for r in base_rows if not r.get("research_only")),
+           "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
+    rec.update(extra or {})
+    return rec
+
+
+def loader_projection(rows):
+    """base3's loader projection of a 1.2 M run on an arm's rows (CLOOP:2927): over 0.8 x 8 h the arm moves to the
+    long path at the same 1.2 M (DS.6)."""
+    rules, conf = load_rules()
+    rate = B3.loader_rate(rows)
+    w = rules if "walltime" in rules else conf
+    return dict(B3.walltime(rate["ms_per_image"], w), loader=rate)
+
+
+def season_rows(rows):
+    """The keys of rows that break DS.0 item 6 (every S arm is season-free, as D1's B'): a tsw22 or tsw23 row (its
+    source one of TSW) or a row of session 20220129_CanonEOS4000D_EO (its session field or its key). The copies of
+    ood22 and ood23 images the guard removes before (DS.5.1 item 7)."""
+    return sorted(str(r.get("key")) for r in rows if r.get("source") in TSW or (r.get("session") or "") ==
+                  SEASON_SESSION or SEASON_SESSION in str(r.get("key") or ""))
+
+
+def write_arm(arm, rows, extra=None):
+    """An arm's manifest and record, each written once (an existing record must name the same bytes). An S arm with a
+    row of the seasons (season_rows) is refused."""
+    if arm.startswith("S"):
+        bad = season_rows(rows)
+        if bad:
+            raise DataRefused("%s holds %d row(s) of tsw22, tsw23 or session %s (e.g. %s): every S arm is season-free "
+                              "(DS.0 item 6)" % (arm, len(bad), SEASON_SESSION, bad[:3]))
+    data, _keys = manifest_bytes([{k: r[k] for k in C.MANIFEST_KEYS} for r in rows])
+    p = arm_path(arm)
+    sha = hashlib.sha256(data).hexdigest()
+    write_once(p, data)
+    rp = arm_record_path(arm)
+    old = _read_json(rp)
+    if isinstance(old, dict):
+        if old.get("sha256") != sha:
+            raise DataRefused("%s exists naming other bytes: an arm's manifest is built once" % rp)
+        return old
+    rec = arm_record(arm, rows, p, sha, extra)
+    if PROJECT_LOADER and arm in ("S1C", "S1U", "S2", "S1CR", "S0"):
+        rec["loader_projection"] = loader_projection([r for r in rows if "__r" not in r["key"]])
+    write_once(rp, rec)
+    return rec
+
+
+PROJECT_LOADER = True            # tests switch it off (the projection reads Ultralytics' loader)
+
+
+def arm_rows(arm):
+    """The rows of a built arm (its manifest, checked against its record)."""
+    rec = _read_json(arm_record_path(arm))
+    if not isinstance(rec, dict) or C.sha256_file(arm_path(arm)) != rec.get("sha256"):
+        raise DataRefused("arm %s is not built (or its manifest does not hash as recorded)" % arm)
+    return read_jsonl(arm_path(arm)), rec
+
+
+def arm_manifest(arm):
+    """(path, sha256, images) of a built arm: what inc2.baseline build --ds1 reads."""
+    _rows, rec = arm_rows(arm)
+    return rec["manifest"], rec["sha256"], rec["images"]
+
+
+# ------------------------------------------------------------------ the exam roots (Z1's pattern) and the never-train list
+def write_exam_root(exam, rows, root, groups):
+    """An exam in its own root: splits/v1/<exam>.jsonl (manifest rows, the class-12 labels), splits/v1/LOCK.json
+    (inc/scorer.py's sha256), exams/v1/<exam>/ (symlinks and verified label copies). Every file written once."""
+    from ..inc import scorer as S
+    from ..inc import splits as SP
+    root = Path(root)
+    data, keys = manifest_bytes([{k: r[k] for k in C.MANIFEST_KEYS} for r in rows])
+    sha = hashlib.sha256(data).hexdigest()
+    write_once(root / "splits" / "v1" / ("%s.jsonl" % exam), data)
+    lock = {"format": FMT_LOCK, "manifests": {exam: sha}, "splits_version": "v1",
+            "scorer_sha256": C.sha256_file(Path(S.__file__).resolve()), "keys_sha256": list_sha256(keys),
+            "decided_by": D.DECIDED_BY}
+    lp = root / "splits" / "v1" / "LOCK.json"
+    old = _read_json(lp)
+    if isinstance(old, dict):
+        if {k: old.get(k) for k in lock} != lock:
+            raise DataRefused("%s exists with other contents: an exam's LOCK is written once" % lp)
+    else:
+        write_once(lp, dict(lock, created_utc=D._utc()))
+    ed = root / "exams" / "v1" / exam
+    man_rows = [json.loads(x) for x in data.decode("utf-8").splitlines() if x.strip()]
+    if not ed.exists():
+        C.materialise(man_rows, ed)
+        for n in os.listdir(ed / "labels"):
+            os.chmod(ed / "labels" / n, 0o444)
+        os.chmod(ed / "data.yaml", 0o444)
+    probs = SP.exam_problems(exam, man_rows, ed)
+    if probs:
+        raise DataRefused("the exam %s in %s has problems: %s" % (exam, root, probs[:3]))
+    return {"root": str(root), "exam": exam, "manifest_sha256": sha, "lock_sha256": C.sha256_file(lp),
+            "images": len(rows), "groups": len({groups[r["key"]] for r in rows})}
+
+
+def never_train_rows():
+    return read_jsonl(never_train_path())
+
+
+def append_never_train(rows, exam, groups):
+    """Every MD and MT-W row and group enters DS1's own never-train list at its draw (append-only; a row already
+    listed for the exam is not listed again)."""
+    have = {(r["exam"], r["key"]) for r in never_train_rows()}
+    new = []
+    for r in rows:
+        if (exam, r["key"]) in have:
+            continue
+        new.append({"exam": exam, "key": r["key"], "source": r["source"], "sha256": r.get("sha256"),
+                    "original_sha256": r.get("original_sha256") or r.get("sha256"),
+                    "train_sha256": r.get("train_sha256"), "dhash": r.get("dhash"), "variants": r.get("variants"),
+                    "group": groups.get(r["key"]), "capture_keys": [list(k) for k in capture_keys(r)],
+                    "drawn_utc": D._utc()})
+    if new:
+        p = never_train_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, "a") as fh:
+            for r in new:
+                fh.write(json.dumps(r, sort_keys=True) + "\n")
+    return len(new)
+
+
+def freeze_record(exam, root_rec, extra=None):
+    """splits/ds1/<md_v1|mtw_v2>/<exam>/frozen.json, written once: the root that is the exam, its LOCK's sha256 (whose
+    OpenTimestamps proof the delegate takes), the draw it froze."""
+    doc = {"format": FMT_EXAM, "exam": exam, "frozen": True, "root": root_rec["root"],
+           "lock_sha256": root_rec["lock_sha256"], "manifest_sha256": root_rec["manifest_sha256"],
+           "images": root_rec["images"], "groups": root_rec["groups"], "decided_by": D.DECIDED_BY,
+           "frozen_utc": D._utc()}
+    doc.update(extra or {})
+    write_once(exam_dir(exam) / "frozen.json", doc)
+    return doc
+
+
+def frozen(exam):
+    d = _read_json(exam_dir(exam) / "frozen.json")
+    return d if isinstance(d, dict) and d.get("frozen") else None
+
+
+# ------------------------------------------------------------------ the inputs (production: the cluster's files)
+class Inputs(object):
+    """Everything a build step reads, each recorded by sha256 (production loaders below; tests build one)."""
+
+    def __init__(self, **kw):
+        self.base_b = kw.get("base_b") or {}            # {key: provenance row} of base B (base3's provenance)
+        self.bprime = kw.get("bprime") or {}            # {key: manifest row} of D1's B' (D1B1, after the season guard)
+        self.base_a = kw.get("base_a") or {}            # {key: manifest row} of base A one-class (base_v2_weed)
+        self.tc_keys = set(kw.get("tc_keys") or ())     # train_core keys (base_v2's)
+        self.ndsu_keys = set(kw.get("ndsu_keys") or ())  # base_v2's 66 NDSU rows
+        self.setting = kw.get("setting") or {}          # {key: Field | Turf | Indoor} of base B (V3F.4's map)
+        self.candidates = kw.get("candidates") or []    # new rows (the queue, the admissions, the intake)
+        self.decisions = kw.get("decisions") or {}      # {source: decided sheet} (inc2.ds1_sheets)
+        self.exams = kw.get("exams") or {}              # {name: {"keys", "H", "ok"}} for the dHash guard
+        self.scanners = kw.get("scanners") or {}        # {name: EmbedScanner}
+        self.eval_sources = set(kw.get("eval_sources") or ())
+        self.quarantined = set(kw.get("quarantined") or ())
+        self.never = set(kw.get("never") or ())
+        self.families = kw.get("families") or {}        # {source: family}
+        self.predict = kw.get("predict")                # E1-A's predictions (the model audit)
+        self.audit_ref = kw.get("audit_ref")            # train_core's rates under the same predictor
+        self.hasher = kw.get("hasher")                  # inc2.guard.image_hashes (tests: a stub)
+        self.consumed = set(kw.get("consumed") or ())   # keys a stream consumed (an increment or a pool)
+        self.base_b_man = kw.get("base_b_man") or {}    # {key: manifest row} of base B (KF's rows)
+        self.links = kw.get("links")                    # DINOv2 links among rows (capture groups)
+        self.read_orientation = kw.get("read_orientation")
+        self.record = kw.get("record") or {}
+        self.production = bool(kw.get("production", False))
+
+
+def load_inputs(phase, procs=5, embedder=None):
+    """The production inputs (the cluster): base B's provenance and D1's B' (splits/v3fam's D1B1), base A, LOCK v2's
+    train_core and NDSU keys, V3F's setting map, the phase's candidates from Step 1's stream, the decided sheets,
+    the exams' hashes and scanners, the evaluation groups by name, the stream's quarantines and the domain config's
+    never lists."""
+    from . import v3fam_data as VD
+    summ = B3.read_summary()
+    if summ is None:
+        raise DataRefused("no complete splits/v3/summary.json: base B is not built")
+    pf = summ["files"]["provenance"]
+    prov = read_jsonl(B3.out_dir() / pf["file"])
+    if C.sha256_file(B3.out_dir() / pf["file"]) != pf["sha256"]:
+        raise DataRefused("base B's provenance does not hash as its summary records")
+    base_b = {r["key"]: r for r in prov if "B" in (r.get("arms") or [])}
+    for r in base_b.values():
+        # base B's own boxes (its class-12 labels), for the copy rule's box match (DS.5.1 item 5)
+        try:
+            r["_boxes"] = [b[1:5] for b in read_inc_label(r["label"])]
+        except (OSError, ValueError, DataRefused):
+            r["_boxes"] = []
+    bb = summ["arms"]["B"]
+    base_b_man = {r["key"]: r for r in C.read_manifest(bb["manifest"])}
+    vs = VD.read_summary()
+    if vs is None or "D1B1" not in (vs.get("arms") or {}):
+        raise DataRefused("no complete splits/v3fam/summary.json with D1's B' (D1B1): B'o starts from it")
+    bp_path, bp_sha, _n = VD.arm_manifest("D1B1")
+    bprime = {r["key"]: r for r in C.read_manifest(bp_path)}
+    ba = summ["arms"]["A"]
+    base_a = {r["key"]: r for r in C.read_manifest(ba["manifest"])}
+    lock2 = C2.read_lock_v2()
+    tc = {r["key"] for r in C.read_manifest(C2.v2_manifest_path("train_core"))}
+    ndsu = {k for k, r in base_b.items() if r.get("source") in VD.NDSU_SOURCES}
+    setting = {}
+    for k, r in base_b.items():
+        try:
+            setting[k] = VD.setting_of(dict(r, key=k))[0]
+        except VD.DataRefused:
+            setting[k] = None
+    rules, conf = load_rules()
+    from . import ds1_sheets as SH
+    decisions = SH.decided_sources()
+    cands = load_candidates(phase, base_b)
+    exams, erec = exam_hashes()
+    predict = e1a_predictor()
+    tc_rows = [dict(r, boxes=[b[1:5] for b in read_inc_label(r["label"])])
+               for r in C.read_manifest(C2.v2_manifest_path("train_core"))]
+    audit_ref = audit_rates(audit_sample(tc_rows, TRAIN_CORE), predict)
+    return Inputs(base_b=base_b, bprime=bprime, base_a=base_a, tc_keys=tc, ndsu_keys=ndsu, setting=setting,
+                  base_b_man=base_b_man, consumed=stream_consumed(), predict=predict, audit_ref=audit_ref,
+                  candidates=cands, decisions=decisions, exams=exams, scanners=scanners(embedder),
+                  eval_sources={s for g in (conf.get("evaluation_groups") or {}).get("groups", {}).values() for s in g},
+                  quarantined=stream_quarantined(), never=domain_never(),
+                  families=families(conf), production=True,
+                  record={"step1_batches": step1_batches(),
+                          "splits_v3_summary_sha256": C.sha256_file(B3.out_dir() / B3.SUMMARY),
+                          "v3fam_summary_sha256": C.sha256_file(VD.out_dir() / VD.SUMMARY),
+                          "bprime_sha256": bp_sha, "lock_v2_sha256": C.sha256_file(C2.LOCK_PATH),
+                          "lock_v2_train_core": lock2["manifests"].get("train_core"), "exams": erec})
+
+
+def eligibility_ctx(inputs):
+    return {"base_keys": set(inputs.base_b), "base_shas": {r.get("original_sha256") for r in inputs.base_b.values()},
+            "eval_sources": inputs.eval_sources, "quarantined": inputs.quarantined, "never": inputs.never,
+            "consumed": inputs.consumed}
+
+
+def stream_consumed():
+    """Keys any stream version consumed (a pool's rows and every increment's), which Q does not count as free."""
+    try:
+        from . import stream as ST
+        out = set()
+        sd = C.INC_DIR / "stream"
+        for sid in sorted(p.name for p in sd.iterdir() if p.is_dir()) if sd.is_dir() else []:
+            try:
+                f = ST.Stream(sid, quiet=True).load(repair=False)
+            except Exception:  # noqa: BLE001 - a stream that cannot be folded consumed nothing readable here
+                continue
+            for k, v in f.keys.items():
+                if v.get("status") not in ST.ELIGIBLE_STATUSES:
+                    out.add(k)
+            out |= {r["key"] for r in f.pool_rows(f.pool)}
+        return out
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def e1a_predictor(conf=0.25):
+    """E1-A seed 0's predictions (cx, cy, w, h, conf) on a row's original image (the model audit, DS.5.1 item 4):
+    E1-A trained on base_v2 only, so it never saw these sources."""
+    from . import v3fam_systems as SYS
+    from . import twostage as TS
+    src = SYS.run_source(D.POWER_EXPS["E1A"], 0, testing_ok=TS._testing_ok())
+    state = {}
+
+    def predict(row):
+        if "m" not in state:
+            from ultralytics import YOLO
+            state["m"] = YOLO(src["weights"])
+        res = state["m"].predict(row["image"], imgsz=640, conf=conf, verbose=False)[0]
+        out = []
+        for b, c in zip(res.boxes.xywhn.cpu().numpy().tolist(), res.boxes.conf.cpu().numpy().tolist()):
+            out.append((float(b[0]), float(b[1]), float(b[2]), float(b[3]), float(c)))
+        return out
+    predict.weights_sha256 = src["weights_sha256"]
+    return predict
+
+
+def step1_batches(inc_dir=None):
+    """The committed Step 1 batches (ledger/batches.jsonl), sorted: what a screen saw, and whether one came since."""
+    p = (Path(inc_dir) if inc_dir else C.INC_DIR) / "step1_stream" / "ledger" / "batches.jsonl"
+    return sorted({str(r.get("batch")) for r in read_jsonl(p) if r.get("batch")})
+
+
+def families(conf):
+    out = {s: v.get("family") for s, v in (conf.get("sources") or {}).items() if v.get("family")}
+    for s, v in (conf.get("intake") or {}).items():
+        if v.get("family"):
+            out[s] = v["family"]
+    for s in MFWD_SOURCES:
+        out[s] = "mfwd"
+    out[SIU] = SIU_FAMILY
+    return out
+
+
+def stream_quarantined():
+    """The stream's quarantined sources (inc2.stream's ledger fold, as base3 reads it)."""
+    try:
+        from .. import inc_autopilot  # noqa: F401  (the package is present wherever the stream runs)
+        from . import stream as ST
+        sids = sorted(p.name for p in (C.INC_DIR / "stream").iterdir() if p.is_dir()) \
+            if (C.INC_DIR / "stream").is_dir() else []
+        out = set()
+        for sid in sids:
+            try:
+                out |= set(ST.Stream(sid, quiet=True).load(repair=False).q_sources)
+            except Exception:  # noqa: BLE001 - a stream that cannot be folded quarantines nothing here
+                continue
+        return out
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def domain_never():
+    """The domain config's never-fetch and never-train sources (collect/domains/weed.json known items and the
+    funnel's never-train list)."""
+    out = set(NEVER_FETCHED) | set(ROLE_C)
+    try:
+        cfg = json.loads((Path(__file__).resolve().parents[1] / "collect" / "domains" / "weed.json").read_text())
+        for it in cfg.get("known_items") or []:
+            if it.get("never_fetch") or it.get("never_train"):
+                out.add(str(it.get("id")))
+    except (OSError, ValueError):
+        pass
+    return out
+
+
+def load_candidates(phase, base_b, inc_dir=None):
+    """The candidate rows of a phase from Step 1's stream (module docstring): the queue's rows (holds, refusals,
+    test_v1 folded in by inc2.step1_stream.load_queue) and every committed batch's not-admitted rows, each with its
+    original file and intake label (the intake batch's manifest, or the v1 pool for b0000)."""
+    from . import step1_stream as S1
+    inc = Path(inc_dir) if inc_dir else C.INC_DIR
+    L = S1.Layout(inc_dir=inc)
+    queue = {r["key"]: r for r in S1.load_queue(L)}
+    files = {}
+    for d in sorted((inc / "intake").glob("i0*")) if (inc / "intake").is_dir() else []:
+        for r in read_jsonl(d / "manifest.jsonl"):
+            files[r["key"]] = dict(r, batch_dir=str(d))
+    pool = inc / "step1" / "pool.jsonl"
+    for r in read_jsonl(pool):
+        files.setdefault(r["key"], r)
+    out = []
+    seen = set()
+    for e in read_jsonl(L.ledger):
+        bdir = L.batch_dir(e["batch"])
+        bj = _read_json(bdir / "batch.json") or {}
+        if bj.get("kind") == "knowntruth":
+            continue
+        for a in read_jsonl(bdir / "admission.jsonl"):
+            k = a["key"]
+            if k in seen:
+                continue
+            seen.add(k)
+            q = queue.get(k)
+            f = files.get(k)
+            if f is None:
+                continue
+            row = candidate_row(k, a, q, f)
+            if row is not None:
+                out.append(row)
+    return out
+
+
+def candidate_row(key, adm, q, f):
+    """One candidate from its admission record, its queue row (None when not admitted) and its original file."""
+    try:
+        boxes = read_inc_label(f["label"])
+    except (OSError, ValueError, DataRefused):
+        return None
+    rel = f.get("rel") or os.path.basename(str(f.get("image") or ""))
+    src = adm.get("source") or f.get("source")
+    video, eppo = siu_video(rel or key) if src == SIU else (None, None)
+    series = video if src == SIU else (f.get("capture_group") if src in MFWD_SOURCES else None)
+    pool = "p1" if src == SIU else ("p5" if q is not None or any(c < 12 for c, *_ in boxes) else "p3")
+    return {"key": key, "source": src, "pool": pool, "image": f.get("image"), "sha256": f.get("sha256"),
+            "label": f.get("label"), "boxes": boxes, "W": f.get("width"), "H": f.get("height"),
+            "rel": rel, "series": series, "eppo": eppo, "capture": ("%s|%s" % (src, f["capture_group"]))
+            if f.get("capture_group") else None, "stem": _stem(rel), "session": f.get("session") or "",
+            "dhash": (q or {}).get("dhash") if q else f.get("dhash"), "variants": None,
+            "licence": (q or {}).get("licence") or f.get("licence"),
+            "research_only": bool((q or {}).get("research_only") or f.get("research_only")),
+            "holds": list((q or {}).get("holds") or f.get("holds") or []), "refused": (q or {}).get("refused")
+            or adm.get("refusal"), "admission": adm.get("admission"), "test_v1": (q or {}).get("test_v1"),
+            "batch": adm.get("batch") or f.get("batch"), "kind_q": (q or {}).get("kind")}
+
+
+def _stem(rel):
+    m = B3.RF_STEM_RE.match(os.path.splitext(os.path.basename(str(rel or "")))[0])
+    return m.group("stem") if m else None
+
+
+def exam_hashes():
+    """{exam: {"keys", "H", "ok"}} of every exam the guard reads (DS.5.1 item 7): cwd12 dev and test and ImageWeeds
+    (the zoo's checked cache), ood22 and ood23 (base_v2's copies' hashes), test v1 and its companions (every
+    earlier test list), evalgroups_v1 (the evaluation groups' stored hashes), MD v1 and MT-W v2 (DS1's never-train
+    list), H10d once F9 wrote it."""
+    from . import v3fam_data as VD
+    import numpy as np
+    zoo, zrec = VD._zoo_exam_hashes()
+    v2prov = VD._provenance(C2.BASE_PROVENANCE, C2.read_lock_v2().get("provenance_sha256"), "base_v2 provenance")
+    ood, orec = VD._ood_exam_hashes(v2prov)
+    out = dict(zoo, **ood)
+    prior, prec = B3.prior_test_lists()
+    pr = [p for p in prior if p.get("dhash") is not None]
+    if pr:
+        H, ok, _h = B3.hash_matrix(pr)
+        out["test_v1"] = {"keys": [p.get("key") for p in pr], "H": H, "ok": ok}
+    nt = [r for r in never_train_rows() if r.get("dhash") is not None]
+    if nt:
+        H, ok, _h = B3.hash_matrix(nt)
+        out["ds1_exams"] = {"keys": ["%s|%s" % (r["exam"], r["key"]) for r in nt], "H": H, "ok": ok}
+    h10 = C.INC_DIR / "step1_r1" / "domain_dev.jsonl"
+    rec = {"zoo": zrec, "ood": orec, "prior_test": prec, "ds1_never_train": len(nt), "h10d": h10.is_file()}
+    if h10.is_file():
+        from ..inc import verify as V
+        meta = {m["key"]: m for m in V._read_jsonl(V.POOL_META)} if Path(V.POOL_META).is_file() else {}
+        keys = [r["key"] for r in C.read_manifest(h10)]
+        rows = [{"dhash": (meta.get(k) or {}).get("dhash"), "variants": None} for k in keys]
+        have = [(k, r) for k, r in zip(keys, rows) if r["dhash"] is not None]
+        if len(have) != len(keys):
+            raise DataRefused("%d H10d image(s) have no stored dHash: the guard cannot clear against it (fail "
+                              "closed)" % (len(keys) - len(have)))
+        H, ok, _h = B3.hash_matrix([r for _k, r in have])
+        out["h10d"] = {"keys": [k for k, _r in have], "H": H, "ok": ok}
+        rec["h10d_images"] = len(have)
+    for k, v in out.items():
+        v["ok"] = np.asarray(v["ok"], dtype=bool)
+    return out, rec
+
+
+def scanners(embedder=None):
+    """The calibrated DINOv2 detector against cwd12 dev, test and ImageWeeds (LOCK v2's stored descriptors) and
+    against ood22 and ood23 (D1's season guard's index), and DS1's own index over test v1 and its companions,
+    evalgroups_v1, MD v1, MT-W v2 and H10d (built in ds1/v1/leak/)."""
+    from . import v3fam_data as VD
+    v2prov = VD._provenance(C2.BASE_PROVENANCE, C2.read_lock_v2().get("provenance_sha256"), "base_v2 provenance")
+    ood, _r = VD._ood_exam_hashes(v2prov)
+    out = {"eval": VD.eval_scanner(embedder), "ood": VD.ood_scanner(ood, embedder, cache=D.root() / "leak" /
+                                                                       "ood_desc.npz")}
+    own = own_exam_rows()
+    if own:
+        out["own"] = own_scanner(own, embedder)
+    return out
+
+
+def own_exam_rows():
+    """{split: [{key, image, sha256}]} of DS1's own guard index: test v1 and its companions, MD v1 and MT-W v2 (their
+    files), H10d."""
+    out = collections.defaultdict(list)
+    prior, _rec = B3.prior_test_lists()
+    for p in prior:
+        img = p.get("image") or p.get("original_image")
+        if img:
+            out["test_v1"].append({"key": str(p.get("key")), "image": img, "sha256": p.get("sha256")})
+    for r in never_train_rows():
+        if r.get("train_image") or r.get("image"):
+            out["ds1_exams"].append({"key": "%s|%s" % (r["exam"], r["key"]), "image": r.get("train_image") or
+                                     r.get("image"), "sha256": r.get("train_sha256") or r.get("sha256")})
+    return dict(out)
+
+
+def own_scanner(rows_by_split, embedder=None):
+    from ..funnel import embed as FE
+    from . import embed_calibration as EC
+    from . import guard as G
+    cal, why = EC.locked(C2.LOCK_PATH, production=True)
+    if cal is None:
+        raise DataRefused("LOCK v2 records no calibration (%s): DS1's guard cannot run (fail closed)" % why)
+    model, _, pooling = str(cal["embedder"]).rpartition(":")
+    emb = embedder or FE.LazyEmbedder(model, pooling)
+    tag = hashlib.sha256(json.dumps({s: sorted(r["key"] for r in rs) for s, rs in rows_by_split.items()},
+                                    sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return G.EmbedScanner(G.eval_index(rows_by_split, emb, D.root() / "leak" / ("own_%s.npz" % tag)), cal)
+
+
+# ------------------------------------------------------------------ the steps
+def screen(phase, inputs, revision=None, write=True):
+    """Step 'screen' (L30): every candidate of the phase not covered by an earlier screen revision, per source:
+    eligibility counts, the class units with their source names and suggested roles, the capture-name scan, the
+    guard against cwd12 dev and test (a hit quarantines the source whole, D28-v2), the model audit, the box
+    convention; the candidates written for the next steps; the sheets' bundles (inc2.ds1_sheets.bundle)."""
+    from . import ds1_sheets as SH
+    prior = screened_keys(phase)
+    rows = [r for r in inputs.candidates if r["key"] not in prior]
+    ctx = eligibility_ctx(inputs)
+    per = collections.defaultdict(lambda: {"rows": 0, "out": collections.Counter(), "units": collections.Counter(),
+                                           "pools": collections.Counter()})
+    live = []
+    outs = collections.defaultdict(list)
+    for r in rows:
+        why = eligibility(r, ctx)
+        p = per[r["source"]]
+        p["rows"] += 1
+        p["pools"][r.get("pool")] += 1
+        if why:
+            p["out"][why] += 1
+            if why != "in_base_b":
+                outs[r["source"]].append(dict(r, why=why))
+            continue
+        for b in r["boxes"]:
+            p["units"][unit_of(r, b[0])] += 1
+        live.append(r)
+    hash_rows(live, hasher=inputs.hasher)
+    live = [r for r in live if not r.get("drop")]
+    # the guard against cwd12 dev and test: a hit quarantines the source whole (D28-v2, unchanged)
+    cwd = {k: v for k, v in inputs.exams.items() if k in ("dev", "test")}
+    dh = dhash_hits(live, cwd)
+    eh = embed_hits(live, inputs.scanners.get("eval"), D.root() / "leak" / ("screen_p%d.npz" % phase)) \
+        if inputs.scanners.get("eval") else {}
+    cwd_hits = merge_hits(dh, {k: [h for h in v if h["exam"] in ("dev", "test")] for k, v in eh.items()})
+    by_src = collections.defaultdict(list)
+    for r in live:
+        by_src[r["source"]].append(r)
+    rec = {}
+    for s, rs in sorted(by_src.items()):
+        hits = sorted({k for k in (r["key"] for r in rs) if cwd_hits.get(k)})
+        names = capture_name_hits([r.get("rel") or r["key"] for r in rs])
+        audit = None
+        if inputs.predict is not None and inputs.audit_ref is not None:
+            audit = audit_verdict(audit_rates(audit_sample(rs, s), inputs.predict), inputs.audit_ref)
+        rec[s] = {"rows": per[s]["rows"], "live": len(rs), "out": dict(per[s]["out"]), "pools": dict(per[s]["pools"]),
+                  "units": {u: {"boxes": n, "suggested": suggest_role(s, u)} for u, n in sorted(per[s]["units"].items())},
+                  "cwd12_hits": len(hits), "cwd12_hit_keys": hits[:20], "quarantine_whole": bool(hits),
+                  "capture_names": {"hits": len(names), "examples": names[:12]}, "audit_verdict": audit,
+                  "convention": B3.source_convention([dict(r, boxes=[b[1:5] for b in r["boxes"]]) for r in rs],
+                                                     load_rules()[0]["source"]),
+                  "family": inputs.families.get(s), "series": bool(any(r.get("series") for r in rs)),
+                  "unit_names": unit_names(s, sorted(per[s]["units"]))}
+    for s, p in per.items():
+        if s not in rec:
+            rec[s] = {"rows": p["rows"], "live": 0, "out": dict(p["out"]), "pools": dict(p["pools"])}
+    revision = revision or (len(screen_revisions(phase)) + 1)
+    doc = {"format": FMT_SCREEN, "phase": int(phase), "revision": int(revision), "candidates": len(rows),
+           "live": len(live), "sources": rec, "inputs": inputs.record, "decided_by": D.DECIDED_BY,
+           "written_utc": D._utc()}
+    if write and rows:
+        base = out_dir() / "screen" / ("p%d_r%03d" % (int(phase), int(revision)))
+        write_jsonl_once(Path(str(base) + "_candidates.jsonl"), [_cand_out(r) for r in rows])
+        write_once(Path(str(base) + ".json"), json.loads(json.dumps(doc, default=str)))
+        if inputs.production:
+            SH.bundle_sources(phase, revision, by_src, rec, out_rows=outs)
+            if int(phase) == 1 and int(revision) == 1:
+                bundle_ln(inputs)
+                bundle_mtw_v1()
+    return doc
+
+
+def unit_names(source, units):
+    """{unit: [source class names]} for the sheet: the intake's class decisions (each source class name and the INC id
+    it took), and SIU's EPPO codes' binomials from the collector's pinned EPPO table."""
+    out = collections.defaultdict(set)
+    idir = C.INC_DIR / "intake"
+    for d in sorted(idir.glob("i0*")) if idir.is_dir() else []:
+        p = d / "decisions.jsonl"
+        if not p.is_file():
+            continue
+        with open(p) as fh:
+            for line in fh:
+                if '"class"' not in line or source not in line:
+                    continue
+                r = json.loads(line)
+                if r.get("kind") == "class" and r.get("source") == source and r.get("inc_id") is not None:
+                    out["inc:%d" % int(r["inc_id"])].add(str(r.get("name")))
+    eppo = {}
+    if any(u.startswith("eppo:") for u in units):
+        try:
+            t = json.loads((Path(__file__).resolve().parents[1] / "collect" / "domains" / "eppo_codes_v2.json")
+                           .read_text())
+            codes = t.get("codes") if isinstance(t, dict) else None
+            eppo = {str(k): (v.get("name") if isinstance(v, dict) else v) for k, v in (codes or t).items()} \
+                if isinstance(codes or t, dict) else {}
+        except (OSError, ValueError):
+            eppo = {}
+    for u in units:
+        if u.startswith("eppo:") and eppo.get(u[5:]):
+            out[u].add(str(eppo[u[5:]]))
+    return {u: sorted(out.get(u, ())) for u in units}
+
+
+def _cand_out(r):
+    return {k: (list(v) if isinstance(v, tuple) else v) for k, v in r.items() if not k.startswith("_")}
+
+
+def bundle_ln(inputs):
+    """The LN sheet's bundle (DS.8.2): the SIU increments inc0001, inc0003 and inc0004 pooled, inc0005, and cwd12
+    train_core; each image with its boxes numbered, species, source and file name hidden."""
+    from . import ds1_sheets as SH
+    from . import stream as ST
+    f = ST.Stream(SH.LN_STREAM, quiet=True).load(repair=False)
+    groups = {}
+    for g, incs in SH.LN_INCREMENTS.items():
+        rows = []
+        for inc in incs:
+            for k, r in f.inc_rows(inc).items():
+                img = r.get("image")
+                if img and r.get("label"):
+                    rows.append({"key": k, "image": img, "label": r["label"], "sha256": r.get("sha256") or k})
+        groups[g] = rows
+    groups["train_core"] = [{"key": r["key"], "image": r["image"], "label": r["label"], "sha256": r["sha256"]}
+                            for r in C.read_manifest(C2.v2_manifest_path("train_core"))]
+    items = []
+    for r in SH.ln_draw(groups):
+        boxes = [["box"] + [float(x) for x in b[1:5]] for b in read_inc_label(r["label"])]
+        items.append({"id": "ln|%s" % r["sha256"], "ln_group": r["ln_group"], "key": r["key"], "image": r["image"],
+                      "boxes": boxes, "caption": ""})
+    return SH.write_bundle("ln_001", items, {"kind": "ln", "groups": {g: len(v) for g, v in groups.items()}})
+
+
+def bundle_mtw_v1():
+    """The MT-W check's bundles of test v1 without its SIU stratum (DS.10 item 4): per source min(60, all) seeded
+    images plus every image whose stored verifier verdicts flag a box."""
+    from . import ds1_sheets as SH
+    flags = verifier_flags()
+    made = []
+    for f in sorted((B3.out_dir() / B3.HOLDOUT_DIR).glob("*.jsonl")):
+        rows = read_jsonl(f)
+        if not rows or rows[0].get("source") == SIU:
+            continue
+        s = rows[0]["source"]
+        pick, whole = SH.mtw_sample(s, rows, [r["key"] for r in rows if flags.get(r["key"])])
+        items = [{"id": "mtw|%s|%s" % (s, r["key"]), "source": s, "key": r["key"], "image": r["image"],
+                  "boxes": [["weed"] + [float(x) for x in b[1:5]] for b in read_inc_label(r["label"])],
+                  "flagged": bool(flags.get(r["key"])), "caption": r["key"], "total": len(rows)} for r in pick]
+        made.append(SH.write_bundle("mtw_v1_%s" % slug(s), items, {"kind": "mtw", "part": "test_v1", "source": s,
+                                                                   "total": len(rows), "whole": whole}))
+    return made
+
+
+def bundle_mtw_v2(source, rows):
+    from . import ds1_sheets as SH
+    flags = verifier_flags()
+    pick, whole = SH.mtw_sample(source, rows, [r["key"] for r in rows if flags.get(r["key"])])
+    items = [{"id": "mtw|%s|%s" % (source, r["key"]), "source": source, "key": r["key"], "image": r["image"],
+              "boxes": [["weed"] + [float(x) for x in b] for b in r["boxes"]], "flagged": bool(flags.get(r["key"])),
+              "caption": r["key"], "total": len(rows)} for r in pick]
+    return SH.write_bundle("mtw_v2_%s" % slug(source), items, {"kind": "mtw", "part": "mtw_v2", "source": source,
+                                                                "total": len(rows), "whole": whole})
+
+
+def verifier_flags(inc_dir=None):
+    """{key: True} of the rows whose stored verifier verdicts (Step 1's admission records) flag a box: records,
+    never a model read of an exam image (DS.7.5)."""
+    from . import ds1_sheets as SH
+    inc = Path(inc_dir) if inc_dir else C.INC_DIR
+    out = {}
+    for d in sorted((inc / "step1_stream" / "batches").glob("b*")) if (inc / "step1_stream" / "batches").is_dir() \
+            else []:
+        for a in read_jsonl(d / "admission.jsonl"):
+            if any(v in SH.FLAG_VERDICTS for v in a.get("verdicts") or ()):
+                out[a["key"]] = True
+    return out
+
+
+def screen_revisions(phase):
+    return sorted((out_dir() / "screen").glob("p%d_r[0-9][0-9][0-9].json" % int(phase))) \
+        if (out_dir() / "screen").is_dir() else []
+
+
+def screened_keys(phase):
+    """The keys every screen revision of this phase and of every earlier phase covered."""
+    out = set()
+    for p in [x for ph in PHASES if ph <= int(phase) for x in screen_revisions(ph)]:
+        for r in read_jsonl(Path(str(p)[:-5] + "_candidates.jsonl")):
+            out.add(r["key"])
+    return out
+
+
+def screened_rows(phase):
+    out = []
+    for p in screen_revisions(phase):
+        out += read_jsonl(Path(str(p)[:-5] + "_candidates.jsonl"))
+    for r in out:
+        r["boxes"] = [tuple(b) for b in r.get("boxes") or ()]
+    return out
+
+
+def screen_records(phase):
+    out = {}
+    for p in screen_revisions(phase):
+        d = _read_json(p) or {}
+        for s, v in (d.get("sources") or {}).items():
+            out[s] = v
+    return out
+
+
+def source_ready(source, decisions, screen_rec):
+    """(ok, why) for a source's rows to enter a manifest (DS.0 item 4, DS.5.1 items 1 and 2): its sheet decided
+    accept or accept for training only (never reject), audited where the owner's audit applies, not quarantined
+    whole by the cwd12 guard, no unresolved unit it has boxes of left to the names round."""
+    d = decisions.get(source)
+    if not d:
+        return False, "sheet pending"
+    if d.get("decision") == "reject":
+        return False, "rejected"
+    if d.get("decision") not in ("accept", "accept_training_only"):
+        return False, "decision %r" % d.get("decision")
+    if d.get("audit_required") and not d.get("audited"):
+        return False, "owner audit pending"
+    if (screen_rec or {}).get("quarantine_whole"):
+        return False, "quarantined whole (a cwd12 dev or test guard hit, D28-v2)"
+    return True, ""
+
+
+def pools(phase, inputs, s0_rows=None, write=True):
+    """Step 'pools' (L30): for every screened source whose sheet is decided (and audited where required), the rows
+    through DS.5.1 items 2-10: roles, base3's rules, the model audit's masks, dedupe against base B and among
+    themselves, thin(10) (kept flags; KD reads the unthinned), the guard against the fixed exams (both
+    directions), EXIF, licence flags, the written files. Each source's pool is written once:
+    splits/ds1/pools/p<phase>/<source slug>.jsonl."""
+    rules, _conf = load_rules()
+    rows = screened_rows(phase)
+    srec = screen_records(phase)
+    ready = {}
+    for s in sorted({r["source"] for r in rows}):
+        ok, why = source_ready(s, inputs.decisions, srec.get(s))
+        ready[s] = (ok, why)
+    done = {p.stem for p in (out_dir() / "pools" / ("p%d" % int(phase))).glob("*.jsonl")} if write else set()
+    todo = [r for r in rows if ready.get(r["source"], (False,))[0] and slug(r["source"]) not in done]
+    ctx = eligibility_ctx(inputs)
+    counts = collections.defaultdict(collections.Counter)
+    live = []
+    for r in todo:
+        why = eligibility(r, ctx)
+        if why:
+            counts[r["source"]][why] += 1
+            continue
+        dec = inputs.decisions[r["source"]]
+        keep, species, dropped, unres = weed_boxes(r, dec.get("roles") or {})
+        if unres:
+            counts[r["source"]]["unresolved_class"] += 1
+            continue
+        r = dict(r, boxes=keep, species=species, dropped_boxes=dropped, drop=None, kind="ds1", mask=[],
+                 masked_area=0.0, family=inputs.families.get(r["source"]) or dec.get("family"),
+                 setting=dec.get("setting"), training_only=dec.get("decision") == "accept_training_only")
+        live.append(r)
+    hash_rows(live, hasher=inputs.hasher)
+    conv = apply_rules(live, rules)
+    # the model audit's masks for a partially labelled source (accept for training only)
+    for r in live:
+        if r.get("drop"):
+            continue
+        a = (srec.get(r["source"]) or {}).get("audit_verdict") or {}
+        if a.get("partial") and inputs.predict is not None:
+            extra = unlabelled_masks(r, inputs.predict)
+            if extra:
+                r["mask"] = list(r.get("mask") or []) + extra
+                r["masked_area"] = B3.masked_area(r["mask"], r["boxes"], r["W"], r["H"])
+                if r["masked_area"] > rules["image"]["max_masked_area"]:
+                    r["drop"] = "masked_over_50"
+    dd = dedupe(live, [_base_dd(k, v) for k, v in inputs.base_b.items()], rules["dedupe"])
+    s0_series = collections.defaultdict(list)
+    for k, v in inputs.base_b.items():
+        if v.get("source") == SIU:
+            vid, _e = siu_video(v.get("original_image") or k)
+            if vid:
+                s0_series[vid].append(v.get("dhash"))
+    th = thin_rows(live, s0_series)
+    kept = [r for r in live if not r.get("drop")]
+    fixed = {k: v for k, v in inputs.exams.items() if k != "ds1_exams"}
+    g = merge_hits(dhash_hits(kept, fixed), *[embed_hits(kept, sc, D.root() / "leak" / ("pools_p%d_%s.npz" % (
+        phase, name))) for name, sc in sorted(inputs.scanners.items())])
+    for r in kept:
+        if g.get(r["key"]):
+            r["drop"] = "guard"
+            r["guard_hits"] = g[r["key"]][:5]
+    for r in kept:
+        if r.get("drop"):
+            continue
+        why = exif_refusal(r, inputs.read_orientation)
+        if why:
+            r["drop"] = why
+    out = collections.defaultdict(list)
+    for r in live:
+        if r.get("drop"):
+            counts[r["source"]][r["drop"]] += 1
+            continue
+        if write:
+            materialise(r)
+            if r.get("drop"):
+                counts[r["source"]][r["drop"]] += 1
+                continue
+            r["label"], r["label_sha256"] = write_label(r["boxes"])
+        r["original_sha256"] = r.get("sha256")
+        out[r["source"]].append(r)
+    recs = {}
+    for s in sorted({r["source"] for r in todo}):
+        rs = out.get(s, [])
+        recs[s] = {"admitted": len(rs), "thinned": sum(1 for r in rs if r.get("thin")), "out": dict(counts[s]),
+                   "convention": conv.get(s), "counts": three_counts(rs)}
+        if write:
+            pd = out_dir() / "pools" / ("p%d" % int(phase))
+            sha = write_jsonl_once(pd / ("%s.jsonl" % slug(s)), [_pool_row(r) for r in sorted(rs, key=lambda r: r["key"])])
+            write_once(pd / ("%s.json" % slug(s)), {"format": FMT_POOL, "source": s, "phase": int(phase),
+                                                   "rows": len(rs), "sha256": sha, "record": recs[s],
+                                                   "written_utc": D._utc()})
+    doc = {"format": FMT_POOL, "phase": int(phase), "sources": recs, "dedupe": dd, "thin": {"series": len(th)},
+           "not_ready": {s: why for s, (ok, why) in ready.items() if not ok}, "written_utc": D._utc()}
+    return doc, out
+
+
+def _base_dd(k, v):
+    return {"key": k, "source": v.get("source"), "sha256": v.get("original_sha256"), "dhash": v.get("dhash"),
+            "variants": v.get("variants"), "boxes": v.get("_boxes") or [], "W": v.get("W"), "H": v.get("H"),
+            "bytes": None, "tier": 0}
+
+
+def _pool_row(r):
+    keep = ("key", "source", "pool", "image", "sha256", "original_sha256", "label", "label_sha256", "train_image",
+            "train_sha256", "session", "series", "eppo", "capture", "stem", "dhash", "variants", "thin", "species",
+            "licence", "research_only", "family", "setting", "training_only", "W", "H", "mask", "rel")
+    out = {k: r.get(k) for k in keep}
+    out["boxes"] = [list(b) for b in r["boxes"]]
+    out["mask"] = [list(b) for b in r.get("mask") or []]
+    return out
+
+
+def pool_rows(phase):
+    """{source: [rows]} of every written pool of a phase, an empty pool included (its record names its source; manifest
+    fields: image is the file trained on)."""
+    out = {}
+    d = out_dir() / "pools" / ("p%d" % int(phase))
+    for p in sorted(d.glob("*.jsonl")) if d.is_dir() else []:
+        rec = _read_json(p.with_suffix(".json")) or {}
+        rs = read_jsonl(p)
+        for r in rs:
+            r["boxes"] = [tuple(b) for b in r["boxes"]]
+            r["image"] = r.get("train_image") or r["image"]
+            r["sha256"] = r.get("train_sha256") or r["sha256"]
+        src = rec.get("source") or (rs[0]["source"] if rs else None)
+        if src:
+            out[src] = rs
+    return out
+
+
+def md_s0(inputs, power_rec=None, write=True):
+    """Step 'md_s0' (L30): MD-S0 drawn from base B's external sources (base_v2 and SIU excluded; test v1's
+    companions, evaluation groups and cwd12 copies never) by capture group, written as a draft in its own root for
+    the power pre-flight; then, once the power record of that draft exists, enlarged in the same order while its
+    MDE is over 0.02 (within the 30 % cap) or frozen (frozen.json, the never-train list). Never after its freeze."""
+    if frozen("md_s0"):
+        return {"status": "frozen", "frozen": frozen("md_s0")}
+    universe = {k: dict(v, key=k) for k, v in inputs.base_b.items()
+                if v.get("kind") != B3.BASE_KIND and v.get("source") != SIU and v.get("source") not in
+                inputs.eval_sources and not v.get("holdout_v1")}
+    rows = list(universe.values())
+    for r in rows:
+        r.setdefault("sha256", r.get("original_sha256"))
+        if r.get("capture_keys"):
+            r["capture"] = next((c[1] for c in r["capture_keys"] if c[0] == "capture"), None)
+            st = next((c for c in r["capture_keys"] if c[0] == "stem"), None)
+            if st:
+                r["stem"], r["family"] = st[2], st[1]
+    groups, digests = capture_groups(rows, inputs.links or ())
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[r["source"]].append(r)
+    drafts = sorted(exam_dir("md_s0").glob("draft_r[0-9][0-9][0-9]")) if exam_dir("md_s0").is_dir() else []
+    last = drafts[-1] if drafts else None
+    target = None
+    if last is not None:
+        prec = power_rec if power_rec is not None else _read_json(D.root() / "power" / ("%s.json" % last.name))
+        if not isinstance(prec, dict):
+            return {"status": "waiting for the power pre-flight of %s" % last.name}
+        md = prec.get("md_s0") or {}
+        if not md.get("enlarge"):
+            return _freeze_md_s0(last, prec, write)
+        prev = _read_json(last / "draw.json") or {}
+        factor = (float(md["mde"]) / D.MDE_MAX) ** 2
+        target = enlarge_targets(prev.get("per_source") or {}, factor)
+        if all(target[s] <= (prev["per_source"][s]["md_images"]) for s in target):
+            return _freeze_md_s0(last, prec, write, capped=True)
+    draw = draw_exams(by, groups, digests, {s: len(v) for s, v in by.items()}, new_sources=(),
+                      md_target=target)
+    keys = [r["key"] for s in sorted(by) for r in by[s] if groups[r["key"]] in set(draw[s]["md"])]
+    rev = len(drafts) + 1
+    d = exam_dir("md_s0") / ("draft_r%03d" % rev)
+    md_rows = []
+    for k in sorted(keys):
+        v = universe[k]
+        md_rows.append({"key": k, "image": v["image"], "label": v["label"], "sha256": v["sha256"],
+                        "label_sha256": v["label_sha256"], "source": v["source"], "session": "", "group": groups[k],
+                        "original_sha256": v.get("original_sha256"), "dhash": v.get("dhash"),
+                        "variants": v.get("variants"), "capture": v.get("capture"), "stem": v.get("stem"),
+                        "family": v.get("family"), "train_sha256": v.get("sha256")})
+    doc = {"format": FMT_EXAM, "exam": "md_s0", "revision": rev, "images": len(md_rows),
+           "groups": len({r["group"] for r in md_rows}), "per_source": {s: {k: v for k, v in x.items()
+                                                                              if k not in ("md", "mtw")}
+                                                                        for s, x in draw.items()},
+           "groups_by_source": {s: x["md"] for s, x in draw.items()}, "enlarged_from": last.name if last else None,
+           "target": target, "written_utc": D._utc()}
+    if write:
+        rr = write_exam_root("md_s0", md_rows, d / "root", groups)
+        doc["root"] = rr
+        write_once(d / "draw.json", json.loads(json.dumps(doc, default=str)))
+        write_jsonl_once(d / "groups.jsonl", [{"exam": "md_s0", "key": r["key"], "group": r["group"]}
+                                               for r in md_rows])
+        write_jsonl_once(d / "rows.jsonl", md_rows)
+    return dict(doc, status="drawn")
+
+
+def _freeze_md_s0(draft, prec, write, capped=False):
+    doc = _read_json(draft / "draw.json") or {}
+    rows = read_jsonl(draft / "rows.jsonl")
+    groups = {r["key"]: r["group"] for r in rows}
+    if not write:
+        return {"status": "would freeze", "draft": draft.name}
+    rec = freeze_record("md_s0", doc["root"], {"draft": draft.name, "power_mde": (prec.get("md_s0") or {}).get("mde"),
+                                                "enlargement_capped": capped})
+    if capped and not D.capacity("ds1_power.json").exists():
+        # the MDE stayed over 0.02 with every source at its 30 % cap: the last draft's power record is the final one
+        D.write_once(D.capacity("ds1_power.json"), dict(prec, enlargement_capped=True))
+    append_never_train(rows, "md_s0", groups)
+    _append_groups("md_s0", rows)
+    return {"status": "frozen", "frozen": rec}
+
+
+def _append_groups(exam, rows):
+    p = out_dir() / "md_v1" / "groups.jsonl"
+    have = {(r["exam"], r["key"]) for r in read_jsonl(p)}
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "a") as fh:
+        for r in rows:
+            if (exam, r["key"]) not in have:
+                fh.write(json.dumps({"exam": exam, "key": r["key"], "group": r["group"]}, sort_keys=True) + "\n")
+
+
+def draw(phase, inputs, checks=None, write=True):
+    """Step 'draw' (L30): MD-N and MT-W v2 for every new non-SIU source decided 'accept' (never 'accept for
+    training only'), audited where required, whose pool is written: capture groups over its thinned rows, the draw
+    in the source's order; MD-N frozen at once (its own root and LOCK), MT-W v2 written as a draft and frozen only
+    after the person's check (checks {source: the recorded check}); every drawn row enters the never-train list."""
+    pr = pool_rows(phase)
+    out = {}
+    for s, rows in sorted(pr.items()):
+        dec = inputs.decisions.get(s) or {}
+        if s == SIU or dec.get("decision") != "accept":
+            out[s] = {"status": "not drawn (%s)" % ("SIU" if s == SIU else dec.get("decision"))}
+            continue
+        mdn, mtw = mdn_exam(s), mtw_exam(s)
+        if frozen(mdn) and (frozen(mtw) or not (exam_dir(mtw) / "draft").is_dir()):
+            out[s] = {"status": "frozen"}
+            continue
+        thin_rows_ = [r for r in rows if r.get("thin")]
+        if not thin_rows_:
+            # an empty pool (every row dropped by a rule): nothing to draw; recorded so, an empty MD-N, no MT-W v2
+            if write and not frozen(mdn):
+                write_once(exam_dir(mdn) / "frozen.json", {"format": FMT_EXAM, "exam": mdn, "frozen": True,
+                                                           "images": 0, "root": None, "source": s,
+                                                           "frozen_utc": D._utc()})
+            out[s] = {"status": "frozen (empty pool)"}
+            continue
+        groups, digests = capture_groups(thin_rows_, inputs.links or ())
+        d = draw_exams({s: thin_rows_}, groups, digests, {s: len(rows)}, new_sources={s})[s]
+        md_keys = {r["key"] for r in thin_rows_ if groups[r["key"]] in set(d["md"])}
+        mt_keys = {r["key"] for r in thin_rows_ if groups[r["key"]] in set(d["mtw"])}
+        rec = {"md": len(md_keys), "mtw": len(mt_keys), "groups": len(set(groups.values())), "draw": d}
+        if write and not frozen(mdn):
+            mrows = [dict(r, group=groups[r["key"]]) for r in thin_rows_ if r["key"] in md_keys]
+            if mrows:
+                rr = write_exam_root(mdn, mrows, exam_dir(mdn) / "root", groups)
+                freeze_record(mdn, rr, {"source": s})
+                append_never_train(mrows, mdn, groups)
+                _append_groups(mdn, mrows)
+            else:
+                # a source with no group to draw (every group over 500 images or past the 30 % cap): recorded so,
+                # an empty exam that no arm is scored on
+                write_once(exam_dir(mdn) / "frozen.json", {"format": FMT_EXAM, "exam": mdn, "frozen": True,
+                                                           "images": 0, "root": None, "source": s,
+                                                           "frozen_utc": D._utc()})
+            rec["md_status"] = "frozen"
+        if write and not (exam_dir(mtw) / "draft").is_dir():
+            trows = [dict(r, group=groups[r["key"]]) for r in thin_rows_ if r["key"] in mt_keys]
+            if trows:
+                write_jsonl_once(exam_dir(mtw) / "draft" / "rows.jsonl", trows)
+                append_never_train(trows, mtw, groups)
+                bundle_mtw_v2(s, trows)
+            rec["mtw_status"] = "draft (waits for the person's check)"
+        chk = (checks or {}).get(s)
+        if write and chk and chk.get("verdict") == "fail" and not (exam_dir(mtw) / "left.json").is_file():
+            # DS.10 item 4: a failing source leaves MT-W unless a person checks it image by image; its rows stay
+            # never-train (they are on the list since the draw)
+            write_once(exam_dir(mtw) / "left.json", {"format": FMT_EXAM, "exam": mtw, "left": True, "source": s,
+                                                     "check": chk.get("sha256"), "written_utc": D._utc()})
+            rec["mtw_status"] = "left MT-W (the check failed); its rows stay never-train"
+        if write and chk and chk.get("verdict") == "pass" and not frozen(mtw) and (exam_dir(mtw) / "draft").is_dir():
+            trows = read_jsonl(exam_dir(mtw) / "draft" / "rows.jsonl")
+            for r in trows:
+                if (chk.get("corrected_labels") or {}).get(r["key"]):
+                    r["label"], r["label_sha256"] = write_label([tuple(b) for b in chk["corrected_labels"][r["key"]]])
+            rr = write_exam_root("mtw_v2", trows, exam_dir(mtw) / "root", {r["key"]: r["group"] for r in trows})
+            freeze_record(mtw, rr, {"source": s, "check": chk.get("sha256")})
+            rec["mtw_status"] = "frozen"
+        out[s] = rec
+    if write and int(phase) == 1:
+        out["mtw_v1_1"] = freeze_mtw_v1_1(checks or {})
+    return out
+
+
+def freeze_mtw_v1_1(checks):
+    """MT-W v1.1 (DS.4): once every test v1 source but SIU has a recorded check, test v1's labels the person
+    corrected are frozen in their own root and LOCK (test v1's own files never change); a failing source leaves
+    MT-W (listed; its rows stay never-train). Written once."""
+    d = out_dir() / "mtw_v1_1"
+    if (d / "status.json").is_file():
+        return _read_json(d / "status.json")
+    files = sorted((B3.out_dir() / B3.HOLDOUT_DIR).glob("*.jsonl"))
+    srcs = {}
+    for f in files:
+        rows = read_jsonl(f)
+        if rows and rows[0].get("source") != SIU:
+            srcs[rows[0]["source"]] = rows
+    if not srcs or any(s not in checks for s in srcs):
+        return {"status": "waiting for the MT-W check of %s" % sorted(s for s in srcs if s not in checks)}
+    left = sorted(s for s in srcs if checks[s].get("verdict") != "pass")
+    corrected = {k: v for s in srcs for k, v in (checks[s].get("corrected_labels") or {}).items()}
+    rec = {"format": FMT_EXAM, "exam": "mtw_v1_1", "left_mtw": left, "corrections": len(corrected),
+           "checks": {s: checks[s].get("sha256") for s in srcs}, "written_utc": D._utc()}
+    if corrected:
+        rows = []
+        for s, rs in sorted(srcs.items()):
+            if s in left:
+                continue
+            for r in rs:
+                if r["key"] in corrected:
+                    lab, lsha = write_label([tuple(b) for b in corrected[r["key"]]])
+                    r = dict(r, label=lab, label_sha256=lsha)
+                rows.append(dict({k: r.get(k) for k in C.MANIFEST_KEYS}, session=r.get("session") or ""))
+        rec["root"] = write_exam_root("mtw_v2", rows, d / "root", {r["key"]: r["key"] for r in rows})
+    write_once(d / "status.json", rec)
+    return rec
+
+
+def b_prime_o(inputs, md_rows, exam_rows, write=True):
+    """B'o (DS.5.2, DS.0 item 16): D1's B' minus MD-S0's groups (every row sharing a capture relation with an MD-S0
+    row), base_v2's 66 NDSU rows and the guard's hits in both directions (base_v2's rows that the detector flags
+    against cwd12 dev or test are kept and listed, as V3F did); the rows of B' as they are, bytes unchanged."""
+    bp = inputs.bprime
+    prov = inputs.base_b
+    rows = []
+    for k, r in bp.items():
+        p = prov.get(k) or {}
+        rows.append(dict(r, original_sha256=p.get("original_sha256"), dhash=p.get("dhash"),
+                         variants=p.get("variants"), group=p.get("group"), capture=next(
+                             (c[1] for c in p.get("capture_keys") or () if c[0] == "capture"), None),
+                         stem=next((c[2] for c in p.get("capture_keys") or () if c[0] == "stem"), None),
+                         family=next((c[1] for c in p.get("capture_keys") or () if c[0] == "stem"), None),
+                         kind_b=p.get("kind")))
+    md_keys = {r["key"] for r in md_rows}
+    gh = group_hits(rows, exam_rows)
+    fixed = {k: v for k, v in inputs.exams.items()}
+    dh = dhash_hits(rows, fixed)
+    eh = merge_hits(*[embed_hits(rows, sc, D.root() / "leak" / ("bprime_%s.npz" % n))
+                      for n, sc in sorted(inputs.scanners.items())])
+    kept, out, listed = [], collections.Counter(), {}
+    for r in rows:
+        if r["key"] in md_keys:
+            out["md_s0"] += 1
+            continue
+        if r["key"] in inputs.ndsu_keys:
+            out["ndsu"] += 1
+            continue
+        if gh.get(r["key"]):
+            out["capture_md_mtw"] += 1
+            continue
+        hits = dh.get(r["key"], []) + eh.get(r["key"], [])
+        if hits:
+            if r.get("kind_b") == B3.BASE_KIND and all(h["exam"] in ("dev", "test") for h in hits):
+                listed[r["key"]] = hits[:5]
+            else:
+                out["guard"] += 1
+                continue
+        kept.append(r)
+    return kept, {"removed": dict(out), "base_v2_kept_with_hits": listed, "rows": len(kept)}
+
+
+def manifests(phase, inputs, write=True, on_date=None):
+    """Step 'manifests' (L30): every arm whose conditions hold and whose manifest is not written: S0 and KF once
+    MD-S0 is frozen; KD and KT once SIU's species-role table is decided and audited; S1c, S1c-R and S1u once every
+    phase-1 source with candidates is decided and frozen; S2 in phase 2. Each written once (row bytes of every
+    smaller manifest unchanged in the larger ones)."""
+    if not frozen("md_s0"):
+        return {"status": "MD-S0 is not frozen: no manifest is built before it (DS.5.4)"}
+    md_rows = read_jsonl(Path(frozen("md_s0")["root"]).parent / "rows.jsonl")
+    exam_rows = never_train_rows()
+    built = {}
+    if not arm_record_path("S0").is_file():
+        s0, rec = b_prime_o(inputs, md_rows, exam_rows, write)
+        if write:
+            built["S0"] = write_arm("S0", s0, {"b_prime_o": rec})
+    s0_rows, s0_rec = arm_rows("S0") if arm_record_path("S0").is_file() else ([], None)
+    if not s0_rows:
+        return {"status": "S0 not built"}
+    s0_keys = {r["key"] for r in s0_rows}
+    tc_rows = [r for r in s0_rows if r["key"] in inputs.tc_keys]
+    c = len(tc_rows)
+    n_s0 = len(s0_rows)
+    # the K arms (base A plus N_K rows each; DS.5.3): KF from base B's thinned Field and Turf external rows (outside
+    # MD-S0, test v1 and its companions), KD and KT from SIU's frames once its table is decided and audited; N_K =
+    # min(15,000, each K pool's supply), the same in every K arm: KF records it, KD and KT take it or are not built
+    pr = pool_rows(1)
+    siu = [r for r in pr.get(SIU, [])]
+    md_keys = {r["key"] for r in md_rows}
+    companions = {str(r.get("key")) for r in B3.prior_test_lists()[0]} if inputs.production else set()
+    kf_rows = []
+    for k, v in inputs.base_b.items():
+        if inputs.setting.get(k) in ("Field", "Turf") and v.get("kind") != B3.BASE_KIND and k not in md_keys \
+                and k not in companions and k in inputs.base_b_man:
+            kf_rows.append(dict(inputs.base_b_man[k], series=None, thin=True))
+    siu_dec = inputs.decisions.get(SIU) or {}
+    siu_ready = source_ready(SIU, inputs.decisions, screen_records(1).get(SIU))[0]
+    crop = tuple(u[5:] for u, role in (siu_dec.get("roles") or {}).items() if u.startswith("eppo:") and role != "weed")
+    kpools, t, n_k = k_pools(siu if siu_ready else [], kf_rows, crop)
+    base_a = [dict(v, key=k) for k, v in inputs.base_a.items()]
+    if write and not arm_record_path("KF").is_file() and kf_rows:
+        nk_f = min(N_K_MAX, kpools["supplies"]["KF"]) if not siu_ready else n_k
+        built["KF"] = write_arm("KF", base_a + [_man(r) for r in kf_draw(kpools, nk_f)],
+                                {"n_k": nk_f, "pool": "base B Field and Turf, thinned", "supplies": kpools["supplies"]})
+    if write and siu_ready and arm_record_path("KF").is_file():
+        nk = int((_read_json(arm_record_path("KF")) or {}).get("n_k") or 0)
+        short = {a: v for a, v in kpools["supplies"].items() if a in ("KD", "KT") and v < nk}
+        if short:
+            why = "not run (supply under N_K %d: %s): N_K is the same in every K arm" % (nk, short)
+            built["k_waits"] = why
+            if not (out_dir() / "arms" / "k_not_run.json").is_file():
+                write_once(out_dir() / "arms" / "k_not_run.json", {"format": FMT_ARM, "arms": ["KD", "KT"],
+                                                                   "status": why, "written_utc": D._utc()})
+        else:
+            tt = min(t, nk)
+            if not arm_record_path("KD").is_file():
+                built["KD"] = write_arm("KD", base_a + [_man(r) for r in kd_draw(kpools, tt, nk)],
+                                        {"n_k": nk, "t": tt, "supplies": kpools["supplies"]})
+            if not arm_record_path("KT").is_file():
+                built["KT"] = write_arm("KT", base_a + [_man(r) for r in kt_draw(kpools, tt, nk)],
+                                        {"n_k": nk, "t": tt, "supplies": kpools["supplies"]})
+    # the S arms of phase 1
+    pending = [s for s, v in screen_records(1).items() if v.get("live") and not v.get("quarantine_whole")
+               and not source_ready(s, inputs.decisions, v)[0]
+               and (inputs.decisions.get(s) or {}).get("decision") != "reject"]
+    unfrozen = [s for s, v in pool_rows(1).items() if s != SIU and (inputs.decisions.get(s) or {}).get(
+        "decision") == "accept" and not frozen(mdn_exam(s))]
+    if pending or unfrozen:
+        built["phase1_waits"] = {"sheets": sorted(pending), "md_n": sorted(unfrozen)}
+    elif write and not arm_record_path("S1U").is_file():
+        new = guard_new(_phase_rows(pr, md_keys, exam_rows, s0_keys), inputs)
+        siu_new = [r for r in new if r["source"] == SIU and r.get("thin")]
+        other = [r for r in new if r["source"] != SIU and r.get("thin")]
+        n_u = n_s0 + len(siu_new) + len(other)
+        s1u = s0_rows + [_man(r) for r in siu_new + other]
+        siu_base = sum(1 for r in s0_rows if r["source"] == SIU)
+        kept, dropped, crec = family_cap(siu_new, siu_base, len(s0_rows) - siu_base + len(other), SIU_FAMILY)
+        s1c = s0_rows + [_man(r) for r in kept + other]
+        r_c, r_u = floor_repeats(len(s1c), n_s0, c), floor_repeats(len(s1u), n_s0, c)
+        s1c_full = s1c + repeat_rows(tc_rows, r_c)
+        s1u_full = s1u + repeat_rows(tc_rows, r_u)
+        s1cr = s1cr_draw(s1c, n_s0, inputs.tc_keys)
+        if not nested_ok({json.dumps(r, sort_keys=True) for r in s0_rows},
+                         {json.dumps(_man(r), sort_keys=True) for r in s1c_full}):
+            raise DataRefused("S1c does not hold every S0 row byte for byte")
+        built["S1C"] = write_arm("S1C", s1c_full, {"repeats": r_c, "family_cap": crec, "dropped_videos": dropped})
+        built["S1U"] = write_arm("S1U", s1u_full, {"repeats": r_u})
+        built["S1CR"] = write_arm("S1CR", s1cr, {"repeats": 1, "of": "S1C"})
+    if int(phase) == 2 and write and not arm_record_path("S2").is_file() and arm_record_path("S1C").is_file():
+        p2 = pool_rows(2)
+        p2_pending = [s for s, v in screen_records(2).items() if v.get("live") and not v.get("quarantine_whole")
+                      and not source_ready(s, inputs.decisions, v)[0]
+                      and (inputs.decisions.get(s) or {}).get("decision") != "reject"]
+        p2_unfrozen = [s for s in p2 if (inputs.decisions.get(s) or {}).get("decision") == "accept"
+                       and not frozen(mdn_exam(s))]
+        if p2_pending or p2_unfrozen:
+            built["phase2_waits"] = {"sheets": sorted(p2_pending), "md_n": sorted(p2_unfrozen)}
+        else:
+            s1c_rows, _r = arm_rows("S1C")
+            s1c_base = [r for r in s1c_rows if "__r" not in r["key"]]
+            new = guard_new(_phase_rows(p2, md_keys, exam_rows, {r["key"] for r in s1c_base}), inputs)
+            fams = collections.defaultdict(list)
+            for r in new:
+                if r.get("thin"):
+                    fams[inputs.families.get(r["source"]) or r["source"]].append(r)
+            rows2 = list(s1c_base)
+            caps = {}
+            for fam in sorted(fams):
+                members = fams[fam]
+                base = sum(1 for r in rows2 if (inputs.families.get(r["source"]) or r["source"]) == fam)
+                if fam in (SIU_FAMILY, "mfwd", "dock"):
+                    kept, dropped, rec = family_cap(members, base, len(rows2) - base + sum(
+                        len(v) for f, v in fams.items() if f != fam), fam)
+                    caps[fam] = rec
+                else:
+                    kept = members
+                rows2 += [_man(r) for r in kept]
+            r2 = floor_repeats(len(rows2), n_s0, c)
+            built["S2"] = write_arm("S2", rows2 + repeat_rows(tc_rows, r2), {"repeats": r2, "family_caps": caps})
+    return built
+
+
+def _phase_rows(pr, md_keys, exam_rows, already):
+    """A phase's admitted pool rows minus every MD and MT-W row, every row sharing a capture relation with one,
+    and rows a smaller manifest holds already."""
+    flat = [dict(r) for s, rs in sorted(pr.items()) for r in rs]
+    gh = group_hits(flat, exam_rows)
+    ex_keys = {r["key"] for r in exam_rows}
+    return [r for r in flat if r["key"] not in ex_keys and r["key"] not in md_keys and not gh.get(r["key"])
+            and r["key"] not in already]
+
+
+def guard_new(rows, inputs):
+    """The pools' rows against MD v1 and MT-W v2 (drawn after the pools' guard ran), both directions: the 8-variant
+    6-bit dHash and the calibrated DINOv2 detector (DS1's own index); a hit is dropped (DS.5.1 item 7)."""
+    ex = {k: v for k, v in inputs.exams.items() if k == "ds1_exams"}
+    hits = merge_hits(dhash_hits(rows, ex) if ex else {},
+                      embed_hits(rows, inputs.scanners.get("own"), D.root() / "leak" / "new_rows_own.npz")
+                      if inputs.scanners.get("own") else {})
+    return [r for r in rows if not hits.get(r["key"])]
+
+
+def _man(r):
+    return {k: r[k] for k in C.MANIFEST_KEYS} if all(k in r for k in C.MANIFEST_KEYS) else \
+        {"image": r.get("train_image") or r["image"], "label": r["label"], "sha256": r.get("train_sha256") or
+         r["sha256"], "label_sha256": r["label_sha256"], "source": r["source"], "session": r.get("session") or "",
+         "key": r["key"]}
+
+
+# ------------------------------------------------------------------ what the platform reads (no image opened)
+def plan_state(inc_dir=None):
+    """DS1's data state for the platform's gate and plan (stream_remote.ds1_status; read-only, cheap): per phase the
+    screens and whether a Step 1 batch came since the last one, each screened source's sheet, audit, pool, MD-N
+    and MT-W v2 states, MD-S0's drafts, power and freeze, the arms built (their images and loader projections),
+    the sheets' bundles and renders, the MT-W checks and the LN record."""
+    from . import ds1_sheets as SH
+    inc = Path(inc_dir) if inc_dir else C.INC_DIR
+    decs = SH.fold(inc)
+    checks = SH.mtw_checks(inc)
+    batches = set(step1_batches(inc))
+    out = {"phases": {}, "md_s0": {}, "arms": {}, "sheets": {}, "checks": {s: v.get("verdict") for s, v in
+                                                                            checks.items()}}
+    for ph in PHASES:
+        revs = screen_revisions(ph)
+        seen = set(((_read_json(revs[-1]) or {}).get("inputs") or {}).get("step1_batches") or []) if revs else set()
+        srcs = {}
+        for s, v in screen_records(ph).items():
+            if not v.get("live"):
+                continue
+            dec = decs.get(s) or {}
+            ok, why = source_ready(s, decs, v)
+            srcs[s] = {"decided": bool(dec.get("decision")), "decision": dec.get("decision"),
+                       "audit_required": bool(dec.get("audit_required")), "audited": bool(dec.get("audited")),
+                       "ready": ok, "why": why, "pooled": (out_dir() / "pools" / ("p%d" % ph) / ("%s.jsonl" % slug(s)))
+                       .is_file(), "md_n": bool(frozen(mdn_exam(s))), "mtw_draft": (exam_dir(mtw_exam(s)) / "draft")
+                       .is_dir(), "mtw": bool(frozen(mtw_exam(s))) or (exam_dir(mtw_exam(s)) / "left.json").is_file(),
+                       "checked": s in checks,
+                       "quarantined_whole": bool(v.get("quarantine_whole"))}
+        out["phases"][str(ph)] = {"revisions": len(revs), "new_batches": len(batches - seen) if revs else None,
+                                  "sources": srcs}
+    drafts = sorted(exam_dir("md_s0").glob("draft_r[0-9][0-9][0-9]")) if exam_dir("md_s0").is_dir() else []
+    last = drafts[-1].name if drafts else None
+    pw = _read_json(D.root() / "power" / ("%s.json" % last)) if last else None
+    out["md_s0"] = {"drafts": len(drafts), "draft": last, "power": isinstance(pw, dict),
+                    "enlarge": bool(((pw or {}).get("md_s0") or {}).get("enlarge")) if isinstance(pw, dict) else None,
+                    "frozen": bool(frozen("md_s0"))}
+    for a in D.BUILD_ARMS:
+        r = _read_json(arm_record_path(a))
+        if isinstance(r, dict):
+            out["arms"][a] = {"images": r.get("images"), "sha256": r.get("sha256"),
+                              "over_line": bool((r.get("loader_projection") or {}).get("over_line"))}
+    bdir = SH.sheets_dir(inc) / "bundles"
+    names = sorted(p.name for p in bdir.iterdir() if p.is_dir() and (p / "bundle.json").is_file()) \
+        if bdir.is_dir() else []
+    rendered = sorted(p.stem for p in (SH.sheets_dir(inc) / "rendered").glob("*.json")) \
+        if (SH.sheets_dir(inc) / "rendered").is_dir() else []
+    src_b = [n for n in names if n.startswith("source_")]
+    out["sheets"] = {"source_batches": len(SH.source_chunks(src_b)),
+                     "ln_batches": len([n for n in names if n.startswith("ln_")]),
+                     "mtw_batches": len([n for n in names if n.startswith("mtw_")]),
+                     "rendered": rendered, "audit_pending": SH.audit_sources(decs),
+                     "ln_recorded": bool(SH.ln_marks(inc))}
+    out["mtw_v1_1"] = (_read_json(out_dir() / "mtw_v1_1" / "status.json") or {}).get("format") is not None
+    out["k_not_run"] = (out_dir() / "arms" / "k_not_run.json").is_file()
+    out["ra"] = isinstance(_read_json(D.capacity("ds1_ra_gate.json")), dict)
+    out["power_final"] = isinstance(_read_json(D.capacity("ds1_power.json")), dict)
+    return out
+
+
+# ------------------------------------------------------------------ the summary (the index the snapshot ships)
+def write_summary(extra=None):
+    """splits/ds1/summary.json (rewritten atomically by every step): the arms built (manifest sha256, images, the
+    three counts, the recipe), the exams frozen, each phase's screens and pools, the steps' states. The platform's
+    evidence reads it (DS.9.4)."""
+    arms = {}
+    for a in D.BUILD_ARMS:
+        r = _read_json(arm_record_path(a))
+        if isinstance(r, dict):
+            arms[a] = {k: r.get(k) for k in ("manifest", "sha256", "images", "rows_before_repeats", "counts",
+                                             "permissive_only_rows", "research_only")}
+            arms[a]["loader_projection_h"] = r.get("loader_projection_h")
+    exams = {}
+    for p in sorted(out_dir().glob("*/*/frozen.json")) if out_dir().is_dir() else []:
+        d = _read_json(p) or {}
+        exams[d.get("exam")] = {k: d.get(k) for k in ("lock_sha256", "images", "groups", "frozen_utc")}
+    drafts = {}
+    for p in sorted(out_dir().glob("mtw_v2/*/draft/rows.jsonl")) if out_dir().is_dir() else []:
+        drafts[p.parent.parent.name] = len(read_jsonl(p))
+    doc = {"format": FORMAT, "status": "index", "arms": arms, "exams": exams, "mtw_v2_drafts": drafts,
+           "screens": {"p%d" % ph: len(screen_revisions(ph)) for ph in PHASES},
+           "pools": {"p%d" % ph: len(pool_rows(ph)) for ph in PHASES}, "md_s0_frozen": bool(frozen("md_s0")),
+           "never_train_rows": len(never_train_rows()), "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
+    doc.update(extra or {})
+    C2.write_json_atomic(summary_path(), json.loads(json.dumps(doc, default=str)))
+    return doc
+
+
+def read_summary():
+    d = _read_json(summary_path())
+    return d if isinstance(d, dict) and d.get("format") == FORMAT else None
+
+
+# ------------------------------------------------------------------ the build verb and the rehearsal
+def build(phase, step, procs=5, embedder=None, inputs=None):
+    """L30: one step of one phase, the E-series and V3F trees unchanged around it."""
+    if step not in STEPS or int(phase) not in PHASES:
+        raise DataRefused("build --phase 1|2 --step %s, not %s %s" % ("|".join(STEPS), phase, step))
+    D.check_frozen()
+    D.require_timestamp()
+    with D.trees_unchanged():
+        inputs = inputs or load_inputs(phase, procs=procs, embedder=embedder)
+        if step == "screen":
+            got = screen(phase, inputs)
+        elif step == "md_s0":
+            got = md_s0(inputs)
+        elif step == "pools":
+            got = pools(phase, inputs)[0]
+        elif step == "draw":
+            from . import ds1_sheets as SH
+            got = draw(phase, inputs, checks=SH.mtw_checks())
+        else:
+            got = manifests(phase, inputs)
+        write_summary({"last_step": {"phase": int(phase), "step": step, "utc": D._utc()}})
+    log("phase %s step %s: %s" % (phase, step, json.dumps(got, default=str)[:600]))
+    return got
+
+
+def rehearse(phase, out=None):
+    """The read-only rehearsal (DS.9.5) on the login node: every pool's counts (images, distinct photos, capture
+    groups) and the role C screen's hits per source, from the files as they are; writes nothing under INC_DIR."""
+    t0 = time.time()
+    summ = B3.read_summary()
+    pf = summ["files"]["provenance"]
+    base_b = {r["key"]: r for r in read_jsonl(B3.out_dir() / pf["file"]) if "B" in (r.get("arms") or [])}
+    cands = load_candidates(phase, base_b)
+    ctx = {"base_keys": set(base_b), "base_shas": {r.get("original_sha256") for r in base_b.values()},
+           "eval_sources": {s for g in (load_rules()[1].get("evaluation_groups") or {}).get("groups", {}).values()
+                            for s in g}, "quarantined": stream_quarantined(), "never": domain_never()}
+    per = collections.defaultdict(lambda: collections.Counter())
+    live = collections.defaultdict(list)
+    for r in cands:
+        why = eligibility(r, ctx)
+        per[r["source"]][why or "candidate"] += 1
+        if not why:
+            live[r["source"]].append(r)
+    rec = {}
+    for s, c in sorted(per.items()):
+        rs = live.get(s, [])
+        units = collections.Counter(unit_of(r, b[0]) for r in rs for b in r["boxes"])
+        rec[s] = {"counts": dict(c), "live": three_counts(rs), "units": dict(units),
+                  "capture_names": len(capture_name_hits([r.get("rel") or r["key"] for r in rs])),
+                  "series": len({r.get("series") for r in rs if r.get("series")})}
+    doc = {"format": "inc2-ds1-rehearsal/1", "phase": int(phase), "candidates": len(cands),
+           "live": sum(len(v) for v in live.values()), "sources": rec, "seconds": round(time.time() - t0, 1),
+           "base_b_rows": len(base_b), "written_utc": D._utc(), "writes_nothing_under_inc_dir": True}
+    if out:
+        Path(out).write_text(json.dumps(doc, indent=1, sort_keys=True, default=str))
+    return doc
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="DS1's data builds (L30).")
+    ap.add_argument("command", choices=("build", "rehearse", "status"))
+    ap.add_argument("--phase", type=int, choices=PHASES, default=1)
+    ap.add_argument("--step", choices=STEPS, default=None)
+    ap.add_argument("--procs", type=int, default=5)
+    ap.add_argument("--out", default=None)
+    a = ap.parse_args(argv)
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("YOLO_OFFLINE", "true")
+    try:
+        if a.command == "build":
+            if not a.step:
+                raise DataRefused("build needs --step %s" % "|".join(STEPS))
+            build(a.phase, a.step, procs=a.procs)
+        elif a.command == "rehearse":
+            doc = rehearse(a.phase, a.out)
+            print(json.dumps({k: doc[k] for k in ("phase", "candidates", "live", "seconds")}))
+        else:
+            print(json.dumps(read_summary(), indent=1, sort_keys=True))
+    except (D.Ds1Refused, C2.Inc2Error, B3.Base3Error, ValueError) as e:
+        print("[inc2.ds1_data] ERROR: %s" % e, file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,418 @@
+{
+ "arm": {
+  "gflops": 68.24,
+  "gflops_at_640": 68.24,
+  "id": "m640",
+  "imgsz": 640,
+  "model": "yolo11m.pt",
+  "weights_sha256": "d5ffc1a674953a08e11a8d21e022781b1b23a19b730afc309290bd9fb5305b95"
+ },
+ "blocked": {},
+ "chains": {
+  "r0": {
+   "accepted": [],
+   "final_incumbent": "base__s0",
+   "neutral": [
+    "inc0005"
+   ],
+   "phase": "done",
+   "quarantined": [],
+   "recipe": {
+    "batch": 32,
+    "cache": "ram",
+    "close_mosaic": 10,
+    "cos_lr": true,
+    "deterministic": true,
+    "epochs": 30,
+    "freeze": null,
+    "imgsz": 640,
+    "lora": null,
+    "lr0": 0.002,
+    "lrf": 0.01,
+    "momentum": 0.937,
+    "optimizer": "SGD",
+    "trainer": "full",
+    "warmup_bias_lr": 0.002,
+    "warmup_epochs": 1,
+    "weight_decay": 0.0005,
+    "workers": 5
+   }
+  }
+ },
+ "code": {
+  "modules": {
+   "tools/cwd12_species.py": "a7b7efbb1ce88e5dde599d2626a605a64f2324dfa4fb9e2f90255f338241d54e",
+   "tools/inc/__init__.py": "cd6ec55a96ee27cf52f44a0031a395753fbf1b6866fc7d1bde620004d08c5c74",
+   "tools/inc/common.py": "6ba51dbea379d5229b8c368ca5c8a8e3b81d015e153ef4d55ab94475e55e7d8d",
+   "tools/inc/driver.py": "6e9aad4be85efcb554b208b4c4813ee8528231fadb2bdbf1e1a39dd68c09bd1c",
+   "tools/inc/gate.py": "48feed381afa6db92a639fa9409574bf19e2a733dab093d2f3a2ca754ce50546",
+   "tools/inc/splits.py": "79bd12f270a6a38f1ca186985576e177cd9ef6cdc02e249a754fb62d82dfa567"
+  },
+  "package_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/weed_optimizer_framework",
+  "pinned_utc": "2026-10-27T11:38:59Z",
+  "reason": "init"
+ },
+ "done": true,
+ "done_utc": "2026-10-27T16:39:36Z",
+ "exams": [
+  "dev",
+  "imageweeds"
+ ],
+ "exp": "weed_stream_v1_fork1364_s002",
+ "final": [
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8749627814161632,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.8628357817592233,
+      "n": 1,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.10511832442042915,
+      "n": 1,
+      "sd": null
+     },
+     "twelve": {
+      "mean": 0.050601179488396875,
+      "n": 1,
+      "sd": null
+     }
+    }
+   },
+   "model": "chain r0: final incumbent",
+   "runs": [
+    "final__r0__incumbent"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": 0.8728524513558197,
+      "n": 3,
+      "sd": 0.006150536054079184
+     },
+     "twelve": {
+      "mean": 0.8627413966486518,
+      "n": 3,
+      "sd": 0.007560804941384908
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": 0.11734762572537032,
+      "n": 3,
+      "sd": 0.011305614370049104
+     },
+     "twelve": {
+      "mean": 0.06311961613917359,
+      "n": 3,
+      "sd": 0.011034986880823104
+     }
+    }
+   },
+   "model": "base P_1",
+   "runs": [
+    "final__base__s0",
+    "final__base__s1",
+    "final__base__s2"
+   ]
+  },
+  {
+   "exams": {
+    "dev": {
+     "agnostic": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+     },
+     "twelve": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+     }
+    },
+    "imageweeds": {
+     "agnostic": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+     },
+     "twelve": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+     }
+    }
+   },
+   "model": "T_final (union of clean data)",
+   "runs": [
+    "final__Tfinal__s0",
+    "final__Tfinal__s1",
+    "final__Tfinal__s2"
+   ]
+  }
+ ],
+ "gate": {
+  "block": {
+   "flips_mode": "net"
+  },
+  "config": {
+   "attr_drop_sd_mult": 2.0,
+   "flips_mode": "net",
+   "flips_sd_mult": 2.0,
+   "flips_slack_images": 3.0,
+   "metric": "map50_95",
+   "min_seeds": 3,
+   "min_species_gt": 30,
+   "p_accept": 0.75,
+   "p_recipe_flag": 0.25,
+   "p_reject": 0.25,
+   "regression_sd_mult": 2.0,
+   "require_production": true,
+   "species_min_drop": 0.03,
+   "species_sd_mult": 3.0
+  },
+  "exp_json_changes": {},
+  "flips_mode": "net",
+  "ledger_checked": {
+   "gate": 1,
+   "gate_pin": 1,
+   "truth": 1
+  },
+  "ledger_mismatches": [],
+  "pinned": true
+ },
+ "generated_utc": "2026-10-27T16:56:03Z",
+ "gpu_hours": {
+  "base": {
+   "hours": 8.932166666666667,
+   "runs": 3
+  },
+  "chain:r0": {
+   "hours": 7.511000000000001,
+   "runs": 6
+  },
+  "final": {
+   "hours": 0.25075000000000003,
+   "runs": 4
+  },
+  "truth": {
+   "hours": 10.415444444444447,
+   "runs": 3
+  }
+ },
+ "gpu_hours_total": 27.109361111111113,
+ "interventions": [],
+ "notes": [],
+ "protocol": "v3",
+ "replay_mode": "full",
+ "research_only": true,
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "steps": [
+  {
+   "chains": {
+    "r0": {
+     "agree": false,
+     "attribution": {
+      "agnostic_delta": 0.0009707786353786441,
+      "blame": null,
+      "class_vs_loc": "none",
+      "map_delta": -0.0006628662931761342,
+      "recipe_flag": false,
+      "species_failed": []
+     },
+     "attribution_not_run": [
+      "label_audit",
+      "leave_one_source_out"
+     ],
+     "cand_mean": 0.8638683146856531,
+     "cand_sd": 0.0019559167880690872,
+     "d_images": 1364,
+     "guards": {
+      "flips": true,
+      "regression": true,
+      "species": true
+     },
+     "inc": 0.8628357817592234,
+     "incumbent_after": "base__s0",
+     "null_mean": 0.8645311809788292,
+     "null_sd": 0.0017887729719059686,
+     "p_data": 0.3333333333333333,
+     "p_recipe": 1.0,
+     "pool_images": 7493,
+     "reason": "HOLD: P_data=0.333 (cand 0.8639+-0.0020 vs null 0.8645+-0.0018, inc 0.8628); effect not detectable, guards pass; P_recipe=1.000; class_vs_loc=none",
+     "replay_mode": "full",
+     "soup_choice": null,
+     "sources": [
+      "kg_yuzhenlu__cottonweeddet3",
+      "mediatum_1717366",
+      "project_agml__weed_crop_detection",
+      "rf_myworkdrive__mlmodel2",
+      "rf_palmer-amaranth-id__palmer-amaranth-id",
+      "weedai_0935d5a0-1270-4e6b-9618-2224240b5a03",
+      "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b",
+      "weedai_84fd3c3f-dd3e-400b-ac5a-d18ca712c3d0"
+     ],
+     "train_images": {
+      "cand": 8857,
+      "null": 7493
+     },
+     "truth_equivalent": "neutral",
+     "v1_agree": false,
+     "v1_counterfactual": "HOLD",
+     "verdict": "HOLD",
+     "warmup_epochs_effective": {
+      "cand": 1.0,
+      "null": 1.0
+     },
+     "warnings": []
+    }
+   },
+   "clean": false,
+   "k": 1,
+   "step": "inc0005",
+   "tag": "s01_inc0005",
+   "truth": {
+    "p": 0.2222222222222222,
+    "species_failed": [],
+    "verdict": "hurts",
+    "with_mean": 0.8566845740625254,
+    "with_sd": 0.003645955194872495,
+    "without_mean": 0.8627413966486518,
+    "without_sd": 0.007560804941384854
+   }
+  }
+ ],
+ "stream": {
+  "k_built": 1,
+  "k_requested": 1,
+  "pool": "P_1",
+  "protocol_gate": "v3 (L-3), read at commit",
+  "research_only": {
+   "increments_research_only_rows": 312,
+   "models": true,
+   "pool": true,
+   "pool_research_only_rows": 7444
+  },
+  "segment": 2,
+  "sid": "weed_stream_v1_fork1364",
+  "stage_b": false,
+  "stream_json_sha256": "5eb08104ad11a0f4a12e10050eadf2ad159591d4f9528bd13488e20599a48bb9",
+  "truth_policy": {
+   "arm": "m640",
+   "cost_basis": "inc2.recipes.step_cost (high bound) for the arm x the measured multiplier of the capacity grid",
+   "cost_multiplier": 0.18006846914844865,
+   "estimate": false,
+   "every": 1,
+   "every_requested": null,
+   "every_stream": 1,
+   "granularity": "segment (the pinned driver's truth arm is per experiment)",
+   "on": true,
+   "segment_ordinal": 1,
+   "step_cost_gpu_h": 15.596
+  }
+ },
+ "stream_commit": {
+  "choice": {
+   "rule": "one recipe",
+   "table": null
+  },
+  "chosen": "r0",
+  "counted": {
+   "inc0005": true
+  },
+  "d30": {
+   "fires": false,
+   "recipe_caused": 0,
+   "rejects": 0
+  },
+  "d33": {
+   "rejects": 0,
+   "species": [],
+   "species_fail_counts": {}
+  },
+  "discordant": [],
+  "dispositions": {
+   "inc0005": "hold"
+  },
+  "pool": {
+   "dhash": {
+    "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/pool/P_2.78fd299a3c3a1c51.dhash.json",
+    "sha256": "dd61ba29d19656f0c3cb16dd12a85d4f0b9efdfe47c995a380eca0b540f4696e"
+   },
+   "n_images": 7493,
+   "name": "P_2",
+   "parent": "P_1",
+   "parts": [
+    "P_1"
+   ],
+   "path": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/stream/weed_stream_v1_fork1364/pool/P_2.78fd299a3c3a1c51.jsonl",
+   "research_only": true,
+   "research_only_known": true,
+   "research_only_rows": 7444,
+   "segment": 2,
+   "sha256": "78fd299a3c3a1c514e74f41f090f54dc2060d09027d37e403763867dd2d65f2d"
+  },
+  "research_only": true,
+  "stale_base": false,
+  "steps": {
+   "r0": [
+    {
+     "disposition": "hold",
+     "increment": "inc0005",
+     "k": 1,
+     "pinned": {
+      "blame": null,
+      "guards": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      },
+      "p_data": 0.3333333333333333,
+      "p_recipe": 1.0,
+      "species_failed": [],
+      "verdict": "HOLD"
+     },
+     "truth": "hurts",
+     "v3": {
+      "blame": null,
+      "cand_mean": 0.8638683146856531,
+      "guards": {
+       "flips": true,
+       "regression": true,
+       "species": true
+      },
+      "inc": 0.8628357817592234,
+      "null_mean": 0.8645311809788292,
+      "null_sd": 0.0017887729719059686,
+      "p_data": 0.3333333333333333,
+      "p_recipe": 1.0,
+      "recipe_flag": false,
+      "species_failed": [],
+      "species_se": {},
+      "species_tolerance": {},
+      "v3_applied": true,
+      "v3_unavailable_reason": null,
+      "verdict": "HOLD"
+     }
+    }
+   ]
+  },
+  "utc": "2026-10-27T16:56:03Z"
+ },
+ "testing": false,
+ "type": "chain"
+}
