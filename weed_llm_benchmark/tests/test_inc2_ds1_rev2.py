@@ -190,6 +190,15 @@ def t_weed_check():
           "arrays' AP differs from the validator-order AP by %.2e (> 1e-9, the check main applied)" % (
               len(np.unique(q)), len(q), abs(key_ap[0] - s1[0])), abs(key_ap[0] - s1[0]) > 1e-9 and
           len(np.unique(q)) < 0.6 * len(q), (key_ap, s1))
+    # end to end first (it runs on 8ba5f75 too, where it is refused): DS1's pass with its own layer, on a scorer feeding the images in the validator's order
+    try:
+        ps = stub_pass(keys, capture, recs)
+        err = None
+    except D.Ds1Refused as e:
+        ps, err = None, e
+    check("a DS1 pass whose validator sees tied images in another order than the exam's keys is not refused, and "
+          "records the check (the POWER pre-flight's refusal)", err is None and ps["stats"].get(
+              "weed_recompute_capture_order") == 0.0 and abs(ps["stage1_agnostic"][0] - s1[0]) < 1e-15, err)
     got = refused(D.weed_check, v, keys, weed, s1)
     rec = D.weed_check(v, keys, weed, s1) if got is None else {}
     check("weed_check passes: in the validator's order the arrays give the AP exactly; the tie-broken key-order AP is "
@@ -227,15 +236,6 @@ def t_weed_check():
           "more, an image recorded twice in the validator's order",
           all(e is not None for e in (e_lost, e_flip, e_rord, e_gt, e_dup)),
           (e_lost, e_flip, e_rord, e_gt, e_dup))
-    # end to end: DS1's pass with its own layer, on a scorer feeding the images in the validator's order
-    try:
-        ps = stub_pass(keys, capture, recs)
-        err = None
-    except D.Ds1Refused as e:
-        ps, err = None, e
-    check("a DS1 pass whose validator sees tied images in another order than the exam's keys is not refused, and "
-          "records the check (the POWER pre-flight's refusal)", err is None and ps["stats"].get(
-              "weed_recompute_capture_order") == 0.0 and abs(ps["stage1_agnostic"][0] - s1[0]) < 1e-15, err)
     if ps is not None:
         check("  its weed arrays are the key-order ones, their reading tie-broken (score_doc's weed_map50_95)",
               [str(k) for k in ps["weed"]["keys"]] == keys and
@@ -282,8 +282,6 @@ def t_audit_render():
     ST.StreamRun._ds1_done(run, it)
     check("a finished audit render records the set its own proposal named (no evidence at hand, as live)",
           run.st["ds1"].get("audit_render_for") == ["src_a", "src_b"], run.st["ds1"].get("audit_render_for"))
-    check("  ds1_audit_sources reads a comma list or a list", ST.ds1_audit_sources(" b, a,") == ["a", "b"] and
-          ST.ds1_audit_sources(["b", "a"]) == ["a", "b"] and ST.ds1_audit_sources(None) == [])
     pend = ["src_a", "src_b"]
     _o, _w, c = DS.ds1_plan(cfg, _fs(pend, ["audit_001"], render_for=["src_a", "src_b"]))
     check("the plan proposes no render of a set the ticker rendered", not [x for x in c["maint"] if
@@ -306,6 +304,8 @@ def t_audit_render():
     au4 = [x for x in c4["maint"] if x["item"].startswith("sheets:audit")]
     check("  a set whose every render is superseded (none listed) is rendered again", au4 and au4[0]["batch"] == 3,
           au4)
+    check("  ds1_audit_sources reads a comma list or a list", ST.ds1_audit_sources(" b, a,") == ["a", "b"] and
+          ST.ds1_audit_sources(["b", "a"]) == ["a", "b"] and ST.ds1_audit_sources(None) == [])
 
 
 def render_rec(d, kind, batch, sources, spec):
@@ -419,8 +419,6 @@ def t_audit():
     got = DD.audit_rates(rows, lambda r: [(0.3, 0.4, 0.2, 0.2, 0.9)])
     check("  boxes found exactly: missing 0, false boxes 0", got["missing_rate"] == 0.0 and
           got["false_box_rate"] == 0.0, got)
-    check("audit_boxes strips the class", DD.audit_boxes({"boxes": [(12, 0.1, 0.2, 0.3, 0.4)]}) ==
-          [(0.1, 0.2, 0.3, 0.4)])
     with inc("inc_audit") as d:
         rs = [cand(d, "a_%d" % i, "src_full", 100 + i, [(12, 0.3, 0.4, 0.2, 0.2), (12, 0.7, 0.6, 0.15, 0.2)])
               for i in range(6)]
@@ -433,10 +431,13 @@ def t_audit():
         a_part = doc["sources"]["src_part"]["audit_verdict"]
         check("a screen's audit of a source whose labels the detector finds exactly is not partial (missing 0, false "
               "boxes 0, version 2)", a_full and not a_full["partial"] and a_full["source"]["missing_rate"] == 0.0 and
-              a_full["source"]["false_box_rate"] == 0.0 and a_full["version"] == DD.AUDIT_VERSION, a_full)
+              a_full["source"]["false_box_rate"] == 0.0 and a_full.get("version") == getattr(DD, "AUDIT_VERSION", 2),
+              a_full)
         check("  one with confident unlabelled plants is (missing 2/3 > train_core's + 0.15)", a_part["partial"] and
               abs(a_part["source"]["missing_rate"] - 2 / 3.0) < 1e-12, a_part)
         check("  nothing to take again", DD.audit_due(1) == [])
+    check("audit_boxes strips the class", DD.audit_boxes({"boxes": [(12, 0.1, 0.2, 0.3, 0.4)]}) ==
+          [(0.1, 0.2, 0.3, 0.4)])
     with inc("inc_reaudit") as d:
         rs = [cand(d, "a_%d" % i, "src_full", 300 + i, [(12, 0.3, 0.4, 0.2, 0.2)]) for i in range(5)]
         rs += [cand(d, "m_%d" % i, "src_mask", 400 + i, [(12, 0.3, 0.4, 0.2, 0.2)]) for i in range(5)]
