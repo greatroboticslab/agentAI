@@ -588,6 +588,26 @@ def t_ts_card():
     check("  and only once", len(run.cards) == 1)
 
 
+def t_decide_again():
+    print("item 4: an 'accept' on a partially labelled source waits for a new decision, named on a card")
+    new = {"partial": True, "version": DD.AUDIT_VERSION}
+    ok, why = DD.source_ready("s_acc", {"s_acc": {"decision": "accept"}}, {"audit_verdict": new})
+    src = {"decided": True, "decision": "accept", "ready": ok, "why": why, "pooled": False}
+    settled, waits = DS._ds1_sources_settled({"sources": {"s_acc": src}})
+    check("the plan waits for its sheet (not for a pool)", not settled and waits == {"sheets": ["s_acc"]}, waits)
+    run = fake_run({"ds1": {"items": {}, "cards": {}}})
+    run.cards = []
+    run._card = lambda kind, title, body, **kw: run.cards.append((title, body))
+    run._ds1_card_once = types.MethodType(ST.StreamRun._ds1_card_once, run)
+    ctx = {"stage": {"ds1": {"amendment": True, "never_cut": True, "status": {
+        "timestamp": True, "ra": True, "phases": {"1": {"sources": {"s_acc": src}}}, "sheets": {}}}}}
+    run.ev = types.SimpleNamespace(json=lambda name: ctx)
+    run._artifact = lambda *a, **k: None
+    ST.StreamRun._ds1_cards(run, {})
+    check("  a card names it and the record step", any("a new sheet decision waits" in b and "s_acc" in b
+                                                       for _t, b in run.cards), run.cards)
+
+
 # ------------------------------------------------------------------ RA's default reports
 def t_ra_reports():
     print("RA's default reports: the stream's segments since its fork")
@@ -645,7 +665,7 @@ def t_registration():
 
 def main():
     for fn in (t_weed_check, t_reopen, t_audit_render, t_supersede, t_audit, t_sheet_label, t_ra_reports,
-               t_registration, t_ts_card):
+               t_registration, t_ts_card, t_decide_again):
         try:
             fn()
         except Exception as e:                   # noqa: BLE001

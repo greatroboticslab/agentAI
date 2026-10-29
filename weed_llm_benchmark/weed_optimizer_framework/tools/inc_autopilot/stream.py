@@ -6630,6 +6630,16 @@ class StreamRun(object):
                                                                          (cfg.get("lab") or {}).get("sheets_html"),
                                                                          (cfg.get("lab") or {}).get("owner_folder"),
                                                                          mod))
+        for ph in ("1", "2"):
+            srcs = ((st.get("phases") or {}).get(ph) or {}).get("sources") or {}
+            # Revision 2, item 4: 'accept' on a source the model audit finds partially labelled waits for a new decision
+            again = sorted(s_ for s_, x in srcs.items() if x.get("decided") and DS.DS1_DECIDE_AGAIN in str(x.get("why")
+                                                                                                       or ""))
+            if again:
+                steps.append("a new sheet decision waits (phase %s, the delegate; DS.5.1 item 4: the model audit finds "
+                             "them partially labelled, so they enter only as 'accept for training only'): %s; stored "
+                             "with %s.ds1_sheets record --file <it> --decided-by delegate" % (ph, ", ".join(again[:12]),
+                                                                                             mod))
         if sh.get("audit_pending"):
             steps.append("owner audit waiting (DS.0 item 4): %s; the audit sheet batch is rendered on the lab; his "
                          "decisions are stored with %s.ds1_sheets record --file <it> --decided-by human:<his id>"

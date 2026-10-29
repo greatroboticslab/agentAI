@@ -124,6 +124,7 @@ must occur exactly once in its file), runs its target against the copy and requi
   DX19  stream            an item attempted after the Revision is reopened by it again
   DX20  stream            an item is reopened before the deployed tree holds the Revision's file
   DX21  stream            the time-stamp card asked for once is never raised again for a later Revision
+  DX22  diagnose_stream   an 'accept' on a partially labelled source waits for a pool, not for its sheet
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -357,6 +358,7 @@ MUTANTS = {
     "DX20": (ST, 'or not self._ds1_tree_file(ro.get("file") or "",',
              'or not (lambda *a, **k: True)(ro.get("file") or "",', REV2),
     "DX21": (ST, '"missing:%s" % ",".join(str(r.get("sha256"))[:12] for r in rv)', '"missing"', REV2),
+    "DX22": (DSM, '        if DS1_DECIDE_AGAIN in str(x.get("why") or ""):', '        if False:', REV2),
 }
 
 

@@ -2187,6 +2187,9 @@ def v3fam_plan(fam, fs):
 
 # DS1 (2026-10-29; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.3, DS.12): DS1's items, in DS.12's order
 DS1_TERMINAL = ("done", "failed", "not needed")
+# inc2.ds1_data.source_ready's reason for an 'accept' decision on a source the model audit finds partially labelled
+# (Revision 2, item 4): the source waits for its sheet to be decided again, and its card says so
+DS1_DECIDE_AGAIN = "its sheet is decided again"
 DS1_PERSON = "waits for a person"
 
 
@@ -2259,6 +2262,9 @@ def _ds1_sources_settled(ph):
             waits["sheets"].append(s_)
             continue
         if x.get("decision") == "reject":
+            continue
+        if DS1_DECIDE_AGAIN in str(x.get("why") or ""):
+            waits["sheets"].append(s_)
             continue
         if x.get("audit_required") and not x.get("audited"):
             waits["audit"].append(s_)
