@@ -521,6 +521,49 @@ def t_sheet_label():
           "taken before Revision 2" not in h_new)
 
 
+def t_reopen():
+    print("item 1: the power pre-flight recorded failed is proposed again once Revision 2 is deployed")
+    blk = {"marker": "DS1 Revision 2 (test)", "file": "docs/prereg/x.md", "sha256": "s" * 64,
+           "items": ["score:POWER:draft_r001"], "before_utc": "2026-10-29T21:00:00Z", "why": "the weed check"}
+    dom = LS.load_domain("weed")
+    dom["ds1"] = dict(dom["ds1"], reopens=[blk])
+    deployed = {"ok": True}
+    st = {"failed_ids": ["other"], "ds1": {"items": {"score:POWER:draft_r001": {
+        "state": "failed", "fails": 2, "proposal": "pidB", "spend": "settled", "settled": 0.03,
+        "started_utc": "2026-10-29T18:17:04Z", "attempts": [{"proposal": "pidA", "gpuh": 0.05, "how": "settled"}],
+        "prior_gpuh": 0.05, "why": "the weed arrays give AP50-95 0.856888007"}}, "cards": {}}}
+    run = fake_run(st)
+    run.dom = dom
+    run.ledger, run.cards = [], []
+    run._ds1_tree_file = lambda rel, sha=None, marker=None: deployed["ok"] and rel == blk["file"] and sha == blk["sha256"]
+    run._failed_ids = types.MethodType(ST.StreamRun._failed_ids, run)
+    run._v3fam_fold = ST.StreamRun._v3fam_fold
+    run._ledger = lambda kind, **kw: run.ledger.append((kind, kw))
+    run._card = lambda kind, title, body, **kw: run.cards.append(title)
+    deployed["ok"] = False
+    check("not reopened while the deployed tree lacks the Revision's file", ST.StreamRun._ds1_reopen(run) == [] and
+          st["ds1"]["items"]["score:POWER:draft_r001"]["state"] == "failed")
+    deployed["ok"] = True
+    got = ST.StreamRun._ds1_reopen(run)
+    rec = st["ds1"]["items"]["score:POWER:draft_r001"]
+    check("reopened once deployed: state missing, fails 0, earlier ids failed (new ids), spend kept in prior_gpuh, "
+          "history kept, one card and one ledger line", got == ["score:POWER:draft_r001"] and rec["state"] == "missing"
+          and rec["fails"] == 0 and {"pidA", "pidB"} <= set(st["failed_ids"]) and abs(rec["prior_gpuh"] - 0.08) <
+          1e-12 and rec["reopen_history"][-1]["marker"] == blk["marker"] and len(run.cards) == 1 and
+          run.ledger[0][0] == "ds1_reopened", (got, rec, run.cards))
+    rec.update(state="failed", started_utc="2026-10-29T18:30:00Z")
+    check("  never twice under one marker", ST.StreamRun._ds1_reopen(run) == [] and rec["state"] == "failed")
+    st["ds1"]["items"]["score:POWER:draft_r001"] = {"state": "failed", "started_utc": "2026-10-30T02:00:00Z",
+                                                    "proposal": "pidC"}
+    check("  an attempt started after the Revision is not reopened by it", ST.StreamRun._ds1_reopen(run) == [])
+    cfg = dom["ds1"]
+    fs = _fs([], ["source_001"])
+    fs["items"]["score:POWER:draft_r001"] = "missing"
+    _o, _w, c = DS.ds1_plan(cfg, fs)
+    check("  reopened, the plan proposes the power pre-flight (L33 POWER) again",
+          [x["item"] for x in c["maint"]][:1] == ["score:POWER:draft_r001"], [x["item"] for x in c["maint"]])
+
+
 # ------------------------------------------------------------------ RA's default reports
 def t_ra_reports():
     print("RA's default reports: the stream's segments since its fork")
@@ -577,7 +620,7 @@ def t_registration():
 
 
 def main():
-    for fn in (t_weed_check, t_audit_render, t_supersede, t_audit, t_sheet_label, t_ra_reports):
+    for fn in (t_weed_check, t_reopen, t_audit_render, t_supersede, t_audit, t_sheet_label, t_ra_reports):
         try:
             fn()
         except Exception as e:                   # noqa: BLE001

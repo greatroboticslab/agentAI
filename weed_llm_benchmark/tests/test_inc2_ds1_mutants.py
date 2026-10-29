@@ -121,6 +121,8 @@ must occur exactly once in its file), runs its target against the copy and requi
   DX16  ds1               a Revision's own time-stamp record naming another sha256 opens the gate
   DX17  ds1               timestamp-revision takes proofs it has not checked
   DX18  ds1_sheets        a sheet rendered after the audit was taken again shows the screen's audit
+  DX19  stream            an item attempted after the Revision is reopened by it again
+  DX20  stream            an item is reopened before the deployed tree holds the Revision's file
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -349,6 +351,10 @@ MUTANTS = {
                  '"written_utc": _utc()}', '           "proofs": [{"sha256": "x"}, {"sha256": "y"}], "written_utc": _utc()}',
              REV2),
     "DX18": (DH, '            if ra:\n', '            if False:\n', REV2),
+    "DX19": (ST, '                        str(rec["started_utc"]) >= str(ro["before_utc"]):',
+             '                        False:', REV2),
+    "DX20": (ST, 'or not self._ds1_tree_file(ro.get("file") or "",',
+             'or not (lambda *a, **k: True)(ro.get("file") or "",', REV2),
 }
 
 

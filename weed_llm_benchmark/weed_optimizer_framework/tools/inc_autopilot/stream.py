@@ -6119,6 +6119,52 @@ class StreamRun(object):
             return marker is None or marker.encode("utf-8") in data
         return False
 
+    def _ds1_reopen(self):
+        """A DS1 Revision's reopening (Revision 2, 2026-10-29: the power pre-flight score:POWER:<draft>, refused twice by
+        a defect of the pass's weed check and recorded failed, which held MD-S0's freeze and every training item): each
+        item a block of the domain's ds1.reopens names is proposed again once the deployed tree holds that Revision's
+        file with its sha256, once per marker, and only if its last attempt started before the block's before_utc and
+        it is recorded failed. Its spend so far moves into prior_gpuh (every attempt stays counted against the family
+        cap), its earlier proposal ids into failed_ids (a new proposal takes a new id: the executor runs an id once),
+        its record into reopen_history, its state to missing. Returns the keys reopened now."""
+        cfg = (self.dom or {}).get("ds1") or {}
+        f = self._ds1()
+        out = []
+        for ro in [b for b in cfg.get("reopens") or [] if isinstance(b, dict)]:
+            marker = ro.get("marker")
+            if not marker or not ro.get("items") or not self._ds1_tree_file(ro.get("file") or "",
+                                                                            sha=ro.get("sha256")):
+                continue
+            now = []
+            for key in ro["items"]:
+                rec = f["items"].get(key)
+                if not isinstance(rec, dict) or rec.get("state") != "failed" or rec.get("reopened") == marker or \
+                        marker in [h.get("marker") for h in rec.get("reopen_history") or [] if isinstance(h, dict)]:
+                    continue
+                if not ro.get("before_utc") or not rec.get("started_utc") or \
+                        str(rec["started_utc"]) >= str(ro["before_utc"]):
+                    continue
+                before = {k: v for k, v in rec.items() if k != "reopen_history"}
+                ids = [a.get("proposal") for a in rec.get("attempts") or [] if isinstance(a, dict)] + \
+                    [rec.get("proposal")]
+                self._v3fam_fold(rec)
+                rec.update(state="missing", fails=0, proposal=None, reopened=marker, reopened_utc=self.utc,
+                           reopen_history=list(rec.get("reopen_history") or []) + [
+                               dict(before, marker=marker, reopened_utc=self.utc)])
+                rec.pop("why", None)
+                failed = self._failed_ids()
+                self.st["failed_ids"] = (failed + [i for i in ids if i and i not in failed])[-FAILED_IDS_KEEP:]
+                now.append(key)
+            if now:
+                self._ledger("ds1_reopened", record_only=True, ds1_items=now, marker=marker, reasons=[
+                    "DS1: %s reopened under %s (%s): proposed again under new ids, earlier spend kept in prior_gpuh"
+                    % (", ".join(now), marker, ro.get("file"))])
+                self._card("research", "DS1: %s proposed again (%s)" % (", ".join(now), marker),
+                           "%s, recorded in %s. Earlier attempts stay counted against the family cap." % (
+                               ro.get("why") or marker, ro.get("file")), lever="L33")
+                out += now
+        return out
+
     def _ds1_stage(self, exp_status, payload=None):
         """/stage/ds1 (DS.9.3), what DR0's DS1 block and DS1's cards read: the gate's inputs (the amendment and the
         cutter's never-cut change in the deployed tree, the time stamp), the cluster's derived status
@@ -6129,6 +6175,7 @@ class StreamRun(object):
         cfg = (self.dom or {}).get("ds1") or {}
         if not cfg:
             return None
+        self._ds1_reopen()
         f = self._ds1()
         status = self._artifact(cfg.get("status") or SR.DS1_STATUS) or {}
         nc = cfg.get("never_cut") or {}
