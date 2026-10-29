@@ -987,7 +987,7 @@ def t_review():
     la = [l["argv"] for l in w3.runner.launched if l["job"].startswith("ds1sheets_audit")]
     check("the owner's audit batch rendered on the lab with --sources (the cluster's audit set)",
           la and la[0][la[0].index("--sources") + 1] == "src_alpha,src_beta", la)
-    # Revision 2, item 2: the render ends; the ticker records the set from its own proposal and never renders it again
+    # Revision 2, item 3: the render ends; the ticker records the set from its own proposal and never renders it again
     run(w3, ticks=8)
     la2 = [l["job"] for l in w3.runner.launched if l["job"].startswith("ds1sheets_audit")]
     f3 = (w3.state() or {}).get("ds1") or {}

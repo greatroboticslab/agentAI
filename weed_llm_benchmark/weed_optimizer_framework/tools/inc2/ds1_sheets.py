@@ -36,7 +36,7 @@ The samples (seeded; stable_int texts named below):
 
 Records (ds1/v1/sheets/): rendered/<kind>_<batch>.json (the spec's sha256, the HTML's sha256, the sources or items),
 superseded.jsonl (append-only: a rendered sheet another render of the same batch stands for; kept, never recorded,
-not counted for its set; Revision 2, item 2), audit_v2/ (the model audit taken again, which later renders show),
+not counted for its set; Revision 2, item 3), audit_v2/ (the model audit taken again, which later renders show),
 decisions.jsonl (append-only: one line per decision with decided_by human:<id> or 'delegate', the sheet's sha256,
 the decider's name as the file gives it, the time). A reversal of the delegate's decision on an audit sheet is
 recorded as the owner's and widens the audit to every decided sheet.
@@ -128,7 +128,7 @@ def superseded_path(inc=None):
 
 
 def audit_v2(inc=None):
-    """{(phase, revision, source): the model audit taken again (Revision 2, item 3)} from ds1/v1/sheets/audit_v2/,
+    """{(phase, revision, source): the model audit taken again (Revision 2, item 4)} from ds1/v1/sheets/audit_v2/,
     which inc2.ds1_data.reaudit writes beside each screen revision's record (the lab pulls it with the sheets)."""
     from . import ds1_data as DD
     out = {}
@@ -640,7 +640,7 @@ def sheet_spec(kind, batch, names, inc=None, decisions=None):
             scr = meta.get("screen") or {}
             ra = av2.get((int(meta.get("phase") or 0), int(meta.get("revision") or 0), meta.get("source")))
             if ra:
-                # the model audit taken again (Revision 2, item 3) in place of the screen's, which is kept beside it
+                # the model audit taken again (Revision 2, item 4) in place of the screen's, which is kept beside it
                 scr = dict(scr, audit_verdict=ra.get("audit_verdict"), audit_superseded=ra.get("superseded"))
             units = sorted((scr.get("units") or {}).keys())
             spec["sources"].append({
@@ -709,7 +709,7 @@ def superseded(inc=None):
 
 def supersede(sheet, by, why, inc=None):
     """Mark a rendered sheet superseded by another of its kind with the same sources (2026-10-29: the owner's audit
-    batch rendered again on every tick for one set; Revision 2, item 2): the sheet and its HTML stay, `record` refuses
+    batch rendered again on every tick for one set; Revision 2, item 3): the sheet and its HTML stay, `record` refuses
     a decisions file naming it, the platform no longer counts it as that set's render. The delegate's, appended
     once per sheet to ds1/v1/sheets/superseded.jsonl."""
     rend = {"%s_%03d" % (r["kind"], r["batch"]): r for r in renders(inc).values()}
@@ -743,7 +743,7 @@ def supersede(sheet, by, why, inc=None):
 
 def audit_sets(inc=None):
     """{sheet name: its sources (sorted)} of the owner's audit batches rendered and not superseded: the sets the
-    platform does not render again (Revision 2, item 2)."""
+    platform does not render again (Revision 2, item 3)."""
     sup = superseded(inc)
     return {"%s_%03d" % (r["kind"], r["batch"]): sorted(r.get("sources") or []) for r in renders(inc).values()
             if r.get("kind") == "audit" and "%s_%03d" % (r["kind"], r["batch"]) not in sup}

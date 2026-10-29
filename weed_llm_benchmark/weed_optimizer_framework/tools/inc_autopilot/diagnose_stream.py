@@ -2334,7 +2334,7 @@ def ds1_plan(cfg, fs):
     if pend:
         nb = 1 + len([x for x in rendered if x.startswith("audit_")])
         key = "sheets:audit:%d" % nb
-        # one render per pending set (Revision 2, item 2): not when the ticker's own record names the set it last
+        # one render per pending set (Revision 2, item 3): not when the ticker's own record names the set it last
         # rendered, nor when the cluster lists a rendered, not superseded, audit batch of exactly this set
         drawn = [sorted(v or []) for v in (sheets.get("audit_sets") or {}).values()]
         if due(key) and fs.get("audit_render_for") != pend and pend not in drawn:

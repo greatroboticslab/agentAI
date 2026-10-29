@@ -37,7 +37,7 @@ The rules, in order, each counted with its reason code (DS.5.1):
   3 base3's box and image rules (CLOOP:2912-2913): the source rule, boxes under 8 px masked, images dropped;
   4 the model audit (E1-A) per source: a source over train_core's missing-label rate by more than 0.15 enters only
     as 'accept for training only' with predicted unlabelled plants masked (inc2.mask); each labelled box read as
-    (cx, cy, w, h), its class stripped (Revision 2, item 3); a screen revision audited before that is taken again by
+    (cx, cy, w, h), its class stripped (Revision 2, item 4); a screen revision audited before that is taken again by
     the pools step first (reaudit: screen/p<ph>_r<rev>_audit_v2.json and ds1/v1/sheets/audit_v2/, written once);
   5 dedupe (base3's copy rule; never at 4-6 bits): the same bytes; 3 bits plus an 80 % box match; an identical
     label layout; base B rows win over copies;
@@ -154,7 +154,7 @@ PARTIAL_MISSING_EXCESS = 0.15
 AUDIT_SAMPLE = 200
 AUDIT_CONF = 0.5
 AUDIT_IOU = 0.5
-# Revision 2, item 3: the model audit reads each labelled box as (cx, cy, w, h), the class stripped, as train_core's
+# Revision 2, item 4: the model audit reads each labelled box as (cx, cy, w, h), the class stripped, as train_core's
 # reference always did; a screen's audit taken before it (no "version") read [class, cx, cy, w] as the box and is
 # taken again (reaudit) before any pool applies it
 AUDIT_VERSION = 2
@@ -460,7 +460,7 @@ def _iou_xywh(a, b):
 
 
 def audit_boxes(row):
-    """A candidate's labelled boxes as the audit reads them: (cx, cy, w, h), its class stripped (Revision 2, item 3;
+    """A candidate's labelled boxes as the audit reads them: (cx, cy, w, h), its class stripped (Revision 2, item 4;
     train_core's reference reads b[1:5] of its labels)."""
     return [tuple(float(x) for x in b[1:5]) for b in row.get("boxes") or ()]
 
@@ -470,7 +470,7 @@ def audit_rates(rows, predict, conf=AUDIT_CONF, iou=AUDIT_IOU):
     rows: missing = confident predictions (conf >= 0.5) matching no labelled box at IoU 0.5 (unlabelled plants),
     false boxes = labelled boxes no prediction (conf >= 0.25) matches; convention = the median of log(predicted
     area / labelled area) over matched pairs. predict(row) -> [(cx, cy, w, h, conf)]; each row's boxes are
-    (cx, cy, w, h) (audit_boxes), and a box of another length is refused (Revision 2, item 3)."""
+    (cx, cy, w, h) (audit_boxes), and a box of another length is refused (Revision 2, item 4)."""
     n_pred = n_miss = n_gt = n_false = 0
     logs = []
     for r in rows:
@@ -2172,7 +2172,7 @@ def screen_revisions(phase):
 
 
 def reaudit_path(rev_path):
-    """screen/p<ph>_r<rev>_audit_v2.json beside a screen revision: its model audit taken again (Revision 2, item 3)."""
+    """screen/p<ph>_r<rev>_audit_v2.json beside a screen revision: its model audit taken again (Revision 2, item 4)."""
     return Path(str(rev_path)[:-5] + "_audit_v2.json")
 
 
@@ -2185,7 +2185,7 @@ def reaudit_sheet_path(rev_path, inc=None):
 
 def audit_due(phase):
     """The screen revisions of a phase holding a model audit taken before Revision 2 (no version) and no record of
-    it taken again: reaudit takes them before any pool reads an audit (Revision 2, item 3)."""
+    it taken again: reaudit takes them before any pool reads an audit (Revision 2, item 4)."""
     out = []
     for p in screen_revisions(phase):
         d = _read_json(p) or {}
@@ -2232,7 +2232,7 @@ def reaudit(phase, inputs, write=True):
                        "partial_changed": bool(old.get("partial")) != bool(new.get("partial"))}
         doc = {"format": FMT_REAUDIT, "phase": int(phase), "revision": d.get("revision"), "screen": p.name,
                "screen_sha256": C.sha256_file(p), "version": AUDIT_VERSION,
-               "why": "Revision 2, item 3: the screen's audit read each labelled box as [class, cx, cy, w]; taken "
+               "why": "Revision 2, item 4: the screen's audit read each labelled box as [class, cx, cy, w]; taken "
                       "again with the class stripped, as train_core's reference reads its boxes",
                "predictor_weights_sha256": getattr(inputs.predict, "weights_sha256", None),
                "train_core": inputs.audit_ref, "sources": srcs, "decided_by": D.DECIDED_BY, "written_utc": D._utc()}
@@ -2274,7 +2274,7 @@ def screen_records(phase, reaudits=None):
         ra = (ra.get("sources") or {}) if isinstance(ra, dict) and ra.get("format") == FMT_REAUDIT else {}
         for s, v in (d.get("sources") or {}).items():
             if s in ra:
-                # the audit taken again (Revision 2, item 3) in place of the revision's own, which stays beside it
+                # the audit taken again (Revision 2, item 4) in place of the revision's own, which stays beside it
                 v = dict(v, audit_verdict=ra[s]["audit_verdict"], audit_superseded=ra[s].get("superseded"))
             old = out.get(s)
             if old is None:

@@ -7,19 +7,22 @@ before any DS1 training or score"; docs/prereg/DS1_rev2_2026-10-29.md).
   another order than the exam's keys passes (ds1_pass end to end on a stubbed scorer), and its weed reading is the
   tie-broken one; weed_check refuses arrays that are not the stage-1 helper's records (a detection lost, a row changed,
   rows reordered within an image, another ground-truth count, an image recorded twice);
-- item 2, the owner's audit render: the ticker records the set it rendered from its own proposal (not the tick's
+- item 3, the owner's audit render: the ticker records the set it rendered from its own proposal (not the tick's
   context); the plan proposes no render for a set the ticker rendered or the cluster lists rendered (the live state
   of 2026-10-29: [] recorded, audit_001 to audit_004 rendered for one set), and the pools step is proposed then;
   superseding: a rendered audit batch marked superseded (kept) is never recorded and no longer counts for its set;
   refusals (unknown sheet, another set, itself, twice, by a superseded sheet, one with decisions, no reason);
-- item 3, the model audit: labelled boxes are read as (cx, cy, w, h) (a class-first box is refused); a screen's audit
+- item 4, the model audit: labelled boxes are read as (cx, cy, w, h) (a class-first box is refused); a screen's audit
   of a source whose labels a detector finds exactly is not partial; a revision audited before Revision 2 is taken
   again (reaudit: the same seeded sample, the old verdict kept beside), read in place of the old one by
   screen_records and by the sheets, before any pool (pools takes it first, refuses a pre-Revision-2 audit's masks);
   an 'accept' decision on a partially labelled source waits for a new decision; plan_state lists what is due;
-- RA's default reports: the stream's segments since its fork only (never b_v2_s640 or a pre-fork segment);
-- the registration: Revision 2's byte copy hashes to its pin; a Revision made after the time-stamp record is named
-  by its own record (timestamp_rev<n>.json), without which the gate stays closed.
+- item 2, the power pre-flight recorded failed is reopened once the Revision is deployed (once, only for an attempt
+  started before it) and proposed again;
+- item 5, RA's default reports: the stream's segments since its fork only (never b_v2_s640 or a pre-fork segment);
+- item 6 and the registration: Revision 2's byte copy hashes to its pin; a Revision made after the time-stamp record
+  is named by its own record (timestamp_rev<n>.json), without which the gate stays closed; the time-stamp card is
+  raised again for it, naming its step.
 
 Run:  python3 tests/test_inc2_ds1_rev2.py
 """
@@ -244,7 +247,7 @@ def t_weed_check():
           np.array_equal(ps2["weed"]["conf"], ps["weed"]["conf"]) if ps is not None else False)
 
 
-# ------------------------------------------------------------------ item 2: the owner's audit render
+# ------------------------------------------------------------------ item 3: the owner's audit render
 def fake_run(st=None):
     """A StreamRun's DS1 bookkeeping without a ticker: its state, domain and no evidence (as when a job's end is read
     before the tick's context holds DS1's status)."""
@@ -265,12 +268,12 @@ def _fs(pend, rendered, audit_sets=None, render_for=None, sources=None):
     items = {"sheets:audit:%d" % i: "done" for i in range(1, 1 + len([x for x in rendered if
                                                                       x.startswith("audit_")]))}
     items["data:1:screen"] = "missing"
-    items["score:POWER:draft_r001"] = "failed"          # as live: the pre-flight recorded failed (Revision 2 item 1)
+    items["score:POWER:draft_r001"] = "failed"          # as live: the pre-flight recorded failed (Revision 2 items 1-2)
     return {"status": st, "items": items, "today": "2026-10-29", "phase1_gb": 2.0, "audit_render_for": render_for}
 
 
 def t_audit_render():
-    print("item 2: the owner's audit batch rendered once per set")
+    print("item 3: the owner's audit batch rendered once per set")
     cfg = LS.load_domain("weed")["ds1"]
     run = fake_run()
     it = {"lever": "L31", "proposal": {"id": "p1", "params": {"kind": "audit", "batch": 2, "lab_inc": "/x",
@@ -323,7 +326,7 @@ def decisions_file(d, spec, sources, name):
 
 
 def t_supersede():
-    print("item 2: an extra render marked superseded (kept, never recorded)")
+    print("item 3: an extra render marked superseded (kept, never recorded)")
     with inc("inc_sup") as d:
         srcs = ["src_a", "src_b"]
         for b in (1, 2, 3):
@@ -362,7 +365,7 @@ def t_supersede():
               ps["sheets"]["audit_sets"]["audit_001"] == srcs, ps["sheets"])
 
 
-# ------------------------------------------------------------------ item 3: the model audit
+# ------------------------------------------------------------------ item 4: the model audit
 def perfect(rows):
     """A detector that finds exactly each row's labelled boxes (conf 0.9), keyed by the row's key."""
     box = {r["key"]: [tuple(float(x) for x in b[1:5]) for b in r["boxes"]] for r in rows}
@@ -409,7 +412,7 @@ REF = {"images": 200, "predictions": 300, "gt_boxes": 320, "missing_rate": 0.021
 
 
 def t_audit():
-    print("item 3: the model audit reads (cx, cy, w, h)")
+    print("item 4: the model audit reads (cx, cy, w, h)")
     rows = [{"key": "r%d" % i, "boxes": [(0.3, 0.4, 0.2, 0.2)]} for i in range(3)]
     e = refused(DD.audit_rates, [{"key": "r0", "boxes": [(12, 0.3, 0.4, 0.2, 0.2)]}], lambda r: [])
     check("audit_rates refuses a class-first box (the screen's call before Revision 2)", e is not None, e)
@@ -513,7 +516,7 @@ def t_audit():
 
 
 def t_sheet_label():
-    print("item 3: the sheets show the audit taken again, and label one taken before Revision 2")
+    print("item 4: the sheets show the audit taken again, and label one taken before Revision 2")
     spec = {"kind": "source", "batch": 1, "spec_sha256": "s" * 64, "rendered_utc": "t", "bundles": [], "items": [],
             "sources": [{"source": "src_x", "units": [], "screen": {"audit_verdict": {"partial": True}},
                          "unit_info": {}, "delegate": None, "items": []}]}
@@ -528,7 +531,7 @@ def t_sheet_label():
 
 
 def t_reopen():
-    print("item 1: the power pre-flight recorded failed is proposed again once Revision 2 is deployed")
+    print("item 2: the power pre-flight recorded failed is proposed again once Revision 2 is deployed")
     blk = {"marker": "DS1 Revision 2 (test)", "file": "docs/prereg/x.md", "sha256": "s" * 64,
            "items": ["score:POWER:draft_r001"], "before_utc": "2026-10-29T21:00:00Z", "why": "the weed check"}
     dom = LS.load_domain("weed")

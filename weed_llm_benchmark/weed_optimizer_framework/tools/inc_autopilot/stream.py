@@ -6412,7 +6412,7 @@ class StreamRun(object):
         if it["lever"] == "L31" and (p.get("params") or {}).get("kind") == "audit":
             # the set this render drew: its own proposal's sources (DR0 named them from the cluster's audit set),
             # never this tick's context, which need not hold DS1's status when a job's end is read (Revision 2,
-            # item 2: on 2026-10-29 it held none, so [] was recorded and the same set was rendered on every tick)
+            # item 3: on 2026-10-29 it held none, so [] was recorded and the same set was rendered on every tick)
             f["audit_render_for"] = ds1_audit_sources((p.get("params") or {}).get("sources"))
         # the next proposal of the same step takes a new id: the executor runs an id once
         akey = step_key(it["lever"], LS.policy_params(it["lever"], p.get("params") or {}))
