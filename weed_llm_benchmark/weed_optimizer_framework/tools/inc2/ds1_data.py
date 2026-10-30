@@ -174,8 +174,8 @@ AUDIT_PREDICTOR_SHA256 = "a8e1b61ad29806c11228b9a54a463e40ac466fb3a717a17fcb2d6f
 # text (the first, b825aa66...ed4d of commit dbd6bea, and the second, 58865e1d...74d4 of commit d91a264, never
 # deployed, are kept under docs/prereg/superseded/DS1_dev2_first_text/ and DS1_dev2_second_text/).
 DEVIATION_2 = {"n": 2, "file": "docs/prereg/DS1_dev2_2026-10-30.md",
-               "sha256": "58865e1d5c83f494e15c238c8e604924715048670fae11eb1f9d6b015eb574d4",
-               "commit": "d91a2641605ed1d2f115385f0fd6936e57fc1ca6",
+               "sha256": "18753a79951488f95e9e3738ad6cd1d49350b4d5e7309f67220f15edae4f7d9d",
+               "commit": "281f35291340f60960d0363cb08a48e17739ee1f",
                "stamp_file": "docs/prereg/DS1_dev2_2026-10-30.stamp.txt"}
 # DS1 deviation 2 (2026-10-30), item 4: DS.0 item 14 lets DS1's builds read SIU past its stream quarantine, which cites
 # D31 (data blamed: redundant frames), once its sheet and species-role table are decided and audited (source_ready);
