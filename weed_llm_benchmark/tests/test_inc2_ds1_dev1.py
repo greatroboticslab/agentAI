@@ -6,10 +6,11 @@
   readings (P7's statistic 0.149603, 0.159426, 0.163401; the plain stage-1 agnostic AP 0.256235, 0.251712, 0.259808)
   and a pass reproducing them, the reproduction passes and records both readings per seed (refused on dd4c302);
 - item 2, both readings named: each registered constant is checked against its own reading before any pass; the
-  text's constants under P7's name refuse before the GPU runs, the refusal naming both readings and saying the
-  constant is the plain reading's; a wrong plain constant refuses too; each pass's two readings are held to DS.7.1's
-  rule (a deviation within 0.002, refused beyond, whichever reading moved); P7's reading is the target arrays (t_),
-  never the OtherPlant ones (o_);
+  text's constants under P7's name refuse before the GPU runs (in the reopened pre-flight's world too, where e1a_dev
+  and e3a_dev are due again: no record moves and no pass of any reproduction runs), the refusal naming both
+  readings and saying the constant is the plain reading's; a wrong plain constant refuses too; each pass's two
+  readings are held to DS.7.1's rule (a deviation within 0.002, refused beyond, whichever reading moved); P7's
+  reading is the target arrays (t_), never the OtherPlant ones (o_);
 - item 3, the reproduction records taken by the refused job under the earlier code (e1a_dev, e3a_dev) refuse every
   later score (require_reproductions); the pre-flight moves exactly those records aside, byte for byte, and takes them
   again, after which require_reproductions passes; a file with another sha256 stays; a move cut off after its link is
@@ -281,6 +282,38 @@ def t_mislabel():
               and msg.count("seed ") == 3, msg)
 
 
+def t_first():
+    print("item 2: in the reopened pre-flight's world (e1a_dev and e3a_dev superseded, so due again), the constants "
+          "are checked first: a refusal moves no record and runs no pass of any reproduction")
+    old = dict(D.code_shas(), ds1="ffafd22fea598b693bb88dca78c667a313f4b6990520f1eb06566a56040ae7b5")
+    text = {"p7": tuple(round(x, 4) for x in PLAIN_LIVE), "plain": tuple(round(x, 4) for x in PLAIN_LIVE)}
+    with inc("inc_first") as d:
+        for s in D.SEEDS:
+            v3f_b1(s, PLAIN_LIVE[s])
+            e3 = TS.arm_dir("A", s) / TS.file_names(TS.EXAM)[0]
+            e3.parent.mkdir(parents=True, exist_ok=True)
+            e3.write_text(json.dumps({"stage1": {"agnostic_map50_95": 0.8568578547397661}, "species_map50_95": 0.8859}))
+        recs = [equiv("e1a_dev", code=old), equiv("e3a_dev", code=old)]
+        equiv("md_identity")
+        sup = tuple({"deviation": 1, "path": str(p.relative_to(d)), "sha256": D._sha(p), "why": "test"} for p in recs)
+        before = [p.read_bytes() for p in recs]
+        stb = Stubs()
+        with patched(*(stb.items() + [(D, "B1_OOD23", text), (D, "SUPERSEDED", sup)])):
+            err = refused(D.reproductions)
+        check("the text's constants under P7's name: refused with no pass at all (no E1-A dev pass, no loader "
+              "pre-flight, no B'1 pass)", err is not None and stb.passes == [] and stb.preflights == 0,
+              (err, stb.passes, stb.preflights))
+        check("  the superseded records were not moved (still at their paths, byte for byte; no superseded/ folder)",
+              [p.read_bytes() if p.is_file() else None for p in recs] == before and
+              not (D.equiv_dir() / "superseded").exists(), sorted(os.listdir(str(D.equiv_dir()))))
+        stb = Stubs()
+        with patched(*(stb.items() + [(D, "SUPERSEDED", sup)])):
+            err = refused(D.reproductions)
+        check("  with the registered constants the same world moves both records, then takes E1-A's three dev passes "
+              "before B'1's three ood23 passes", err is None and [x[1] for x in stb.passes] == ["dev"] * 3 +
+              ["ood23"] * 3 and (D.equiv_dir() / "superseded" / "dev1" / "e1a_dev.json").is_file(), (err, stb.passes))
+
+
 def t_band():
     print("item 2: each pass's two readings within DS.7.1's rule (1e-6 passed, 0.002 a recorded deviation)")
     cases = [("p7_0.001", {"dp7": 0.001}, "deviation"), ("p7_0.003", {"dp7": 0.003}, "refused"),
@@ -521,7 +554,7 @@ def t_registration():
 
 
 def main():
-    for fn in (t_live, t_mislabel, t_band, t_readings, t_supersede, t_reopen, t_gate, t_registration):
+    for fn in (t_live, t_mislabel, t_first, t_band, t_readings, t_supersede, t_reopen, t_gate, t_registration):
         try:
             fn()
         except Exception as e:                   # noqa: BLE001

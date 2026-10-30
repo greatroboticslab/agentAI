@@ -1631,14 +1631,21 @@ def reproductions(embedder=None, workers=None, kw=None, seeds=SEEDS):
     """The three reproductions (DS.7.1), each taken once if missing: E1-A's three stage-1 dev records and E3-A's
     dev species records (E1-A's seeds through DS1's two-stage pass with E3's pinned classifier); B'1's ood23
     statistic (D1B1's seeds in stage1 mode under deviation 6's loader); an identity pass on MD equal to a plain
-    inc.scorer.score on its root. The records a recorded deviation supersedes are moved aside first (supersede), so
-    they are taken again. B'1's two readings (DS1 deviation 1): V3F's records are checked against both registered
-    constants before any pass, and each pass's two readings against V3F's, each within DS.7.1's rule."""
+    inc.scorer.score on its root. B'1's two readings (DS1 deviation 1): while b1_ood23 is due, V3F's records are
+    checked against both registered constants first, before any record moves and before any pass of any reproduction;
+    each pass's two readings are then held to V3F's, each within DS.7.1's rule. The records a recorded deviation
+    supersedes are moved aside next (supersede), so they are taken again."""
     from ..inc import verify as V
     from . import v3fam_loader as LD
     from . import v3fam_systems as SYS
     kw = kw or {}
     done = {}
+    # V3F's own D1B1 ood23 files (v3fam/v1/arms/D1B1/s<k>/ood23.json and their p7 arrays, read on the CPU), taken under
+    # the same loader fix: both readings of every seed against their registered constants, so a refusal comes before
+    # the superseded records move and before E1-A's dev passes or B'1's ood23 passes use the GPU
+    recorded = {int(s): v3f_b1_readings(s) for s in seeds} if not (equiv_dir() / "b1_ood23.json").exists() else None
+    if recorded is not None:
+        b1_check_constants(recorded)
     supersede()
     if not (equiv_dir() / "e1a_dev.json").exists() or not (equiv_dir() / "e3a_dev.json").exists():
         ccfg, _r, shas = TS._clf_cfg()
@@ -1667,11 +1674,8 @@ def reproductions(embedder=None, workers=None, kw=None, seeds=SEEDS):
         if not (equiv_dir() / "e3a_dev.json").exists():
             done["e3a_dev"] = equiv_record("e3a_dev", per3, {"what": "E3-A's dev species records",
                                                              "classifier": shas})
-    if not (equiv_dir() / "b1_ood23.json").exists():
-        # V3F's own D1B1 ood23 files (v3fam/v1/arms/D1B1/s<k>/ood23.json and their p7 arrays), taken under the same
-        # loader fix: both readings of every seed checked against their registered constants before any GPU pass
-        recorded = {int(s): v3f_b1_readings(s) for s in seeds}
-        b1_check_constants(recorded)
+    if recorded is not None and not (equiv_dir() / "b1_ood23.json").exists():
+        # V3F's readings were read and checked above, before any pass
         shapes = LD.preflight()
         per = {}
         for s in seeds:

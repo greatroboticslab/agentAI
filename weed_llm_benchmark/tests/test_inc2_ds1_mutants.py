@@ -144,6 +144,7 @@ must occur exactly once in its file), runs its target against the copy and requi
   DV12  stream            the gate opens while the deployed tree lacks the deviation's file
   DV13  weed.json         the reopen block's time precedes the live attempt (the pre-flight is never reopened)
   DV14  deploy_funnel     the deviation's file is not shipped
+  DV15  ds1               the superseded records are moved before the constants are checked (a refusal moves them)
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -409,6 +410,8 @@ MUTANTS = {
     "DV13": (WJ, '"before_utc": "2026-10-30T04:02:00Z",', '"before_utc": "2026-10-30T03:00:00Z",', DEV1),
     "DV14": (DF, "ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md docs/prereg/DS1_dev1_2026-10-30.md.ots",
              "ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md.ots", DEPLOY),
+    "DV15": (DC, '    if recorded is not None:\n        b1_check_constants(recorded)\n    supersede()\n',
+             '    supersede()\n    if recorded is not None:\n        b1_check_constants(recorded)\n', DEV1),
 }
 
 
