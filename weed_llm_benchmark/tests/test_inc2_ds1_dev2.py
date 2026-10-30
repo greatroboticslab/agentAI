@@ -5,24 +5,24 @@ docs/prereg/DS1_dev2_2026-10-30.md).
 Fixtures: tests/fixtures/ds1/dev2/, read only from the cluster on 2026-10-30, every file checked against its sha256
 (MANIFEST.json), the images and labels also against the cluster's sha256s.
 
-- item 2, the intake rows Step 1 keyed otherwise: 21,979 admissions of ten intake batches (a9s9v 8,946) had no file
-  record under their admission key (the manifest spells '.rf.', Step 1 '_rf_'); two a9s9v admissions become
-  candidates (on main 98ef308 neither);
 - item 1, image sizes: Step 1's v1-pool rows carry no image size, so the pools step's source rule (base3's) saw no
   weed box and dropped every row of rf_tuf__weed-3434e and rf_weed-detection-o9sfb__weed-detection-in-a-field as
   source_convention (main 98ef308: 1,019 and 1,229 live rows, 0 pooled). With the screen's own candidate rows of the
   two sources and their images, the pools step now reads each size from the header and pools them; a row whose
   header cannot be read is dropped 'unreadable'; base3's rules refuse a live row without a size;
-- item 1, the superseded pool records: the six records the pools step wrote at 05:38Z (by sha256) are moved aside,
+- item 2, the intake rows Step 1 keyed otherwise: 21,979 admissions of ten intake batches (a9s9v 8,946) had no file
+  record under their admission key (the manifest spells '.rf.', Step 1 '_rf_'); two a9s9v admissions become
+  candidates (on main 98ef308 neither);
+- item 3, the superseded pool records: the six records the pools step wrote at 05:38Z (by sha256) are moved aside,
   record and rows, into pools/p1/superseded/dev2/ with a MANIFEST; nothing deleted; a record with other bytes stays;
   a cut-off move completes; a folder copy or rows with other bytes refuse; the status reads them as not pooled until
   then, and the pools step moves them first and pools their sources again;
-- item 2, SIU: a queued row's holds are the queue's (SIU's 123,348 queue rows hold none; the screen read the intake
+- item 4, SIU: a queued row's holds are the queue's (SIU's 123,348 queue rows hold none; the screen read the intake
   record's h6_scan, released since by serve-holds); a row the queue does not hold keeps its intake record's; DS1
   reads SIU past its stream quarantine when every cite is D31, never under D28 or with the cites unknown; SIU's rows
   that screen p1_r001 held out are screened again once, the new record replacing the old (no counts summed), its
   candidates replacing the old ones; the plan proposes that screen and holds S1 until it is taken;
-- item 3, the reopen: data:1:screen and data:1:pools, as the lab's state holds them, are reopened once under the
+- item 5, the reopen: data:1:screen and data:1:pools, as the lab's state holds them, are reopened once under the
   deviation's marker once the deployed tree holds its file, their spend kept (1.0 + 0.9517 and 2.0983 GPU-h); the
   earlier blocks (failed items only) do not reopen a missing item; the gate holds every DS1 lever until the deployed
   tree holds the file;
@@ -217,7 +217,7 @@ def t_sizes():
           "no image size" in str(e), e)
 
 
-# ------------------------------------------------------------------ item 1: the superseded pool records
+# ------------------------------------------------------------------ item 3: the superseded pool records
 def plant_pools(names=None):
     d = DD.out_dir() / "pools" / "p1"
     d.mkdir(parents=True, exist_ok=True)
@@ -230,7 +230,7 @@ def plant_pools(names=None):
 
 
 def t_supersede():
-    print("item 1: the six pool records written without sizes are moved aside, byte for byte, and pooled again")
+    print("item 3: the six pool records written without sizes are moved aside, byte for byte, and pooled again")
     check("the deviation names exactly the six live records by sha256, their rows the empty file",
           {e["source"]: e["record_sha256"] for e in DD.SUPERSEDED_POOLS} == LIVE_POOLS and
           all(e["rows_sha256"] == EMPTY and e["deviation"] == 2 and e["phase"] == 1 for e in DD.SUPERSEDED_POOLS))
@@ -306,9 +306,9 @@ def t_supersede():
               LIVE_POOLS[TUF])
 
 
-# ------------------------------------------------------------------ item 1: the intake rows Step 1 keyed otherwise
+# ------------------------------------------------------------------ item 2: the intake rows Step 1 keyed otherwise
 def t_keys():
-    print("item 1: an intake row is found under the key Step 1 gave it (a9s9v's '.rf.' admitted as '_rf_')")
+    print("item 2: an intake row is found under the key Step 1 gave it (a9s9v's '.rf.' admitted as '_rf_')")
     from weed_optimizer_framework.tools.inc2 import step1_stream as S1
     d = fx_json("a9s9v_rows.json")
     lost = {b: v["admissions"].get("step1_spelling", 0) for b, v in d["by_batch"].items()
@@ -348,7 +348,7 @@ def t_keys():
               n.get("image") == man[1]["image"], (q.get("holds"), n.get("pool")))
 
 
-# ------------------------------------------------------------------ item 2: SIU
+# ------------------------------------------------------------------ item 4: SIU
 def siu_rows():
     """SIU's fixture rows through candidate_row: 4 queued (the queue holds none), 2 not admitted (no queue row)."""
     d = fx_json("siu_rows.json")
@@ -361,7 +361,7 @@ def siu_rows():
 
 
 def t_siu_holds():
-    print("item 2: a queued row's holds are the queue's (SIU: h6_scan released by serve-holds)")
+    print("item 4: a queued row's holds are the queue's (SIU: h6_scan released by serve-holds)")
     d = fx_json("siu_rows.json")
     check("the fixture: 4 queued SIU rows whose queue rows hold nothing and whose intake records hold h6_scan; 2 not "
           "admitted (no queue row) whose intake records hold h6_scan", len(d["queued"]) == 4 and all(
@@ -376,7 +376,7 @@ def t_siu_holds():
 
 
 def t_siu_eligibility():
-    print("item 2: DS1 reads SIU past its D31 stream quarantine (DS.0 item 14), never past D28 or unknown cites")
+    print("item 4: DS1 reads SIU past its D31 stream quarantine (DS.0 item 14), never past D28 or unknown cites")
     rows = [r for k, r in siu_rows()]
     q = {SIU, "rf_uav-qnoms__uav-wqshy"}
     live = {SIU: ["D31"], "rf_uav-qnoms__uav-wqshy": ["D28"]}
@@ -408,7 +408,7 @@ def siu_screen_world():
 
 
 def t_rescreen():
-    print("item 2: SIU's rows held out by the quarantine are screened again once, the new record replacing the old")
+    print("item 4: SIU's rows held out by the quarantine are screened again once, the new record replacing the old")
     with inc("rescreen"):
         siu_screen_world()
         rec0 = DD.screen_records(1)[SIU]
@@ -471,7 +471,7 @@ def t_plan():
           "data:1:manifests" in [x["item"] for x in c["maint"]], [x["item"] for x in c["maint"]])
 
 
-# ------------------------------------------------------------------ item 3: the reopen
+# ------------------------------------------------------------------ item 5: the reopen
 def live_items():
     """data:1:screen and data:1:pools as the lab's state held them on 2026-10-30 (12:2xZ)."""
     return {"data:1:screen": {"attempts": [{"gpuh": 1.0, "how": "settled",
@@ -499,7 +499,7 @@ def reopen_run(st, deployed):
 
 
 def t_reopen():
-    print("item 3: the live data:1:screen and data:1:pools reopened under the deviation, their spend kept")
+    print("item 5: the live data:1:screen and data:1:pools reopened under the deviation, their spend kept")
     dom = LS.load_domain("weed")["ds1"]
     dv = next((x for x in DD.deviations() if x["n"] == 2), {})
     blk = next((b for b in dom.get("reopens") or [] if b.get("marker") == MARKER), {})

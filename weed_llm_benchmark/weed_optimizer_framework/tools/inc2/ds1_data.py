@@ -167,27 +167,6 @@ AUDIT_VERSION = 2
 # The audit's predictor, E1-A seed 0 (e1a_predictor: INC/e1_a_m640/runs/base__s0/weights/final.pt, the file the screen
 # p1_r001 read; cited by sha256 in Revision 2's stamp file): the audit taken again refuses any other weights
 AUDIT_PREDICTOR_SHA256 = "a8e1b61ad29806c11228b9a54a463e40ac466fb3a717a17fcb2d6fc620e4cfcb"
-# DS1 deviation 2 (2026-10-30), item 2: DS.0 item 14 lets DS1's builds read SIU past its stream quarantine, which cites
-# D31 (data blamed: redundant frames), once its sheet and species-role table are decided and audited (source_ready);
-# never past a D28 (leak) quarantine, and never when the stream's cites cannot be read (fail closed). The screen's rows
-# of SIU that a revision held out by that quarantine are screened again (rescreen_due), and the new revision's record
-# of SIU replaces the earlier one.
-SIU_STREAM_CITES = ("D31",)
-QUARANTINED = "quarantined_d28"                     # the reason code of a source a stream quarantines whole
-# DS1 deviation 2, item 2: the phase-1 sources screened before it with rows its code reads otherwise, screened again
-# whole once (rescreen_due): SIU, held out whole by its D31 quarantine, and the sources whose queued rows the screen
-# read with the intake record's h6_scan hold, which step1_stream's serve-holds had released (read on 2026-10-30:
-# SIU 123,348 rows, mendeley_9yhd5b8kc3 6,604, kg_yuzhenlu__cottonweeddet3 755, zenodo_22033986 352, weedai_7e03cd97
-# 8; candidate_row now takes a queued row's holds from the queue)
-RESCREEN = (SIU, "mendeley_9yhd5b8kc3", "kg_yuzhenlu__cottonweeddet3", "zenodo_22033986",
-            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b")
-SCREEN_DEVIATION = 2                                # a screen revision's "deviation": the last whose rules it applied
-# DS1 deviation 2, item 1: the phase-1 pool records L30's pools step (job 50028368) wrote at 2026-10-30T05:38Z while
-# every Step 1 v1-pool row (step1/pool.jsonl) had no image size (candidate_row read it from the file record only):
-# base3's source rule skips a row without one, so each source showed "no weed box" and every row dropped as
-# source_convention. Each is moved aside byte for byte (its record and its rows, which must hash as named) into
-# splits/ds1/pools/p<phase>/superseded/dev2/ (supersede_pools), and the source is pooled again. A record at the path
-# with other bytes is not the one named and stays.
 # DS1 deviation 2's record (docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-30): DS1 deviation 2"), kept byte for byte
 # under docs/prereg/ and time-stamped as deviation 1 was; the ticker's gate pins it by sha256 (the domain's
 # ds1.deviations). It is pinned here and not in inc2.ds1.DEVIATIONS: the reproduction records pin inc2/ds1.py's bytes
@@ -198,6 +177,27 @@ DEVIATION_2 = {"n": 2, "file": "docs/prereg/DS1_dev2_2026-10-30.md",
                "sha256": "58865e1d5c83f494e15c238c8e604924715048670fae11eb1f9d6b015eb574d4",
                "commit": "d91a2641605ed1d2f115385f0fd6936e57fc1ca6",
                "stamp_file": "docs/prereg/DS1_dev2_2026-10-30.stamp.txt"}
+# DS1 deviation 2 (2026-10-30), item 4: DS.0 item 14 lets DS1's builds read SIU past its stream quarantine, which cites
+# D31 (data blamed: redundant frames), once its sheet and species-role table are decided and audited (source_ready);
+# never past a D28 (leak) quarantine, and never when the stream's cites cannot be read (fail closed). The screen's rows
+# of SIU that a revision held out by that quarantine are screened again (rescreen_due), and the new revision's record
+# of SIU replaces the earlier one.
+SIU_STREAM_CITES = ("D31",)
+QUARANTINED = "quarantined_d28"                     # the reason code of a source a stream quarantines whole
+# DS1 deviation 2, item 4: the phase-1 sources screened before it with rows its code reads otherwise, screened again
+# whole once (rescreen_due): SIU, held out whole by its D31 quarantine, and the sources whose queued rows the screen
+# read with the intake record's h6_scan hold, which step1_stream's serve-holds had released (read on 2026-10-30:
+# SIU 123,348 rows, mendeley_9yhd5b8kc3 6,604, kg_yuzhenlu__cottonweeddet3 755, zenodo_22033986 352, weedai_7e03cd97
+# 8; candidate_row now takes a queued row's holds from the queue)
+RESCREEN = (SIU, "mendeley_9yhd5b8kc3", "kg_yuzhenlu__cottonweeddet3", "zenodo_22033986",
+            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b")
+SCREEN_DEVIATION = 2                                # a screen revision's "deviation": the last whose rules it applied
+# DS1 deviation 2, item 3: the phase-1 pool records L30's pools step (job 50028368) wrote at 2026-10-30T05:38Z while
+# every Step 1 v1-pool row (step1/pool.jsonl) had no image size (candidate_row read it from the file record only):
+# base3's source rule skips a row without one, so each source showed "no weed box" and every row dropped as
+# source_convention. Each is moved aside byte for byte (its record and its rows, which must hash as named) into
+# splits/ds1/pools/p<phase>/superseded/dev2/ (supersede_pools), and the source is pooled again. A record at the path
+# with other bytes is not the one named and stays.
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 _DEV2_POOL_WHY = ("written 2026-10-30T05:38Z by job 50028368 while every row lacked its image size, so base3's source "
                   "rule saw no weed box and dropped all %d live rows as source_convention; pooled again under DS1 "
@@ -405,7 +405,7 @@ def capture_name_hits(names):
 
 
 def siu_scoped(source, ctx):
-    """True for SIU when every stream quarantine of it cites D31 (DS.0 item 14, DS1 deviation 2 item 2): DS1 reads it
+    """True for SIU when every stream quarantine of it cites D31 (DS.0 item 14, DS1 deviation 2 item 4): DS1 reads it
     past that quarantine, its sheet and species-role table decided and audited before any of its rows enters a
     manifest (source_ready). False for every other source, for SIU quarantined under D28, and when the cites are not
     known (fail closed). ctx: quarantine_cites {source: [cites]}."""
@@ -1338,7 +1338,7 @@ class Inputs(object):
         self.scanners = kw.get("scanners") or {}        # {name: EmbedScanner}
         self.eval_sources = set(kw.get("eval_sources") or ())
         self.quarantined = set(kw.get("quarantined") or ())
-        # {source: [cites]} of the stream's quarantines (DS1 deviation 2, item 2: SIU's D31 quarantine is read past)
+        # {source: [cites]} of the stream's quarantines (DS1 deviation 2, item 4: SIU's D31 quarantine is read past)
         self.quarantine_cites = dict(kw.get("quarantine_cites") or {})
         self.read_size = kw.get("read_size")            # (path) -> (W, H) from the header (tests: a stub)
         self.never = set(kw.get("never") or ())
@@ -1652,7 +1652,7 @@ def ingest_matches(bdir, bj=None):
 def candidate_row(key, adm, q, f, im=None):
     """One candidate from its admission record, its queue row (None when not admitted), its original file and its
     Step 1 batch's copy-refusal match (im: ingest_matches). A queued row's holds are the queue's, events folded (a hold
-    step1_stream's serve-holds released is gone, DS1 deviation 2 item 2: the intake file record keeps the holds it was
+    step1_stream's serve-holds released is gone, DS1 deviation 2 item 4: the intake file record keeps the holds it was
     admitted with); a row the queue does not hold keeps its intake record's."""
     try:
         boxes = read_inc_label(f["label"])
@@ -2085,7 +2085,7 @@ def screen(phase, inputs, revision=None, write=True):
     or a Step 1 batch came since the last one (its record names the batches it saw), so the platform's plan sees
     the screen done even when no row is new. A source screened before DS1 deviation 2 with rows its code reads
     otherwise (rescreen_due: SIU, held out by its D31 quarantine, and the sources read with released intake holds) is
-    screened again whole, once, and this revision's record of it replaces the earlier ones (deviation 2, item 2).
+    screened again whole, once, and this revision's record of it replaces the earlier ones (deviation 2, item 4).
     Each live row's image size is read from its header where its file record gave none (fill_sizes), so its
     convention sees every box (DS1 deviation 2, item 1)."""
     from . import ds1_sheets as SH
@@ -2190,7 +2190,7 @@ def screen(phase, inputs, revision=None, write=True):
            "live": len(live), "sources": rec, "inputs": inputs.record, "decided_by": D.DECIDED_BY,
            "written_utc": D._utc(), "deviation": SCREEN_DEVIATION}
     if again:
-        # DS1 deviation 2, item 2: the sources screened again whole; screen_records reads this revision's record of
+        # DS1 deviation 2, item 4: the sources screened again whole; screen_records reads this revision's record of
         # each in place of the earlier ones, screened_rows its candidates in place of theirs
         doc["rescreen"] = {s: {"of": [p.name for p in revs if s in ((_read_json(p) or {}).get("sources") or {})],
                                "rows": per[s]["rows"] if s in per else 0, "deviation": 2,
@@ -2414,7 +2414,7 @@ def screened_keys(phase):
 
 def screened_rows(phase):
     """Every screen revision's candidates of a phase, each key once: a key a later revision screened again (DS1
-    deviation 2, item 2) is that revision's row, in the place the key first held."""
+    deviation 2, item 4) is that revision's row, in the place the key first held."""
     by = {}
     for p in screen_revisions(phase):
         for r in read_jsonl(Path(str(p)[:-5] + "_candidates.jsonl")):
@@ -2426,7 +2426,7 @@ def screened_rows(phase):
 
 
 def rescreen_due(phase):
-    """The sources the next screen of a phase takes again whole (DS1 deviation 2, item 2): each source of RESCREEN that
+    """The sources the next screen of a phase takes again whole (DS1 deviation 2, item 4): each source of RESCREEN that
     a revision of phase 1 written before the deviation screened (its record names no deviation: SIU held out by its D31
     quarantine, which DS.0 item 14 reads past, and queued rows held by an intake hold the queue had released) and that
     no revision screened again (once only). Phase 2 reads only its named sources."""
@@ -2446,7 +2446,7 @@ def screen_records(phase, reaudits=None):
     """{source: record} over every screen revision of a phase: the latest revision's record of the source, with the
     counts summed and the flags that settle a source taken from any revision (a cwd12 copy quarantines it whole
     whichever revision found it; a capture name sends it to role C). A revision that screened a source again whole
-    (its 'rescreen', DS1 deviation 2 item 2) replaces the earlier revisions' record of it."""
+    (its 'rescreen', DS1 deviation 2 item 4) replaces the earlier revisions' record of it."""
     out = {}
     for p in screen_revisions(phase):
         d = _read_json(p) or {}
@@ -2541,7 +2541,7 @@ def _pool_paths(phase, source):
 
 def pools_superseded_due(phase):
     """The sources of a phase whose pool record a recorded deviation supersedes still stands at its path, hashing as
-    named (SUPERSEDED_POOLS; DS1 deviation 2, item 1): the plan reads them as not pooled, and the pools step moves
+    named (SUPERSEDED_POOLS; DS1 deviation 2, item 3): the plan reads them as not pooled, and the pools step moves
     them aside first (supersede_pools)."""
     out = []
     for e in SUPERSEDED_POOLS:
@@ -2553,7 +2553,7 @@ def pools_superseded_due(phase):
 
 
 def supersede_pools(phase):
-    """The pool records of a phase that a recorded deviation supersedes (SUPERSEDED_POOLS; DS1 deviation 2, item 1),
+    """The pool records of a phase that a recorded deviation supersedes (SUPERSEDED_POOLS; DS1 deviation 2, item 3),
     moved aside byte for byte into pools/p<phase>/superseded/dev<n>/: for each, its record (<slug>.json, hashing as
     named) and its rows (<slug>.jsonl, which must hash as named), each a hard link made there and then the original
     unlinked, the rows first and the record last, so a move cut off midway is still due and completes; never
@@ -3314,7 +3314,7 @@ def plan_state(inc_dir=None):
     for ph in PHASES:
         revs = screen_revisions(ph)
         seen = set(((_read_json(revs[-1]) or {}).get("inputs") or {}).get("step1_batches") or []) if revs else set()
-        repool = set(pools_superseded_due(ph))         # DS1 deviation 2, item 1: pooled again, so not pooled now
+        repool = set(pools_superseded_due(ph))         # DS1 deviation 2, item 3: pooled again, so not pooled now
         srcs = {}
         for s, v in screen_records(ph).items():
             if not v.get("live"):
