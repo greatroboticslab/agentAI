@@ -156,6 +156,10 @@ ROOT_PATHS+=(docs/prereg/DS1_rev2_2026-10-29.md docs/prereg/DS1_rev2_2026-10-29.
 # and its reopen block pin it by sha256), its proofs and stamp file
 ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md docs/prereg/DS1_dev1_2026-10-30.md.ots
              docs/prereg/DS1_dev1_2026-10-30.stamp.txt docs/prereg/DS1_dev1_2026-10-30.stamp.txt.ots)
+# DS1 deviation 2 (2026-10-30): its byte copy (the gate, the domain's ds1.deviations, and its reopen block pin it by
+# sha256; inc2.ds1_data.DEVIATION_2 likewise), its proofs and stamp file
+ROOT_PATHS+=(docs/prereg/DS1_dev2_2026-10-30.md docs/prereg/DS1_dev2_2026-10-30.md.ots
+             docs/prereg/DS1_dev2_2026-10-30.stamp.txt docs/prereg/DS1_dev2_2026-10-30.stamp.txt.ots)
 # V3F (2026-10-11): the ticker proposes the family's levers only once the deployed tree holds the amendment's byte
 # copy (docs/prereg/V3F_2026-10-11.md) and its Revisions 29-31's (docs/prereg/V3F_rev29-31_2026-10-11.md), each by
 # its sha256; it reopens the items a recorded deviation names only once the deployed tree holds that deviation's
