@@ -111,7 +111,7 @@ DEVIATIONS = ({"n": 1, "file": "docs/prereg/DS1_dev1_2026-10-30.md",
                "sha256": "ade0f0d3cf08a28c2e5149e2fd1ac71642c8ab61787c199272e1f1c4f5d82a34",
                "commit": "97e78a550c97a594a78eaffb855d77aced546f74",
                "stamp_file": "docs/prereg/DS1_dev1_2026-10-30.stamp.txt"},)
-DELEGATE ="the delegate under the 2026-09-30 owner grant"
+DELEGATE = "the delegate under the 2026-09-30 owner grant"
 OWNER = "Harry He (owner)"
 DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-29): DS1, scaling verified training data at the weed level "
               "(pre-registered); commit %s; %s sha256 %s" % (PREREG_COMMIT[:7], PREREG_FILE, PREREG_SHA256))
