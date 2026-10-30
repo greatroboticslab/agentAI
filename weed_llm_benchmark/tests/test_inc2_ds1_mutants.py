@@ -315,8 +315,7 @@ MUTANTS = {
     "DR7": (DD, "    if corrected or left:\n", "    if corrected:\n", REV1),
     "DR8": (DD, "    if write and (rows or not revs or sorted(seen or []) != sorted(last_seen or [])):\n",
             "    if write and rows:\n", REV1),
-    "DR9": (DD, '    rows = [r for r in inputs.candidates if r["key"] not in prior and (int(phase) == 1 or r["source"] in '
-                'named)]\n', '    rows = [r for r in inputs.candidates if r["key"] not in prior]\n', REV1),
+    "DR9": (DD, '            and (int(phase) == 1 or r["source"] in named)]\n', '            and True]\n', REV1),
     "DR10": (DD, '        if r["key"] in traced:\n            r["box_src"] = [str(x) for x in traced[r["key"]]]\n',
              '        if False:\n            r["box_src"] = [str(x) for x in traced[r["key"]]]\n', REV1),
     "DR11": (DD, '                    "image": r.get("train_image") or r.get("image"),\n', "", REV1),
