@@ -170,9 +170,9 @@ AUDIT_PREDICTOR_SHA256 = "a8e1b61ad29806c11228b9a54a463e40ac466fb3a717a17fcb2d6f
 # DS1 deviation 2's record (docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-30): DS1 deviation 2"), kept byte for byte
 # under docs/prereg/ and time-stamped as deviation 1 was; the ticker's gate pins it by sha256 (the domain's
 # ds1.deviations). It is pinned here and not in inc2.ds1.DEVIATIONS: the reproduction records pin inc2/ds1.py's bytes
-# (inc2.ds1.code_shas), so a change of that file would refuse every later score until they are taken again. Its second
-# text (the first, b825aa66...ed4d of commit dbd6bea, never deployed, is kept under
-# docs/prereg/superseded/DS1_dev2_first_text/).
+# (inc2.ds1.code_shas), so a change of that file would refuse every later score until they are taken again. Its third
+# text (the first, b825aa66...ed4d of commit dbd6bea, and the second, 58865e1d...74d4 of commit d91a264, never
+# deployed, are kept under docs/prereg/superseded/DS1_dev2_first_text/ and DS1_dev2_second_text/).
 DEVIATION_2 = {"n": 2, "file": "docs/prereg/DS1_dev2_2026-10-30.md",
                "sha256": "58865e1d5c83f494e15c238c8e604924715048670fae11eb1f9d6b015eb574d4",
                "commit": "d91a2641605ed1d2f115385f0fd6936e57fc1ca6",
@@ -185,12 +185,15 @@ DEVIATION_2 = {"n": 2, "file": "docs/prereg/DS1_dev2_2026-10-30.md",
 SIU_STREAM_CITES = ("D31",)
 QUARANTINED = "quarantined_d28"                     # the reason code of a source a stream quarantines whole
 # DS1 deviation 2, item 4: the phase-1 sources screened before it with rows its code reads otherwise, screened again
-# whole once (rescreen_due): SIU, held out whole by its D31 quarantine, and the sources whose queued rows the screen
-# read with the intake record's h6_scan hold, which step1_stream's serve-holds had released (read on 2026-10-30:
-# SIU 123,348 rows, mendeley_9yhd5b8kc3 6,604, kg_yuzhenlu__cottonweeddet3 755, zenodo_22033986 352, weedai_7e03cd97
-# 8; candidate_row now takes a queued row's holds from the queue)
+# whole once (rescreen_due): SIU, held out whole by its D31 quarantine, and the sources whose rows the screen read with
+# the collector's h6_scan hold from the intake record, though Step 1 had scanned them at ingest and so held none: queued
+# rows whose queue row holds nothing (main's candidate_row fell back to the intake record on an empty list) and rows not
+# admitted at species level (no queue row; their ingest rows record the scan). Read on 2026-10-30 from screens p1_r001
+# and p1_r002: SIU 123,348 queued and 64,421 not admitted, mendeley_9yhd5b8kc3 6,604 and 2,663,
+# kg_yuzhenlu__cottonweeddet3 755 and 40, zenodo_22033986 352 and 974, mendeley_fcf7brsfm6 0 and 567, weedai_7e03cd97
+# 8 and 5 (each scanned, 'funnel')
 RESCREEN = (SIU, "mendeley_9yhd5b8kc3", "kg_yuzhenlu__cottonweeddet3", "zenodo_22033986",
-            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b")
+            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b", "mendeley_fcf7brsfm6")
 SCREEN_DEVIATION = 2                                # a screen revision's "deviation": the last whose rules it applied
 # DS1 deviation 2, item 3: the phase-1 pool records L30's pools step (job 50028368) wrote at 2026-10-30T05:38Z while
 # every Step 1 v1-pool row (step1/pool.jsonl) had no image size (candidate_row read it from the file record only):
@@ -211,6 +214,19 @@ SUPERSEDED_POOLS = tuple({"deviation": 2, "phase": 1, "source": s, "record_sha25
      "f76ee83fb74ebc9abda7ba97cd6838e12a1c00617a113bf89ffd4ec8fc9f9a90", 1229),
     ("rf_yolo-gyfyq__weed-ieda7", "1ac035e0ae4a98628488ec7f92c9be710786f3e1bd624b9d0a0ca1e421eb11b1", 1825),
     ("rf_zijian-peng__grass-weed-69hcm", "72bdb39ea7e0bc78c24f670edecfcf1de1b046fe5882a83e7f5ae1c4e06883b2", 1)))
+# DS1 deviation 2, item 6: KF's arm record the manifests step (job 50037144) wrote at 2026-10-30T13:50:11Z at N_K
+# 12,255 = min(15,000, KF's supply) while SIU's K supply read 0 (items 1-4); DS.5.3 sets N_K = min(15,000, every K
+# pool's supply at build), the same in every K arm. KF was never trained (build:KF failed twice on the seeds argument,
+# item 7). Its record and manifest are moved aside byte for byte into splits/ds1/arms/superseded/dev2/ (supersede_arms)
+# by the manifests step, and KF is built again with KD and KT once SIU's supply is known (or alone once SIU settles
+# out); until then the status reads KF as not built.
+_DEV2_ARM_WHY = ("written 2026-10-30T13:50:11Z by the manifests step (job 50037144) at N_K 12,255 = min(15,000, KF's "
+                 "supply) while SIU's K supply read 0; never trained; built again under DS1 deviation 2 (item 6) at "
+                 "N_K = min(15,000, every K pool's supply) once SIU's supply is known")
+SUPERSEDED_ARMS = ({"deviation": 2, "arm": "KF",
+                    "record_sha256": "eb0d0ef3b98588e5770dcdd44a5b4d5bb7905073ba9102d921c5cd4916f74a6d",
+                    "rows_sha256": "9b0d256849b92f43d295c2e52768de08378467bc53ceb04ecc0a6a3ab46422ec",
+                    "why": _DEV2_ARM_WHY},)
 FAMILY_CAP = 0.35
 MD_SHARE, MD_MIN, MD_MAX = 0.05, 15, 500
 MTW_SHARE, MTW_MIN, MTW_MAX = 0.10, 30, 1000
@@ -1093,6 +1109,24 @@ def k_pools(siu_rows, kf_rows, crop_eppo=()):
     return {"target": tgt, "nontarget": non, "kf": kf_rows, "supplies": supplies}, t, n_k
 
 
+def k_after_kf(supplies, kf_n_k):
+    """(mode, N_K, short) of KD and KT once SIU's supply is known, KF built at kf_n_k (DS1 deviation 2, item 6). KF was
+    built while SIU's supply was unknown, at min(15,000, KF's supply); DS.5.3 sets N_K = min(15,000, every K pool's
+    supply at build), the same in every K arm. Both supplies at least kf_n_k: ('build', kf_n_k, {}). Otherwise
+    ('wait', min(15,000, every supply), short): KD and KT are not recorded not run for a supply under KF's N_K; KF is
+    superseded and the three K arms built at the common N_K by a recorded change."""
+    short = k_short(supplies, kf_n_k)
+    if not short:
+        return "build", int(kf_n_k), {}
+    return "wait", min([N_K_MAX] + [int(v) for v in supplies.values()]), short
+
+
+def k_wait_path():
+    """splits/ds1/arms/k_wait.json (DS1 deviation 2, item 6): KD and KT wait, their supplies under KF's N_K (rewritten
+    by each manifests step while they wait; the plan names the wait and proposes no K build)."""
+    return out_dir() / "arms" / "k_wait.json"
+
+
 def k_short(supplies, n_k):
     """{arm: supply} of KD and KT where the supply is under N_K (DS.5.3: N_K is the same in every K arm, so both are
     then not run, recorded in k_not_run.json)."""
@@ -1526,7 +1560,10 @@ def families(conf):
 
 def stream_quarantine_cites():
     """{source: [the diagnoses its quarantines cite, D28 or D31]} over every stream (inc2.stream's ledger fold,
-    q_sources {source: {cite, seq, utc}}, as base3 reads it); a quarantine without a cite reads '?'."""
+    q_sources {source: {cite, seq, utc}}, as base3 reads it); a quarantine without a cite reads '?'. SIU is read past
+    its quarantine only when every cite is known to be D31 (siu_scoped), so where a stream cannot be folded, or the
+    streams cannot be read at all, SIU's cites include '?' (fail closed, DS1 deviation 2 item 4): an unread stream
+    might quarantine it under D28."""
     try:
         from .. import inc_autopilot  # noqa: F401  (the package is present wherever the stream runs)
         from . import stream as ST
@@ -1536,13 +1573,14 @@ def stream_quarantine_cites():
         for sid in sids:
             try:
                 q = ST.Stream(sid, quiet=True).load(repair=False).q_sources
-            except Exception:  # noqa: BLE001 - a stream that cannot be folded quarantines nothing here
+            except Exception:  # noqa: BLE001 - a stream that cannot be folded: its quarantines are unknown
+                out[SIU].add("?")
                 continue
             for s, v in q.items():
                 out[s].add(str((v or {}).get("cite") or "?") if isinstance(v, dict) else "?")
         return {s: sorted(c) for s, c in out.items()}
     except Exception:  # noqa: BLE001
-        return {}
+        return {SIU: ["?"]}
 
 
 def stream_quarantined():
@@ -1595,6 +1633,7 @@ def load_candidates(phase, base_b, inc_dir=None):
         if bj.get("kind") == "knowntruth":
             continue
         im = ingest_matches(bdir, bj)
+        sc = ingest_scanned(bdir)
         for a in read_jsonl(bdir / "admission.jsonl"):
             k = a["key"]
             if k in seen:
@@ -1604,7 +1643,7 @@ def load_candidates(phase, base_b, inc_dir=None):
             f = files.get(k)
             if f is None:
                 continue
-            row = candidate_row(k, a, q, f, im.get(k))
+            row = candidate_row(k, a, q, f, im.get(k), scanned=sc.get(k))
             if row is not None:
                 out.append(row)
     return out
@@ -1616,6 +1655,26 @@ def step1_keys(r):
     from ..inc import verify as V
     k = V._sanitise(r["key"])
     return [k, "%s__%s" % (k, C.sha256_text("%s/%s" % (r.get("source"), r.get("image")))[:8])]
+
+
+def ingest_scanned(bdir):
+    """{key: what cleared Step 1's copy hold} of a Step 1 batch's ingest rows (ingest.jsonl): the embedding copy scan
+    that scanned the image at ingest ('scanned', the scanner's name), or 'provenance' for a provenance-cleared row:
+    the two conditions under which inc2.step1_stream.row_holds sets no h6_scan (DS1 deviation 2, item 4). b0000
+    writes no ingest.jsonl: {}."""
+    out = {}
+    p = Path(bdir) / "ingest.jsonl"
+    if not p.is_file():
+        return out
+    with open(p) as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            w = r.get("scanned") or ("provenance" if r.get("provenance_cleared") else None)
+            if w and r.get("key") is not None:
+                out[r["key"]] = str(w)
+    return out
 
 
 def ingest_matches(bdir, bj=None):
@@ -1649,11 +1708,14 @@ def ingest_matches(bdir, bj=None):
     return out
 
 
-def candidate_row(key, adm, q, f, im=None):
-    """One candidate from its admission record, its queue row (None when not admitted), its original file and its
-    Step 1 batch's copy-refusal match (im: ingest_matches). A queued row's holds are the queue's, events folded (a hold
-    step1_stream's serve-holds released is gone, DS1 deviation 2 item 4: the intake file record keeps the holds it was
-    admitted with); a row the queue does not hold keeps its intake record's."""
+def candidate_row(key, adm, q, f, im=None, scanned=None):
+    """One candidate from its admission record, its queue row (None when not admitted), its original file, its
+    Step 1 batch's copy-refusal match (im: ingest_matches) and what cleared Step 1's copy hold at ingest (scanned:
+    ingest_scanned). DS1 deviation 2, item 4: the holds are Step 1's, not the collector's. A queued row's holds are
+    the queue's, events folded; an empty list is no hold (the intake file record keeps the holds the collector gave
+    it, h6_scan among them, which Step 1 decides anew: inc2.step1_stream.row_holds sets h6_scan only on a row neither
+    provenance-cleared nor scanned). A row the queue does not hold keeps its intake record's holds, less h6_scan where
+    Step 1's ingest row records the copy scan (or provenance) that clears it."""
     try:
         boxes = read_inc_label(f["label"])
     except (OSError, ValueError, DataRefused):
@@ -1670,7 +1732,9 @@ def candidate_row(key, adm, q, f, im=None):
             "dhash": (q or {}).get("dhash") if q else f.get("dhash"), "variants": None,
             "licence": (q or {}).get("licence") or f.get("licence"),
             "research_only": bool((q or {}).get("research_only") or f.get("research_only")),
-            "holds": list((q.get("holds") if q is not None else f.get("holds")) or []),
+            "holds": (list(q.get("holds") or []) if q is not None else
+                      [h for h in (f.get("holds") or []) if not (h == "h6_scan" and scanned)]),
+            "h6_cleared": (str(scanned) if q is None and scanned and "h6_scan" in (f.get("holds") or []) else None),
             "refused": (q or {}).get("refused") or adm.get("refusal"), "admission": adm.get("admission"),
             "test_v1": (q or {}).get("test_v1"),
             "batch": adm.get("batch") or f.get("batch"), "kind_q": (q or {}).get("kind"),
@@ -2084,8 +2148,8 @@ def screen(phase, inputs, revision=None, write=True):
     the next steps; the sheets' bundles (inc2.ds1_sheets.bundle). A revision is written whenever it screens new rows
     or a Step 1 batch came since the last one (its record names the batches it saw), so the platform's plan sees
     the screen done even when no row is new. A source screened before DS1 deviation 2 with rows its code reads
-    otherwise (rescreen_due: SIU, held out by its D31 quarantine, and the sources read with released intake holds) is
-    screened again whole, once, and this revision's record of it replaces the earlier ones (deviation 2, item 4).
+    otherwise (rescreen_due: SIU, held out by its D31 quarantine, and the sources read with the intake record's h6_scan
+    hold that Step 1's scan at ingest had cleared) is screened again whole, once, and this revision's record of it replaces the earlier ones (deviation 2, item 4).
     Each live row's image size is read from its header where its file record gave none (fill_sizes), so its
     convention sees every box (DS1 deviation 2, item 1)."""
     from . import ds1_sheets as SH
@@ -2140,6 +2204,10 @@ def screen(phase, inputs, revision=None, write=True):
             per[r["source"]]["units"][unit_of(r, b[0], i)] += 1
     fill_sizes(live, inputs.read_size)
     hash_rows(live, hasher=inputs.hasher)
+    for r in live:
+        if r.get("drop"):
+            # an image whose header or pixels cannot be read: out, counted with its reason (rows - out = live)
+            per[r["source"]]["out"][r["drop"]] += 1
     live = [r for r in live if not r.get("drop")]
     # DS1's guard against cwd12 dev and test on the live rows: an embedding hit is a copy at the calibrated threshold;
     # a dHash hit only where the detector confirms it (its pair cosine reaches the threshold, D28-v2), every dHash hit
@@ -2195,9 +2263,11 @@ def screen(phase, inputs, revision=None, write=True):
         doc["rescreen"] = {s: {"of": [p.name for p in revs if s in ((_read_json(p) or {}).get("sources") or {})],
                                "rows": per[s]["rows"] if s in per else 0, "deviation": 2,
                                "why": ("held out whole before DS1 deviation 2 by its D31 stream quarantine, which DS.0 "
-                                       "item 14 reads past, and its queued rows read with their intake hold"
-                                       if s == SIU else "its queued rows read before DS1 deviation 2 with an intake "
-                                       "hold (h6_scan) the queue had released")} for s in sorted(again)}
+                                       "item 14 reads past, and its rows read with the collector's h6_scan hold from "
+                                       "the intake record, though Step 1 scanned them at ingest and held none"
+                                       if s == SIU else "its rows read before DS1 deviation 2 with the collector's "
+                                       "h6_scan hold from the intake record, though Step 1 scanned them at ingest and "
+                                       "held none")} for s in sorted(again)}
     if write and (rows or not revs or sorted(seen or []) != sorted(last_seen or [])):
         base_p = out_dir() / "screen" / ("p%d_r%03d" % (int(phase), int(revision)))
         write_jsonl_once(Path(str(base_p) + "_candidates.jsonl"), [_cand_out(r) for r in rows])
@@ -2428,8 +2498,8 @@ def screened_rows(phase):
 def rescreen_due(phase):
     """The sources the next screen of a phase takes again whole (DS1 deviation 2, item 4): each source of RESCREEN that
     a revision of phase 1 written before the deviation screened (its record names no deviation: SIU held out by its D31
-    quarantine, which DS.0 item 14 reads past, and queued rows held by an intake hold the queue had released) and that
-    no revision screened again (once only). Phase 2 reads only its named sources."""
+    quarantine, which DS.0 item 14 reads past, and rows read with the intake record's h6_scan hold, which Step 1's
+    copy scan at ingest had cleared) and that no revision screened again (once only). Phase 2 reads only its named sources."""
     if int(phase) != 1:
         return []
     seen, again = set(), set()
@@ -2437,7 +2507,7 @@ def rescreen_due(phase):
         d = _read_json(p) or {}
         again |= set(d.get("rescreen") or {})
         if int(d.get("deviation") or 0) < SCREEN_DEVIATION:
-            # a revision written before deviation 2 (its code read SIU's quarantine and the queued rows' holds so)
+            # a revision written before deviation 2 (its code read SIU's quarantine and the rows' holds so)
             seen |= {s for s in (d.get("sources") or {}) if s in RESCREEN}
     return sorted(seen - again)
 
@@ -2537,6 +2607,76 @@ def sources_out(decisions=None):
 def _pool_paths(phase, source):
     d = out_dir() / "pools" / ("p%d" % int(phase))
     return d / ("%s.json" % slug(source)), d / ("%s.jsonl" % slug(source))
+
+
+def arms_superseded_due():
+    """The arms whose record a recorded deviation supersedes still stands at its path, hashing as named
+    (SUPERSEDED_ARMS; DS1 deviation 2, item 6): the status reads them as not built, and the manifests step moves them
+    aside first (supersede_arms)."""
+    out = []
+    for e in SUPERSEDED_ARMS:
+        rec = arm_record_path(e["arm"])
+        if rec.is_file() and not rec.is_symlink() and C.sha256_file(rec) == e["record_sha256"]:
+            out.append(e["arm"])
+    return sorted(out)
+
+
+def supersede_arms():
+    """The arm records a recorded deviation supersedes (SUPERSEDED_ARMS; DS1 deviation 2, item 6), moved aside byte
+    for byte into arms/superseded/dev<n>/ as supersede_pools moves pools: its manifest (<arm>.jsonl, which must hash as
+    named) first and its record (<arm>.json) last, each a hard link made there and then the original unlinked; never
+    overwritten, never deleted; each move recorded in that folder's MANIFEST.json. A record at the path with other
+    bytes is not the one named and stays. Returns [{arm, status: moved | moved_before | other | absent}]."""
+    out = []
+    for e in SUPERSEDED_ARMS:
+        rec, man_ = arm_record_path(e["arm"]), arm_path(e["arm"])
+        dd = rec.parent / "superseded" / ("dev%d" % int(e["deviation"]))
+        named = ((man_, e["rows_sha256"]), (rec, e["record_sha256"]))
+        for src, sha in named:
+            dst = dd / src.name
+            if dst.is_file() and sha != C.sha256_file(dst):
+                raise DataRefused("%s holds another file than the one DS1 deviation %d supersedes (%s...)" % (
+                    dst, int(e["deviation"]), sha[:12]))
+        got = C.sha256_file(rec) if rec.is_file() and not rec.is_symlink() else None
+        if got != e["record_sha256"]:
+            st_ = "moved_before" if (dd / rec.name).is_file() else ("other" if got is not None else "absent")
+            out.append({"arm": e["arm"], "status": st_})
+            continue
+        dv = next((d for d in deviations() if int(d["n"]) == int(e["deviation"]) and d.get("sha256")), None)
+        if dv is None:
+            raise DataRefused("the superseded record of %s names DS1 deviation %s, which no pinned deviation record "
+                              "holds" % (e["arm"], e["deviation"]))
+        if man_.is_file() and C.sha256_file(man_) != e["rows_sha256"]:
+            raise DataRefused("%s does not hash as the manifest DS1 deviation %d names (%s...): its record is not "
+                              "moved" % (man_, int(dv["n"]), e["rows_sha256"][:12]))
+        if not man_.is_file() and not (dd / man_.name).is_file():
+            raise DataRefused("%s's manifest (%s) is neither at its path nor moved aside: its record is not moved" % (
+                e["arm"], man_.name))
+        dd.mkdir(parents=True, exist_ok=True)
+        files = []
+        for src, sha in named:
+            dst = dd / src.name
+            if src.is_file():
+                if not dst.is_file():
+                    os.link(str(src), str(dst))
+                size = src.stat().st_size
+                os.unlink(str(src))
+            else:
+                size = dst.stat().st_size          # moved by a run cut off after its link and unlink
+            files.append({"path": str(src.relative_to(C.INC_DIR)) if str(src).startswith(str(C.INC_DIR)) else str(src),
+                          "sha256": sha, "size": size, "moved_to": str(dst.relative_to(C.INC_DIR))
+                          if str(dst).startswith(str(C.INC_DIR)) else str(dst)})
+        man = dd / "MANIFEST.json"
+        doc = _read_json(man) if man.is_file() else None
+        doc = doc if isinstance(doc, dict) and isinstance(doc.get("moves"), list) else {"format": D.FMT_SUPERSEDED,
+                                                                                         "moves": []}
+        doc["moves"].append({"arm": e["arm"], "files": files, "moved_utc": D._utc(),
+                             "job": os.environ.get("SLURM_JOB_ID"), "host": os.uname().nodename, "why": e["why"],
+                             "deviation": {"n": int(dv["n"]), "file": dv["file"], "sha256": dv["sha256"]}})
+        D.write_json(man, doc)
+        log("superseded the arm record of %s (DS1 deviation %d): moved to %s" % (e["arm"], int(dv["n"]), dd))
+        out.append({"arm": e["arm"], "status": "moved"})
+    return out
 
 
 def pools_superseded_due(phase):
@@ -3139,6 +3279,11 @@ def manifests(phase, inputs, write=True, on_date=None):
     md_rows = read_jsonl(Path(frozen("md_s0")["root"]).parent / "rows.jsonl")
     exam_rows = never_train_rows()
     built = {}
+    if write:
+        # DS1 deviation 2, item 6: KF's record written before SIU's K supply was known is moved aside first
+        moved = [m for m in supersede_arms() if m["status"] == "moved"]
+        if moved:
+            built["superseded"] = moved
     if not arm_record_path("S0").is_file():
         s0, rec = b_prime_o(inputs, md_rows, exam_rows, write)
         if write:
@@ -3174,7 +3319,9 @@ def manifests(phase, inputs, write=True, on_date=None):
     kpools, t, n_k = k_pools(siu, kf_rows, crop)
     base_a = [dict(v, key=k) for k, v in inputs.base_a.items()]
     ahits = base_a_hits(inputs, base_a) if write and (not arm_record_path("KF").is_file() or siu_ready) else {}
-    if write and not arm_record_path("KF").is_file() and kf_rows:
+    if write and not arm_record_path("KF").is_file() and kf_rows and (siu_ready or siu_out):
+        # DS1 deviation 2, item 6: KF is built once SIU's K supply is known (N_K over every K pool, the same in every
+        # K arm), or alone, at its own supply, once SIU settles out (KD and KT then not run)
         nk_f = min(N_K_MAX, kpools["supplies"]["KF"]) if not siu_ready else n_k
         built["KF"] = write_arm("KF", base_a + [_man(r) for r in kf_draw(kpools, nk_f)],
                                 {"n_k": nk_f, "pool": "base B Field and Turf, thinned", "supplies": kpools["supplies"],
@@ -3189,12 +3336,17 @@ def manifests(phase, inputs, write=True, on_date=None):
         write_once(k_nr, {"format": FMT_ARM, "arms": ["KD", "KT"], "status": why, "written_utc": D._utc()})
     if write and siu_ready and arm_record_path("KF").is_file():
         nk = int((_read_json(arm_record_path("KF")) or {}).get("n_k") or 0)
-        short = k_short(kpools["supplies"], nk)
-        if short:
-            why = "not run (supply under N_K %d: %s): N_K is the same in every K arm" % (nk, short)
+        mode, nk_c, short = k_after_kf(kpools["supplies"], nk)
+        if mode == "wait":
+            # DS1 deviation 2, item 6: KF's N_K was fixed while SIU's supply was unknown; KD and KT wait (k_wait.json
+            # names the supplies), never recorded not run for a supply under it
+            why = ("waits (DS1 deviation 2, item 6): K supplies %s under KF's N_K %d, fixed before SIU's supply was "
+                   "known; KF is superseded and KD, KT and KF are built at N_K %d by a recorded change"
+                   % (short, nk, nk_c))
             built["k_waits"] = why
-            if not k_nr.is_file():
-                write_once(k_nr, {"format": FMT_ARM, "arms": ["KD", "KT"], "status": why, "written_utc": D._utc()})
+            C2.write_json_atomic(k_wait_path(), {"format": FMT_ARM, "arms": ["KD", "KT", "KF"], "status": why,
+                                                 "supplies": kpools["supplies"], "kf_n_k": nk, "t": t, "n_k": nk_c,
+                                                 "deviation": 2, "written_utc": D._utc()})
         else:
             tt = min(t, nk)
             if not arm_record_path("KD").is_file():
@@ -3343,8 +3495,9 @@ def plan_state(inc_dir=None):
     out["md_s0"] = {"drafts": len(drafts), "draft": last, "power": isinstance(pw, dict),
                     "enlarge": bool(((pw or {}).get("md_s0") or {}).get("enlarge")) if isinstance(pw, dict) else None,
                     "frozen": bool(frozen("md_s0"))}
+    pending = set(arms_superseded_due())            # DS1 deviation 2, item 6: built again, so not built now
     for a in D.BUILD_ARMS:
-        r = _read_json(arm_record_path(a))
+        r = _read_json(arm_record_path(a)) if a not in pending else None
         if isinstance(r, dict):
             out["arms"][a] = {"images": r.get("images"), "sha256": r.get("sha256"),
                               "over_line": bool((r.get("loader_projection") or {}).get("over_line"))}
@@ -3364,8 +3517,13 @@ def plan_state(inc_dir=None):
                      "audit_sets": SH.audit_sets(inc), "superseded": sorted(SH.superseded(inc))}
     out["mtw_v1_1"] = (_read_json(out_dir() / "mtw_v1_1" / "status.json") or {}).get("format") is not None
     out["k_not_run"] = (out_dir() / "arms" / "k_not_run.json").is_file()
+    # DS1 deviation 2, item 6: KD and KT wait while their supplies are under KF's N_K (no K build, a named wait)
+    kw = _read_json(k_wait_path())
+    out["k_wait"] = ({k: kw.get(k) for k in ("supplies", "kf_n_k", "n_k", "t", "written_utc")}
+                     if isinstance(kw, dict) and not arm_record_path("KD").is_file() and not out["k_not_run"] else None)
     srec1 = screen_records(1)
     out["k_source_out"] = SIU in srec1 and settled_out(SIU, decs, srec1.get(SIU))
+    out["arms_superseded"] = sorted(pending)
     out["ra"] = isinstance(_read_json(D.capacity("ds1_ra_gate.json")), dict)
     out["power_final"] = isinstance(_read_json(D.capacity("ds1_power.json")), dict)
     return out

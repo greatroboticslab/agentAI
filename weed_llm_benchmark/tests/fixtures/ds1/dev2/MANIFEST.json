@@ -87,6 +87,10 @@
    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_weed-detection-o9sfb__weed-detection-in-a-field/rf_weed-detection-o9sfb__weed-detection-in-a-field__train__ridderzuring_4572_jpg_rf_854486597b19d69a81c3ccce20e09e13.cf9fe6cabc572d52.txt",
    "label_sha256": "cf9fe6cabc572d520531451fcce4bf18c015074c76c65641c3cca2252c0cbb30",
    "size": 88731
+  },
+  "step1_stream/batches/b0005/ingest.jsonl": {
+   "sha256": "17954d6c70e2f62c2ebc928e17d46ca344ae7b941aaba9a52ff63df37c0dc682",
+   "rows_kept": "the six SIU fixture rows' ingest rows (siu_ingest.jsonl), read 2026-10-30"
   }
  },
  "files": {
@@ -120,10 +124,11 @@
   "pools_p1/rf_weed_detection_o9sfb_weed_detection_i_43cdfb9d.json": "f76ee83fb74ebc9abda7ba97cd6838e12a1c00617a113bf89ffd4ec8fc9f9a90",
   "pools_p1/rf_yolo_gyfyq_weed_ieda7.json": "1ac035e0ae4a98628488ec7f92c9be710786f3e1bd624b9d0a0ca1e421eb11b1",
   "pools_p1/rf_zijian_peng_grass_weed_69hcm.json": "72bdb39ea7e0bc78c24f670edecfcf1de1b046fe5882a83e7f5ae1c4e06883b2",
+  "siu_ingest.jsonl": "36e4889e1aee0f12f2864d17f1f0812a483a4671f8eba86f52f3f2ad9dcccf8f",
   "siu_rows.json": "52caa767cfa12d2a7f6b57b4689f162600508e8b380cebba083e6d61f374245c",
   "step1_pool.jsonl": "2203659e770b32462ab48e6129f897ea20c3998f550f2964366efe833097d8af"
  },
  "format": "inc2-ds1-dev2-fixture/1",
  "origin": "Bridges-2 /ocean, read only, 2026-10-30",
- "what": "DS1 deviation 2 test fixtures, read only from the cluster on 2026-10-30: 10 Step 1 v1-pool rows (5 of rf_tuf__weed-3434e, 5 of rf_weed-detection-o9sfb__weed-detection-in-a-field) with their images and intake labels (byte copies; cluster paths and sha256s under \"cluster\"), their screen p1_r001 candidate rows and step1/pool.jsonl rows (paths made relative), the screen record of those sources and of SIU, their sheet decisions, the six phase-1 pool records the deviation supersedes,, SIU rows (4 queued, 2 not admitted: admission record, folded queue row, intake manifest row) and two a9s9v admissions of batch b0014 with their intake manifest rows (keys spelt '.rf.') and queue row"
+ "what": "DS1 deviation 2 test fixtures, read only from the cluster on 2026-10-30: 10 Step 1 v1-pool rows (5 of rf_tuf__weed-3434e, 5 of rf_weed-detection-o9sfb__weed-detection-in-a-field) with their images and intake labels (byte copies; cluster paths and sha256s under \"cluster\"), their screen p1_r001 candidate rows and step1/pool.jsonl rows (paths made relative), the screen record of those sources and of SIU, their sheet decisions, the six phase-1 pool records the deviation supersedes,, SIU rows (4 queued, 2 not admitted: admission record, folded queue row, intake manifest row) and two a9s9v admissions of batch b0014 with their intake manifest rows (keys spelt '.rf.') and queue row; the six SIU rows' Step 1 ingest rows (batch b0005: each scanned 'funnel', decision 'pool')"
 }

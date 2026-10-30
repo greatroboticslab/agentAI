@@ -152,7 +152,7 @@ must occur exactly once in its file), runs its target against the copy and requi
   DW5   ds1_data          a folder copy with other bytes is taken as the superseded record
   DW6   ds1_data          rows with other bytes than named are moved with the record
   DW7   ds1_data          the status reads a superseded pool as pooled (the pools step is never proposed)
-  DW8   ds1_data          a queued row's holds fall back to the intake record's (h6_scan released by serve-holds)
+  DW8   ds1_data          a queued row's empty holds fall back to the intake record's (the collector's h6_scan)
   DW9   ds1_data          SIU is read past a quarantine that also cites D28
   DW10  ds1_data          SIU is read past its quarantine when the cites are unknown (fail open)
   DW11  ds1_data          SIU's D31 quarantine holds it out (DS.0 item 14 not applied)
@@ -166,6 +166,19 @@ must occur exactly once in its file), runs its target against the copy and requi
   DW19  ds1_data          a revision written under deviation 2 counts as screened before it (screened again)
   DW20  ds1_data          an intake row is looked up under its manifest key only (a9s9v's '.rf.' rows no candidates)
   DW21  stream            a reopen block reopens attempts other than those it names (any proposal id)
+  DW22  ds1_data          a not-admitted row keeps the intake record's h6_scan though Step 1 scanned it at ingest
+  DW23  ds1_data          load_candidates reads no batch's ingest rows (every not-admitted row keeps h6_scan)
+  DW24  ds1_data          a provenance-cleared ingest row does not clear h6_scan (row_holds' second condition)
+  DW25  ds1_data          mendeley_fcf7brsfm6 is not screened again (its 567 rows stay held h6_scan)
+  DW26  ds1_data          KD and KT are built at KF's N_K whatever their supply (the draws refuse; or not run)
+  DW27  ds1_data          the status never names the K wait (the plan proposes the manifests step every tick)
+  DW28  diagnose_stream   the plan proposes KD and KT while they wait
+  DW29  ds1_data          a stream that cannot be folded leaves SIU's cites D31 only (fail open)
+  DW30  ds1_data          the screen does not count its unreadable rows among a source's out
+  DW31  ds1_data          the status reads KF's superseded record as built (its old N_K kept, KD and KT short)
+  DW32  ds1_data          KF's record moves before its manifest (a cut-off move leaves a stale manifest)
+  DW33  diagnose_stream   the plan builds KF before the K source's supply is known (N_K fixed over KF alone)
+  DW34  baseline          build --ds1 reads --seeds 0,1,2 character by character (every DS1 build refused)
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -187,6 +200,7 @@ DL = "weed_optimizer_framework/tools/inc2/ds1_long.py"
 S1 = "weed_optimizer_framework/tools/inc2/step1_stream.py"
 ST = "weed_optimizer_framework/tools/inc_autopilot/stream.py"
 DSM = "weed_optimizer_framework/tools/inc_autopilot/diagnose_stream.py"
+BLM = "weed_optimizer_framework/tools/inc2/baseline.py"
 SRM = "weed_optimizer_framework/tools/inc_autopilot/stream_remote.py"
 EV = "weed_optimizer_framework/tools/inc_autopilot/evidence.py"
 WJ = "weed_optimizer_framework/tools/inc_autopilot/stream_domains/weed.json"
@@ -445,8 +459,8 @@ MUTANTS = {
     "DW6": (DD, '        if rows.is_file() and C.sha256_file(rows) != e["rows_sha256"]:\n',
             "        if False:\n", DEV2),
     "DW7": (DD, "                       .is_file() and s not in repool,", "                       .is_file(),", DEV2),
-    "DW8": (DD, '            "holds": list((q.get("holds") if q is not None else f.get("holds")) or []),',
-            '            "holds": list((q or {}).get("holds") or f.get("holds") or []),', DEV2),
+    "DW8": (DD, '            "holds": (list(q.get("holds") or []) if q is not None else\n',
+            '            "holds": (list(q.get("holds") or f.get("holds") or []) if q is not None else\n', DEV2),
     "DW9": (DD, "    return bool(cites) and set(cites) <= set(SIU_STREAM_CITES)\n",
             "    return bool(cites) and bool(set(cites) & set(SIU_STREAM_CITES))\n", DEV2),
     "DW10": (DD, "    return bool(cites) and set(cites) <= set(SIU_STREAM_CITES)\n",
@@ -468,6 +482,30 @@ MUTANTS = {
              "    for k2, r in ():\n        files.setdefault(k2, r)\n", DEV2),
     "DW21": (ST, '                if ro.get("proposals") is not None and rec.get("proposal") not in ro["proposals"]:\n',
              '                if False:\n', DEV2),
+    "DW22": (DD, '                      [h for h in (f.get("holds") or []) if not (h == "h6_scan" and scanned)]),\n',
+             '                      [h for h in (f.get("holds") or [])]),\n', DEV2),
+    "DW23": (DD, "            row = candidate_row(k, a, q, f, im.get(k), scanned=sc.get(k))\n",
+             "            row = candidate_row(k, a, q, f, im.get(k), scanned=None)\n", DEV2),
+    "DW24": (DD, '            w = r.get("scanned") or ("provenance" if r.get("provenance_cleared") else None)\n',
+             '            w = r.get("scanned")\n', DEV2),
+    "DW25": (DD, '            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b", "mendeley_fcf7brsfm6")\n',
+             '            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b")\n', DEV2),
+    "DW26": (DD, '    if not short:\n        return "build", int(kf_n_k), {}\n',
+             '    if True:\n        return "build", int(kf_n_k), {}\n', DEV2),
+    "DW27": (DD, '                     if isinstance(kw, dict) and not arm_record_path("KD").is_file() and not out["k_not_run"] '
+             'else None)', '                     if False else None)', DEV2),
+    "DW28": (DSM, '                and not st.get("k_source_out") and not st.get("k_wait"):\n',
+             '                and not st.get("k_source_out"):\n', DEV2),
+    "DW29": (DD, '                out[SIU].add("?")\n                continue\n', '                continue\n', DEV2),
+    "DW30": (DD, '            per[r["source"]]["out"][r["drop"]] += 1\n', '            pass\n', DEV2),
+    "DW31": (DD, "        r = _read_json(arm_record_path(a)) if a not in pending else None\n",
+             "        r = _read_json(arm_record_path(a))\n", DEV2),
+    "DW32": (DD, '        named = ((man_, e["rows_sha256"]), (rec, e["record_sha256"]))\n',
+             '        named = ((rec, e["record_sha256"]), (man_, e["rows_sha256"]))\n', DEV2),
+    "DW33": (DSM, '            if siu.get("pooled") or st.get("k_source_out"):\n                want.append("KF")',
+             '            if True:\n                want.append("KF")', DEV2),
+    "DW34": (BLM, '[int(x) for x in (str(seeds).split(",") if isinstance(seeds, str) else seeds)]',
+             '[int(x) for x in seeds]', DEV2),
 }
 
 

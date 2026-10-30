@@ -923,7 +923,10 @@ def ds1_args(ds1, exp, manifest=None, union=None, seeds=None, arm=None, final_ex
         raise BaselineError(str(e))
     if exp != RC.DS1_EXPS[ds1]:
         raise BaselineError("DS1's %s is built as %s, not %s" % (ds1, RC.DS1_EXPS[ds1], exp))
-    if seeds is not None and [int(x) for x in seeds] != list(DS.SEEDS):
+    # the lever passes --seeds as text ("0,1,2"), as V3F's build_kwargs reads it (DS1 deviation 2, item 7: read
+    # character by character, "0,1,2" refused every DS1 build with a ValueError)
+    if seeds is not None and [int(x) for x in (str(seeds).split(",") if isinstance(seeds, str) else seeds)] \
+            != list(DS.SEEDS):
         raise BaselineError("a DS1 arm trains seeds %s" % list(DS.SEEDS))
     if role not in (None, "baseline"):
         raise BaselineError("a DS1 arm is role baseline")
