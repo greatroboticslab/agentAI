@@ -13,6 +13,16 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-29 — DS1 Revision 2 registered again before its deploy: its changes count as deviations, and the label audit's inputs are checked
+
+- **Where the data stands.** No change. Base B's D1 B′ holds 40,743 images and the stream's pool P_1 holds 7,493, against a target of tens to hundreds of thousands of verified images. Accuracy is also unchanged: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90). No DS1 training has started.
+- **Change.** A review before the deploy found Revision 2's first text wrong on one point. It said no DS1 number existed, but RA's record, the phase-1 screen's counts and audit rates, and MD-S0's draft did. The second text lists them. Under V3F.3.9 its changes therefore count as deviations, and DS1's report will list them as such. None of the changes was steered by those numbers, and no registered number or rule changes. The first text and its time stamp are kept.
+  - The label audit taken again now refuses any predictor other than the screen's. It also records, per source, whether the live rows are still the screen's. Its lab numbers are a check; the binding ones will come from the cluster.
+  - The time-stamp card names only the step still missing.
+- **Verified.** On lab copies, the full suite fails nothing the base does not (the same 17 environment failures). The mutation run kills 119 of 119 and the replay gate passes. A copy of the live state, ticked with the fix, reopens the power pre-flight and waits for the Revision's time stamp with one card that names only that step. Once the stamp exists, it proposes the pre-flight and renders no further audit sheet.
+- **Next.** Deploy, then on the login node the delegate's `inc2.ds1 timestamp-revision --revision 2` and the supersede marks. Then the platform runs the power pre-flight, MD-S0's freeze and the pools of the sources decided for training. The owner's audit is still ds1_audit_001 only.
+
+
 ## 2026-10-29 — DS1 Revision 2: the power pre-flight can pass, the owner's audit is rendered once, and the label audit measures what it says
 
 - **Where the data stands.** No change. Base B's D1 B′ holds 40,743 images and the stream's pool P_1 holds 7,493, against a target of tens to hundreds of thousands of verified images. Accuracy is unchanged too: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90). DS1's phase-1 screen saw 290,532 candidates (34,970 live), and the delegate decided 20 sources: 10 for training only, 10 rejected. No DS1 training has started, because the power pre-flight refused.

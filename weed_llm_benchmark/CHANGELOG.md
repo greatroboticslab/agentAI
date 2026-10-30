@@ -11309,3 +11309,45 @@ Every result sat near test 0.85, against the 0.90 goal.
   2. On the login node, `python -m weed_optimizer_framework.tools.inc2.ds1_sheets supersede --sheet audit_002 --by audit_001 --why "rendered again for the same set by the audit-render loop (DS1 Revision 2, item 3)"`, and the same for every later audit batch (audit_003, …; 011 by 20:17Z).
   3. The ticker reopens the power pre-flight (L33 POWER). The pools step takes the model audit again before it reads one.
   4. `ots upgrade` of Revision 2's two proofs once Bitcoin confirms them.
+
+## 2026-10-29 — DS1 Revision 2, second text before its deploy: its standing under V3F.3.9, the model audit's predictor and rows, the time-stamp card
+
+- **Why.** A review of branch `ds1-fix1` before its deploy found these problems:
+  - Revision 2's first text called each change "a Revision before any DS1 number (DS.13)". DS.13 holds no such rule, and DS1 records holding numbers existed when it was made:
+    - RA's record (`capacity/ds1_ra_gate.json`, da139d47…, written 11:39:24Z);
+    - the phase-1 screen's counts and audit rates (p1_r001, p1_r002);
+    - MD-S0's draft_r001;
+    - the two pre-flight logs.
+    V3F.3.9 counts records like these as numbers, so under it the changes are deviations.
+  - Item 4 said the audit taken again uses "the same live rows, seeded sample and predictor". The code read eligibility again and recorded the predictor, but compared neither with the screen's.
+  - Item 1 said no threshold changes, yet it adds a 0.02 bound. It also said no detection differed, which was inferred from E1's arrays, not observed on the failing pass.
+  - The time-stamp card numbered the Revisions by position and named `timestamp-revision --revision 1`, which is refused. Its ledger copy was cut at 1,000 characters, inside the Revision 2 command.
+  - The reopen card said "proposed again" while the gate was still closed. The decide-again card named only the delegate, though the owner's audit decision governs where he recorded one.
+- **Change.**
+  - Revision 2's second text: `docs/prereg/DS1_rev2_2026-10-29.md`, sha256 5970fd75…0fc4, commit 9ca7e4d. Its stamp file was written 2026-10-29T23:46:16Z, and the OpenTimestamps proofs are in 91f58f5.
+    - It lists the DS1 records that held numbers and states that its changes are deviations under V3F.3.9, listed as such in DS1's report. It also states that none was steered by those numbers.
+    - It narrows items 1 and 4 and adds two notes: the e1a_dev reproduction's tie sensitivity, and that the audit is blind where E1-A predicts nothing.
+    - It names the owner's note on ds1_audit_001 (R3).
+    - The first text (b9c73500…bb13), its proofs and its stamp file are kept unchanged under `docs/prereg/superseded/DS1_rev2_first_text/`. Neither text was deployed before.
+  - `inc2/ds1_data.py`: `reaudit` refuses weights other than E1-A seed 0's (`AUDIT_PREDICTOR_SHA256`, a8e1b61a…). Each source's record holds `rows_as_screened` and `sample_keys`, and the record holds `rows_differ`.
+  - `inc2/ds1.py`: adds `revision_named` and `timestamp_missing` (whether the record exists, and which Revisions no record names). `inc_autopilot/stream_remote.py`: the DS1 status carries `timestamp_missing`.
+  - `inc_autopilot/stream.py`:
+    - the time-stamp card names only the Revisions the status lists as unnamed, each by its own number (the domain's revisions carry `n`);
+    - the reopen card says "reopened";
+    - the decide-again card names the owner's step where his audit decision governs.
+  - `stream_domains/weed.json`: Revision 2's new sha256 in `ds1.revisions` and `ds1.reopens` (before_utc 2026-10-29T23:46:16Z), and `n` on each Revision.
+  - Tests: `test_inc2_ds1_rev2.py` checks the predictor refusal, a source with fewer live rows than the screen's, the record's keys, `timestamp_missing` and the card's steps. Mutants DX23–DX26 are new; DX16 and DX21 follow their changed lines.
+- **Verified.** On a lab scratch copy of the tip 91f58f5 (`~/ds1_fix1_ci/fix2`, the platform Python, Ultralytics 8.4.37):
+  - The full suite passes 168 of 185 test files, as the base 8ba5f75 does. The 17 failing files are the base's, with the same failure lines; `test_inc2_stream`'s line also lists the hashes of the changed modules.
+  - The mutation run kills 119 of 119, DX1–DX26 among them.
+  - The replay gate passes: 57 cases pass, and R2 and R4b are skipped.
+  - A copy of the live lab state (2026-10-29 23:17Z) was ticked with the tip, using the cluster's DS1 status as the branch derives it (no ssh, nothing launched).
+    - Before `timestamp_rev2.json` exists, the L31 render in flight ends and records its set. `score:POWER:draft_r001` is reopened, with its card saying "reopened" and 0.1477 GPU-h kept. The time-stamp card names only `timestamp-revision --revision 2`, and no DS1 lever is proposed.
+    - Once the record exists, L33 POWER is proposed on MAINT and no audit render follows.
+  - `deploy_funnel.sh --dry-run` passes with no `--allow-*` flag, and the V3F deploy checks pass.
+- **After the deploy**, in this order:
+  1. `deploy_funnel.sh --no-restart`.
+  2. On the login node, `inc2.ds1 timestamp-revision --revision 2` with the two proofs under `$CLUSTER_REPO/docs/prereg/`. This way the first tick of the new code reads a status that already names Revision 2's record, and the reopened pre-flight is never submitted to a closed gate.
+  3. Restart the dashboard.
+  4. On the login node, `inc2.ds1_sheets supersede` for every audit batch after ds1_audit_001.
+  5. Once the pools step writes `p1_r001_audit_v2.json` on the cluster, compare it with R2 and record any difference.
