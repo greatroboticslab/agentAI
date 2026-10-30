@@ -6126,7 +6126,10 @@ class StreamRun(object):
         Revision's file with its sha256, once per marker, and only if its last attempt started before the block's
         before_utc and it is recorded failed. Its spend so far moves into prior_gpuh (every attempt stays counted
         against the family cap), its earlier proposal ids into failed_ids (a new proposal takes a new id: the executor
-        runs an id once), its record into reopen_history, its state to missing. Returns the keys reopened now."""
+        runs an id once), its record into reopen_history, its state to missing. A block's "states" may also name
+        "missing" (DS1 deviation 2: an L30 data step goes back to missing when it is done, and runs again when the
+        cluster's status calls for it): such an item is reopened the same way, its spend kept, so the run the deviation
+        calls for is its own attempt on record. Returns the keys reopened now."""
         cfg = (self.dom or {}).get("ds1") or {}
         f = self._ds1()
         out = []
@@ -6135,10 +6138,11 @@ class StreamRun(object):
             if not marker or not ro.get("items") or not self._ds1_tree_file(ro.get("file") or "",
                                                                             sha=ro.get("sha256")):
                 continue
+            states = [x for x in (ro.get("states") or ["failed"]) if x in ("failed", "missing")]
             now = []
             for key in ro["items"]:
                 rec = f["items"].get(key)
-                if not isinstance(rec, dict) or rec.get("state") != "failed" or rec.get("reopened") == marker or \
+                if not isinstance(rec, dict) or rec.get("state") not in states or rec.get("reopened") == marker or \
                         marker in [h.get("marker") for h in rec.get("reopen_history") or [] if isinstance(h, dict)]:
                     continue
                 if not ro.get("before_utc") or not rec.get("started_utc") or \
@@ -6163,7 +6167,8 @@ class StreamRun(object):
                 self._card("research", "DS1: %s reopened (%s)" % (", ".join(now), marker),
                            "%s, recorded in %s. It is proposed again under a new id once DS1's gate is open (every "
                            "time-stamp record in place). Earlier attempts stay counted against the family cap." % (
-                               ro.get("why") or marker, ro.get("file")), lever="L33")
+                               ro.get("why") or marker, ro.get("file")),
+                           lever="L30" if all(k.startswith("data:") for k in now) else "L33")
                 out += now
         return out
 

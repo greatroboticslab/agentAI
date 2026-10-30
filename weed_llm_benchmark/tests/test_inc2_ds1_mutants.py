@@ -145,6 +145,25 @@ must occur exactly once in its file), runs its target against the copy and requi
   DV13  weed.json         the reopen block's time precedes the live attempt (the pre-flight is never reopened)
   DV14  deploy_funnel     the deviation's file is not shipped
   DV15  ds1               the superseded records are moved before the constants are checked (a refusal moves them)
+  DW1   ds1_data          the pools step reads no image size from the header (DS1 deviation 2: the live drops)
+  DW2   ds1_data          base3's rules take a live row without a size (skipped unseen by the source rule)
+  DW3   ds1_data          a header that cannot be read leaves its row live
+  DW4   ds1_data          a superseded pool's record moves before its rows (a cut-off move leaves stale rows)
+  DW5   ds1_data          a folder copy with other bytes is taken as the superseded record
+  DW6   ds1_data          rows with other bytes than named are moved with the record
+  DW7   ds1_data          the status reads a superseded pool as pooled (the pools step is never proposed)
+  DW8   ds1_data          a queued row's holds fall back to the intake record's (h6_scan released by serve-holds)
+  DW9   ds1_data          SIU is read past a quarantine that also cites D28
+  DW10  ds1_data          SIU is read past its quarantine when the cites are unknown (fail open)
+  DW11  ds1_data          SIU's D31 quarantine holds it out (DS.0 item 14 not applied)
+  DW12  ds1_data          no source is screened again
+  DW13  ds1_data          a source screened again has its counts summed with the earlier records
+  DW14  ds1_data          a key screened again is read twice
+  DW15  ds1_data          a source is screened again on every screen
+  DW16  diagnose_stream   the plan proposes no screen for a source due again
+  DW17  diagnose_stream   S1 is built while a source is due to be screened again
+  DW18  stream            a reopen block's missing state is ignored (the data steps are not reopened)
+  DW19  ds1_data          a revision written under deviation 2 counts as screened before it (screened again)
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -185,6 +204,7 @@ DEPLOY = "tests/test_inc2_ds1_deploy.py"
 REV2 = "tests/test_inc2_ds1_rev2.py"
 REV1 = "tests/test_inc2_ds1_rev1.py"
 DEV1 = "tests/test_inc2_ds1_dev1.py"
+DEV2 = "tests/test_inc2_ds1_dev2.py"
 AP_PLANR1 = "tests/test_stream_ap_ds1.py?DS1_WORLD=plan_rev1"
 AP_REVIEW = "tests/test_stream_ap_ds1.py?DS1_WORLD=review"
 MUTANTS = {
@@ -412,6 +432,37 @@ MUTANTS = {
              "ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md.ots", DEPLOY),
     "DV15": (DC, '    if recorded is not None:\n        b1_check_constants(recorded)\n    supersede()\n',
              '    supersede()\n    if recorded is not None:\n        b1_check_constants(recorded)\n', DEV1),
+    "DW1": (DD, "    hash_rows(live, hasher=inputs.hasher)\n    fill_sizes(live, inputs.read_size)\n    conv = apply_rules(",
+            "    hash_rows(live, hasher=inputs.hasher)\n    conv = apply_rules(", DEV2),
+    "DW2": (DD, "    if nosize:\n        raise DataRefused(", "    if False:\n        raise DataRefused(", DEV2),
+    "DW3": (DD, '            if not wh or not wh[0] or not wh[1]:\n                r["drop"] = "unreadable"\n',
+            '            if not wh or not wh[0] or not wh[1]:\n', DEV2),
+    "DW4": (DD, '        named = ((rows, e["rows_sha256"]), (rec, e["record_sha256"]))\n',
+            '        named = ((rec, e["record_sha256"]), (rows, e["rows_sha256"]))\n', DEV2),
+    "DW5": (DD, "            if dst.is_file() and C.sha256_file(dst) != sha:\n                raise DataRefused(\"%s holds",
+            "            if False:\n                raise DataRefused(\"%s holds", DEV2),
+    "DW6": (DD, '        if rows.is_file() and C.sha256_file(rows) != e["rows_sha256"]:\n',
+            "        if False:\n", DEV2),
+    "DW7": (DD, "                       .is_file() and s not in repool,", "                       .is_file(),", DEV2),
+    "DW8": (DD, '            "holds": list((q.get("holds") if q is not None else f.get("holds")) or []),',
+            '            "holds": list((q or {}).get("holds") or f.get("holds") or []),', DEV2),
+    "DW9": (DD, "    return bool(cites) and set(cites) <= set(SIU_STREAM_CITES)\n",
+            "    return bool(cites) and bool(set(cites) & set(SIU_STREAM_CITES))\n", DEV2),
+    "DW10": (DD, "    return bool(cites) and set(cites) <= set(SIU_STREAM_CITES)\n",
+             "    return not cites or set(cites) <= set(SIU_STREAM_CITES)\n", DEV2),
+    "DW11": (DD, '    if s in ctx.get("quarantined", ()) and not siu_scoped(s, ctx):\n',
+             '    if s in ctx.get("quarantined", ()):\n', DEV2),
+    "DW12": (DD, "    return sorted(seen - again)\n", "    return []\n", DEV2),
+    "DW13": (DD, "            if s in again:\n                out[s] = dict(v, rescreen_of=",
+             "            if False:\n                out[s] = dict(v, rescreen_of=", DEV2),
+    "DW14": (DD, '            by[r["key"]] = r\n', '            by[(p.name, r["key"])] = r\n', DEV2),
+    "DW15": (DD, '        again |= set(d.get("rescreen") or {})\n', "        pass\n", DEV2),
+    "DW16": (DSM, '            (p1.get("rescreen") and not s1_frozen)) and due("data:1:screen"):',
+             '            False) and due("data:1:screen"):', DEV2),
+    "DW17": (DSM, '    if p1.get("rescreen"):\n        # DS1 deviation 2', '    if False:\n        # DS1 deviation 2', DEV2),
+    "DW18": (ST, '            states = [x for x in (ro.get("states") or ["failed"]) if x in ("failed", "missing")]\n',
+             '            states = ["failed"]\n', DEV2),
+    "DW19": (DD, "        if int(d.get(\"deviation\") or 0) < SCREEN_DEVIATION:\n", "        if True:\n", DATA),
 }
 
 

@@ -26,15 +26,21 @@ The rules, in order, each counted with its reason code (DS.5.1):
     domain config's never-fetch and never-train sources) out; any copy of a cwd12 dev or test image at the
     calibrated copy threshold quarantines its source whole (D28-v2): its intake's and Step 1's refusals as copies
     and DS1's guard on its rows, a dHash hit counting where the DINOv2 detector confirms it (fail closed without
-    it); a source whose file names carry cwd12 or 3SeasonWeedDet10 capture names is role C, whatever its sheet says,
-    the sheet showing the pairs; evaluation groups by name; off-goal (role X); a queue row holding funnel_F9,
-    join_conflict or h6_scan, and a row refused at intake or admission (a copy, an exam, a hold-out, a licence,
-    EXIF) out; a row only not admitted at species level stays; phase 2 reads only the named sources;
+    it); a source a stream quarantines whole is out, except SIU under its D31 quarantine (DS.0 item 14, DS1
+    deviation 2: its rows held out before are screened again); a source whose file names carry cwd12 or
+    3SeasonWeedDet10 capture names is role C, whatever its sheet says, the sheet showing the pairs; evaluation
+    groups by name; off-goal (role X); a queue row holding funnel_F9, join_conflict or h6_scan (the queue's holds,
+    events folded; a row the queue does not hold, its intake record's: DS1 deviation 2), and a row refused at intake
+    or admission (a copy, an exam, a hold-out, a licence, EXIF) out; a row only not admitted at species level stays;
+    phase 2 reads only the named sources; the sources screened before DS1 deviation 2 with rows it reads otherwise
+    are screened again once (RESCREEN);
   2 names to roles: each box's class unit (SIU: its video's EPPO code; else its source class, traced from the
     source's own label files where its INC class stands for several, Revision 1 item 2; else its INC class id) has
     the role its source's decided sheet gives it: weed (class 12), crop, plant part or non-plant (dropped as
     background), or unresolved (the image is held, never admitted); species identity is kept per box;
-  3 base3's box and image rules (CLOOP:2912-2913): the source rule, boxes under 8 px masked, images dropped;
+  3 base3's box and image rules (CLOOP:2912-2913): the source rule, boxes under 8 px masked, images dropped; each
+    row's image size read from its header where its file record gave none (Step 1's v1 pool: DS1 deviation 2, whose
+    superseded pool records are moved aside and pooled again), a row without one refused;
   4 the model audit (E1-A) per source: a source over train_core's missing-label rate by more than 0.15 enters only
     as 'accept for training only' with predicted unlabelled plants masked (inc2.mask); each labelled box read as
     (cx, cy, w, h), its class stripped (Revision 2, item 4); a screen revision audited before that is taken again by
@@ -161,6 +167,46 @@ AUDIT_VERSION = 2
 # The audit's predictor, E1-A seed 0 (e1a_predictor: INC/e1_a_m640/runs/base__s0/weights/final.pt, the file the screen
 # p1_r001 read; cited by sha256 in Revision 2's stamp file): the audit taken again refuses any other weights
 AUDIT_PREDICTOR_SHA256 = "a8e1b61ad29806c11228b9a54a463e40ac466fb3a717a17fcb2d6fc620e4cfcb"
+# DS1 deviation 2 (2026-10-30), item 2: DS.0 item 14 lets DS1's builds read SIU past its stream quarantine, which cites
+# D31 (data blamed: redundant frames), once its sheet and species-role table are decided and audited (source_ready);
+# never past a D28 (leak) quarantine, and never when the stream's cites cannot be read (fail closed). The screen's rows
+# of SIU that a revision held out by that quarantine are screened again (rescreen_due), and the new revision's record
+# of SIU replaces the earlier one.
+SIU_STREAM_CITES = ("D31",)
+QUARANTINED = "quarantined_d28"                     # the reason code of a source a stream quarantines whole
+# DS1 deviation 2, item 2: the phase-1 sources screened before it with rows its code reads otherwise, screened again
+# whole once (rescreen_due): SIU, held out whole by its D31 quarantine, and the sources whose queued rows the screen
+# read with the intake record's h6_scan hold, which step1_stream's serve-holds had released (read on 2026-10-30:
+# SIU 123,348 rows, mendeley_9yhd5b8kc3 6,604, kg_yuzhenlu__cottonweeddet3 755, zenodo_22033986 352, weedai_7e03cd97
+# 8; candidate_row now takes a queued row's holds from the queue)
+RESCREEN = (SIU, "mendeley_9yhd5b8kc3", "kg_yuzhenlu__cottonweeddet3", "zenodo_22033986",
+            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b")
+SCREEN_DEVIATION = 2                                # a screen revision's "deviation": the last whose rules it applied
+# DS1 deviation 2, item 1: the phase-1 pool records L30's pools step (job 50028368) wrote at 2026-10-30T05:38Z while
+# every Step 1 v1-pool row (step1/pool.jsonl) had no image size (candidate_row read it from the file record only):
+# base3's source rule skips a row without one, so each source showed "no weed box" and every row dropped as
+# source_convention. Each is moved aside byte for byte (its record and its rows, which must hash as named) into
+# splits/ds1/pools/p<phase>/superseded/dev2/ (supersede_pools), and the source is pooled again. A record at the path
+# with other bytes is not the one named and stays.
+# DS1 deviation 2's record (docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-30): DS1 deviation 2"), kept byte for byte
+# under docs/prereg/ and time-stamped as deviation 1 was; the ticker's gate pins it by sha256 (the domain's
+# ds1.deviations). It is pinned here and not in inc2.ds1.DEVIATIONS: the reproduction records pin inc2/ds1.py's bytes
+# (inc2.ds1.code_shas), so a change of that file would refuse every later score until they are taken again.
+DEVIATION_2 = {"n": 2, "file": "docs/prereg/DS1_dev2_2026-10-30.md", "sha256": None, "commit": None,
+               "stamp_file": "docs/prereg/DS1_dev2_2026-10-30.stamp.txt"}
+EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+_DEV2_POOL_WHY = ("written 2026-10-30T05:38Z by job 50028368 while every row lacked its image size, so base3's source "
+                  "rule saw no weed box and dropped all %d live rows as source_convention; pooled again under DS1 "
+                  "deviation 2")
+SUPERSEDED_POOLS = tuple({"deviation": 2, "phase": 1, "source": s, "record_sha256": h, "rows_sha256": EMPTY_SHA256,
+                          "why": _DEV2_POOL_WHY % n} for s, h, n in (
+    ("project_agml__mh_weed16_weed_detection", "c1b0e2c5f63d97960e6a477596ee8b923264b9b3b815a3c2f70195da12fa713c", 10),
+    ("rf_tuf__weed-3434e", "43482abf523851690e9d36d8ad8089c96485138a20a48ec3e2e20e0f12661ecb", 1019),
+    ("rf_vizerion__weed-detection-5ell6", "c90d64f128003c30cba2af70c7625e0e589914bf1d9aa9b178d752565a3844e6", 385),
+    ("rf_weed-detection-o9sfb__weed-detection-in-a-field",
+     "f76ee83fb74ebc9abda7ba97cd6838e12a1c00617a113bf89ffd4ec8fc9f9a90", 1229),
+    ("rf_yolo-gyfyq__weed-ieda7", "1ac035e0ae4a98628488ec7f92c9be710786f3e1bd624b9d0a0ca1e421eb11b1", 1825),
+    ("rf_zijian-peng__grass-weed-69hcm", "72bdb39ea7e0bc78c24f670edecfcf1de1b046fe5882a83e7f5ae1c4e06883b2", 1)))
 FAMILY_CAP = 0.35
 MD_SHARE, MD_MIN, MD_MAX = 0.05, 15, 500
 MTW_SHARE, MTW_MIN, MTW_MAX = 0.10, 30, 1000
@@ -183,6 +229,11 @@ FLOOR_ARMS = ("S1C", "S1CR", "S1U", "S2")
 
 class DataRefused(D.Ds1Refused):
     pass
+
+
+def deviations():
+    """DS1's recorded deviations in order: inc2.ds1.DEVIATIONS (deviation 1), then deviation 2 (DEVIATION_2)."""
+    return tuple(D.DEVIATIONS) + (DEVIATION_2,)
 
 
 def phase2_ids():
@@ -349,17 +400,29 @@ def capture_name_hits(names):
     return out
 
 
+def siu_scoped(source, ctx):
+    """True for SIU when every stream quarantine of it cites D31 (DS.0 item 14, DS1 deviation 2 item 2): DS1 reads it
+    past that quarantine, its sheet and species-role table decided and audited before any of its rows enters a
+    manifest (source_ready). False for every other source, for SIU quarantined under D28, and when the cites are not
+    known (fail closed). ctx: quarantine_cites {source: [cites]}."""
+    if source != SIU:
+        return False
+    cites = (ctx.get("quarantine_cites") or {}).get(source)
+    return bool(cites) and set(cites) <= set(SIU_STREAM_CITES)
+
+
 def eligibility(row, ctx):
     """The first reason a candidate row is out (DS.5.1 item 1, DS.0 item 2), or None. ctx: role_c (sources),
-    quarantined (sources the D28-v2 rule quarantines whole), eval_sources (evaluation groups by name), never
-    (the domain config's never-fetch and never-train sources), base_keys and base_shas (base B's rows)."""
+    quarantined (sources a stream quarantines whole) with quarantine_cites (their cites: SIU's D31 quarantine is
+    read past, DS.0 item 14), eval_sources (evaluation groups by name), never (the domain config's never-fetch and
+    never-train sources), base_keys and base_shas (base B's rows)."""
     s = row["source"]
     if s in ctx.get("role_c", ()) or s in ROLE_C or s in NEVER_FETCHED:
         return "role_c"
     if s in ctx.get("never", ()):
         return "never_train_source"
-    if s in ctx.get("quarantined", ()):
-        return "quarantined_d28"
+    if s in ctx.get("quarantined", ()) and not siu_scoped(s, ctx):
+        return QUARANTINED
     if s in ctx.get("eval_sources", ()):
         return "evaluation_group"
     if row.get("refused"):
@@ -434,9 +497,40 @@ def weed_boxes(row, roles):
 
 
 # ------------------------------------------------------------------ 3. box and image rules (base3's)
+def image_size(path):
+    """(W, H) of an image as its header stores it (base3's reader for external rows), or None when unreadable."""
+    return B3._header_size(path)
+
+
+def fill_sizes(rows, read_size=None, procs=5):
+    """Every live row's image size where its file record gave none, read from the image's header (DS1 deviation 2,
+    item 1): Step 1's v1-pool rows (step1/pool.jsonl) carry no size, and base3's source rule skips a row without one,
+    so a source whose rows all lack it showed no weed box and dropped whole. Sets W, H and size_from 'header'; a file
+    whose header cannot be read is dropped 'unreadable' (base3's image rule's reason). Returns the rows read."""
+    from concurrent.futures import ThreadPoolExecutor
+    read_size = read_size or image_size
+    todo = [r for r in rows if not r.get("drop") and (not r.get("W") or not r.get("H"))]
+
+    def one(r):
+        return r, read_size(r["image"])
+    with ThreadPoolExecutor(max_workers=max(1, int(procs))) as ex:
+        for r, wh in ex.map(one, todo):
+            if not wh or not wh[0] or not wh[1]:
+                r["drop"] = "unreadable"
+                continue
+            r["W"], r["H"], r["size_from"] = int(wh[0]), int(wh[1]), "header"
+    return len(todo)
+
+
 def apply_rules(rows, rules):
     """base3's source rule (over each source's weed boxes as delivered) and its per-box and per-image rules; sets
-    row['drop'], row['mask'] and row['masked_area']. Returns {source: convention record}."""
+    row['drop'], row['mask'] and row['masked_area']. Returns {source: convention record}. Refuses a live row without
+    its image size (DS1 deviation 2, item 1: base3's source rule would skip it unseen; fill_sizes reads it first)."""
+    nosize = [r["key"] for r in rows if not r.get("drop") and (not r.get("W") or not r.get("H"))]
+    if nosize:
+        raise DataRefused("%d live row(s) have no image size (the first: %s): base3's source rule would skip them, and "
+                          "a source whose rows all lack one would show no weed box and drop whole; read their sizes "
+                          "first (fill_sizes)" % (len(nosize), nosize[0]))
     by = collections.defaultdict(list)
     for r in rows:
         if not r.get("drop"):
@@ -1240,6 +1334,9 @@ class Inputs(object):
         self.scanners = kw.get("scanners") or {}        # {name: EmbedScanner}
         self.eval_sources = set(kw.get("eval_sources") or ())
         self.quarantined = set(kw.get("quarantined") or ())
+        # {source: [cites]} of the stream's quarantines (DS1 deviation 2, item 2: SIU's D31 quarantine is read past)
+        self.quarantine_cites = dict(kw.get("quarantine_cites") or {})
+        self.read_size = kw.get("read_size")            # (path) -> (W, H) from the header (tests: a stub)
         self.never = set(kw.get("never") or ())
         self.families = kw.get("families") or {}        # {source: family}
         self.predict = kw.get("predict")                # E1-A's predictions (the model audit)
@@ -1301,6 +1398,7 @@ def load_inputs(phase, procs=5, embedder=None):
     from . import ds1_sheets as SH
     decisions = SH.decided_sources()
     cands = load_candidates(phase, base_b)
+    qcites = stream_quarantine_cites()
     exams, erec = exam_hashes()
     predict = e1a_predictor()
     tc_rows = [dict(r, boxes=[b[1:5] for b in read_inc_label(r["label"])])
@@ -1310,7 +1408,7 @@ def load_inputs(phase, procs=5, embedder=None):
                   base_b_man=base_b_man, consumed=stream_consumed(), predict=predict, audit_ref=audit_ref,
                   candidates=cands, decisions=decisions, exams=exams, scanners=scanners(embedder),
                   eval_sources={s for g in (conf.get("evaluation_groups") or {}).get("groups", {}).values() for s in g},
-                  quarantined=stream_quarantined(), never=domain_never(),
+                  quarantined=set(qcites), quarantine_cites=qcites, never=domain_never(),
                   families=families(conf), production=True,
                   link_fn=lambda rows, tag: dino_links(rows, tag, embedder),
                   ref_scan_fn=lambda rows, ref, tag: dino_ref_hits(rows, ref, tag, embedder),
@@ -1326,7 +1424,7 @@ def load_inputs(phase, procs=5, embedder=None):
 def eligibility_ctx(inputs):
     return {"base_keys": set(inputs.base_b), "base_shas": {r.get("original_sha256") for r in inputs.base_b.values()},
             "eval_sources": inputs.eval_sources, "quarantined": inputs.quarantined, "never": inputs.never,
-            "consumed": inputs.consumed}
+            "consumed": inputs.consumed, "quarantine_cites": inputs.quarantine_cites}
 
 
 def stream_consumed():
@@ -1422,22 +1520,30 @@ def families(conf):
     return out
 
 
-def stream_quarantined():
-    """The stream's quarantined sources (inc2.stream's ledger fold, as base3 reads it)."""
+def stream_quarantine_cites():
+    """{source: [the diagnoses its quarantines cite, D28 or D31]} over every stream (inc2.stream's ledger fold,
+    q_sources {source: {cite, seq, utc}}, as base3 reads it); a quarantine without a cite reads '?'."""
     try:
         from .. import inc_autopilot  # noqa: F401  (the package is present wherever the stream runs)
         from . import stream as ST
         sids = sorted(p.name for p in (C.INC_DIR / "stream").iterdir() if p.is_dir()) \
             if (C.INC_DIR / "stream").is_dir() else []
-        out = set()
+        out = collections.defaultdict(set)
         for sid in sids:
             try:
-                out |= set(ST.Stream(sid, quiet=True).load(repair=False).q_sources)
+                q = ST.Stream(sid, quiet=True).load(repair=False).q_sources
             except Exception:  # noqa: BLE001 - a stream that cannot be folded quarantines nothing here
                 continue
-        return out
+            for s, v in q.items():
+                out[s].add(str((v or {}).get("cite") or "?") if isinstance(v, dict) else "?")
+        return {s: sorted(c) for s, c in out.items()}
     except Exception:  # noqa: BLE001
-        return set()
+        return {}
+
+
+def stream_quarantined():
+    """The stream's quarantined sources (inc2.stream's ledger fold, as base3 reads it)."""
+    return set(stream_quarantine_cites())
 
 
 def domain_never():
@@ -1525,7 +1631,9 @@ def ingest_matches(bdir, bj=None):
 
 def candidate_row(key, adm, q, f, im=None):
     """One candidate from its admission record, its queue row (None when not admitted), its original file and its
-    Step 1 batch's copy-refusal match (im: ingest_matches)."""
+    Step 1 batch's copy-refusal match (im: ingest_matches). A queued row's holds are the queue's, events folded (a hold
+    step1_stream's serve-holds released is gone, DS1 deviation 2 item 2: the intake file record keeps the holds it was
+    admitted with); a row the queue does not hold keeps its intake record's."""
     try:
         boxes = read_inc_label(f["label"])
     except (OSError, ValueError, DataRefused):
@@ -1542,8 +1650,9 @@ def candidate_row(key, adm, q, f, im=None):
             "dhash": (q or {}).get("dhash") if q else f.get("dhash"), "variants": None,
             "licence": (q or {}).get("licence") or f.get("licence"),
             "research_only": bool((q or {}).get("research_only") or f.get("research_only")),
-            "holds": list((q or {}).get("holds") or f.get("holds") or []), "refused": (q or {}).get("refused")
-            or adm.get("refusal"), "admission": adm.get("admission"), "test_v1": (q or {}).get("test_v1"),
+            "holds": list((q.get("holds") if q is not None else f.get("holds")) or []),
+            "refused": (q or {}).get("refused") or adm.get("refusal"), "admission": adm.get("admission"),
+            "test_v1": (q or {}).get("test_v1"),
             "batch": adm.get("batch") or f.get("batch"), "kind_q": (q or {}).get("kind"),
             # Step 1's guard match and pair cosine of a refused copy (D28-v2's input: DS.5.1 item 1(a))
             "guard_match": adm.get("guard_match") or (im or {}).get("guard_match"),
@@ -1954,11 +2063,17 @@ def screen(phase, inputs, revision=None, write=True):
     confirms it, fail closed without the detector); the model audit, the box convention; the candidates written for
     the next steps; the sheets' bundles (inc2.ds1_sheets.bundle). A revision is written whenever it screens new rows
     or a Step 1 batch came since the last one (its record names the batches it saw), so the platform's plan sees
-    the screen done even when no row is new."""
+    the screen done even when no row is new. A source screened before DS1 deviation 2 with rows its code reads
+    otherwise (rescreen_due: SIU, held out by its D31 quarantine, and the sources read with released intake holds) is
+    screened again whole, once, and this revision's record of it replaces the earlier ones (deviation 2, item 2).
+    Each live row's image size is read from its header where its file record gave none (fill_sizes), so its
+    convention sees every box (DS1 deviation 2, item 1)."""
     from . import ds1_sheets as SH
     prior = screened_keys(phase)
     named = phase2_ids()
-    rows = [r for r in inputs.candidates if r["key"] not in prior and (int(phase) == 1 or r["source"] in named)]
+    again = set(rescreen_due(phase))
+    rows = [r for r in inputs.candidates if (r["key"] not in prior or r["source"] in again)
+            and (int(phase) == 1 or r["source"] in named)]
     ctx = eligibility_ctx(inputs)
     per = collections.defaultdict(lambda: {"rows": 0, "out": collections.Counter(), "units": collections.Counter(),
                                            "pools": collections.Counter()})
@@ -2003,6 +2118,7 @@ def screen(phase, inputs, revision=None, write=True):
     for r in live:
         for i, b in enumerate(r["boxes"]):
             per[r["source"]]["units"][unit_of(r, b[0], i)] += 1
+    fill_sizes(live, inputs.read_size)
     hash_rows(live, hasher=inputs.hasher)
     live = [r for r in live if not r.get("drop")]
     # DS1's guard against cwd12 dev and test on the live rows: an embedding hit is a copy at the calibrated threshold;
@@ -2052,7 +2168,16 @@ def screen(phase, inputs, revision=None, write=True):
     last_seen = ((_read_json(revs[-1]) or {}).get("inputs") or {}).get("step1_batches") if revs else None
     doc = {"format": FMT_SCREEN, "phase": int(phase), "revision": int(revision), "candidates": len(rows),
            "live": len(live), "sources": rec, "inputs": inputs.record, "decided_by": D.DECIDED_BY,
-           "written_utc": D._utc()}
+           "written_utc": D._utc(), "deviation": SCREEN_DEVIATION}
+    if again:
+        # DS1 deviation 2, item 2: the sources screened again whole; screen_records reads this revision's record of
+        # each in place of the earlier ones, screened_rows its candidates in place of theirs
+        doc["rescreen"] = {s: {"of": [p.name for p in revs if s in ((_read_json(p) or {}).get("sources") or {})],
+                               "rows": per[s]["rows"] if s in per else 0, "deviation": 2,
+                               "why": ("held out whole before DS1 deviation 2 by its D31 stream quarantine, which DS.0 "
+                                       "item 14 reads past, and its queued rows read with their intake hold"
+                                       if s == SIU else "its queued rows read before DS1 deviation 2 with an intake "
+                                       "hold (h6_scan) the queue had released")} for s in sorted(again)}
     if write and (rows or not revs or sorted(seen or []) != sorted(last_seen or [])):
         base_p = out_dir() / "screen" / ("p%d_r%03d" % (int(phase), int(revision)))
         write_jsonl_once(Path(str(base_p) + "_candidates.jsonl"), [_cand_out(r) for r in rows])
@@ -2268,27 +2393,53 @@ def screened_keys(phase):
 
 
 def screened_rows(phase):
-    out = []
+    """Every screen revision's candidates of a phase, each key once: a key a later revision screened again (DS1
+    deviation 2, item 2) is that revision's row, in the place the key first held."""
+    by = {}
     for p in screen_revisions(phase):
-        out += read_jsonl(Path(str(p)[:-5] + "_candidates.jsonl"))
+        for r in read_jsonl(Path(str(p)[:-5] + "_candidates.jsonl")):
+            by[r["key"]] = r
+    out = list(by.values())
     for r in out:
         r["boxes"] = [tuple(b) for b in r.get("boxes") or ()]
     return out
 
 
+def rescreen_due(phase):
+    """The sources the next screen of a phase takes again whole (DS1 deviation 2, item 2): each source of RESCREEN that
+    a revision of phase 1 written before the deviation screened (its record names no deviation: SIU held out by its D31
+    quarantine, which DS.0 item 14 reads past, and queued rows held by an intake hold the queue had released) and that
+    no revision screened again (once only). Phase 2 reads only its named sources."""
+    if int(phase) != 1:
+        return []
+    seen, again = set(), set()
+    for p in screen_revisions(phase):
+        d = _read_json(p) or {}
+        again |= set(d.get("rescreen") or {})
+        if int(d.get("deviation") or 0) < SCREEN_DEVIATION:
+            # a revision written before deviation 2 (its code read SIU's quarantine and the queued rows' holds so)
+            seen |= {s for s in (d.get("sources") or {}) if s in RESCREEN}
+    return sorted(seen - again)
+
+
 def screen_records(phase, reaudits=None):
     """{source: record} over every screen revision of a phase: the latest revision's record of the source, with the
     counts summed and the flags that settle a source taken from any revision (a cwd12 copy quarantines it whole
-    whichever revision found it; a capture name sends it to role C)."""
+    whichever revision found it; a capture name sends it to role C). A revision that screened a source again whole
+    (its 'rescreen', DS1 deviation 2 item 2) replaces the earlier revisions' record of it."""
     out = {}
     for p in screen_revisions(phase):
         d = _read_json(p) or {}
         ra = (reaudits or {}).get(p.name) or _read_json(reaudit_path(p))
         ra = (ra.get("sources") or {}) if isinstance(ra, dict) and ra.get("format") == FMT_REAUDIT else {}
+        again = d.get("rescreen") or {}
         for s, v in (d.get("sources") or {}).items():
             if s in ra:
                 # the audit taken again (Revision 2, item 4) in place of the revision's own, which stays beside it
                 v = dict(v, audit_verdict=ra[s]["audit_verdict"], audit_superseded=ra[s].get("superseded"))
+            if s in again:
+                out[s] = dict(v, rescreen_of=list((again[s] or {}).get("of") or []))
+                continue
             old = out.get(s)
             if old is None:
                 out[s] = dict(v)
@@ -2363,13 +2514,98 @@ def sources_out(decisions=None):
     return out
 
 
+def _pool_paths(phase, source):
+    d = out_dir() / "pools" / ("p%d" % int(phase))
+    return d / ("%s.json" % slug(source)), d / ("%s.jsonl" % slug(source))
+
+
+def pools_superseded_due(phase):
+    """The sources of a phase whose pool record a recorded deviation supersedes still stands at its path, hashing as
+    named (SUPERSEDED_POOLS; DS1 deviation 2, item 1): the plan reads them as not pooled, and the pools step moves
+    them aside first (supersede_pools)."""
+    out = []
+    for e in SUPERSEDED_POOLS:
+        rec, _rows = _pool_paths(e["phase"], e["source"])
+        if int(e["phase"]) == int(phase) and rec.is_file() and not rec.is_symlink() and \
+                C.sha256_file(rec) == e["record_sha256"]:
+            out.append(e["source"])
+    return sorted(out)
+
+
+def supersede_pools(phase):
+    """The pool records of a phase that a recorded deviation supersedes (SUPERSEDED_POOLS; DS1 deviation 2, item 1),
+    moved aside byte for byte into pools/p<phase>/superseded/dev<n>/: for each, its record (<slug>.json, hashing as
+    named) and its rows (<slug>.jsonl, which must hash as named), each a hard link made there and then the original
+    unlinked, the rows first and the record last, so a move cut off midway is still due and completes; never
+    overwritten, never deleted. Each move is recorded in that folder's MANIFEST.json (the files' paths, sha256s and
+    sizes, when, by which job and host, why, the deviation's file and sha256). A record at the path with other bytes
+    is not the one named and stays (the source pooled again: moved_before; else other). A folder copy with other
+    bytes, or rows at the path with other bytes than named, refuse. Returns [{source, status: moved | moved_before |
+    other | absent}]."""
+    out = []
+    for e in SUPERSEDED_POOLS:
+        if int(e["phase"]) != int(phase):
+            continue
+        rec, rows = _pool_paths(phase, e["source"])
+        dd = rec.parent / "superseded" / ("dev%d" % int(e["deviation"]))
+        named = ((rows, e["rows_sha256"]), (rec, e["record_sha256"]))
+        for src, sha in named:
+            dst = dd / src.name
+            if dst.is_file() and C.sha256_file(dst) != sha:
+                raise DataRefused("%s holds another file than the one DS1 deviation %d supersedes (%s...)" % (
+                    dst, int(e["deviation"]), sha[:12]))
+        got = C.sha256_file(rec) if rec.is_file() and not rec.is_symlink() else None
+        if got != e["record_sha256"]:
+            st_ = "moved_before" if (dd / rec.name).is_file() else ("other" if got is not None else "absent")
+            out.append({"source": e["source"], "status": st_})
+            continue
+        dv = next((d for d in deviations() if int(d["n"]) == int(e["deviation"]) and d.get("sha256")), None)
+        if dv is None:
+            raise DataRefused("the superseded pool record of %s names DS1 deviation %s, which no pinned deviation "
+                              "record holds" % (e["source"], e["deviation"]))
+        if rows.is_file() and C.sha256_file(rows) != e["rows_sha256"]:
+            raise DataRefused("%s does not hash as the rows DS1 deviation %d names (%s...): its record is not moved" % (
+                rows, int(dv["n"]), e["rows_sha256"][:12]))
+        if not rows.is_file() and not (dd / rows.name).is_file():
+            raise DataRefused("%s's rows (%s) are neither at their path nor moved aside: its record is not moved" % (
+                e["source"], rows.name))
+        dd.mkdir(parents=True, exist_ok=True)
+        files = []
+        for src, sha in named:
+            dst = dd / src.name
+            if src.is_file():
+                if not dst.is_file():
+                    os.link(str(src), str(dst))
+                size = src.stat().st_size
+                os.unlink(str(src))
+            else:
+                size = dst.stat().st_size          # moved by a run cut off after its link and unlink
+            files.append({"path": str(src.relative_to(C.INC_DIR)) if str(src).startswith(str(C.INC_DIR)) else str(src),
+                          "sha256": sha, "size": size, "moved_to": str(dst.relative_to(C.INC_DIR))
+                          if str(dst).startswith(str(C.INC_DIR)) else str(dst)})
+        man = dd / "MANIFEST.json"
+        doc = _read_json(man) if man.is_file() else None
+        doc = doc if isinstance(doc, dict) and isinstance(doc.get("moves"), list) else {"format": D.FMT_SUPERSEDED,
+                                                                                         "moves": []}
+        doc["moves"].append({"source": e["source"], "phase": int(phase), "files": files, "moved_utc": D._utc(),
+                             "job": os.environ.get("SLURM_JOB_ID"), "host": os.uname().nodename, "why": e["why"],
+                             "deviation": {"n": int(dv["n"]), "file": dv["file"], "sha256": dv["sha256"]}})
+        D.write_json(man, doc)
+        log("superseded the pool of %s (DS1 deviation %d): moved to %s" % (e["source"], int(dv["n"]), dd))
+        out.append({"source": e["source"], "status": "moved"})
+    return out
+
+
 def pools(phase, inputs, s0_rows=None, write=True):
     """Step 'pools' (L30): for every screened source whose sheet is decided (and audited where required), the rows
-    through DS.5.1 items 2-10: roles, base3's rules, the model audit's masks, dedupe against base B and among
+    through DS.5.1 items 2-10: roles, base3's rules (each row's image size read from its header where its file
+    record gave none: DS1 deviation 2, item 1), the model audit's masks, dedupe against base B and among
     themselves, thin(10) (kept flags; KD reads the unthinned), the guard against the fixed exams (both
     directions), EXIF, licence flags, the written files. Each source's pool is written once:
-    splits/ds1/pools/p<phase>/<source slug>.jsonl."""
+    splits/ds1/pools/p<phase>/<source slug>.jsonl; the pool records a recorded deviation supersedes are moved aside
+    first (supersede_pools), so their sources are pooled again."""
     rules, _conf = load_rules()
+    moved = supersede_pools(phase) if write else []
     taken = {}
     if audit_due(phase):
         # a screen's audit taken before Revision 2 is taken again before any pool reads it (masks, readiness)
@@ -2382,7 +2618,8 @@ def pools(phase, inputs, s0_rows=None, write=True):
     for s in sorted({r["source"] for r in rows}):
         ok, why = source_ready(s, inputs.decisions, srec.get(s))
         ready[s] = (ok, why)
-    done = {p.stem for p in (out_dir() / "pools" / ("p%d" % int(phase))).glob("*.jsonl")} if write else set()
+    done = ({p.stem for p in (out_dir() / "pools" / ("p%d" % int(phase))).glob("*.jsonl")} -
+            {slug(x) for x in pools_superseded_due(phase)}) if write else set()
     todo = [r for r in rows if ready.get(r["source"], (False,))[0] and slug(r["source"]) not in done]
     ctx = eligibility_ctx(inputs)
     counts = collections.defaultdict(collections.Counter)
@@ -2402,6 +2639,7 @@ def pools(phase, inputs, s0_rows=None, write=True):
                  setting=dec.get("setting"), training_only=dec.get("decision") == "accept_training_only")
         live.append(r)
     hash_rows(live, hasher=inputs.hasher)
+    fill_sizes(live, inputs.read_size)
     conv = apply_rules(live, rules)
     # the model audit's masks for a partially labelled source (accept for training only)
     for r in live:
@@ -2457,7 +2695,8 @@ def pools(phase, inputs, s0_rows=None, write=True):
     for s in sorted({r["source"] for r in todo}):
         rs = out.get(s, [])
         recs[s] = {"admitted": len(rs), "thinned": sum(1 for r in rs if r.get("thin")), "out": dict(counts[s]),
-                   "convention": conv.get(s), "counts": three_counts(rs)}
+                   "convention": conv.get(s), "counts": three_counts(rs),
+                   "sizes_from_header": sum(1 for r in live if r["source"] == s and r.get("size_from") == "header")}
         if write:
             pd = out_dir() / "pools" / ("p%d" % int(phase))
             sha = write_jsonl_once(pd / ("%s.jsonl" % slug(s)), [_pool_row(r) for r in sorted(rs, key=lambda r: r["key"])])
@@ -2466,6 +2705,8 @@ def pools(phase, inputs, s0_rows=None, write=True):
                                                    "written_utc": D._utc()})
     doc = {"format": FMT_POOL, "phase": int(phase), "sources": recs, "dedupe": dd, "thin": {"series": len(th)},
            "not_ready": {s: why for s, (ok, why) in ready.items() if not ok}, "written_utc": D._utc()}
+    if moved:
+        doc["superseded"] = moved
     return doc, out
 
 
@@ -2951,8 +3192,10 @@ def manifests(phase, inputs, write=True, on_date=None):
                and not source_ready(s, inputs.decisions, v)[0]]
     unfrozen = [s for s in pr if s != SIU and (inputs.decisions.get(s) or {}).get("decision") == "accept"
                 and not frozen(mdn_exam(s))]
-    if pending or unfrozen:
-        built["phase1_waits"] = {"sheets": sorted(pending), "md_n": sorted(unfrozen)}
+    # DS1 deviation 2: S1c, S1c-R and S1u wait for SIU's screen taken again and the superseded pools pooled again
+    dev2 = {k: v for k, v in (("rescreen", rescreen_due(1)), ("repool", pools_superseded_due(1))) if v}
+    if pending or unfrozen or dev2:
+        built["phase1_waits"] = dict({"sheets": sorted(pending), "md_n": sorted(unfrozen)}, **dev2)
     elif write and not arm_record_path("S1U").is_file():
         new = guard_new(_phase_rows(pr, md_keys, exam_rows, s0_keys), inputs)
         siu_new = [r for r in new if r["source"] == SIU and r.get("thin")]
@@ -3051,6 +3294,7 @@ def plan_state(inc_dir=None):
     for ph in PHASES:
         revs = screen_revisions(ph)
         seen = set(((_read_json(revs[-1]) or {}).get("inputs") or {}).get("step1_batches") or []) if revs else set()
+        repool = set(pools_superseded_due(ph))         # DS1 deviation 2, item 1: pooled again, so not pooled now
         srcs = {}
         for s, v in screen_records(ph).items():
             if not v.get("live"):
@@ -3060,7 +3304,8 @@ def plan_state(inc_dir=None):
             srcs[s] = {"decided": bool(dec.get("decision")), "decision": dec.get("decision"),
                        "audit_required": bool(dec.get("audit_required")), "audited": bool(dec.get("audited")),
                        "ready": ok, "why": why, "pooled": (out_dir() / "pools" / ("p%d" % ph) / ("%s.jsonl" % slug(s)))
-                       .is_file(), "md_n": bool(frozen(mdn_exam(s))), "mtw_draft": (exam_dir(mtw_exam(s)) / "draft")
+                       .is_file() and s not in repool, "md_n": bool(frozen(mdn_exam(s))),
+                       "mtw_draft": (exam_dir(mtw_exam(s)) / "draft")
                        .is_dir(), "mtw": bool(frozen(mtw_exam(s))) or (exam_dir(mtw_exam(s)) / "left.json").is_file(),
                        "checked": s in checks,
                        "quarantined_whole": bool(v.get("quarantine_whole")),
@@ -3069,7 +3314,9 @@ def plan_state(inc_dir=None):
                        "role_c": bool(v.get("role_c") or int((v.get("capture_names") or {}).get("hits") or 0)),
                        "settled_out": settled_out(s, decs, v), "exam_draw": s != SIU}
         out["phases"][str(ph)] = {"revisions": len(revs), "new_batches": len(batches - seen) if revs else None,
-                                  "sources": srcs, "audit_due": [p.name for p in audit_due(ph)]}
+                                  "sources": srcs, "audit_due": [p.name for p in audit_due(ph)],
+                                  # DS1 deviation 2: the sources the next screen takes again, the pools moved aside
+                                  "rescreen": rescreen_due(ph), "repool": sorted(repool)}
     drafts = sorted(exam_dir("md_s0").glob("draft_r[0-9][0-9][0-9]")) if exam_dir("md_s0").is_dir() else []
     last = drafts[-1].name if drafts else None
     pw = _read_json(D.root() / "power" / ("%s.json" % last)) if last else None
@@ -3172,7 +3419,8 @@ def rehearse(phase, out=None):
     cands = load_candidates(phase, base_b)
     ctx = {"base_keys": set(base_b), "base_shas": {r.get("original_sha256") for r in base_b.values()},
            "eval_sources": {s for g in (load_rules()[1].get("evaluation_groups") or {}).get("groups", {}).values()
-                            for s in g}, "quarantined": stream_quarantined(), "never": domain_never()}
+                            for s in g}, "quarantined": stream_quarantined(), "never": domain_never(),
+           "quarantine_cites": stream_quarantine_cites()}
     per = collections.defaultdict(lambda: collections.Counter())
     live = collections.defaultdict(list)
     for r in cands:

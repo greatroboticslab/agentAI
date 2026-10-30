@@ -670,7 +670,8 @@ def t_registration():
     cl = (GIT / "docs" / "CONTINUOUS_LOOP.md").read_bytes()
     # sections appended after it (DS1 deviation 1, 2026-10-30) follow its last line after one blank line (V3F.12: the
     # blank line before a following heading is not part of the hashed text)
-    later = [(GIT / d["file"]).read_bytes() for d in D.DEVIATIONS]
+    from weed_optimizer_framework.tools.inc2 import ds1_data as DD
+    later = [(GIT / d["file"]).read_bytes() for d in DD.deviations()]
     check("  and it is docs/CONTINUOUS_LOOP.md's Revision 2 section byte for byte (to the end of the file, or to the "
           "blank line before the sections recorded after it)",
           f.is_file() and cl.endswith(b"".join([f.read_bytes()] + [b"\n" + x for x in later])))

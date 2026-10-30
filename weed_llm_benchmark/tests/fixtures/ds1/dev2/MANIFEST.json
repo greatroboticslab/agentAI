@@ -1,0 +1,128 @@
+{
+ "cluster": {
+  "pools/p1/project_agml_mh_weed16_weed_detection.json": {
+   "sha256": "c1b0e2c5f63d97960e6a477596ee8b923264b9b3b815a3c2f70195da12fa713c"
+  },
+  "pools/p1/rf_tuf_weed_3434e.json": {
+   "sha256": "43482abf523851690e9d36d8ad8089c96485138a20a48ec3e2e20e0f12661ecb"
+  },
+  "pools/p1/rf_vizerion_weed_detection_5ell6.json": {
+   "sha256": "c90d64f128003c30cba2af70c7625e0e589914bf1d9aa9b178d752565a3844e6"
+  },
+  "pools/p1/rf_weed_detection_o9sfb_weed_detection_i_43cdfb9d.json": {
+   "sha256": "f76ee83fb74ebc9abda7ba97cd6838e12a1c00617a113bf89ffd4ec8fc9f9a90"
+  },
+  "pools/p1/rf_yolo_gyfyq_weed_ieda7.json": {
+   "sha256": "1ac035e0ae4a98628488ec7f92c9be710786f3e1bd624b9d0a0ca1e421eb11b1"
+  },
+  "pools/p1/rf_zijian_peng_grass_weed_69hcm.json": {
+   "sha256": "72bdb39ea7e0bc78c24f670edecfcf1de1b046fe5882a83e7f5ae1c4e06883b2"
+  },
+  "rf_tuf__weed-3434e__train__cwd_weed_henbit_w3_0_2591_jpg_rf_698b4f9f158ee2e5278ebb3d46dc3bf5": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_tuf__weed-3434e/train/images/cwd_weed_henbit_w3_0_2591_jpg.rf.698b4f9f158ee2e5278ebb3d46dc3bf5.jpg",
+   "image_sha256": "a7b3fdae78bf16dd23587fd88528923964d90717f1de18416c2f054318729861",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_tuf__weed-3434e/rf_tuf__weed-3434e__train__cwd_weed_henbit_w3_0_2591_jpg_rf_698b4f9f158ee2e5278ebb3d46dc3bf5.49e4188498591601.txt",
+   "label_sha256": "49e41884985916015c0cecfc1c67c5857238968f783e324b0fb6f8f08684f28e",
+   "size": 30402
+  },
+  "rf_tuf__weed-3434e__train__cwd_weed_henbit_w3_90_29531_jpg_rf_2874dfe608aa9b57a4e94274a30cb8be": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_tuf__weed-3434e/train/images/cwd_weed_henbit_w3_90_29531_jpg.rf.2874dfe608aa9b57a4e94274a30cb8be.jpg",
+   "image_sha256": "c4a2dae42792aaa2e1ac619a620e24960404fb929cdaf117e63fb7a980059325",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_tuf__weed-3434e/rf_tuf__weed-3434e__train__cwd_weed_henbit_w3_90_29531_jpg_rf_2874dfe608aa9b57a4e94274a30cb8be.af4512e421fd7eb8.txt",
+   "label_sha256": "af4512e421fd7eb8c44ac87860bb31f3122adf74f350cc85c8782918f1818ff5",
+   "size": 84995
+  },
+  "rf_tuf__weed-3434e__train__cwd_weed_henbit_w3_90_29564_jpg_rf_6fe544e6ec795d74e6311a8f10abbe48": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_tuf__weed-3434e/train/images/cwd_weed_henbit_w3_90_29564_jpg.rf.6fe544e6ec795d74e6311a8f10abbe48.jpg",
+   "image_sha256": "67f0705f37af4da430cd25edf957482b1baabe0a10f582c92d5ab2348ff51893",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_tuf__weed-3434e/rf_tuf__weed-3434e__train__cwd_weed_henbit_w3_90_29564_jpg_rf_6fe544e6ec795d74e6311a8f10abbe48.d62c537f4865e1ac.txt",
+   "label_sha256": "d62c537f4865e1ac9e828b77258a9f52b9991c48180ebde374a7a05f99f933cd",
+   "size": 88764
+  },
+  "rf_tuf__weed-3434e__train__cwd_weed_indian-goosegrass_w4_90_00004181_jpg_rf_ef0996ddc25f5a8d6d0925e0be31e16f": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_tuf__weed-3434e/train/images/cwd_weed_indian-goosegrass_w4_90_00004181_jpg.rf.ef0996ddc25f5a8d6d0925e0be31e16f.jpg",
+   "image_sha256": "12a069000ca9311f3ab8f386050699a0da3d6ea2634195b4af608e878f59b30c",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_tuf__weed-3434e/rf_tuf__weed-3434e__train__cwd_weed_indian-goosegrass_w4_90_00004181_jpg_rf_ef0996ddc25f5a8d6d0925e0be31e16f.d015c7216c526fd7.txt",
+   "label_sha256": "d015c7216c526fd786df9850accb4b910f35faacc1b4eacfeb2e6cdcfc393b4f",
+   "size": 55807
+  },
+  "rf_tuf__weed-3434e__train__cwd_weed_indian-goosegrass_w4_90_00004197_jpg_rf_07790ca1557b762893891554985c0f71": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_tuf__weed-3434e/train/images/cwd_weed_indian-goosegrass_w4_90_00004197_jpg.rf.07790ca1557b762893891554985c0f71.jpg",
+   "image_sha256": "ea93103d28ea9bfee555eb50dc49a3fe77f2158717a50f7fc80dff7f674f2381",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_tuf__weed-3434e/rf_tuf__weed-3434e__train__cwd_weed_indian-goosegrass_w4_90_00004197_jpg_rf_07790ca1557b762893891554985c0f71.238d70eb5a6574c2.txt",
+   "label_sha256": "238d70eb5a6574c28a111d3384c3eedf7555c0969e009a263af2f6b0d8c567d3",
+   "size": 50990
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field__train__Rumex-obtusifolius-L_0234_jpg_rf_a246b690d5e1798055e2febe3080f11e": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_weed-detection-o9sfb__weed-detection-in-a-field/train/images/Rumex-obtusifolius-L_0234_jpg.rf.a246b690d5e1798055e2febe3080f11e.jpg",
+   "image_sha256": "5438dc5057410d1e11d8d3b971f0f6f859872e06ac7c79f4f5c9e744a5ea50b9",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_weed-detection-o9sfb__weed-detection-in-a-field/rf_weed-detection-o9sfb__weed-detection-in-a-field__train__Rumex-obtusifolius-L_0234_jpg_rf_a246b690d5e1798055e2febe3080f11e.8efc8d758b8ca65d.txt",
+   "label_sha256": "8efc8d758b8ca65daf5f4e9b33ac976470a64d1760a2c3f81a7cba33864ead58",
+   "size": 82834
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field__train__Rumex-obtusifolius-L_2379_jpg_rf_e9b0e021b83b65b17221d7e8cdedbc2c": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_weed-detection-o9sfb__weed-detection-in-a-field/train/images/Rumex-obtusifolius-L_2379_jpg.rf.e9b0e021b83b65b17221d7e8cdedbc2c.jpg",
+   "image_sha256": "8a7ede221888b532de2cf68c653d6e9053ab82b01abe368ac2ccdc9d616970da",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_weed-detection-o9sfb__weed-detection-in-a-field/rf_weed-detection-o9sfb__weed-detection-in-a-field__train__Rumex-obtusifolius-L_2379_jpg_rf_e9b0e021b83b65b17221d7e8cdedbc2c.6f18b5eaa0bccc07.txt",
+   "label_sha256": "6f18b5eaa0bccc07debe822aca1dc1159af7c9e1d6650ed3abb737277199e5fd",
+   "size": 98936
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field__train__ridderzuring_0227_jpg_rf_e5916027faa86412396a5c0d2f05c703": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_weed-detection-o9sfb__weed-detection-in-a-field/train/images/ridderzuring_0227_jpg.rf.e5916027faa86412396a5c0d2f05c703.jpg",
+   "image_sha256": "26b619153866f86cb567692a789552cd31056006135cfce8dcae45ef642693f8",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_weed-detection-o9sfb__weed-detection-in-a-field/rf_weed-detection-o9sfb__weed-detection-in-a-field__train__ridderzuring_0227_jpg_rf_e5916027faa86412396a5c0d2f05c703.11e4d59f8bd03c05.txt",
+   "label_sha256": "11e4d59f8bd03c05ed0a3616fa1eab9493a42c0c46771ae5ee06677961e92794",
+   "size": 99877
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field__train__ridderzuring_3018_jpg_rf_2cfc2601b8d1a22b8cfdae7f27841942": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_weed-detection-o9sfb__weed-detection-in-a-field/train/images/ridderzuring_3018_jpg.rf.2cfc2601b8d1a22b8cfdae7f27841942.jpg",
+   "image_sha256": "337f4121818a1547df3565ad5abe5c97d64d8424af4fbc1698e8cb989427946d",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_weed-detection-o9sfb__weed-detection-in-a-field/rf_weed-detection-o9sfb__weed-detection-in-a-field__train__ridderzuring_3018_jpg_rf_2cfc2601b8d1a22b8cfdae7f27841942.366e516b5a29faf9.txt",
+   "label_sha256": "366e516b5a29faf9ad2ee51ad09ea398854481a131351ad59ddb18eaea0e64e3",
+   "size": 73797
+  },
+  "rf_weed-detection-o9sfb__weed-detection-in-a-field__train__ridderzuring_4572_jpg_rf_854486597b19d69a81c3ccce20e09e13": {
+   "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/datasets/rf_weed-detection-o9sfb__weed-detection-in-a-field/train/images/ridderzuring_4572_jpg.rf.854486597b19d69a81c3ccce20e09e13.jpg",
+   "image_sha256": "969d2e48637b269f9e5e3191f1cb45f143bd50e6a82cd47a9f21645cd1654b29",
+   "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1/labels/rf_weed-detection-o9sfb__weed-detection-in-a-field/rf_weed-detection-o9sfb__weed-detection-in-a-field__train__ridderzuring_4572_jpg_rf_854486597b19d69a81c3ccce20e09e13.cf9fe6cabc572d52.txt",
+   "label_sha256": "cf9fe6cabc572d520531451fcce4bf18c015074c76c65641c3cca2252c0cbb30",
+   "size": 88731
+  }
+ },
+ "files": {
+  "decisions.jsonl": "a059ad2840906d09ab2ad27bde30d5785199e23f0b84dbf6336fa0681fca3030",
+  "images/14d08afdc33d2692.jpg": "67f0705f37af4da430cd25edf957482b1baabe0a10f582c92d5ab2348ff51893",
+  "images/2f2e3898c528a3fb.jpg": "5438dc5057410d1e11d8d3b971f0f6f859872e06ac7c79f4f5c9e744a5ea50b9",
+  "images/4b1469f9fa56cacf.jpg": "969d2e48637b269f9e5e3191f1cb45f143bd50e6a82cd47a9f21645cd1654b29",
+  "images/5aa89ae4e7d83186.jpg": "c4a2dae42792aaa2e1ac619a620e24960404fb929cdaf117e63fb7a980059325",
+  "images/97e806d2a5846ced.jpg": "337f4121818a1547df3565ad5abe5c97d64d8424af4fbc1698e8cb989427946d",
+  "images/be90c4da8d37083b.jpg": "8a7ede221888b532de2cf68c653d6e9053ab82b01abe368ac2ccdc9d616970da",
+  "images/d0e182394e2829af.jpg": "ea93103d28ea9bfee555eb50dc49a3fe77f2158717a50f7fc80dff7f674f2381",
+  "images/df90501658cf91e5.jpg": "12a069000ca9311f3ab8f386050699a0da3d6ea2634195b4af608e878f59b30c",
+  "images/f282a862365b44cb.jpg": "26b619153866f86cb567692a789552cd31056006135cfce8dcae45ef642693f8",
+  "images/fb0e6067be42819c.jpg": "a7b3fdae78bf16dd23587fd88528923964d90717f1de18416c2f054318729861",
+  "labels/14d08afdc33d2692.txt": "d62c537f4865e1ac9e828b77258a9f52b9991c48180ebde374a7a05f99f933cd",
+  "labels/2f2e3898c528a3fb.txt": "8efc8d758b8ca65daf5f4e9b33ac976470a64d1760a2c3f81a7cba33864ead58",
+  "labels/4b1469f9fa56cacf.txt": "cf9fe6cabc572d520531451fcce4bf18c015074c76c65641c3cca2252c0cbb30",
+  "labels/5aa89ae4e7d83186.txt": "af4512e421fd7eb8c44ac87860bb31f3122adf74f350cc85c8782918f1818ff5",
+  "labels/97e806d2a5846ced.txt": "366e516b5a29faf9ad2ee51ad09ea398854481a131351ad59ddb18eaea0e64e3",
+  "labels/be90c4da8d37083b.txt": "6f18b5eaa0bccc07debe822aca1dc1159af7c9e1d6650ed3abb737277199e5fd",
+  "labels/d0e182394e2829af.txt": "238d70eb5a6574c28a111d3384c3eedf7555c0969e009a263af2f6b0d8c567d3",
+  "labels/df90501658cf91e5.txt": "d015c7216c526fd786df9850accb4b910f35faacc1b4eacfeb2e6cdcfc393b4f",
+  "labels/f282a862365b44cb.txt": "11e4d59f8bd03c05ed0a3616fa1eab9493a42c0c46771ae5ee06677961e92794",
+  "labels/fb0e6067be42819c.txt": "49e41884985916015c0cecfc1c67c5857238968f783e324b0fb6f8f08684f28e",
+  "p1_r001_candidates.jsonl": "d61a57d822fd61dd1f88a5d6446b6c8b382023b2b5236f5a982103daf025fc99",
+  "p1_r001_sources.json": "478e8bd189bcc734636d9432905feed39a061e1c8d7189246cd69aa3acf5ba22",
+  "pools_p1/project_agml_mh_weed16_weed_detection.json": "c1b0e2c5f63d97960e6a477596ee8b923264b9b3b815a3c2f70195da12fa713c",
+  "pools_p1/rf_tuf_weed_3434e.json": "43482abf523851690e9d36d8ad8089c96485138a20a48ec3e2e20e0f12661ecb",
+  "pools_p1/rf_vizerion_weed_detection_5ell6.json": "c90d64f128003c30cba2af70c7625e0e589914bf1d9aa9b178d752565a3844e6",
+  "pools_p1/rf_weed_detection_o9sfb_weed_detection_i_43cdfb9d.json": "f76ee83fb74ebc9abda7ba97cd6838e12a1c00617a113bf89ffd4ec8fc9f9a90",
+  "pools_p1/rf_yolo_gyfyq_weed_ieda7.json": "1ac035e0ae4a98628488ec7f92c9be710786f3e1bd624b9d0a0ca1e421eb11b1",
+  "pools_p1/rf_zijian_peng_grass_weed_69hcm.json": "72bdb39ea7e0bc78c24f670edecfcf1de1b046fe5882a83e7f5ae1c4e06883b2",
+  "siu_rows.json": "52caa767cfa12d2a7f6b57b4689f162600508e8b380cebba083e6d61f374245c",
+  "step1_pool.jsonl": "2203659e770b32462ab48e6129f897ea20c3998f550f2964366efe833097d8af"
+ },
+ "format": "inc2-ds1-dev2-fixture/1",
+ "origin": "Bridges-2 /ocean, read only, 2026-10-30",
+ "what": "DS1 deviation 2 test fixtures, read only from the cluster on 2026-10-30: 10 Step 1 v1-pool rows (5 of rf_tuf__weed-3434e, 5 of rf_weed-detection-o9sfb__weed-detection-in-a-field) with their images and intake labels (byte copies; cluster paths and sha256s under \"cluster\"), their screen p1_r001 candidate rows and step1/pool.jsonl rows (paths made relative), the screen record of those sources and of SIU, their sheet decisions, the six phase-1 pool records the deviation supersedes, and SIU rows (4 queued, 2 not admitted: admission record, folded queue row, intake manifest row)"
+}
