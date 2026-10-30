@@ -2320,8 +2320,8 @@ def ds1_plan(cfg, fs):
             ("RA (the delegate's inc2.ds1 ra)", not st.get("ra")), ("the power pre-flight", not st.get("power_final")),
             ("MD-S0's freeze", not md.get("frozen"))) if c)
     s1_frozen = bool(arms.get("S1U"))
-    # ---- 1. the phase-1 screen (again while new batches arrive before the phase-1 freeze, and once for the source
-    # DS1 deviation 2 has screened again: SIU, held out before by its D31 quarantine)
+    # ---- 1. the phase-1 screen (again while new batches arrive before the phase-1 freeze, and once for the sources
+    # DS1 deviation 2 screens again: the status's rescreen)
     if (not p1.get("revisions") or (p1.get("new_batches") and not s1_frozen) or
             (p1.get("rescreen") and not s1_frozen)) and due("data:1:screen"):
         add(maint, {"lever": "L30", "phase": 1, "step": "screen", "item": "data:1:screen"})
@@ -2363,7 +2363,8 @@ def ds1_plan(cfg, fs):
     # ---- 5. the manifests (S0 and KF; KD and KT; S1c, S1c-R, S1u; S2)
     settled1, w1 = _ds1_sources_settled(p1)
     if p1.get("rescreen"):
-        # DS1 deviation 2: the phase-1 arms wait for SIU's screen taken again (its sheet and table follow from it)
+        # DS1 deviation 2: the phase-1 arms wait for the sources the status says are screened again (their sheets
+        # follow from that screen)
         settled1, w1 = False, dict(w1, screen=list(p1["rescreen"]))
     if md.get("frozen"):
         want = []
