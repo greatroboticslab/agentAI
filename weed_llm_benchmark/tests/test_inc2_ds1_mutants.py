@@ -129,6 +129,21 @@ must occur exactly once in its file), runs its target against the copy and requi
   DX24  ds1_data          a source whose live rows are no longer the screen's is recorded as the screen's
   DX25  stream            the time-stamp card names every Revision, also one the record names (refused)
   DX26  ds1               timestamp_missing lists a Revision its own record names
+  DS1 deviation 1 (2026-10-30, after the power pre-flight's b1_ood23 refusals of jobs 50026958 and 50027968):
+  DV1   ds1               B'1's P7 constants are the plain reading's again (the text's numbers: the live refusal)
+  DV2   ds1               only P7's constant is checked against V3F's record (a wrong plain constant passes)
+  DV3   ds1               the refusal does not say a constant is the other reading's value
+  DV4   ds1               V3F's records are not checked against the registered constants before the passes
+  DV5   ds1               the pass's plain reading is not held to DS.7.1's rule (only P7's difference counts)
+  DV6   ds1               the pass's P7 reading is taken from its OtherPlant arrays, not its target ones
+  DV7   ds1               V3F's recorded P7 statistic is read from the OtherPlant arrays of its p7 sidecar
+  DV8   ds1               the superseded records stay at their paths (require_reproductions refuses every score)
+  DV9   ds1               a file at a superseded path with another sha256 is moved aside too
+  DV10  ds1               a superseded record is deleted, not moved (no copy kept)
+  DV11  ds1               the pre-flight takes its reproductions without moving the superseded records aside
+  DV12  stream            the gate opens while the deployed tree lacks the deviation's file
+  DV13  weed.json         the reopen block's time precedes the live attempt (the pre-flight is never reopened)
+  DV14  deploy_funnel     the deviation's file is not shipped
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -168,6 +183,7 @@ AP_FAIL = "tests/test_stream_ap_ds1.py?DS1_WORLD=fail"
 DEPLOY = "tests/test_inc2_ds1_deploy.py"
 REV2 = "tests/test_inc2_ds1_rev2.py"
 REV1 = "tests/test_inc2_ds1_rev1.py"
+DEV1 = "tests/test_inc2_ds1_dev1.py"
 AP_PLANR1 = "tests/test_stream_ap_ds1.py?DS1_WORLD=plan_rev1"
 AP_REVIEW = "tests/test_stream_ap_ds1.py?DS1_WORLD=review"
 MUTANTS = {
@@ -372,6 +388,27 @@ MUTANTS = {
              '                    True]', REV2),
     "DX26": (DC, '    return {"record": rec, "revisions": [int(rv["n"]) for rv in REVISIONS if not revision_named(rv, d, p)]}',
              '    return {"record": rec, "revisions": [int(rv["n"]) for rv in REVISIONS]}', REV2),
+    # DS1 deviation 1 (2026-10-30)
+    "DV1": (DC, 'B1_OOD23 = {"p7": (0.1496, 0.1594, 0.1634), "plain": (0.2562, 0.2517, 0.2598)}',
+            'B1_OOD23 = {"p7": (0.2562, 0.2517, 0.2598), "plain": (0.2562, 0.2517, 0.2598)}', DEV1),
+    "DV2": (DC, '        for name, other in (("p7", "plain"), ("plain", "p7")):',
+            '        for name, other in (("p7", "plain"),):', DEV1),
+    "DV3": (DC, '" (it is the %s reading\'s value)" % other\n                    if round(float(rec[other]), 4) == reg else ""',
+            '""', DEV1),
+    "DV4": (DC, '        b1_check_constants(recorded)\n', '', DEV1),
+    "DV5": (DC, '"diff": max(r["diff"] for r in rd.values())', '"diff": rd["p7"]["diff"]', DEV1),
+    "DV6": (DC, 'got = {"p7": F.statistic_value(ps["p7"]["t"], "agnostic"),',
+            'got = {"p7": F.statistic_value(ps["p7"]["o"], "agnostic"),', DEV1),
+    "DV7": (DC, 'if k.startswith("t_")}, "agnostic")', 'if k.startswith("o_")}, "agnostic")', DEV1),
+    "DV8": (DC, '        os.unlink(str(src))\n', '        pass\n', DEV1),
+    "DV9": (DC, '        if got != e["sha256"]:', '        if False:', DEV1),
+    "DV10": (DC, '            os.link(str(src), str(dst))', '            pass', DEV1),
+    "DV11": (DC, '    supersede()\n', '', DEV1),
+    "DV12": (ST, '                       for r in list(cfg.get("revisions") or []) + list(cfg.get("deviations") or [])),',
+             '                       for r in list(cfg.get("revisions") or [])),', DEV1),
+    "DV13": (WJ, '"before_utc": "DEV1_STAMP_UTC",', '"before_utc": "2026-10-30T03:00:00Z",', DEV1),
+    "DV14": (DF, "ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md docs/prereg/DS1_dev1_2026-10-30.md.ots",
+             "ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md.ots", DEPLOY),
 }
 
 

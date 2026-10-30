@@ -668,8 +668,12 @@ def t_registration():
           [(r["file"], r["sha256"]) for r in LS.load_domain("weed")["ds1"]["revisions"]] ==
           [(r["file"], r["sha256"]) for r in D.REVISIONS])
     cl = (GIT / "docs" / "CONTINUOUS_LOOP.md").read_bytes()
-    check("  and it is docs/CONTINUOUS_LOOP.md's Revision 2 section byte for byte (to the end of the file)",
-          f.is_file() and cl.endswith(f.read_bytes()))
+    # sections appended after it (DS1 deviation 1, 2026-10-30) follow its last line after one blank line (V3F.12: the
+    # blank line before a following heading is not part of the hashed text)
+    later = [(GIT / d["file"]).read_bytes() for d in D.DEVIATIONS]
+    check("  and it is docs/CONTINUOUS_LOOP.md's Revision 2 section byte for byte (to the end of the file, or to the "
+          "blank line before the sections recorded after it)",
+          f.is_file() and cl.endswith(b"".join([f.read_bytes()] + [b"\n" + x for x in later])))
     with inc("inc_ts") as d:
         D.write_json(D.timestamp_path(), {"format": D.FMT_TIMESTAMP, "sha256": D.PREREG_SHA256, "proofs": [
             {"file": "a.ots", "sha256": "a" * 64}, {"file": "b.ots", "sha256": "b" * 64}],
