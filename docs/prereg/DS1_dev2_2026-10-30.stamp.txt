@@ -1,0 +1,85 @@
+DS1 deviation 2 time-stamp file, third text (docs/CONTINUOUS_LOOP.md, Deviation (2026-10-30): DS1 deviation 2, recorded after DS1 held numbers under V3F.3.9; time-stamped as deviation 1 was, the procedure of V3F.12)
+
+deviation_sha256: 18753a79951488f95e9e3738ad6cd1d49350b4d5e7309f67220f15edae4f7d9d
+deviation_text: docs/CONTINUOUS_LOOP.md from line 5709 ('## Deviation (2026-10-30): DS1 deviation 2, ...') to the end of the file at the commit below; byte-identical to docs/prereg/DS1_dev2_2026-10-30.md
+deviation_commit: 281f35291340f60960d0363cb08a48e17739ee1f
+supersedes: deviation 2's first text, sha256 b825aa66198553a7bae49efb6f0afdfa77ce46b71226e3791ad67b467ea3ed4d (commit dbd6bea02e7d0b0d415b598d608d5bcecd6d056d, stamp file written 2026-10-30T13:19:06Z), and its second text, sha256 58865e1d5c83f494e15c238c8e604924715048670fae11eb1f9d6b015eb574d4 (commit d91a2641605ed1d2f115385f0fd6936e57fc1ca6, stamp file written 2026-10-30T13:31:54Z), neither deployed; kept unchanged under docs/prereg/superseded/DS1_dev2_first_text/:
+  b825aa66198553a7bae49efb6f0afdfa77ce46b71226e3791ad67b467ea3ed4d  DS1_dev2_2026-10-30.md
+  ec9aa35189d329573b90a1a2e8b102bc405190b3b0bd3b5dad9167f240fa7302  DS1_dev2_2026-10-30.md.ots
+  d5f43fb7b409bdfc6acc7a0f8321ce4da960c674f4a762c716bb96d6d7d901cf  DS1_dev2_2026-10-30.stamp.txt
+  66177a7bcc983cd7396fb3a4994976c54eab19a52e93fac5764cc26aa2147c5e  DS1_dev2_2026-10-30.stamp.txt.ots
+  and docs/prereg/superseded/DS1_dev2_second_text/:
+  58865e1d5c83f494e15c238c8e604924715048670fae11eb1f9d6b015eb574d4  DS1_dev2_2026-10-30.md
+  e923ea6bc4014cd695b650c78343685631d45fd3e30d36d091fe0d4d28f08996  DS1_dev2_2026-10-30.md.ots
+  ec57210da12e58a4a181237e3b9dee5b52352bfb8a4b7e54298f435b65086190  DS1_dev2_2026-10-30.stamp.txt
+  1d50fad5b23f3b34b52ab86548cf993be41ddb137d9a653a2359595b6ac63d57  DS1_dev2_2026-10-30.stamp.txt.ots
+amendment_sha256: 3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699 (unchanged; docs/prereg/DS1_2026-10-29.md)
+revision1_sha256: 543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7 (unchanged; docs/prereg/DS1_rev1_2026-10-29.md)
+revision2_sha256: 5970fd759df8e291f645caff1d3da4ee540972da33f86c0a7248c44ff8760fc4 (unchanged; docs/prereg/DS1_rev2_2026-10-29.md)
+deviation1_sha256: 04c52e4f77229948f04a257dbe6c0aacfab84ce4f83d387c2af0e0b62a59780d (unchanged; docs/prereg/DS1_dev1_2026-10-30.md)
+inc2/ds1.py: 8075ea81756c448baac20a4a516396ec90c4cc0581734a5091628e82b91cc74f (unchanged; the code map the four reproduction records pin)
+written_utc: 2026-10-30T16:01:49Z
+decided_by: the delegate under the 2026-09-30 owner grant (deviation 2, items 1-7)
+gate: the domain's ds1.deviations pins this file by its sha256 (inc2.ds1_data.DEVIATION_2 likewise); its ds1.reopens block "DS1 deviation 2 (2026-10-30)" reopens data:1:screen and data:1:pools (states failed and missing; proposals d8967fc5f33dc713fb7f969b854c2014 and 0c1bae5fd6e893309a57422b6583ff4f) and its block "DS1 deviation 2 (2026-10-30): the builds" reopens build:S0 and build:KF (state failed; proposals b40fe1e663406bb6d5605e626b472c81 and e879165b9182ac53efa590ba9da1d133), each for an attempt started before written_utc
+
+superseded pool records (item 3; record and rows, moved into splits/ds1/pools/p1/superseded/dev2/ by the pools step):
+c1b0e2c5f63d97960e6a477596ee8b923264b9b3b815a3c2f70195da12fa713c  INC/splits/ds1/pools/p1/project_agml_mh_weed16_weed_detection.json (project_agml__mh_weed16_weed_detection; rows e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, the empty file)
+43482abf523851690e9d36d8ad8089c96485138a20a48ec3e2e20e0f12661ecb  INC/splits/ds1/pools/p1/rf_tuf_weed_3434e.json (rf_tuf__weed-3434e; rows e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, the empty file)
+c90d64f128003c30cba2af70c7625e0e589914bf1d9aa9b178d752565a3844e6  INC/splits/ds1/pools/p1/rf_vizerion_weed_detection_5ell6.json (rf_vizerion__weed-detection-5ell6; rows e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, the empty file)
+f76ee83fb74ebc9abda7ba97cd6838e12a1c00617a113bf89ffd4ec8fc9f9a90  INC/splits/ds1/pools/p1/rf_weed_detection_o9sfb_weed_detection_i_43cdfb9d.json (rf_weed-detection-o9sfb__weed-detection-in-a-field; rows e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, the empty file)
+1ac035e0ae4a98628488ec7f92c9be710786f3e1bd624b9d0a0ca1e421eb11b1  INC/splits/ds1/pools/p1/rf_yolo_gyfyq_weed_ieda7.json (rf_yolo-gyfyq__weed-ieda7; rows e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, the empty file)
+72bdb39ea7e0bc78c24f670edecfcf1de1b046fe5882a83e7f5ae1c4e06883b2  INC/splits/ds1/pools/p1/rf_zijian_peng_grass_weed_69hcm.json (rf_zijian-peng__grass-weed-69hcm; rows e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, the empty file)
+
+K arm record read (item 6; it stands, unchanged):
+eb0d0ef3b98588e5770dcdd44a5b4d5bb7905073ba9102d921c5cd4916f74a6d  INC/splits/ds1/arms/kf.json (KF's record, written 2026-10-30T13:50:11Z by job 50037144: n_k 12255, supplies KD 0, KF 12255, KT 0)
+9b0d256849b92f43d295c2e52768de08378467bc53ceb04ecc0a6a3ab46422ec  INC/splits/ds1/arms/kf.jsonl (KF's manifest)
+
+outside-repository records cited (sha256, file name under the paper's working folder _work/):
+590468c5c3716ffb6c453e8e7475df6cd0dd1ba720301f3fa0b09c22c65b2c5f  v7/ds1_evidence/dev2/MANIFEST_second_text.sha256 (R1: the second text's reads, unchanged)
+c36d2544d2a30bc3882ef60f02e08b3ddec0b3aff72163b34fb338fc67577553  v7/ds1_evidence/dev2_third/MANIFEST_third_text.sha256 (R2: this text's reads: the not-admitted rows' intake holds against their ingest rows, the screened rows' holds per source, the queue's holds and events, SIU's expected sizes under this text's code, the K arms' records, the lab ledger's refused builds; the read scripts)
+
+cluster records cited by sha256 (INC = results/framework/inc on /ocean; read only, 2026-10-30):
+e160bf6540c3d604c9ce47ee91023c24b611bea57244275b117833853dc1a1e8  INC/ds1/v1/power/draft_r001.json (the power pre-flight's record (MD-S0: E1-A and b_v2_m640))
+e160bf6540c3d604c9ce47ee91023c24b611bea57244275b117833853dc1a1e8  INC/capacity/ds1_power.json (the power record)
+175d5ad7c80d5f4029289fc71158f7d8d29a6ea2e3dbd5f24c19acfdaa229d1b  INC/splits/ds1/md_v1/md_s0/frozen.json (MD-S0's freeze (12:05:08Z), unchanged)
+16256b2e93b32c5e4a6e9e168d43e7673fed5f1f895234f41539a8ede93d8150  INC/splits/ds1/md_v1/md_s0/draft_r001/rows.jsonl (MD-S0's rows (its composition), unchanged)
+573e52c5321b6583cd302483b31f29bb4141e4c828ca4fe7f6b4d8523fa95be5  INC/splits/ds1/screen/p1_r001.json (the phase-1 screen's first revision (SIU: 187,770 rows out, none live; 40 sources without sizes))
+0a67347e4ca1cc60228ecba8496b3f91962668ab33d35cd885f5042bba5a3536  INC/splits/ds1/screen/p1_r002.json (the phase-1 screen's second revision)
+45b09c24e6e14a96139d43e6d284f3bbecf6bf02f8450d0651a1d10372cbd631  INC/splits/ds1/screen/p1_r001_candidates.jsonl (its candidate rows (W and H null for the v1-pool rows; queued rows with intake holds))
+7540358278637730dce12929c0d730304689ec843e11fa8ea950962a361131b1  INC/splits/ds1/screen/p1_r002_candidates.jsonl (its candidate rows)
+a2eeff6a292b396616f2aa3158ac0860afec69775544282ece359e0ac3617cb9  INC/splits/ds1/screen/p1_r001_audit_v2.json (the model audit taken again (Revision 2, item 4))
+7b911abec25d71f948a255b17e3ae55e8de3fc2e0c504b136315435f5cc09ae8  INC/logs/inc_build_ds1_data_p1_pools_50028368.out (L30's pools step (phase 1's pools, 05:38Z))
+6ad8e0b4aeece0a3a2997faced3a1f431f31b42b35add67250c98a09c3c09a8d  INC/ds1/v1/sheets/decisions.jsonl (the sheet decisions recorded on 2026-10-29)
+a9c7a3c05e64aa9cc9cbe2bd59dad5e5bdd2a8b53c99033a22ddf00ea13013bc  INC/step1/pool.jsonl (Step 1's v1 pool (102,920 rows, no width or height))
+0173af9ac8d8ada0e47529d0d12e191cffa32755253f540124b48130e8507598  INC/ds1/v1/equivalence/e1a_dev.json (a reproduction record taken 2026-10-30 under inc2/ds1.py 8075ea81... (unchanged by this deviation))
+1a360782a772d5aa0a045578c32f76fbba463222e02f3bc71f107ba2174bfa7e  INC/ds1/v1/equivalence/e3a_dev.json (a reproduction record taken 2026-10-30 under inc2/ds1.py 8075ea81... (unchanged by this deviation))
+1b89a7abc3d7951ecdbf965d9a4fe94b24bad175a75f988f5421a5c92ffc228a  INC/ds1/v1/equivalence/b1_ood23.json (a reproduction record taken 2026-10-30 under inc2/ds1.py 8075ea81... (unchanged by this deviation))
+bb709ca49d882671fe0e9c79a5c1bd534de01d9b03b1fb312e5d67f51b10fbd8  INC/ds1/v1/equivalence/md_identity.json (a reproduction record taken 2026-10-30 under inc2/ds1.py 8075ea81... (unchanged by this deviation))
+f39dbc4a19e9cddcd87bb0a894e918c7db1f3ab9bd2777a5985b1744b8a54d69  INC/splits/ds1/pools/p1/mediatum_1717366.json (phase 1's pool written 2026-10-30T05:38Z by job 50028368, unchanged)
+3b0ac5ca0dedb6876d9aa606e6e1b337d9de7d15cc27d247831187dc107beef4  INC/splits/ds1/pools/p1/mediatum_1717366.jsonl (phase 1's pool written 2026-10-30T05:38Z by job 50028368, unchanged)
+c1b0e2c5f63d97960e6a477596ee8b923264b9b3b815a3c2f70195da12fa713c  INC/splits/ds1/pools/p1/project_agml_mh_weed16_weed_detection.json (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  INC/splits/ds1/pools/p1/project_agml_mh_weed16_weed_detection.jsonl (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+09ed3e0ad81507c24bda6fe7219a93a0f645cb304aaffd5e249c75d05705ef49  INC/splits/ds1/pools/p1/rf_cotton_weed_detect_grass_weed_cotton_detect.json (phase 1's pool written 2026-10-30T05:38Z by job 50028368, unchanged)
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  INC/splits/ds1/pools/p1/rf_cotton_weed_detect_grass_weed_cotton_detect.jsonl (phase 1's pool written 2026-10-30T05:38Z by job 50028368, unchanged)
+43482abf523851690e9d36d8ad8089c96485138a20a48ec3e2e20e0f12661ecb  INC/splits/ds1/pools/p1/rf_tuf_weed_3434e.json (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  INC/splits/ds1/pools/p1/rf_tuf_weed_3434e.jsonl (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+c90d64f128003c30cba2af70c7625e0e589914bf1d9aa9b178d752565a3844e6  INC/splits/ds1/pools/p1/rf_vizerion_weed_detection_5ell6.json (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  INC/splits/ds1/pools/p1/rf_vizerion_weed_detection_5ell6.jsonl (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+f76ee83fb74ebc9abda7ba97cd6838e12a1c00617a113bf89ffd4ec8fc9f9a90  INC/splits/ds1/pools/p1/rf_weed_detection_o9sfb_weed_detection_i_43cdfb9d.json (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  INC/splits/ds1/pools/p1/rf_weed_detection_o9sfb_weed_detection_i_43cdfb9d.jsonl (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+1ac035e0ae4a98628488ec7f92c9be710786f3e1bd624b9d0a0ca1e421eb11b1  INC/splits/ds1/pools/p1/rf_yolo_gyfyq_weed_ieda7.json (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  INC/splits/ds1/pools/p1/rf_yolo_gyfyq_weed_ieda7.jsonl (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+72bdb39ea7e0bc78c24f670edecfcf1de1b046fe5882a83e7f5ae1c4e06883b2  INC/splits/ds1/pools/p1/rf_zijian_peng_grass_weed_69hcm.json (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  INC/splits/ds1/pools/p1/rf_zijian_peng_grass_weed_69hcm.jsonl (superseded by item 3 (written 2026-10-30T05:38Z by job 50028368))
+eb0d0ef3b98588e5770dcdd44a5b4d5bb7905073ba9102d921c5cd4916f74a6d  INC/splits/ds1/arms/kf.json (read for the third text, 2026-10-30)
+9b0d256849b92f43d295c2e52768de08378467bc53ceb04ecc0a6a3ab46422ec  INC/splits/ds1/arms/kf.jsonl (read for the third text, 2026-10-30)
+80bef0cc96395e9b56d941826b22316a373bedd5a388acee992636be71fd79c5  INC/splits/ds1/arms/s0.json (read for the third text, 2026-10-30)
+6f83ca7de4d75d3d25f6bf2fa99cef3d0fee43eaf70f5c3bc5aa933c6b1da4c4  INC/splits/ds1/arms/s0.jsonl (read for the third text, 2026-10-30)
+d980261edd2546fa928781e853a63d9cd8bf41e2e3f9429d0e355ba2d41c8176  INC/step1_stream/queue/queue.jsonl (read for the third text, 2026-10-30)
+8526d72018fdf061799852eb195b2ebd6d4b4a5225d18c57b911de07392db05f  INC/step1_stream/queue/events.jsonl (read for the third text, 2026-10-30)
+17954d6c70e2f62c2ebc928e17d46ca344ae7b941aaba9a52ff63df37c0dc682  INC/step1_stream/batches/b0005/ingest.jsonl (read for the third text, 2026-10-30)
+45b09c24e6e14a96139d43e6d284f3bbecf6bf02f8450d0651a1d10372cbd631  INC/splits/ds1/screen/p1_r001_candidates.jsonl (read for the third text, 2026-10-30)
+7540358278637730dce12929c0d730304689ec843e11fa8ea950962a361131b1  INC/splits/ds1/screen/p1_r002_candidates.jsonl (read for the third text, 2026-10-30)
+09ed3e0ad81507c24bda6fe7219a93a0f645cb304aaffd5e249c75d05705ef49  INC/splits/ds1/pools/p1/rf_cotton_weed_detect_grass_weed_cotton_detect.json (read for the third text, 2026-10-30)
+
+Proofs: OpenTimestamps (ots stamp) of this file and of docs/prereg/DS1_dev2_2026-10-30.md, as DS1_dev2_2026-10-30.stamp.txt.ots and DS1_dev2_2026-10-30.md.ots beside them.

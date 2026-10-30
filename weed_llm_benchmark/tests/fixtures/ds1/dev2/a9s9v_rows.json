@@ -1,0 +1,362 @@
+{
+ "by_batch": {
+  "b0000": {
+   "admissions": {
+    "exact": 96549
+   },
+   "input": "v1",
+   "kind": "backfill"
+  },
+  "b0001": {
+   "admissions": {},
+   "input": "knowntruth:tsw22,tsw23",
+   "kind": "knowntruth"
+  },
+  "b0002": {
+   "admissions": {
+    "exact": 795
+   },
+   "input": "intake:i0001_kg_yuzhenlu__cottonweeddet3",
+   "kind": "intake"
+  },
+  "b0003": {
+   "admissions": {
+    "exact": 2881
+   },
+   "input": "intake:i0002_mediatum_1717366",
+   "kind": "intake"
+  },
+  "b0004": {
+   "admissions": {
+    "exact": 611
+   },
+   "input": "intake:i0003_weedai_5c78d067-8750-4803-9cbe-57df8fae55e4",
+   "kind": "intake"
+  },
+  "b0005": {
+   "admissions": {
+    "exact": 37943
+   },
+   "input": "intake:i0004_zenodo_15808623",
+   "kind": "intake"
+  },
+  "b0006": {
+   "admissions": {
+    "exact": 43143
+   },
+   "input": "intake:i0005_zenodo_15808623",
+   "kind": "intake"
+  },
+  "b0007": {
+   "admissions": {
+    "exact": 40039
+   },
+   "input": "intake:i0006_zenodo_15808623",
+   "kind": "intake"
+  },
+  "b0008": {
+   "admissions": {
+    "exact": 37256
+   },
+   "input": "intake:i0007_zenodo_15808623",
+   "kind": "intake"
+  },
+  "b0009": {
+   "admissions": {
+    "exact": 29389
+   },
+   "input": "intake:i0008_zenodo_15808623",
+   "kind": "intake"
+  },
+  "b0010": {
+   "admissions": {
+    "step1_spelling": 5704
+   },
+   "input": "intake:i0009_rf_school-wevfc__weeddec2-sqnot",
+   "kind": "intake"
+  },
+  "b0011": {
+   "admissions": {
+    "step1_spelling": 2452
+   },
+   "input": "intake:i0010_rf_priyankas-workspace-o43oc__weeds1-dsqzl",
+   "kind": "intake"
+  },
+  "b0012": {
+   "admissions": {
+    "step1_spelling": 356
+   },
+   "input": "intake:i0011_rf_corn-y933v__schwarz-weed1",
+   "kind": "intake"
+  },
+  "b0013": {
+   "admissions": {
+    "step1_spelling": 1801
+   },
+   "input": "intake:i0013_rf_palmer-amaranth-id__palmer-amaranth-id",
+   "kind": "intake"
+  },
+  "b0014": {
+   "admissions": {
+    "step1_spelling": 8946
+   },
+   "input": "intake:i0014_rf_zig-zag-lnodr__weed-detection-a9s9v",
+   "kind": "intake"
+  },
+  "b0015": {
+   "admissions": {
+    "step1_spelling": 325
+   },
+   "input": "intake:i0015_rf_weedtown__weedsv2-46hkh",
+   "kind": "intake"
+  },
+  "b0016": {
+   "admissions": {
+    "step1_spelling": 87
+   },
+   "input": "intake:i0016_rf_myworkdrive__mlmodel2",
+   "kind": "intake"
+  },
+  "b0017": {
+   "admissions": {
+    "exact": 13
+   },
+   "input": "intake:i0017_weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b",
+   "kind": "intake"
+  },
+  "b0018": {
+   "admissions": {
+    "step1_spelling": 993
+   },
+   "input": "intake:i0018_weedai_0935d5a0-1270-4e6b-9618-2224240b5a03",
+   "kind": "intake"
+  },
+  "b0019": {
+   "admissions": {
+    "exact": 567,
+    "step1_spelling": 625
+   },
+   "input": "intake:i0019_mendeley_fcf7brsfm6",
+   "kind": "intake"
+  },
+  "b0020": {
+   "admissions": {
+    "exact": 1346
+   },
+   "input": "intake:i0020_zenodo_22033986",
+   "kind": "intake"
+  },
+  "b0021": {
+   "admissions": {
+    "step1_spelling": 690
+   },
+   "input": "intake:i0021_weedai_84fd3c3f-dd3e-400b-ac5a-d18ca712c3d0",
+   "kind": "intake"
+  },
+  "b0022": {
+   "admissions": {
+    "exact": 9271
+   },
+   "input": "intake:i0022_mendeley_9yhd5b8kc3",
+   "kind": "intake"
+  }
+ },
+ "ledger": [
+  {
+   "batch": "b0014",
+   "batch_json_sha256": "786ca7f12bbc912dce07d8e7f7cb63ab5fd2c21e2d49f486937d997b45d0c65a",
+   "crop_offset": 765865,
+   "crops": 9461,
+   "input": "intake:i0014_rf_zig-zag-lnodr__weed-detection-a9s9v",
+   "kind": "intake",
+   "prev_sha256": "8e5fcef9654b3d40539cce1743f0bf59a2eca00932012f9e251e1cfffd8909bd",
+   "queue_rows": 2430,
+   "queue_rows_sha256": "7734cdce03def504e04124b59e5942af361361e2d0358338d2b28cc2d5c63727",
+   "utc": "2026-10-07T11:44:26Z"
+  }
+ ],
+ "pick": {
+  "not_admitted": {
+   "adm": {
+    "admission": "not_admitted",
+    "image_verdict": "conflict",
+    "keep": [],
+    "key": "rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Eclipta_135_jpg_rf_8528b1f2e5f7121779fc02fa22e4bdcf",
+    "labels": [
+     6
+    ],
+    "mask": [],
+    "mask_record": null,
+    "overlaps": [],
+    "refusal": null,
+    "source": "rf_zig-zag-lnodr__weed-detection-a9s9v",
+    "verdicts": [
+     "conflict"
+    ]
+   },
+   "manifest": {
+    "bad_boxes": 0,
+    "batch": "i0014_rf_zig-zag-lnodr__weed-detection-a9s9v",
+    "boxes": 1,
+    "capture_group": "weed-detection-a9s9v-v1-yolov8/train/images/Eclipta_135_jpg.rf.8528b1f2e5f7121779fc02fa22e4bdcf.jpg",
+    "capture_group_basis": "image",
+    "class_ids": [
+     6
+    ],
+    "clipped_boxes": 0,
+    "copy_scan_calibration": {
+     "cos_threshold": 0.946384,
+     "file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v2/embed_calibration_v2.json",
+     "sha256": "cc9c0e2eb2eb5a324c906a5da0b7553bf0a5b537a29fc0c789a077a1f59bbf38"
+    },
+    "dhash": 3803036054427453540,
+    "exhaustive_labels": null,
+    "height": null,
+    "hold_until": "h6_scan",
+    "holds": [
+     "h6_scan"
+    ],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0014_rf_zig-zag-lnodr__weed-detection-a9s9v/images/rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Eclipta_135_jpg.rf.8528b1f2e5f7121779fc02fa22e4bdcf.jpg",
+    "intake_utc": "2026-10-07T11:15:10Z",
+    "key": "rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Eclipta_135_jpg.rf.8528b1f2e5f7121779fc02fa22e4bdcf",
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0014_rf_zig-zag-lnodr__weed-detection-a9s9v/labels/rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Eclipta_135_jpg.rf.8528b1f2e5f7121779fc02fa22e4bdcf.txt",
+    "label_sha256": "0f82fc72c1b97d426445542fe96c66009903b9a35be97d26acc81dfe4d673d62",
+    "licence": "cc-by-4.0",
+    "licence_class": "permissive",
+    "licence_override": null,
+    "provenance_cleared": false,
+    "rel": "weed-detection-a9s9v-v1-yolov8/train/images/Eclipta_135_jpg.rf.8528b1f2e5f7121779fc02fa22e4bdcf.jpg",
+    "research_only": false,
+    "session": "weed-detection-a9s9v-v1-yolov8/train/images/Eclipta_135_jpg.rf.8528b1f2e5f7121779fc02fa22e4bdcf.jpg",
+    "sha256": "f3ed28357aa32c18d7debcedd52361b4f613a96b0aa06cfbfb49ed7f5ece6937",
+    "source": "rf_zig-zag-lnodr__weed-detection-a9s9v",
+    "target_boxes": 1,
+    "unlisted_class_boxes": 0,
+    "unmapped_boxes": 0,
+    "width": null
+   },
+   "queue_row": null
+  },
+  "queued": {
+   "adm": {
+    "admission": "whole",
+    "image_verdict": "admitted",
+    "keep": [
+     0
+    ],
+    "key": "rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Crabgrass_augmented_88_jpg_rf_4516f99f5a72269778daebd2416d9c26",
+    "labels": [
+     12
+    ],
+    "mask": [],
+    "mask_record": null,
+    "overlaps": [],
+    "refusal": null,
+    "source": "rf_zig-zag-lnodr__weed-detection-a9s9v",
+    "verdicts": [
+     "other_ok"
+    ]
+   },
+   "manifest": {
+    "bad_boxes": 0,
+    "batch": "i0014_rf_zig-zag-lnodr__weed-detection-a9s9v",
+    "boxes": 1,
+    "capture_group": "weed-detection-a9s9v-v1-yolov8/train/images/Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.jpg",
+    "capture_group_basis": "image",
+    "class_ids": [
+     12
+    ],
+    "clipped_boxes": 0,
+    "copy_scan_calibration": {
+     "cos_threshold": 0.946384,
+     "file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v2/embed_calibration_v2.json",
+     "sha256": "cc9c0e2eb2eb5a324c906a5da0b7553bf0a5b537a29fc0c789a077a1f59bbf38"
+    },
+    "dhash": 14761579918300739808,
+    "exhaustive_labels": null,
+    "height": null,
+    "hold_until": "h6_scan",
+    "holds": [
+     "h6_scan"
+    ],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0014_rf_zig-zag-lnodr__weed-detection-a9s9v/images/rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.jpg",
+    "intake_utc": "2026-10-07T11:15:10Z",
+    "key": "rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26",
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0014_rf_zig-zag-lnodr__weed-detection-a9s9v/labels/rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.txt",
+    "label_sha256": "423903fa1619db9203e56e73fafb52d71b02f7de481f0eda1e416436afcf2e1c",
+    "licence": "cc-by-4.0",
+    "licence_class": "permissive",
+    "licence_override": null,
+    "provenance_cleared": false,
+    "rel": "weed-detection-a9s9v-v1-yolov8/train/images/Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.jpg",
+    "research_only": false,
+    "session": "weed-detection-a9s9v-v1-yolov8/train/images/Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.jpg",
+    "sha256": "df3fe1aa0afa662a8c2f735f5446c86987b9fa0ea9d8fafcbbf2ff445ab7450d",
+    "source": "rf_zig-zag-lnodr__weed-detection-a9s9v",
+    "target_boxes": 0,
+    "unlisted_class_boxes": 0,
+    "unmapped_boxes": 0,
+    "width": null
+   },
+   "queue_row": {
+    "admission": "whole",
+    "admitted_utc": "2026-10-07T11:44:08Z",
+    "batch": "b0014",
+    "capture_group": "weed-detection-a9s9v-v1-yolov8/train/images/Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.jpg",
+    "dhash": 14761579918300739808,
+    "dhash_masked": null,
+    "evidenced": false,
+    "format": "inc2-stream-queue/1",
+    "group": 142062,
+    "h6_reason": null,
+    "hold_deadline": {},
+    "hold_until": null,
+    "holds": [],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0014_rf_zig-zag-lnodr__weed-detection-a9s9v/images/rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.jpg",
+    "input": "intake:i0014_rf_zig-zag-lnodr__weed-detection-a9s9v",
+    "key": "rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Crabgrass_augmented_88_jpg_rf_4516f99f5a72269778daebd2416d9c26",
+    "kind": "other",
+    "l1": 73,
+    "l2": 3,
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/labels/rf_zig-zag-lnodr__weed-detection-a9s9v/rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Crabgrass_augmented_88_jpg_rf_4516f99f5a72269778daebd2416d9c26.423903fa1619db92.txt",
+    "label_sha256": "423903fa1619db9203e56e73fafb52d71b02f7de481f0eda1e416436afcf2e1c",
+    "licence": "cc-by-4.0",
+    "masked_area_frac": 0.0,
+    "n_masked": 0,
+    "other_boxes": 1,
+    "prior": null,
+    "reference": "v1",
+    "research_only": false,
+    "scanned": "funnel",
+    "score": null,
+    "session": "weed-detection-a9s9v-v1-yolov8/train/images/Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.jpg",
+    "sha256": "df3fe1aa0afa662a8c2f735f5446c86987b9fa0ea9d8fafcbbf2ff445ab7450d",
+    "source": "rf_zig-zag-lnodr__weed-detection-a9s9v",
+    "species_boxes": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "stream_pins_sha": "50720641fb98ac141498322adaf35c888ef91afd293b097d8d03a7562ad73175",
+    "supersedes": null,
+    "typicality": 0.880325,
+    "unmasked_image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0014_rf_zig-zag-lnodr__weed-detection-a9s9v/images/rf_zig-zag-lnodr__weed-detection-a9s9v__weed-detection-a9s9v-v1-yolov8__train__images__Crabgrass_augmented_88_jpg.rf.4516f99f5a72269778daebd2416d9c26.jpg",
+    "unmasked_sha256": "df3fe1aa0afa662a8c2f735f5446c86987b9fa0ea9d8fafcbbf2ff445ab7450d",
+    "verifier": "v1"
+   }
+  }
+ },
+ "what": "two admissions of Step 1 batch b0014 (intake i0014_rf_zig-zag-lnodr__weed-detection-a9s9v) as the cluster holds them: each with its intake manifest row (key spelt '.rf.') and, for the queued one, its queue row (key spelt '_rf_'); the ledger line of b0014; the admissions of every committed batch found under their own key, under Step 1's spelling only, or not at all"
+}

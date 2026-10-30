@@ -145,6 +145,37 @@ must occur exactly once in its file), runs its target against the copy and requi
   DV13  weed.json         the reopen block's time precedes the live attempt (the pre-flight is never reopened)
   DV14  deploy_funnel     the deviation's file is not shipped
   DV15  ds1               the superseded records are moved before the constants are checked (a refusal moves them)
+  DW1   ds1_data          the pools step reads no image size from the header (DS1 deviation 2: the live drops)
+  DW2   ds1_data          base3's rules take a live row without a size (skipped unseen by the source rule)
+  DW3   ds1_data          a header that cannot be read leaves its row live
+  DW4   ds1_data          a superseded pool's record moves before its rows (a cut-off move leaves stale rows)
+  DW5   ds1_data          a folder copy with other bytes is taken as the superseded record
+  DW6   ds1_data          rows with other bytes than named are moved with the record
+  DW7   ds1_data          the status reads a superseded pool as pooled (the pools step is never proposed)
+  DW8   ds1_data          a queued row's empty holds fall back to the intake record's (the collector's h6_scan)
+  DW9   ds1_data          SIU is read past a quarantine that also cites D28
+  DW10  ds1_data          SIU is read past its quarantine when the cites are unknown (fail open)
+  DW11  ds1_data          SIU's D31 quarantine holds it out (DS.0 item 14 not applied)
+  DW12  ds1_data          no source is screened again
+  DW13  ds1_data          a source screened again has its counts summed with the earlier records
+  DW14  ds1_data          a key screened again is read twice
+  DW15  ds1_data          a source is screened again on every screen
+  DW16  diagnose_stream   the plan proposes no screen for a source due again
+  DW17  diagnose_stream   S1 is built while a source is due to be screened again
+  DW18  stream            a reopen block's missing state is ignored (the data steps are not reopened)
+  DW19  ds1_data          a revision written under deviation 2 counts as screened before it (screened again)
+  DW20  ds1_data          an intake row is looked up under its manifest key only (a9s9v's '.rf.' rows no candidates)
+  DW21  stream            a reopen block reopens attempts other than those it names (any proposal id)
+  DW22  ds1_data          a not-admitted row keeps the intake record's h6_scan though Step 1 scanned it at ingest
+  DW23  ds1_data          load_candidates reads no batch's ingest rows (every not-admitted row keeps h6_scan)
+  DW24  ds1_data          a provenance-cleared ingest row does not clear h6_scan (row_holds' second condition)
+  DW25  ds1_data          mendeley_fcf7brsfm6 is not screened again (its 567 rows stay held h6_scan)
+  DW26  ds1_data          KD and KT are built at KF's N_K whatever their supply (the draws refuse; or not run)
+  DW27  ds1_data          the status never names the K wait (the plan proposes the manifests step every tick)
+  DW28  diagnose_stream   the plan proposes KD and KT while they wait
+  DW29  ds1_data          a stream that cannot be folded leaves SIU's cites D31 only (fail open)
+  DW30  ds1_data          the screen does not count its unreadable rows among a source's out
+  DW31  baseline          build --ds1 reads --seeds 0,1,2 character by character (every DS1 build refused)
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -166,6 +197,7 @@ DL = "weed_optimizer_framework/tools/inc2/ds1_long.py"
 S1 = "weed_optimizer_framework/tools/inc2/step1_stream.py"
 ST = "weed_optimizer_framework/tools/inc_autopilot/stream.py"
 DSM = "weed_optimizer_framework/tools/inc_autopilot/diagnose_stream.py"
+BLM = "weed_optimizer_framework/tools/inc2/baseline.py"
 SRM = "weed_optimizer_framework/tools/inc_autopilot/stream_remote.py"
 EV = "weed_optimizer_framework/tools/inc_autopilot/evidence.py"
 WJ = "weed_optimizer_framework/tools/inc_autopilot/stream_domains/weed.json"
@@ -185,6 +217,7 @@ DEPLOY = "tests/test_inc2_ds1_deploy.py"
 REV2 = "tests/test_inc2_ds1_rev2.py"
 REV1 = "tests/test_inc2_ds1_rev1.py"
 DEV1 = "tests/test_inc2_ds1_dev1.py"
+DEV2 = "tests/test_inc2_ds1_dev2.py"
 AP_PLANR1 = "tests/test_stream_ap_ds1.py?DS1_WORLD=plan_rev1"
 AP_REVIEW = "tests/test_stream_ap_ds1.py?DS1_WORLD=review"
 MUTANTS = {
@@ -293,8 +326,7 @@ MUTANTS = {
     "DR7": (DD, "    if corrected or left:\n", "    if corrected:\n", REV1),
     "DR8": (DD, "    if write and (rows or not revs or sorted(seen or []) != sorted(last_seen or [])):\n",
             "    if write and rows:\n", REV1),
-    "DR9": (DD, '    rows = [r for r in inputs.candidates if r["key"] not in prior and (int(phase) == 1 or r["source"] in '
-                'named)]\n', '    rows = [r for r in inputs.candidates if r["key"] not in prior]\n', REV1),
+    "DR9": (DD, '            and (int(phase) == 1 or r["source"] in named)]\n', '            and True]\n', REV1),
     "DR10": (DD, '        if r["key"] in traced:\n            r["box_src"] = [str(x) for x in traced[r["key"]]]\n',
              '        if False:\n            r["box_src"] = [str(x) for x in traced[r["key"]]]\n', REV1),
     "DR11": (DD, '                    "image": r.get("train_image") or r.get("image"),\n', "", REV1),
@@ -412,6 +444,59 @@ MUTANTS = {
              "ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md.ots", DEPLOY),
     "DV15": (DC, '    if recorded is not None:\n        b1_check_constants(recorded)\n    supersede()\n',
              '    supersede()\n    if recorded is not None:\n        b1_check_constants(recorded)\n', DEV1),
+    "DW1": (DD, "    hash_rows(live, hasher=inputs.hasher)\n    fill_sizes(live, inputs.read_size)\n    conv = apply_rules(",
+            "    hash_rows(live, hasher=inputs.hasher)\n    conv = apply_rules(", DEV2),
+    "DW2": (DD, "    if nosize:\n        raise DataRefused(", "    if False:\n        raise DataRefused(", DEV2),
+    "DW3": (DD, '            if not wh or not wh[0] or not wh[1]:\n                r["drop"] = "unreadable"\n',
+            '            if not wh or not wh[0] or not wh[1]:\n', DEV2),
+    "DW4": (DD, '        named = ((rows, e["rows_sha256"]), (rec, e["record_sha256"]))\n',
+            '        named = ((rec, e["record_sha256"]), (rows, e["rows_sha256"]))\n', DEV2),
+    "DW5": (DD, "            if dst.is_file() and C.sha256_file(dst) != sha:\n                raise DataRefused(\"%s holds",
+            "            if False:\n                raise DataRefused(\"%s holds", DEV2),
+    "DW6": (DD, '        if rows.is_file() and C.sha256_file(rows) != e["rows_sha256"]:\n',
+            "        if False:\n", DEV2),
+    "DW7": (DD, "                       .is_file() and s not in repool,", "                       .is_file(),", DEV2),
+    "DW8": (DD, '            "holds": (list(q.get("holds") or []) if q is not None else\n',
+            '            "holds": (list(q.get("holds") or f.get("holds") or []) if q is not None else\n', DEV2),
+    "DW9": (DD, "    return bool(cites) and set(cites) <= set(SIU_STREAM_CITES)\n",
+            "    return bool(cites) and bool(set(cites) & set(SIU_STREAM_CITES))\n", DEV2),
+    "DW10": (DD, "    return bool(cites) and set(cites) <= set(SIU_STREAM_CITES)\n",
+             "    return not cites or set(cites) <= set(SIU_STREAM_CITES)\n", DEV2),
+    "DW11": (DD, '    if s in ctx.get("quarantined", ()) and not siu_scoped(s, ctx):\n',
+             '    if s in ctx.get("quarantined", ()):\n', DEV2),
+    "DW12": (DD, "    return sorted(seen - again)\n", "    return []\n", DEV2),
+    "DW13": (DD, "            if s in again:\n                out[s] = dict(v, rescreen_of=",
+             "            if False:\n                out[s] = dict(v, rescreen_of=", DEV2),
+    "DW14": (DD, '            by[r["key"]] = r\n', '            by[(p.name, r["key"])] = r\n', DEV2),
+    "DW15": (DD, '        again |= set(d.get("rescreen") or {})\n', "        pass\n", DEV2),
+    "DW16": (DSM, '            (p1.get("rescreen") and not s1_frozen)) and due("data:1:screen"):',
+             '            False) and due("data:1:screen"):', DEV2),
+    "DW17": (DSM, '    if p1.get("rescreen"):\n        # DS1 deviation 2', '    if False:\n        # DS1 deviation 2', DEV2),
+    "DW18": (ST, '            states = [x for x in (ro.get("states") or ["failed"]) if x in ("failed", "missing")]\n',
+             '            states = ["failed"]\n', DEV2),
+    "DW19": (DD, "        if int(d.get(\"deviation\") or 0) < SCREEN_DEVIATION:\n", "        if True:\n", DATA),
+    "DW20": (DD, "    for k2, r in spelt.items():\n        files.setdefault(k2, r)\n",
+             "    for k2, r in ():\n        files.setdefault(k2, r)\n", DEV2),
+    "DW21": (ST, '                if ro.get("proposals") is not None and rec.get("proposal") not in ro["proposals"]:\n',
+             '                if False:\n', DEV2),
+    "DW22": (DD, '                      [h for h in (f.get("holds") or []) if not (h == "h6_scan" and scanned)]),\n',
+             '                      [h for h in (f.get("holds") or [])]),\n', DEV2),
+    "DW23": (DD, "            row = candidate_row(k, a, q, f, im.get(k), scanned=sc.get(k))\n",
+             "            row = candidate_row(k, a, q, f, im.get(k), scanned=None)\n", DEV2),
+    "DW24": (DD, '            w = r.get("scanned") or ("provenance" if r.get("provenance_cleared") else None)\n',
+             '            w = r.get("scanned")\n', DEV2),
+    "DW25": (DD, '            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b", "mendeley_fcf7brsfm6")\n',
+             '            "weedai_7e03cd97-f462-439d-b4c7-b6289edcc21b")\n', DEV2),
+    "DW26": (DD, '    if not short:\n        return "build", int(kf_n_k), {}\n',
+             '    if True:\n        return "build", int(kf_n_k), {}\n', DEV2),
+    "DW27": (DD, '                     if isinstance(kw, dict) and not arm_record_path("KD").is_file() and not out["k_not_run"] '
+             'else None)', '                     if False else None)', DEV2),
+    "DW28": (DSM, '                and not st.get("k_source_out") and not st.get("k_wait"):\n',
+             '                and not st.get("k_source_out"):\n', DEV2),
+    "DW29": (DD, '                out[SIU].add("?")\n                continue\n', '                continue\n', DEV2),
+    "DW30": (DD, '            per[r["source"]]["out"][r["drop"]] += 1\n', '            pass\n', DEV2),
+    "DW31": (BLM, '[int(x) for x in (str(seeds).split(",") if isinstance(seeds, str) else seeds)]',
+             '[int(x) for x in seeds]', DEV2),
 }
 
 

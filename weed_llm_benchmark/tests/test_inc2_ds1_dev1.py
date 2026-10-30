@@ -506,9 +506,12 @@ def t_gate():
     cfg = LS.load_domain("weed")["ds1"]
     files = [(cfg["amendment_file"], cfg["amendment_sha256"])] + [(r["file"], r["sha256"]) for r in
                                                                   cfg["revisions"] + cfg.get("deviations", [])]
-    check("the domain pins the deviation (ds1.deviations) as inc2.ds1.DEVIATIONS does",
+    from weed_optimizer_framework.tools.inc2 import ds1_data as DD
+    check("the domain pins the deviations (ds1.deviations) as inc2.ds1.DEVIATIONS and inc2.ds1_data do (deviation 2 "
+          "in ds1_data: inc2/ds1.py stays as the reproduction records pin it)",
           [(r["file"], r["sha256"]) for r in cfg.get("deviations") or []] ==
-          [(r["file"], r["sha256"]) for r in D.DEVIATIONS])
+          [(r["file"], r["sha256"]) for r in DD.deviations()] and
+          cfg["deviations"][0]["file"] == D.DEVIATIONS[0]["file"])
 
     def stage(present):
         run = types.SimpleNamespace(st={"ds1": {"items": {}, "cards": {}}}, dom=LS.load_domain("weed"), ev=None,
@@ -532,14 +535,18 @@ def t_registration():
     dv = D.DEVIATIONS[0] if D.DEVIATIONS else {}
     f = GIT / dv.get("file", "missing")
     data = f.read_bytes() if f.is_file() else b""
-    check("DS1 has deviation 1; its byte copy hashes to its pin", [d["n"] for d in D.DEVIATIONS] == [1] and data and
-          hashlib.sha256(data).hexdigest() == dv.get("sha256"), dv)
+    check("DS1 has deviation 1; its byte copy hashes to its pin", [d["n"] for d in D.DEVIATIONS][:1] == [1] and data
+          and hashlib.sha256(data).hexdigest() == dv.get("sha256"), dv)
     cl = (GIT / "docs" / "CONTINUOUS_LOOP.md").read_bytes()
-    check("  it is docs/CONTINUOUS_LOOP.md's deviation section byte for byte, to the end of the file", data and
-          cl.endswith(data) and data.startswith(b"## Deviation (2026-10-30): DS1 deviation 1"))
+    # the deviations recorded after it (DS1 deviation 2, 2026-10-30) follow its last line after one blank line
+    from weed_optimizer_framework.tools.inc2 import ds1_data as DD
+    later = b"".join(b"\n" + (GIT / d["file"]).read_bytes() for d in DD.deviations()[1:])
+    check("  it is docs/CONTINUOUS_LOOP.md's deviation section byte for byte, to the end of the file or to the blank "
+          "line before the deviations recorded after it", data and cl.endswith(data + later) and
+          data.startswith(b"## Deviation (2026-10-30): DS1 deviation 1"))
     rev2 = (GIT / D.REVISIONS[1]["file"]).read_bytes()
     check("  appended after Revision 2's section, which stays byte for byte (its heading to the blank line before "
-          "the next heading)", cl.endswith(rev2 + b"\n" + data))
+          "the next heading)", cl.endswith(rev2 + b"\n" + data + later))
     stamp = GIT / dv.get("stamp_file", "missing")
     text = stamp.read_text() if stamp.is_file() else ""
     check("its proofs stamp the byte copy and the stamp file (OpenTimestamps headers)",

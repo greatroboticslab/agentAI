@@ -1,0 +1,34 @@
+{
+ "format": "inc2-ds1-pool/1",
+ "phase": 1,
+ "record": {
+  "admitted": 0,
+  "convention": {
+   "big_share": null,
+   "boxes": 0,
+   "fails": [
+    "no weed box"
+   ],
+   "images": 0,
+   "median_boxes_per_image": null,
+   "median_side_px": null,
+   "passes": false,
+   "small_share": null
+  },
+  "counts": {
+   "capture_groups": 0,
+   "distinct_photos": 0,
+   "images": 0,
+   "scale_rule": 10000
+  },
+  "out": {
+   "source_convention": 1,
+   "test_v1": 2
+  },
+  "thinned": 0
+ },
+ "rows": 0,
+ "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+ "source": "rf_zijian-peng__grass-weed-69hcm",
+ "written_utc": "2026-10-30T05:38:36.491843Z"
+}

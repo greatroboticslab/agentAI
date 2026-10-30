@@ -1,0 +1,636 @@
+{
+ "not_admitted": [
+  {
+   "adm": {
+    "admission": "not_admitted",
+    "image_verdict": "conflict",
+    "keep": [],
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__AMBEL_week_1_IMG_0793_frame_0336",
+    "labels": [
+     5
+    ],
+    "mask": [],
+    "mask_record": null,
+    "overlaps": [],
+    "refusal": null,
+    "source": "zenodo_15808623",
+    "verdicts": [
+     "conflict"
+    ]
+   },
+   "batch": "b0005",
+   "f": {
+    "bad_boxes": 0,
+    "batch": "i0004_zenodo_15808623",
+    "batch_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623",
+    "boxes": 1,
+    "capture_group": "weed_dataset/Dataset/images/train/AMBEL_week_1_IMG_0793_frame_0336.jpeg",
+    "capture_group_basis": "image",
+    "class_ids": [
+     5
+    ],
+    "clipped_boxes": 0,
+    "copy_scan_calibration": {
+     "cos_threshold": 0.946384,
+     "file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v2/embed_calibration_v2.json",
+     "sha256": "cc9c0e2eb2eb5a324c906a5da0b7553bf0a5b537a29fc0c789a077a1f59bbf38"
+    },
+    "dhash": 17786495409837611886,
+    "exhaustive_labels": null,
+    "height": 960,
+    "hold_until": "h6_scan",
+    "holds": [
+     "h6_scan"
+    ],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__AMBEL_week_1_IMG_0793_frame_0336.jpeg",
+    "intake_utc": "2026-10-03T16:50:08Z",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__AMBEL_week_1_IMG_0793_frame_0336",
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/labels/zenodo_15808623__weed_dataset__Dataset__images__train__AMBEL_week_1_IMG_0793_frame_0336.txt",
+    "label_sha256": "b458ec5831a1957a2b0e80899d15b289561e2ba628498938e847fc2aa011331c",
+    "licence": "cc-by-nc-sa-4.0",
+    "licence_class": "research_only",
+    "licence_override": null,
+    "provenance_cleared": false,
+    "rel": "weed_dataset/Dataset/images/train/AMBEL_week_1_IMG_0793_frame_0336.jpeg",
+    "research_only": true,
+    "session": "weed_dataset/Dataset/images/train/AMBEL_week_1_IMG_0793_frame_0336.jpeg",
+    "sha256": "4b581cc645fac03be419fec4729ebd5cbedcc4c6fa8047ed1991ccfd4d2d7201",
+    "source": "zenodo_15808623",
+    "target_boxes": 1,
+    "unlisted_class_boxes": 0,
+    "unmapped_boxes": 0,
+    "width": 720
+   },
+   "key": "zenodo_15808623__weed_dataset__Dataset__images__train__AMBEL_week_1_IMG_0793_frame_0336",
+   "q": null
+  },
+  {
+   "adm": {
+    "admission": "not_admitted",
+    "image_verdict": "conflict",
+    "keep": [],
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__AMARE_week_9_IMG_1477_frame_0288",
+    "labels": [
+     12
+    ],
+    "mask": [],
+    "mask_record": null,
+    "overlaps": [],
+    "refusal": null,
+    "source": "zenodo_15808623",
+    "verdicts": [
+     "conflict"
+    ]
+   },
+   "batch": "b0005",
+   "f": {
+    "bad_boxes": 0,
+    "batch": "i0004_zenodo_15808623",
+    "batch_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623",
+    "boxes": 1,
+    "capture_group": "weed_dataset/Dataset/images/train/AMARE_week_9_IMG_1477_frame_0288.jpeg",
+    "capture_group_basis": "image",
+    "class_ids": [
+     12
+    ],
+    "clipped_boxes": 0,
+    "copy_scan_calibration": {
+     "cos_threshold": 0.946384,
+     "file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v2/embed_calibration_v2.json",
+     "sha256": "cc9c0e2eb2eb5a324c906a5da0b7553bf0a5b537a29fc0c789a077a1f59bbf38"
+    },
+    "dhash": 12924025825334380512,
+    "exhaustive_labels": null,
+    "height": 960,
+    "hold_until": "h6_scan",
+    "holds": [
+     "h6_scan"
+    ],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__AMARE_week_9_IMG_1477_frame_0288.jpeg",
+    "intake_utc": "2026-10-03T16:50:08Z",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__AMARE_week_9_IMG_1477_frame_0288",
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/labels/zenodo_15808623__weed_dataset__Dataset__images__train__AMARE_week_9_IMG_1477_frame_0288.txt",
+    "label_sha256": "1fca3f7adb2862ff30bdfa3c3154dce5f2213cabe1d342fd20fa45156dc7e3fb",
+    "licence": "cc-by-nc-sa-4.0",
+    "licence_class": "research_only",
+    "licence_override": null,
+    "provenance_cleared": false,
+    "rel": "weed_dataset/Dataset/images/train/AMARE_week_9_IMG_1477_frame_0288.jpeg",
+    "research_only": true,
+    "session": "weed_dataset/Dataset/images/train/AMARE_week_9_IMG_1477_frame_0288.jpeg",
+    "sha256": "2fcb90d4f8f8f4f22296cee637b557b951a55c258ea97b3eef9065fb37124a08",
+    "source": "zenodo_15808623",
+    "target_boxes": 0,
+    "unlisted_class_boxes": 0,
+    "unmapped_boxes": 0,
+    "width": 720
+   },
+   "key": "zenodo_15808623__weed_dataset__Dataset__images__train__AMARE_week_9_IMG_1477_frame_0288",
+   "q": null
+  }
+ ],
+ "queued": [
+  {
+   "adm": {
+    "admission": "whole",
+    "image_verdict": "admitted",
+    "keep": [
+     0
+    ],
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023",
+    "labels": [
+     12
+    ],
+    "mask": [],
+    "mask_record": null,
+    "overlaps": [],
+    "refusal": null,
+    "source": "zenodo_15808623",
+    "verdicts": [
+     "other_ok"
+    ]
+   },
+   "batch": "b0005",
+   "f": {
+    "bad_boxes": 0,
+    "batch": "i0004_zenodo_15808623",
+    "batch_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623",
+    "boxes": 1,
+    "capture_group": "weed_dataset/Dataset/images/train/SORHA_week_4_IMG_1055_frame_0023.jpeg",
+    "capture_group_basis": "image",
+    "class_ids": [
+     12
+    ],
+    "clipped_boxes": 0,
+    "copy_scan_calibration": {
+     "cos_threshold": 0.946384,
+     "file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v2/embed_calibration_v2.json",
+     "sha256": "cc9c0e2eb2eb5a324c906a5da0b7553bf0a5b537a29fc0c789a077a1f59bbf38"
+    },
+    "dhash": 16200647579114954230,
+    "exhaustive_labels": null,
+    "height": 960,
+    "hold_until": "h6_scan",
+    "holds": [
+     "h6_scan"
+    ],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023.jpeg",
+    "intake_utc": "2026-10-03T16:50:08Z",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023",
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/labels/zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023.txt",
+    "label_sha256": "b3a519f8b22556e0f0f3d6ad24fa4f5c4aa5d5ba41fee4c7c527db2b87a6894c",
+    "licence": "cc-by-nc-sa-4.0",
+    "licence_class": "research_only",
+    "licence_override": null,
+    "provenance_cleared": false,
+    "rel": "weed_dataset/Dataset/images/train/SORHA_week_4_IMG_1055_frame_0023.jpeg",
+    "research_only": true,
+    "session": "weed_dataset/Dataset/images/train/SORHA_week_4_IMG_1055_frame_0023.jpeg",
+    "sha256": "e34b6f9640981237a06cb4e0c451b8311b3d30d50b9975127019f889d5c662c4",
+    "source": "zenodo_15808623",
+    "target_boxes": 0,
+    "unlisted_class_boxes": 0,
+    "unmapped_boxes": 0,
+    "width": 720
+   },
+   "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023",
+   "q": {
+    "admission": "whole",
+    "admitted_utc": "2026-10-03T19:04:33Z",
+    "batch": "b0005",
+    "capture_group": "weed_dataset/Dataset/images/train/SORHA_week_4_IMG_1055_frame_0023.jpeg",
+    "dhash": 16200647579114954230,
+    "dhash_masked": null,
+    "eligible_step1": false,
+    "evidenced": true,
+    "format": "inc2-stream-queue/1",
+    "group": 97276,
+    "h6_reason": null,
+    "hold_deadline": {},
+    "hold_until": null,
+    "holds": [],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023.jpeg",
+    "input": "intake:i0004_zenodo_15808623",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023",
+    "kind": "other",
+    "l1": 4,
+    "l2": 0,
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/labels/zenodo_15808623/zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023.b3a519f8b22556e0.txt",
+    "label_sha256": "b3a519f8b22556e0f0f3d6ad24fa4f5c4aa5d5ba41fee4c7c527db2b87a6894c",
+    "licence": "cc-by-nc-sa-4.0",
+    "masked_area_frac": 0.0,
+    "n_masked": 0,
+    "other_boxes": 1,
+    "prior": null,
+    "reference": "v1",
+    "refused": null,
+    "released": {},
+    "research_only": true,
+    "scanned": "funnel",
+    "score": null,
+    "session": "weed_dataset/Dataset/images/train/SORHA_week_4_IMG_1055_frame_0023.jpeg",
+    "sha256": "e34b6f9640981237a06cb4e0c451b8311b3d30d50b9975127019f889d5c662c4",
+    "source": "zenodo_15808623",
+    "species_boxes": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "stream_pins_sha": "50720641fb98ac141498322adaf35c888ef91afd293b097d8d03a7562ad73175",
+    "supersedes": null,
+    "typicality": 0.849268,
+    "unmasked_image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SORHA_week_4_IMG_1055_frame_0023.jpeg",
+    "unmasked_sha256": "e34b6f9640981237a06cb4e0c451b8311b3d30d50b9975127019f889d5c662c4",
+    "verifier": "v1"
+   }
+  },
+  {
+   "adm": {
+    "admission": "whole",
+    "image_verdict": "admitted",
+    "keep": [
+     0
+    ],
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280",
+    "labels": [
+     12
+    ],
+    "mask": [],
+    "mask_record": null,
+    "overlaps": [],
+    "refusal": null,
+    "source": "zenodo_15808623",
+    "verdicts": [
+     "other_ok"
+    ]
+   },
+   "batch": "b0005",
+   "f": {
+    "bad_boxes": 0,
+    "batch": "i0004_zenodo_15808623",
+    "batch_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623",
+    "boxes": 1,
+    "capture_group": "weed_dataset/Dataset/images/train/SORVU_week_9_IMG_1467_frame_0280.jpeg",
+    "capture_group_basis": "image",
+    "class_ids": [
+     12
+    ],
+    "clipped_boxes": 0,
+    "copy_scan_calibration": {
+     "cos_threshold": 0.946384,
+     "file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v2/embed_calibration_v2.json",
+     "sha256": "cc9c0e2eb2eb5a324c906a5da0b7553bf0a5b537a29fc0c789a077a1f59bbf38"
+    },
+    "dhash": 5479770304730508075,
+    "exhaustive_labels": null,
+    "height": 960,
+    "hold_until": "h6_scan",
+    "holds": [
+     "h6_scan"
+    ],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280.jpeg",
+    "intake_utc": "2026-10-03T16:50:08Z",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280",
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/labels/zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280.txt",
+    "label_sha256": "3fe503da95c204f38285f9f07afa25384845f472affe66dfb0f1ebaa1cd4b3f8",
+    "licence": "cc-by-nc-sa-4.0",
+    "licence_class": "research_only",
+    "licence_override": null,
+    "provenance_cleared": false,
+    "rel": "weed_dataset/Dataset/images/train/SORVU_week_9_IMG_1467_frame_0280.jpeg",
+    "research_only": true,
+    "session": "weed_dataset/Dataset/images/train/SORVU_week_9_IMG_1467_frame_0280.jpeg",
+    "sha256": "30be294ec1dc65334f42989cf4054897f91b1fea57af18f62121c1d2bed19910",
+    "source": "zenodo_15808623",
+    "target_boxes": 0,
+    "unlisted_class_boxes": 0,
+    "unmapped_boxes": 0,
+    "width": 720
+   },
+   "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280",
+   "q": {
+    "admission": "whole",
+    "admitted_utc": "2026-10-03T19:04:44Z",
+    "batch": "b0005",
+    "capture_group": "weed_dataset/Dataset/images/train/SORVU_week_9_IMG_1467_frame_0280.jpeg",
+    "dhash": 5479770304730508075,
+    "dhash_masked": null,
+    "eligible_step1": false,
+    "evidenced": true,
+    "format": "inc2-stream-queue/1",
+    "group": 99107,
+    "h6_reason": null,
+    "hold_deadline": {},
+    "hold_until": null,
+    "holds": [],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280.jpeg",
+    "input": "intake:i0004_zenodo_15808623",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280",
+    "kind": "other",
+    "l1": 46,
+    "l2": 4,
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/labels/zenodo_15808623/zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280.41efb1c49d7e858c.txt",
+    "label_sha256": "41efb1c49d7e858c0dec8f34892196beeff93f088fe15435bb10060fb2da139b",
+    "licence": "cc-by-nc-sa-4.0",
+    "masked_area_frac": 0.0,
+    "n_masked": 0,
+    "other_boxes": 1,
+    "prior": null,
+    "reference": "v1",
+    "refused": null,
+    "released": {},
+    "research_only": true,
+    "scanned": "funnel",
+    "score": null,
+    "session": "weed_dataset/Dataset/images/train/SORVU_week_9_IMG_1467_frame_0280.jpeg",
+    "sha256": "30be294ec1dc65334f42989cf4054897f91b1fea57af18f62121c1d2bed19910",
+    "source": "zenodo_15808623",
+    "species_boxes": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "stream_pins_sha": "50720641fb98ac141498322adaf35c888ef91afd293b097d8d03a7562ad73175",
+    "supersedes": null,
+    "typicality": 0.870107,
+    "unmasked_image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SORVU_week_9_IMG_1467_frame_0280.jpeg",
+    "unmasked_sha256": "30be294ec1dc65334f42989cf4054897f91b1fea57af18f62121c1d2bed19910",
+    "verifier": "v1"
+   }
+  },
+  {
+   "adm": {
+    "admission": "whole",
+    "image_verdict": "admitted",
+    "keep": [
+     0
+    ],
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757",
+    "labels": [
+     12
+    ],
+    "mask": [],
+    "mask_record": null,
+    "overlaps": [],
+    "refusal": null,
+    "source": "zenodo_15808623",
+    "verdicts": [
+     "other_ok"
+    ]
+   },
+   "batch": "b0005",
+   "f": {
+    "bad_boxes": 0,
+    "batch": "i0004_zenodo_15808623",
+    "batch_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623",
+    "boxes": 1,
+    "capture_group": "weed_dataset/Dataset/images/train/SETFA_week_3_IMG_1009_frame_0757.jpeg",
+    "capture_group_basis": "image",
+    "class_ids": [
+     12
+    ],
+    "clipped_boxes": 0,
+    "copy_scan_calibration": {
+     "cos_threshold": 0.946384,
+     "file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v2/embed_calibration_v2.json",
+     "sha256": "cc9c0e2eb2eb5a324c906a5da0b7553bf0a5b537a29fc0c789a077a1f59bbf38"
+    },
+    "dhash": 13689222711447338743,
+    "exhaustive_labels": null,
+    "height": 960,
+    "hold_until": "h6_scan",
+    "holds": [
+     "h6_scan"
+    ],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757.jpeg",
+    "intake_utc": "2026-10-03T16:50:08Z",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757",
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/labels/zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757.txt",
+    "label_sha256": "3575b5dead60fe2eff59462f7f180c2e6f6cc6ec49fa9380e3f54d6bfcf27f98",
+    "licence": "cc-by-nc-sa-4.0",
+    "licence_class": "research_only",
+    "licence_override": null,
+    "provenance_cleared": false,
+    "rel": "weed_dataset/Dataset/images/train/SETFA_week_3_IMG_1009_frame_0757.jpeg",
+    "research_only": true,
+    "session": "weed_dataset/Dataset/images/train/SETFA_week_3_IMG_1009_frame_0757.jpeg",
+    "sha256": "3d601421b0917df718de4439e0e44beafb7af0ff51dbeecd62ff4eef801f2b8a",
+    "source": "zenodo_15808623",
+    "target_boxes": 0,
+    "unlisted_class_boxes": 0,
+    "unmapped_boxes": 0,
+    "width": 720
+   },
+   "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757",
+   "q": {
+    "admission": "whole",
+    "admitted_utc": "2026-10-03T19:04:18Z",
+    "batch": "b0005",
+    "capture_group": "weed_dataset/Dataset/images/train/SETFA_week_3_IMG_1009_frame_0757.jpeg",
+    "dhash": 13689222711447338743,
+    "dhash_masked": null,
+    "eligible_step1": false,
+    "evidenced": true,
+    "format": "inc2-stream-queue/1",
+    "group": 94180,
+    "h6_reason": null,
+    "hold_deadline": {},
+    "hold_until": null,
+    "holds": [],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757.jpeg",
+    "input": "intake:i0004_zenodo_15808623",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757",
+    "kind": "other",
+    "l1": 46,
+    "l2": 3,
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/labels/zenodo_15808623/zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757.3575b5dead60fe2e.txt",
+    "label_sha256": "3575b5dead60fe2eff59462f7f180c2e6f6cc6ec49fa9380e3f54d6bfcf27f98",
+    "licence": "cc-by-nc-sa-4.0",
+    "masked_area_frac": 0.0,
+    "n_masked": 0,
+    "other_boxes": 1,
+    "prior": null,
+    "reference": "v1",
+    "refused": null,
+    "released": {},
+    "research_only": true,
+    "scanned": "funnel",
+    "score": null,
+    "session": "weed_dataset/Dataset/images/train/SETFA_week_3_IMG_1009_frame_0757.jpeg",
+    "sha256": "3d601421b0917df718de4439e0e44beafb7af0ff51dbeecd62ff4eef801f2b8a",
+    "source": "zenodo_15808623",
+    "species_boxes": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "stream_pins_sha": "50720641fb98ac141498322adaf35c888ef91afd293b097d8d03a7562ad73175",
+    "supersedes": null,
+    "typicality": 0.882769,
+    "unmasked_image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__SETFA_week_3_IMG_1009_frame_0757.jpeg",
+    "unmasked_sha256": "3d601421b0917df718de4439e0e44beafb7af0ff51dbeecd62ff4eef801f2b8a",
+    "verifier": "v1"
+   }
+  },
+  {
+   "adm": {
+    "admission": "whole",
+    "image_verdict": "admitted",
+    "keep": [
+     0
+    ],
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404",
+    "labels": [
+     12
+    ],
+    "mask": [],
+    "mask_record": null,
+    "overlaps": [],
+    "refusal": null,
+    "source": "zenodo_15808623",
+    "verdicts": [
+     "other_ok"
+    ]
+   },
+   "batch": "b0005",
+   "f": {
+    "bad_boxes": 0,
+    "batch": "i0004_zenodo_15808623",
+    "batch_dir": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623",
+    "boxes": 1,
+    "capture_group": "weed_dataset/Dataset/images/train/CHEAL_week_7_IMG_1297_frame_0404.jpeg",
+    "capture_group_basis": "image",
+    "class_ids": [
+     12
+    ],
+    "clipped_boxes": 0,
+    "copy_scan_calibration": {
+     "cos_threshold": 0.946384,
+     "file": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/splits/v2/embed_calibration_v2.json",
+     "sha256": "cc9c0e2eb2eb5a324c906a5da0b7553bf0a5b537a29fc0c789a077a1f59bbf38"
+    },
+    "dhash": 17392967786565165953,
+    "exhaustive_labels": null,
+    "height": 960,
+    "hold_until": "h6_scan",
+    "holds": [
+     "h6_scan"
+    ],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404.jpeg",
+    "intake_utc": "2026-10-03T16:50:08Z",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404",
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/labels/zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404.txt",
+    "label_sha256": "78f425c9f5eed5afe26aadbcb80cbd79ccee5668cd27e381101ec81e84c92d7f",
+    "licence": "cc-by-nc-sa-4.0",
+    "licence_class": "research_only",
+    "licence_override": null,
+    "provenance_cleared": false,
+    "rel": "weed_dataset/Dataset/images/train/CHEAL_week_7_IMG_1297_frame_0404.jpeg",
+    "research_only": true,
+    "session": "weed_dataset/Dataset/images/train/CHEAL_week_7_IMG_1297_frame_0404.jpeg",
+    "sha256": "f2c51f54c08b222ced5e9eb1c5df653c0443e3e01a4815c6dde8437edd5320f0",
+    "source": "zenodo_15808623",
+    "target_boxes": 0,
+    "unlisted_class_boxes": 0,
+    "unmapped_boxes": 0,
+    "width": 720
+   },
+   "key": "zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404",
+   "q": {
+    "admission": "whole",
+    "admitted_utc": "2026-10-03T19:03:45Z",
+    "batch": "b0005",
+    "capture_group": "weed_dataset/Dataset/images/train/CHEAL_week_7_IMG_1297_frame_0404.jpeg",
+    "dhash": 17392967786565165953,
+    "dhash_masked": null,
+    "eligible_step1": false,
+    "evidenced": true,
+    "format": "inc2-stream-queue/1",
+    "group": 88057,
+    "h6_reason": null,
+    "hold_deadline": {},
+    "hold_until": null,
+    "holds": [],
+    "image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404.jpeg",
+    "input": "intake:i0004_zenodo_15808623",
+    "key": "zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404",
+    "kind": "other",
+    "l1": 27,
+    "l2": 0,
+    "lab_group": null,
+    "label": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/step1_stream/labels/zenodo_15808623/zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404.78f425c9f5eed5af.txt",
+    "label_sha256": "78f425c9f5eed5afe26aadbcb80cbd79ccee5668cd27e381101ec81e84c92d7f",
+    "licence": "cc-by-nc-sa-4.0",
+    "masked_area_frac": 0.0,
+    "n_masked": 0,
+    "other_boxes": 1,
+    "prior": null,
+    "reference": "v1",
+    "refused": null,
+    "released": {},
+    "research_only": true,
+    "scanned": "funnel",
+    "score": null,
+    "session": "weed_dataset/Dataset/images/train/CHEAL_week_7_IMG_1297_frame_0404.jpeg",
+    "sha256": "f2c51f54c08b222ced5e9eb1c5df653c0443e3e01a4815c6dde8437edd5320f0",
+    "source": "zenodo_15808623",
+    "species_boxes": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "stream_pins_sha": "50720641fb98ac141498322adaf35c888ef91afd293b097d8d03a7562ad73175",
+    "supersedes": null,
+    "typicality": 0.871853,
+    "unmasked_image": "/ocean/projects/cis240145p/byler/harry/weed_llm_benchmark/results/framework/inc/intake/i0004_zenodo_15808623/images/zenodo_15808623__weed_dataset__Dataset__images__train__CHEAL_week_7_IMG_1297_frame_0404.jpeg",
+    "unmasked_sha256": "f2c51f54c08b222ced5e9eb1c5df653c0443e3e01a4815c6dde8437edd5320f0",
+    "verifier": "v1"
+   }
+  }
+ ]
+}

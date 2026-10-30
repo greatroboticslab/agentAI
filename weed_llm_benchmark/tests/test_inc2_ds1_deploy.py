@@ -3,8 +3,9 @@
 
 - the git-root paths hold the amendment's byte copy (docs/prereg/DS1_2026-10-29.md, hashing to the registered
   sha256 that the ticker's gate compares), its two OpenTimestamps proofs and the stamp file the delegate's
-  inc2.ds1 timestamp reads on the login node; each Revision's and each recorded deviation's likewise (DS1 deviation 1:
-  docs/prereg/DS1_dev1_2026-10-30.md, which the gate and its reopen block pin by sha256);
+  inc2.ds1 timestamp reads on the login node; each Revision's and each recorded deviation's likewise (DS1 deviations 1
+  and 2: docs/prereg/DS1_dev1_2026-10-30.md and DS1_dev2_2026-10-30.md, which the gate and their reopen blocks pin by
+  sha256);
 - the package paths hold inc2 (DS1's four modules), run_inc2_long.sh (lever L32X) and tests/fixtures/ds1;
 - the job scripts hash DS1's modules (their module lists), so a drift between the cluster's two copies refuses;
 - the replay set the deploy runs first holds S30 (executor.STREAM_REPLAY_CASES and the replay's cases).
@@ -90,21 +91,25 @@ def main():
               r["sha256"] in (GIT / r["stamp_file"]).read_text() and r["commit"] in (GIT / r["stamp_file"]).read_text()
               for r in D.REVISIONS))
     devs = cfg.get("deviations") or []
-    dfiles = [x for r in D.DEVIATIONS for x in (r["file"], r["file"] + ".ots", r["stamp_file"],
-                                                r["stamp_file"] + ".ots")]
-    check("the git-root paths ship DS1's recorded deviations (DS1 deviation 1), their proofs and stamp files",
+    # deviation 1 is pinned in inc2.ds1, deviation 2 in inc2.ds1_data (inc2/ds1.py stays as the reproduction records
+    # pin it): inc2.ds1_data.deviations() lists both in order
+    from weed_optimizer_framework.tools.inc2 import ds1_data as DD
+    DEVS = DD.deviations()
+    dfiles = [x for r in DEVS for x in (r["file"], r["file"] + ".ots", r["stamp_file"], r["stamp_file"] + ".ots")]
+    check("the git-root paths ship DS1's recorded deviations (deviations 1 and 2), their proofs and stamp files",
           devs and all(f in root for f in dfiles), [f for f in dfiles if f not in root])
     check("  each deviation's file hashes to the sha256 the gate pins (ds1.deviations), its reopen blocks name and "
-          "inc2.ds1 records; its proofs stamp it and its stamp file, which names its sha256 and commit",
-          [(r["file"], r["sha256"]) for r in devs] == [(r["file"], r["sha256"]) for r in D.DEVIATIONS] and
-          all(b.get("sha256") == next(r["sha256"] for r in D.DEVIATIONS if r["file"] == b.get("file"))
-              for b in cfg.get("reopens") or [] if b.get("file") in [r["file"] for r in D.DEVIATIONS]) and
+          "inc2.ds1 or inc2.ds1_data records; its proofs stamp it and its stamp file, which names its sha256 and "
+          "commit",
+          [(r["file"], r["sha256"]) for r in devs] == [(r["file"], r["sha256"]) for r in DEVS] and
+          all(b.get("sha256") == next(r["sha256"] for r in DEVS if r["file"] == b.get("file"))
+              for b in cfg.get("reopens") or [] if b.get("file") in [r["file"] for r in DEVS]) and
           all(hashlib.sha256((GIT / r["file"]).read_bytes()).hexdigest() == r["sha256"] and
               D.ots_digest(GIT / (r["file"] + ".ots")) == r["sha256"] and
               D.ots_digest(GIT / (r["stamp_file"] + ".ots")) == hashlib.sha256(
                   (GIT / r["stamp_file"]).read_bytes()).hexdigest() and
               r["sha256"] in (GIT / r["stamp_file"]).read_text() and r["commit"] in (GIT / r["stamp_file"]).read_text()
-              for r in D.DEVIATIONS))
+              for r in DEVS))
     check("the package paths ship inc2 (DS1's modules), run_inc2_long.sh and tests/fixtures/ds1",
           "weed_optimizer_framework/tools/inc2" in pkg and "run_inc2_long.sh" in pkg and "tests/fixtures/ds1" in pkg
           and all((PKG / "weed_optimizer_framework" / "tools" / "inc2" / n).is_file()

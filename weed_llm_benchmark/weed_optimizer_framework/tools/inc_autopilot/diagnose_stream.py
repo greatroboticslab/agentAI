@@ -2320,8 +2320,10 @@ def ds1_plan(cfg, fs):
             ("RA (the delegate's inc2.ds1 ra)", not st.get("ra")), ("the power pre-flight", not st.get("power_final")),
             ("MD-S0's freeze", not md.get("frozen"))) if c)
     s1_frozen = bool(arms.get("S1U"))
-    # ---- 1. the phase-1 screen (again while new batches arrive before the phase-1 freeze)
-    if (not p1.get("revisions") or (p1.get("new_batches") and not s1_frozen)) and due("data:1:screen"):
+    # ---- 1. the phase-1 screen (again while new batches arrive before the phase-1 freeze, and once for the sources
+    # DS1 deviation 2 screens again: the status's rescreen)
+    if (not p1.get("revisions") or (p1.get("new_batches") and not s1_frozen) or
+            (p1.get("rescreen") and not s1_frozen)) and due("data:1:screen"):
         add(maint, {"lever": "L30", "phase": 1, "step": "screen", "item": "data:1:screen"})
     # ---- 2. the sheets on the lab
     rendered = set(sheets.get("rendered") or [])
@@ -2360,14 +2362,24 @@ def ds1_plan(cfg, fs):
             add(maint, {"lever": "L30", "phase": int(phn), "step": "draw", "item": "data:%s:draw" % phn})
     # ---- 5. the manifests (S0 and KF; KD and KT; S1c, S1c-R, S1u; S2)
     settled1, w1 = _ds1_sources_settled(p1)
+    if p1.get("rescreen"):
+        # DS1 deviation 2: the phase-1 arms wait for the sources the status says are screened again (their sheets
+        # follow from that screen)
+        settled1, w1 = False, dict(w1, screen=list(p1["rescreen"]))
     if md.get("frozen"):
         want = []
         if not arms.get("S0") or not arms.get("KF"):
             want.append("S0/KF")
         siu = (p1.get("sources") or {}).get(cfg.get("k_source") or "", {}) if cfg.get("k_source") else {}
         if (not arms.get("KD") or not arms.get("KT")) and siu.get("pooled") and not st.get("k_not_run") \
-                and not st.get("k_source_out"):
+                and not st.get("k_source_out") and not st.get("k_wait"):
             want.append("KD/KT")
+        if st.get("k_wait") and not arms.get("KD"):
+            # DS1 deviation 2, item 6: KD's or KT's supply under KF's N_K; no K build until the recorded change
+            kw = st["k_wait"]
+            waits["k_arms"] = ("KD and KT wait (DS1 deviation 2, item 6): K supplies %s under KF's N_K %s; KF is "
+                               "superseded and the three K arms built at N_K %s by a recorded change"
+                               % (kw.get("supplies"), kw.get("kf_n_k"), kw.get("n_k")))
         if st.get("k_source_out") and not st.get("k_not_run") and not arms.get("KD"):
             want.append("KD/KT not run")
         if settled1 and not arms.get("S1U"):
