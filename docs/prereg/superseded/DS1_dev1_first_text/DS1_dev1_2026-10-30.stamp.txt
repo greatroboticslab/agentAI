@@ -1,0 +1,36 @@
+DS1 deviation 1 time-stamp file (docs/CONTINUOUS_LOOP.md, Deviation (2026-10-30): DS1 deviation 1, recorded after DS1 held numbers under V3F.3.9; time-stamped as the Revisions were, the procedure of V3F.12)
+
+deviation_sha256: ade0f0d3cf08a28c2e5149e2fd1ac71642c8ab61787c199272e1f1c4f5d82a34
+deviation_text: docs/CONTINUOUS_LOOP.md from line 5683 ('## Deviation (2026-10-30): DS1 deviation 1, ...') to the end of the file at the commit below; byte-identical to docs/prereg/DS1_dev1_2026-10-30.md
+deviation_commit: 97e78a550c97a594a78eaffb855d77aced546f74
+amendment_sha256: 3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699 (unchanged; docs/prereg/DS1_2026-10-29.md)
+revision1_sha256: 543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7 (unchanged; docs/prereg/DS1_rev1_2026-10-29.md)
+revision2_sha256: 5970fd759df8e291f645caff1d3da4ee540972da33f86c0a7248c44ff8760fc4 (unchanged; docs/prereg/DS1_rev2_2026-10-29.md)
+written_utc: 2026-10-30T04:02:00Z
+decided_by: the delegate under the 2026-09-30 owner grant (deviation 1, items 1-4)
+gate: the domain's ds1.deviations pins this file by its sha256; its ds1.reopens block "DS1 deviation 1 (2026-10-30)" reopens score:POWER:draft_r001 for an attempt started before written_utc
+
+outside-repository records cited (sha256, file name under the paper's working folder _work/):
+4a2000ff4b7ab589dd3d6d6ed3b77048bcd3c3032fe1684fecd32fb98debfc77  v7/ds1_evidence/dev1/MANIFEST.sha256 (26 files: R1, byte copies of the cluster records below and of V3F's continuation records, the read script p7_read.py and its outputs on the lab under Ultralytics 8.4.37 and 8.4.129 and on the Mac, the cluster's sha256 list of 2026-10-30)
+
+cluster records cited by sha256 (INC = results/framework/inc on /ocean; read only, 2026-10-30):
+de6dd5bd6d241cb0af9b0f248212b70855e98b95ca38a7411581816cf7c04a39  INC/capacity/v3fam_v1_cont2_report.json (V3F-R's report: P7's record (x_values for B'1, y_values for A'1, D +0.0423))
+521b9468dee283f0a243416f95bff670e105f7de0f63fa60f374e7b442d03b78  INC/v3fam/v1/arms/D1B1/s0/ood23.json (B'1 seed 0's ood23 score file (agnostic_map50_95: the plain reading))
+2a3a3655ceb0896935eb293ac77f6037c9d11921b083c08d13c92ae2e89329b5  INC/v3fam/v1/arms/D1B1/s1/ood23.json (B'1 seed 1's ood23 score file (agnostic_map50_95: the plain reading))
+8903a5fc74f72ab535391dda5dfaa631aa12e5f20a2edf2039a10e1d37fc32d8  INC/v3fam/v1/arms/D1B1/s2/ood23.json (B'1 seed 2's ood23 score file (agnostic_map50_95: the plain reading))
+8cf9d9c3cc6b72b0aa7a5d2fe5314d4cb2c6b2b9acb412df8b57c6bbba371293  INC/v3fam/v1/arms/D1B1/s0/ood23.p7.npz (B'1 seed 0's ood23 p7 arrays (P7's statistic: the t_ arrays))
+0934e3a76d6c95ddb596bd9f81f0e883d24411303fce2669b3dd87cf03ce28f8  INC/v3fam/v1/arms/D1B1/s1/ood23.p7.npz (B'1 seed 1's ood23 p7 arrays (P7's statistic: the t_ arrays))
+36a6b9f20fc28bbcd441feed37f41e3fb14acbe884c61f9ab34818543300daa0  INC/v3fam/v1/arms/D1B1/s2/ood23.p7.npz (B'1 seed 2's ood23 p7 arrays (P7's statistic: the t_ arrays))
+3a0f0c8d0a04c6b2ac8e076a78db62696c76b0a5f773043f0fd5b9261558d0f4  INC/v3fam/v1/arms/D1A1/s0/ood23.json (A'1 seed 0's ood23 score file (agnostic_map50_95: the plain reading))
+9aeae00d3d177e0f77c723057fc0e807640c0764c6a16c991cf5976ba760131e  INC/v3fam/v1/arms/D1A1/s1/ood23.json (A'1 seed 1's ood23 score file (agnostic_map50_95: the plain reading))
+57dd766065de42bbfd5e6cb26607d29115ba6ed81bea4148c8b4abbd1e0eeb21  INC/v3fam/v1/arms/D1A1/s2/ood23.json (A'1 seed 2's ood23 score file (agnostic_map50_95: the plain reading))
+cafbbedcfbca26e8a6f54061c579c55eeb05cfea84051593ad712bb05220dbff  INC/v3fam/v1/arms/D1A1/s0/ood23.p7.npz (A'1 seed 0's ood23 p7 arrays (P7's statistic: the t_ arrays))
+a8acfa60266ab3f559573fe5e05d266af681b0eca49a1cb5488e332e6ad9369b  INC/v3fam/v1/arms/D1A1/s1/ood23.p7.npz (A'1 seed 1's ood23 p7 arrays (P7's statistic: the t_ arrays))
+14f5898c3887a212cda4fe2b2d1b3f6d029b74ccf6865888a65ab110f0623a36  INC/v3fam/v1/arms/D1A1/s2/ood23.p7.npz (A'1 seed 2's ood23 p7 arrays (P7's statistic: the t_ arrays))
+a3d2479859086f1232a80f0264f5f2eb96b55e966c0f70bda38000b1da9e4b43  INC/ds1/v1/equivalence/e1a_dev.json (superseded by item 3 (taken 2026-10-30T02:56Z by job 50026958; passed, difference 0.0))
+2ea945605f066e3e68ec10de12d322823d6f243f9ae8f51b76ce677971fb304e  INC/ds1/v1/equivalence/e3a_dev.json (superseded by item 3 (taken 2026-10-30T02:56Z by job 50026958; passed, difference 0.0))
+0096fd1ced1e94b53701416d92e42dabd0f1ee596b0eb25a3c669b73dd1bac10  INC/logs/inc_build_ds1_score_power_50026958.out (the first refused job of 2026-10-30)
+a89db7b3ddd5ae7d8f628764bfde0e72f60a19a98c6c8c1c6eeda0f3056c194f  INC/logs/inc_build_ds1_score_power_50027968.out (the second refused job of 2026-10-30)
+2a14addca0ee0a9f5560fb8156bf9b272c41db465faa7b639f8e0dcbc37eb3e3  INC/ds1/v1/timestamp_rev2.json (Revision 2's time-stamp record)
+
+Proofs: OpenTimestamps (ots stamp) of this file and of docs/prereg/DS1_dev1_2026-10-30.md, as DS1_dev1_2026-10-30.stamp.txt.ots and DS1_dev1_2026-10-30.md.ots beside them.

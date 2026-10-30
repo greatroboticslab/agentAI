@@ -80,7 +80,9 @@ def ds1_world(tag, amendment=True, never_cut=True, timestamp=True, fake=True):
     (w.scripts / "run_inc2_long.sh").write_text("#!/bin/bash\n")
     w.ready_r0()
     if amendment:
-        for f in [CFG["amendment_file"]] + [r["file"] for r in CFG.get("revisions") or []]:
+        # the amendment, its Revisions and its recorded deviations (DS1 deviation 1: the gate pins each by sha256)
+        for f in [CFG["amendment_file"]] + [r["file"] for r in list(CFG.get("revisions") or []) +
+                                            list(CFG.get("deviations") or [])]:
             dst = w.dir / f
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(str(REPO_ROOT / f), str(dst))

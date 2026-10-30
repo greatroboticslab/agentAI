@@ -2210,12 +2210,13 @@ def _ds1_due(state):
 
 
 def _ds1_gate(v, st, cfg):
-    """(True, cites) when DS1's items may be proposed (DS.9.3): the deployed tree holds the amendment (its file's
-    sha256) and the cutter's never-cut change (its marker in the deployed step1_stream.py), and
-    ds1/v1/timestamp.json names the text's sha256 and its proofs. Else (False, why)."""
+    """(True, cites) when DS1's items may be proposed (DS.9.3): the deployed tree holds the amendment, its Revisions
+    and its recorded deviations (each file's sha256) and the cutter's never-cut change (its marker in the deployed
+    step1_stream.py), and ds1/v1/timestamp.json names the text's sha256 and its proofs. Else (False, why)."""
     fs = st.get("ds1") or {}
     if not fs.get("amendment"):
-        return False, "the deployed tree does not hold the amendment (%s)" % cfg.get("amendment_file")
+        return False, ("the deployed tree does not hold the amendment (%s), a Revision or a recorded deviation by "
+                       "the sha256 the domain pins" % cfg.get("amendment_file"))
     if not fs.get("never_cut"):
         return False, "the deployed cutter does not read DS1's never-train list (DS.9.1)"
     if not (fs.get("status") or {}).get("timestamp"):

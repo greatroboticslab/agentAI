@@ -45,6 +45,7 @@ Records (each written once):
   ds1/v1/timestamp.json                 the prereg's sha256 and its proofs (the delegate's, DS.12 step 0a)
   ds1/v1/timestamp_rev<n>.json          a later Revision's sha256 and proofs (timestamp_revision; Revision 2 on)
   ds1/v1/equivalence/<item>.json        the three reproductions (DS.7.1): e1a_dev, e3a_dev, b1_ood23, md_identity
+  ds1/v1/equivalence/superseded/dev<n>/ the records a recorded deviation supersedes, moved aside (MANIFEST.json)
   ds1/v1/arms/<ARM>/s<k>/<exam>.{json, images.npz, stage1.npz, rows.npz, p7.npz, weed.npz}
   ds1/v1/reported/<ARM>.json            the non-deciding passes' files and statuses
   capacity/ds1_score_<arm>.json         the platform's record of a score job (dev and MD only)
@@ -103,6 +104,15 @@ REVISIONS = ({"n": 1, "file": "docs/prereg/DS1_rev1_2026-10-29.md",
               "sha256": "5970fd759df8e291f645caff1d3da4ee540972da33f86c0a7248c44ff8760fc4",
               "commit": "9ca7e4d321bf11dc4abba35ed920fb27ecb9d8bc",
               "stamp_file": "docs/prereg/DS1_rev2_2026-10-29.stamp.txt"})
+# Deviations recorded after DS1 held numbers (V3F.3.9; docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-30): DS1 deviation
+# 1"), each kept byte for byte under docs/prereg/ and time-stamped as the Revisions were (its two OpenTimestamps proofs
+# and stamp file beside it); the ticker's gate pins each by sha256 (the domain's ds1.deviations). Deviation 1's second
+# text (the first, ade0f0d3...2a34 of commit 97e78a5, never deployed, is kept under
+# docs/prereg/superseded/DS1_dev1_first_text/)
+DEVIATIONS = ({"n": 1, "file": "docs/prereg/DS1_dev1_2026-10-30.md",
+               "sha256": "04c52e4f77229948f04a257dbe6c0aacfab84ce4f83d387c2af0e0b62a59780d",
+               "commit": "4bc8c94b36929219e7a0856e2410ab91162e746d",
+               "stamp_file": "docs/prereg/DS1_dev1_2026-10-30.stamp.txt"},)
 DELEGATE = "the delegate under the 2026-09-30 owner grant"
 OWNER = "Harry He (owner)"
 DECIDED_BY = ("docs/CONTINUOUS_LOOP.md, Amendment (2026-10-29): DS1, scaling verified training data at the weed level "
@@ -155,7 +165,15 @@ EXP_OF = {"K0": "e1_a_m640", "KD": "ds1_kd_m640", "KT": "ds1_kt_m640", "KF": "ds
           "S1CR": "ds1_s1cr_m640", "S1C": "ds1_s1c_m640", "S1U": "ds1_s1u_m640", "S2": "ds1_s2_m640"}
 POWER_EXPS = {"E1A": "e1_a_m640", "BV2": "b_v2_m640", "E1B": "e1_b_m640"}
 B1_EXP = "v3_d1_b1_m640"                      # D1's B'1, whose ood23 statistic is reproduced (DS.7.1)
-B1_OOD23 = (0.2562, 0.2517, 0.2598)           # B'1's ood23 statistic per seed, as V3F-R records it (4 decimals)
+# B'1's two ood23 readings per seed as V3F's records hold them (4 decimals), each under its own name (DS1 deviation 1,
+# 2026-10-30): "p7" is V3F P7's statistic (the target-species agnostic AP with OtherPlant boxes as ignore regions, on
+# the tie-broken target arrays of the score's p7 sidecar; V3F-R's P7 x_values), which P4 decides on and DS.7.1's
+# reproduction holds; "plain" is the stage-1 agnostic AP over every ground-truth box (the score file's
+# stage1.agnostic_map50_95), the numbers the registration's text named as the statistic. Each constant is checked
+# against its own reading, before any pass: a constant of one reading under the other's name refuses, saying so.
+B1_OOD23 = {"p7": (0.1496, 0.1594, 0.1634), "plain": (0.2562, 0.2517, 0.2598)}
+B1_READINGS = {"p7": "V3F P7's statistic (target-species agnostic AP, OtherPlant boxes as ignore regions)",
+               "plain": "the stage-1 agnostic AP over every ground-truth box (stage1.agnostic_map50_95)"}
 K_ARMS = ("KD", "KT", "KF")
 S_ARMS = ("S0", "S1CR", "S1C", "S1U", "S2") + LONG_ARMS
 SEASON_ARMS = ("S0", "S1C", "S1U", "S2") + LONG_ARMS                       # season-free: ood22 and ood23 are exams
@@ -198,6 +216,18 @@ READ_KINDS = ("reference", "candidate", "challenger", "cwd12")
 REPRO_TOL = F.REPRO_TOL                       # 1e-6
 DEVIATION_TOL = F.DEVIATION_TOL               # 0.002
 REPRO_ITEMS = ("e1a_dev", "e3a_dev", "b1_ood23", "md_identity")
+# The records a recorded deviation supersedes (path under INC_DIR, sha256), moved aside byte for byte by the job that
+# takes them again (supersede). DS1 deviation 1: the e1a_dev and e3a_dev reproductions written on 2026-10-30 by the
+# refused power pre-flight (job 50026958) under the code before the deviation; require_reproductions refuses a record
+# taken by other code, so under the deviation's code they would refuse every score after the pre-flight
+SUPERSEDED = ({"deviation": 1, "path": "ds1/v1/equivalence/e1a_dev.json",
+               "sha256": "a3d2479859086f1232a80f0264f5f2eb96b55e966c0f70bda38000b1da9e4b43",
+               "why": "taken 2026-10-30T02:56Z by job 50026958 under the code before DS1 deviation 1 (passed, difference "
+                      "0.0); taken again under the deviation's code"},
+              {"deviation": 1, "path": "ds1/v1/equivalence/e3a_dev.json",
+               "sha256": "2ea945605f066e3e68ec10de12d322823d6f243f9ae8f51b76ce677971fb304e",
+               "why": "taken 2026-10-30T02:56Z by job 50026958 under the code before DS1 deviation 1 (passed, difference "
+                      "0.0); taken again under the deviation's code"})
 # The weed arrays against the pass's stage-1 agnostic AP (Revision 2, item 1; E1's rule, inc2.scorer_agnostic):
 # ap_per_class ranks equal confidences by an unstable sort, so the AP of tied arrays depends on their order and on the
 # CPU's sort kernel. The identity is checked in the validator's own image order (the same rows in the same order:
@@ -218,6 +248,7 @@ FMT_TEST = "inc2-ds1-test/1"
 FMT_TIMESTAMP = "inc2-ds1-timestamp/1"
 FMT_REV_TIMESTAMP = "inc2-ds1-revision-timestamp/1"
 FMT_PASS_SPEC = "inc2-ds1-pass-spec/1"
+FMT_SUPERSEDED = "inc2-ds1-superseded/1"
 FMT_REPORTED = "inc2-ds1-reported/1"
 STAMP = "DS1-"
 
@@ -1517,16 +1548,107 @@ def _md_pass(src, exam, arm, kw):
         return pass_in_root(src["weights"], exam, "stage1", arm, Path(tmp) / "out", root_dir=md_root(exam), **kw)
 
 
+def supersede():
+    """The records a recorded deviation supersedes (SUPERSEDED), moved aside byte for byte, each into its folder's
+    superseded/dev<n>/ (a hard link made there, then the original unlinked: never overwritten, never deleted), the
+    move recorded in that folder's MANIFEST.json (the record's path, sha256 and size, when, by which job and host, why,
+    and the deviation's file and sha256). A file at the path with another sha256 is not the record named: it stays,
+    reported as other, or as moved_before once the record is in its folder (the record taken again stands there). A
+    move cut off after its link (the same bytes at both places) is completed. A folder copy with other bytes refuses.
+    Returns [{path, status: moved | moved_before | other | absent}]."""
+    out = []
+    for e in SUPERSEDED:
+        dv = next((d for d in DEVIATIONS if int(d["n"]) == int(e["deviation"])), None)
+        if dv is None:
+            raise Ds1Refused("%s names DS1 deviation %s, which inc2.ds1.DEVIATIONS does not hold" % (e["path"],
+                                                                                                  e["deviation"]))
+        src = C.INC_DIR / e["path"]
+        dst = src.parent / "superseded" / ("dev%d" % int(e["deviation"])) / src.name
+        if dst.is_file() and _sha(dst) != e["sha256"]:
+            raise Ds1Refused("%s holds another file than the record %s supersedes (%s)" % (dst, e["path"],
+                                                                                         e["sha256"][:12]))
+        got = _sha(src) if src.is_file() and not src.is_symlink() else None
+        if got != e["sha256"]:
+            # the record named is not at its path: moved before (a record taken again may stand there), or never
+            # there (a file with other bytes stays as it is)
+            st_ = "moved_before" if dst.is_file() else ("other" if got is not None else "absent")
+            out.append(dict({"path": e["path"], "status": st_}, **({"sha256": got} if got is not None else {})))
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.is_file():
+            os.link(str(src), str(dst))
+        size = src.stat().st_size
+        os.unlink(str(src))
+        man = dst.parent / "MANIFEST.json"
+        doc = _read_json(man) if man.is_file() else None
+        doc = doc if isinstance(doc, dict) and isinstance(doc.get("moves"), list) else {"format": FMT_SUPERSEDED,
+                                                                                         "moves": []}
+        doc["moves"].append({"path": e["path"], "sha256": e["sha256"], "size": size,
+                             "moved_to": str(dst.relative_to(C.INC_DIR)), "moved_utc": _utc(),
+                             "job": os.environ.get("SLURM_JOB_ID"), "host": os.uname().nodename, "why": e["why"],
+                             "deviation": {"n": int(dv["n"]), "file": dv["file"], "sha256": dv["sha256"]}})
+        write_json(man, doc)
+        log("superseded %s (DS1 deviation %d): moved to %s" % (e["path"], int(dv["n"]), dst.relative_to(C.INC_DIR)))
+        out.append({"path": e["path"], "status": "moved"})
+    return out
+
+
+def v3f_b1_readings(seed):
+    """B'1's two recorded ood23 readings of one seed (B1_READINGS), from V3F's D1B1 score file
+    (v3fam/v1/arms/D1B1/s<k>/ood23.json): p7 from its p7 arrays (checked against the file's sha256), plain from its
+    stage1.agnostic_map50_95; with the file and its sha256."""
+    d = F.arm_dir("D1B1", seed)
+    p = d / F.file_names("ood23")[0]
+    doc = _read_json(p)
+    plain = ((doc.get("stage1") or {}).get("agnostic_map50_95")) if isinstance(doc, dict) else None
+    if plain is None:
+        raise Ds1Refused("%s records no stage-1 agnostic AP (B'1's plain ood23 reading)" % p)
+    return {"p7": v3f_p7_value(d), "plain": float(plain), "file": str(p), "sha256": _sha(p)}
+
+
+def b1_check_constants(recorded):
+    """Refuses unless every seed's two recorded readings ({seed: {p7, plain}}) equal their registered constants
+    (B1_OOD23, 4 decimals), each against its own reading. The refusal names both readings of every seed it lists and,
+    when a registered constant is the other reading's value, says so: a constant registered under the wrong reading's
+    name (DS1 deviation 1: the text named the plain reading's numbers as P7's statistic)."""
+    bad = []
+    for s in sorted(recorded, key=int):
+        rec, why = recorded[s], []
+        for name, other in (("p7", "plain"), ("plain", "p7")):
+            reg = B1_OOD23[name][int(s)]
+            if round(float(rec[name]), 4) != reg:
+                why.append("the registered %s constant %.4f is not V3F's %s reading%s" % (
+                    name, reg, name, " (it is the %s reading's value)" % other
+                    if round(float(rec[other]), 4) == reg else ""))
+        if why:
+            bad.append("seed %s: P7's statistic %.6f, plain %.6f; %s" % (s, float(rec["p7"]), float(rec["plain"]),
+                                                                       "; ".join(why)))
+    if bad:
+        raise Ds1Refused("V3F's recorded ood23 readings of B'1 are not the registered ones (p7: %s; plain: %s): %s" % (
+            B1_READINGS["p7"], B1_READINGS["plain"], " | ".join(bad)))
+    return True
+
+
 def reproductions(embedder=None, workers=None, kw=None, seeds=SEEDS):
     """The three reproductions (DS.7.1), each taken once if missing: E1-A's three stage-1 dev records and E3-A's
     dev species records (E1-A's seeds through DS1's two-stage pass with E3's pinned classifier); B'1's ood23
     statistic (D1B1's seeds in stage1 mode under deviation 6's loader); an identity pass on MD equal to a plain
-    inc.scorer.score on its root."""
+    inc.scorer.score on its root. B'1's two readings (DS1 deviation 1): while b1_ood23 is due, V3F's records are
+    checked against both registered constants first, before any record moves and before any pass of any reproduction;
+    each pass's two readings are then held to V3F's, each within DS.7.1's rule. The records a recorded deviation
+    supersedes are moved aside next (supersede), so they are taken again."""
     from ..inc import verify as V
     from . import v3fam_loader as LD
     from . import v3fam_systems as SYS
     kw = kw or {}
     done = {}
+    # V3F's own D1B1 ood23 files (v3fam/v1/arms/D1B1/s<k>/ood23.json and their p7 arrays, read on the CPU), taken under
+    # the same loader fix: both readings of every seed against their registered constants, so a refusal comes before
+    # the superseded records move and before E1-A's dev passes or B'1's ood23 passes use the GPU
+    recorded = {int(s): v3f_b1_readings(s) for s in seeds} if not (equiv_dir() / "b1_ood23.json").exists() else None
+    if recorded is not None:
+        b1_check_constants(recorded)
+    supersede()
     if not (equiv_dir() / "e1a_dev.json").exists() or not (equiv_dir() / "e3a_dev.json").exists():
         ccfg, _r, shas = TS._clf_cfg()
         per1, per3 = {}, {}
@@ -1554,7 +1676,8 @@ def reproductions(embedder=None, workers=None, kw=None, seeds=SEEDS):
         if not (equiv_dir() / "e3a_dev.json").exists():
             done["e3a_dev"] = equiv_record("e3a_dev", per3, {"what": "E3-A's dev species records",
                                                              "classifier": shas})
-    if not (equiv_dir() / "b1_ood23.json").exists():
+    if recorded is not None and not (equiv_dir() / "b1_ood23.json").exists():
+        # V3F's readings were read and checked above, before any pass
         shapes = LD.preflight()
         per = {}
         for s in seeds:
@@ -1563,15 +1686,22 @@ def reproductions(embedder=None, workers=None, kw=None, seeds=SEEDS):
                 ps = ds1_pass(src["weights"], "ood23", {"mode": "stage1", "nms": NMS}, "S0", **kw)
             if obs is not None:
                 obs.check(LD.exam_keys("ood23"), LD.changed_of(shapes, "ood23"), 1, "B'1 seed %d" % s)
-            got = F.statistic_value(ps["p7"]["t"], "agnostic")
-            # V3F's own D1B1 ood23 file (v3fam/v1/arms/D1B1/s<k>/ood23.json and its p7 arrays), taken under the same
-            # loader fix: the statistic from its target reading's arrays, as V3F's verdict reads it
-            want = v3f_p7_value(F.arm_dir("D1B1", s))
-            if round(want, 4) != B1_OOD23[int(s)]:
-                raise Ds1Refused("V3F's recorded ood23 statistic of B'1 seed %d is %.6f, not the registered %.4f"
-                                 % (s, want, B1_OOD23[int(s)]))
-            per[str(s)] = {"diff": abs(got - want), "new": got, "recorded": want, "registered_4dp": B1_OOD23[int(s)]}
-        done["b1_ood23"] = equiv_record("b1_ood23", per, {"what": "B'1's ood23 statistic under deviation 6's loader"})
+            # the pass's two readings, each against V3F's own: P7's statistic from its target reading's tie-broken
+            # arrays (as V3F's verdict and P4 read it), the plain one from its stage-1 agnostic AP
+            got = {"p7": F.statistic_value(ps["p7"]["t"], "agnostic"), "plain": float(ps["stage1_agnostic"][0])}
+            want = recorded[int(s)]
+            rd = {k: {"new": got[k], "recorded": float(want[k]), "diff": abs(got[k] - float(want[k])),
+                      "registered_4dp": B1_OOD23[k][int(s)], "reading": B1_READINGS[k]} for k in B1_READINGS}
+            log("b1_ood23 seed %d: P7's statistic %.9f (V3F %.9f), plain %.9f (V3F %.9f)" % (
+                s, got["p7"], float(want["p7"]), got["plain"], float(want["plain"])))
+            per[str(s)] = {"diff": max(r["diff"] for r in rd.values()), "new": got["p7"], "recorded": float(want["p7"]),
+                           "registered_4dp": B1_OOD23["p7"][int(s)], "readings": rd, "recorded_file": want["file"],
+                           "recorded_sha256": want["sha256"]}
+        done["b1_ood23"] = equiv_record("b1_ood23", per, {
+            "what": "B'1's ood23 statistic under deviation 6's loader: V3F P7's statistic, with the plain reading "
+                    "beside it, each within DS.7.1's rule (diff: the larger of the two)",
+            "registered": {k: list(v) for k, v in B1_OOD23.items()}, "readings": B1_READINGS,
+            "deviation": {k: DEVIATIONS[0][k] for k in ("file", "sha256")}})
     if not (equiv_dir() / "md_identity.json").exists():
         src = TS._source("A", seeds[0], testing_ok=TS._testing_ok())
         draft = md_s0_draft()

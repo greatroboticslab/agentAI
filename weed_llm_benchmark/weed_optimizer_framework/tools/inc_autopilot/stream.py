@@ -6168,11 +6168,12 @@ class StreamRun(object):
         return out
 
     def _ds1_stage(self, exp_status, payload=None):
-        """/stage/ds1 (DS.9.3), what DR0's DS1 block and DS1's cards read: the gate's inputs (the amendment and the
-        cutter's never-cut change in the deployed tree, the time stamp), the cluster's derived status
-        (stream_remote.ds1_status), every item's state (done from its own record where one exists: an experiment
-        done, a score record complete, the long path's seeds trained, a verdict decided; else what the platform
-        ran), the family's GPU-h against its cap, the bytes phase 1 wrote. None without a ds1 block."""
+        """/stage/ds1 (DS.9.3), what DR0's DS1 block and DS1's cards read: the gate's inputs (the amendment, its
+        Revisions and recorded deviations and the cutter's never-cut change in the deployed tree, the time stamp), the
+        cluster's derived status (stream_remote.ds1_status), every item's state (done from its own record where one
+        exists: an experiment done, a score record complete, the long path's seeds trained, a verdict decided; else
+        what the platform ran), the family's GPU-h against its cap, the bytes phase 1 wrote. None without a ds1
+        block."""
         from . import stream_remote as SR
         cfg = (self.dom or {}).get("ds1") or {}
         if not cfg:
@@ -6207,8 +6208,11 @@ class StreamRun(object):
         for ph, v in (status.get("verdicts") or {}).items():
             if (v or {}).get("status") == "decided":
                 items["verdict:%s" % ph] = "done"
+        # the amendment, each Revision and each recorded deviation (DS1 deviation 1, 2026-10-30: the domain's
+        # ds1.deviations) in the deployed tree, each by the sha256 the domain pins
         out = {"amendment": self._ds1_tree_file(cfg.get("amendment_file") or "", sha=cfg.get("amendment_sha256"))
-               and all(self._ds1_tree_file(r.get("file") or "", sha=r.get("sha256")) for r in cfg.get("revisions") or []),
+               and all(self._ds1_tree_file(r.get("file") or "", sha=r.get("sha256"))
+                       for r in list(cfg.get("revisions") or []) + list(cfg.get("deviations") or [])),
                "never_cut": self._ds1_tree_file(nc.get("module") or "", marker=nc.get("marker")),
                "timestamp": bool(status.get("timestamp")), "status": status, "items": items,
                "today": str(self.utc)[:10],
