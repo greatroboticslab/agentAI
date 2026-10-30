@@ -1,0 +1,7 @@
+[Unit]
+Description=Check the dashboard's public Tailscale Funnel ingress and repair the node's side when it fails
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/weed_llm_benchmark/deploy/funnel_watchdog.sh

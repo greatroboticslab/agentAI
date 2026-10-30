@@ -13,6 +13,11 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-30 — The public dashboard address was down for about 11 hours; now watched and self-repairing
+
+- **What happened.** From 2026-10-29 ~17:00 CDT the dashboard was reachable only through Tailscale: the lab node lost its home DERP connection and Funnel's public ingress closed every TLS handshake, while the server looked healthy from inside the tailnet.
+- **Fix.** Funnel re-applied and the node's sockets rebound (no root, the node stays on the tailnet); all four public ingress addresses answer again. `deploy/funnel_watchdog.sh` now probes them every 10 minutes and repeats the repair on any failure (CHANGELOG, 2026-10-30).
+
 ## 2026-10-29 — DS1 Revision 2 registered again before its deploy: its changes count as deviations, and the label audit's inputs are checked
 
 - **Where the data stands.** No change. Base B's D1 B′ holds 40,743 images and the stream's pool P_1 holds 7,493, against a target of tens to hundreds of thousands of verified images. Accuracy is also unchanged: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90). No DS1 training has started.
