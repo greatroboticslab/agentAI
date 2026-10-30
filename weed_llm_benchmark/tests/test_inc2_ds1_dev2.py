@@ -503,10 +503,12 @@ def t_reopen():
     dom = LS.load_domain("weed")["ds1"]
     dv = next((x for x in DD.deviations() if x["n"] == 2), {})
     blk = next((b for b in dom.get("reopens") or [] if b.get("marker") == MARKER), {})
-    check("the domain's reopen block names the two data steps, states failed and missing, the deviation's file and "
-          "sha256, and a time after both live attempts", blk.get("items") == ["data:1:screen", "data:1:pools"] and
-          sorted(blk.get("states") or []) == ["failed", "missing"] and blk.get("file") == dv.get("file") and
-          blk.get("sha256") == dv.get("sha256") and str(blk.get("before_utc")) > "2026-10-30T03:32:00Z", blk)
+    check("the domain's reopen block names the two data steps, states failed and missing, the two live attempts' "
+          "proposal ids, the deviation's file and sha256, and a time after both", blk.get("items") ==
+          ["data:1:screen", "data:1:pools"] and sorted(blk.get("states") or []) == ["failed", "missing"] and
+          sorted(blk.get("proposals") or []) == ["0c1bae5fd6e893309a57422b6583ff4f", "d8967fc5f33dc713fb7f969b854c2014"]
+          and blk.get("file") == dv.get("file") and blk.get("sha256") == dv.get("sha256") and
+          str(blk.get("before_utc")) > "2026-10-30T03:32:00Z", blk)
     others = {(b["file"], b["sha256"]) for b in dom["reopens"] if b.get("marker") != MARKER}
     st = {"failed_ids": [], "ds1": {"items": live_items(), "cards": {}}}
     run = reopen_run(st, others)
@@ -532,6 +534,10 @@ def t_reopen():
                                                                      started_utc="2026-10-31T00:00:00Z")}}}
     check("  an attempt started after the deviation is not reopened by it", ST.StreamRun._ds1_reopen(
         reopen_run(st2, others | {(dv.get("file"), dv.get("sha256"))})) == [])
+    st4 = {"failed_ids": [], "ds1": {"items": {"data:1:screen": dict(live_items()["data:1:screen"], state="failed",
+                                                                     proposal="pidW")}}}
+    check("  another attempt of the same item (another proposal id: a test world's, say) is not reopened by it",
+          ST.StreamRun._ds1_reopen(reopen_run(st4, others | {(dv.get("file"), dv.get("sha256"))})) == [])
     st3 = {"failed_ids": [], "ds1": {"items": {"score:POWER:draft_r001": {"state": "missing",
                                                                            "started_utc": "2026-10-29T18:00:00Z"}}}}
     check("  the earlier blocks (states failed by default) do not reopen a missing item", ST.StreamRun._ds1_reopen(

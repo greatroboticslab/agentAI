@@ -859,6 +859,10 @@
      "failed",
      "missing"
     ],
+    "proposals": [
+     "d8967fc5f33dc713fb7f969b854c2014",
+     "0c1bae5fd6e893309a57422b6583ff4f"
+    ],
     "before_utc": "2026-10-30T13:31:54Z",
     "why": "DS1 deviation 2 (2026-10-30): phase 1's screen held SIU out by its D31 stream quarantine, read queued rows with intake holds the queue had released and missed 21,979 admissions whose intake keys Step 1 spelt otherwise, and its pools step (job 50028368) dropped all 4,469 live rows of six sources because their images' sizes were never read. The code is fixed: the screen takes SIU and four other sources again once, and the admissions it missed, and the pools step moves the six empty pool records aside and pools those sources again. Both L30 steps are reopened (an L30 step is missing once done), their earlier GPU-h kept against the family cap and their proposal ids not used again."
    }

@@ -6129,7 +6129,9 @@ class StreamRun(object):
         runs an id once), its record into reopen_history, its state to missing. A block's "states" may also name
         "missing" (DS1 deviation 2: an L30 data step goes back to missing when it is done, and runs again when the
         cluster's status calls for it): such an item is reopened the same way, its spend kept, so the run the deviation
-        calls for is its own attempt on record. Returns the keys reopened now."""
+        calls for is its own attempt on record. A block's "proposals", when given, limits it to the attempts it names
+        (DS1 deviation 2: the two the lab's state recorded), so it never reopens another attempt of those items.
+        Returns the keys reopened now."""
         cfg = (self.dom or {}).get("ds1") or {}
         f = self._ds1()
         out = []
@@ -6147,6 +6149,8 @@ class StreamRun(object):
                     continue
                 if not ro.get("before_utc") or not rec.get("started_utc") or \
                         str(rec["started_utc"]) >= str(ro["before_utc"]):
+                    continue
+                if ro.get("proposals") is not None and rec.get("proposal") not in ro["proposals"]:
                     continue
                 before = {k: v for k, v in rec.items() if k != "reopen_history"}
                 ids = [a.get("proposal") for a in rec.get("attempts") or [] if isinstance(a, dict)] + \
