@@ -11351,3 +11351,34 @@ Every result sat near test 0.85, against the 0.90 goal.
   3. Restart the dashboard.
   4. On the login node, `inc2.ds1_sheets supersede` for every audit batch after ds1_audit_001.
   5. Once the pools step writes `p1_r001_audit_v2.json` on the cluster, compare it with R2 and record any difference.
+
+## 2026-10-30 — DS1 deviation 1: B′1's ood23 numbers are V3F P7's statistic, the reproduction names both readings, the power pre-flight reopened
+
+- **Why.** After Revision 2's deploy the ticker reopened the power pre-flight (`score:POWER:draft_r001`). Jobs 50026958 and 50027968 passed the weed check and the e1a_dev and e3a_dev reproductions with difference 0.0, then refused at b1_ood23 before any comparison: "V3F's recorded ood23 statistic of B'1 seed 0 is 0.149603, not the registered 0.2562". The item was recorded failed at 2026-10-30T03:22Z.
+  - Read-only on the cluster: DS.7.1's numbers (0.2562, 0.2517, 0.2598) are D1B1's plain stage-1 agnostic AP over every ground-truth box of ood23 (0.256235, 0.251712, 0.259808). V3F P7's statistic (target-species agnostic AP, OtherPlant boxes as ignore regions; V3F-R's P7 record) is 0.149603, 0.159426, 0.163401 for B′1 and 0.109522, 0.120397, 0.115479 for A′1 (D +0.0423). DS.2's P7 row "(0.256 against 0.146)" holds seed 0's plain values. The code compared the pass's P7 reading with V3F's, as P4 needs, but checked V3F's value against the plain numbers, and only after the seed's GPU pass.
+  - A ds1.py change alone would leave the two reproduction records the refused job wrote (taken by the old ds1.py) refusing every later score (`require_reproductions` compares the code map), as V3F's twelve score jobs were refused on 2026-10-21.
+- **Change.**
+  - DS1 deviation 1 (V3F.3.9: DS1 records holding numbers existed): `docs/prereg/DS1_dev1_2026-10-30.md`, sha256 ade0f0d3…2a34, commit 97e78a5, appended byte for byte to `docs/CONTINUOUS_LOOP.md`; stamp file written 2026-10-30T04:02:00Z, OpenTimestamps proofs in 3e57b4e. It corrects DS.7.1's numbers and DS.2's P7 row; no threshold, arm, exam, statistic or decision rule changes.
+  - `inc2/ds1.py`:
+    - `B1_OOD23` holds both readings by name: `p7` (0.1496, 0.1594, 0.1634) and `plain` (0.2562, 0.2517, 0.2598), described in `B1_READINGS`.
+    - `v3f_b1_readings(seed)` reads both of V3F's readings (P7 from the p7 sidecar's target arrays, checked by sha256; plain from `stage1.agnostic_map50_95`). `b1_check_constants` checks each against its own number for every seed before the loader pre-flight and any GPU pass; the refusal names both readings of each seed and says when a number is the other reading's value.
+    - Each B′1 pass's two readings are compared with V3F's; a seed's `diff` is the larger difference, so DS.7.1's rule (1e-6 passed, 0.002 a recorded deviation, beyond refused) applies to each. `b1_ood23.json` keeps both readings per seed, the registered numbers and the deviation's file and sha256.
+    - `DEVIATIONS` pins the deviation; `SUPERSEDED` names e1a_dev.json (a3d24798…4b43) and e3a_dev.json (2ea94560…304e); `supersede()` (run first by `reproductions`) moves each, if it hashes so, into `ds1/v1/equivalence/superseded/dev1/` (hard link, then unlink; MANIFEST.json with path, sha256, size, time, job, host, why, deviation). A file with other bytes stays; a cut-off move completes; a folder copy with other bytes refuses.
+  - `inc_autopilot/stream.py` and `diagnose_stream.py`: DS1's gate also requires each file of the domain's `ds1.deviations` in the deployed tree by its sha256; the gate's message says so.
+  - `stream_domains/weed.json`: `ds1.deviations` (the deviation, by sha256) and a `ds1.reopens` block "DS1 deviation 1 (2026-10-30)" for `score:POWER:draft_r001`, before_utc 2026-10-30T04:02:00Z.
+  - `deploy/deploy_funnel.sh`: ships the deviation, its proofs and stamp file.
+  - Tests: `tests/test_inc2_ds1_dev1.py` (new); `test_inc2_ds1_deploy.py` checks the deviation's shipping and pins; `test_inc2_ds1_rev2.py` reads Revision 2's section followed by the later sections; `test_stream_ap_ds1.py`'s worlds deploy the deviation's file. Mutants DV1–DV14 in `test_inc2_ds1_mutants.py`.
+- **Verified.**
+  - Read-only on the cluster (2026-10-30, through the lab's ControlMaster): V3F-R's P7 record, the six ood23 score files of D1B1 and D1A1 and their p7 arrays, the two reproduction records and the two job logs, each by sha256 (the stamp file lists them). On the lab, from byte copies, the deployed `v3f_p7_value` gives V3F's numbers to 9 digits under Ultralytics 8.4.37 and 8.4.129. The weights of B′1, E1-A, b_v2_m640 and E1-B resolve for all three seeds (`v3fam_systems.run_source`, read only), and MD-S0's draft_r001 holds its LOCK and capture groups.
+  - On lab scratch copies (the platform Python, Ultralytics 8.4.37) of the branch at 3e57b4e (`~/ds1_dev1_ci/dev1`; the tip 0cbf3b2 differs by one space in ds1.py) and of main dd4c302 (`~/ds1_dev1_ci/base`):
+    - The full suite: 169 of the 185 common test files pass on both; the 16 failing are the same files with the same failure lines. `test_inc2_ds1_dev1` passes. The 22 files that failed on either copy in the first run (which lacked `docs/poster/figures_data.json`) were run again on both with it.
+    - On main's code `test_inc2_ds1_dev1` fails 17 checks; its first is the live refusal, verbatim.
+    - The mutation run kills 133 of 133, DV1–DV14 among them (main: 119 of 119).
+    - The replay gate passes on both: 57 cases pass, R2 and R4b are skipped.
+    - A copy of the live lab state (2026-10-30T04:04Z) was ticked three times with the branch (no ssh, nothing launched). Without the deviation's file in the deployed tree, the pre-flight stays failed and DR0 proposes no DS1 item. With it, the first tick reopens `score:POWER:draft_r001` (prior_gpuh 0.4571, proposal 41d69870 failed, history Revision 2 then the deviation, one card), and DR0 names L33 POWER next on MAINT, which still holds L30's pools item.
+  - `deploy_funnel.sh --dry-run` passes with no `--allow-*` flag; it ships the deviation's four files, and the V3F deploy checks pass.
+- **After the deploy**, in this order:
+  1. `deploy_funnel.sh` (no time-stamp record is needed: the gate pins the deviation by sha256).
+  2. The ticker reopens the pre-flight and proposes L33 POWER once MAINT's L30 pools item ends. Its job moves e1a_dev.json and e3a_dev.json aside, takes them again, checks B′1's recorded readings, runs B′1's three ood23 passes, the MD identity pass and the power pre-flight.
+  3. Read `ds1/v1/equivalence/b1_ood23.json`: both readings per seed and their differences.
+  4. `ots upgrade` of the deviation's two proofs once Bitcoin confirms them.

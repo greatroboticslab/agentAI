@@ -13,6 +13,16 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-30 — DS1 deviation 1: the power pre-flight compared B′1 with the wrong numbers; corrected, both readings named, the pre-flight reopened
+
+- **Where the data stands.** No change. Base B's D1 B′ holds 40,743 images and the stream's pool P_1 holds 7,493, against a target of tens to hundreds of thousands of verified images. Accuracy is unchanged too: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90). No DS1 training has started, because the power pre-flight refused again.
+- **What happened.** Revision 2's fix held: the reopened pre-flight passed the weed check and the e1a_dev and e3a_dev reproductions with difference 0.0 (jobs 50026958 and 50027968). It then refused at B′1's ood23 check. The registration had written B′1's plain stage-1 agnostic AP (0.2562, 0.2517, 0.2598) where it meant V3F P7's statistic (0.1496, 0.1594, 0.1634), the one P4 decides on.
+- **Change.** DS1 deviation 1 (a deviation under V3F.3.9, since DS1 records with numbers exist) corrects those numbers and DS.2's P7 row. The check now holds both readings by name, checks them before any GPU pass, and says which reading a wrong number belongs to. The two reproduction records the refused job took under the old code are moved aside and taken again; otherwise the new code would refuse every later score. The pre-flight is reopened, its 0.4571 GPU-h kept against the family cap.
+- **Verified.** On lab copies, the full suite fails nothing main does not (the same 16 environment failures). The mutation run kills 133 of 133, and the replay gate passes. The new test fails on main with the live refusal line. A copy of the live state, ticked with the branch, reopens the pre-flight and names it next on MAINT. The deploy's dry run passes.
+- **Observation.** From the same arrays, the Mac (Ultralytics 8.4.22, numpy 2.5.4) computes other P7 values: 0.153943 for B′1 seed 0, and 0.158786 instead of 0.120397 for A′1 seed 1. The lab under Ultralytics 8.4.37 and 8.4.129 matches the cluster to 9 digits. P7's reproductions must therefore run in the cluster's environment. The Mac's cause is not traced yet.
+- **Next.** Deploy. The platform then runs the power pre-flight once MAINT's pools item ends, then MD-S0's freeze and the training items.
+
+
 ## 2026-10-29 — DS1 Revision 2 registered again before its deploy: its changes count as deviations, and the label audit's inputs are checked
 
 - **Where the data stands.** No change. Base B's D1 B′ holds 40,743 images and the stream's pool P_1 holds 7,493, against a target of tens to hundreds of thousands of verified images. Accuracy is also unchanged: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90). No DS1 training has started.
