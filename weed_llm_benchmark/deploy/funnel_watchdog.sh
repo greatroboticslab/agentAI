@@ -4,7 +4,7 @@
 #
 # 2026-10-29: after the node lost its connection to its home DERP region, Funnel's public ingress
 # accepted TCP and closed every TLS handshake; the dashboard stayed reachable inside the tailnet only.
-# Re-applying the funnel and rebinding the node's sockets (tailscale debug rebind / restun) restored
+# Turning the funnel off and on and rebinding the node's sockets (tailscale debug rebind / restun) restored
 # every ingress address within two minutes. None of this needs root, and none of it takes the node off
 # the tailnet (the lab is administered over that tailnet).
 #
@@ -46,11 +46,15 @@ if [ "$ok" -eq "$total" ]; then
   echo "$(TS) ok $ok/$total" >> "$LOG"; exit 0
 fi
 
-echo "$(TS) FAIL $ok/$total:$bad -> re-apply funnel, rebind, restun" >> "$LOG"
+# 2026-10-30 12:43Z: re-applying the funnel over itself did not bring the ingress back within 90 s;
+# turning it off first and then on did, within 90 s (as on 10-29).
+echo "$(TS) FAIL $ok/$total:$bad -> funnel off/on, rebind, restun" >> "$LOG"
+tailscale funnel --https=443 off >/dev/null 2>&1
+sleep 5
 tailscale funnel --bg "$TARGET" >/dev/null 2>&1
 tailscale debug rebind >/dev/null 2>&1
 tailscale debug restun >/dev/null 2>&1
-sleep 90
+sleep 150
 read -r ok total bad <<<"$(probe)"
 echo "$(TS) after repair $ok/$total${bad:+:$bad}" >> "$LOG"
 [ "$ok" -eq "$total" ]
