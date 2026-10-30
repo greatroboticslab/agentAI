@@ -10,6 +10,9 @@
 #
 # Run by funnel-watchdog.timer every 10 minutes; one line per run in ~/funnel_watchdog.log.
 set -u
+# The body is one compound command, read whole before it runs, so replacing this file while a run
+# is in progress cannot make bash execute a fragment of the new file.
+{
 HOST="${FUNNEL_HOST:-lab-b660m-c.tailfa6424.ts.net}"
 TARGET="${FUNNEL_TARGET:-http://127.0.0.1:8000}"
 LOG="${FUNNEL_LOG:-$HOME/funnel_watchdog.log}"
@@ -51,3 +54,5 @@ sleep 90
 read -r ok total bad <<<"$(probe)"
 echo "$(TS) after repair $ok/$total${bad:+:$bad}" >> "$LOG"
 [ "$ok" -eq "$total" ]
+exit $?
+}
