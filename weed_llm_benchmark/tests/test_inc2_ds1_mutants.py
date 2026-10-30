@@ -396,7 +396,7 @@ MUTANTS = {
             '        for name, other in (("p7", "plain"),):', DEV1),
     "DV3": (DC, '" (it is the %s reading\'s value)" % other\n                    if round(float(rec[other]), 4) == reg else ""',
             '""', DEV1),
-    "DV4": (DC, '        b1_check_constants(recorded)\n', '', DEV1),
+    "DV4": (DC, '        b1_check_constants(recorded)\n', '        pass\n', DEV1),
     "DV5": (DC, '"diff": max(r["diff"] for r in rd.values())', '"diff": rd["p7"]["diff"]', DEV1),
     "DV6": (DC, 'got = {"p7": F.statistic_value(ps["p7"]["t"], "agnostic"),',
             'got = {"p7": F.statistic_value(ps["p7"]["o"], "agnostic"),', DEV1),
