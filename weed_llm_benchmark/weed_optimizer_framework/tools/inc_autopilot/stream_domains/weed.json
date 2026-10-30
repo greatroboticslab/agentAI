@@ -814,9 +814,9 @@
    {
     "n": 1,
     "file": "docs/prereg/DS1_dev1_2026-10-30.md",
-    "sha256": "ade0f0d3cf08a28c2e5149e2fd1ac71642c8ab61787c199272e1f1c4f5d82a34",
+    "sha256": "04c52e4f77229948f04a257dbe6c0aacfab84ce4f83d387c2af0e0b62a59780d",
     "stamp_file": "docs/prereg/DS1_dev1_2026-10-30.stamp.txt",
-    "why": "DS1 deviation 1 (docs/CONTINUOUS_LOOP.md, Deviation (2026-10-30)), recorded after DS1 held numbers (V3F.3.9): B'1's ood23 constants are V3F P7's statistic, the reproduction names both readings; no DS1 lever is proposed until the deployed tree holds it by this sha256"
+    "why": "DS1 deviation 1 (docs/CONTINUOUS_LOOP.md, Deviation (2026-10-30)), recorded after DS1 held numbers (V3F.3.9): B'1's ood23 constants are V3F P7's statistic, the reproduction names both readings (its second text; the first, ade0f0d3...2a34, never deployed, is kept under docs/prereg/superseded/DS1_dev1_first_text/); no DS1 lever is proposed until the deployed tree holds it by this sha256"
    }
   ],
   "reopens": [
@@ -833,11 +833,11 @@
    {
     "marker": "DS1 deviation 1 (2026-10-30)",
     "file": "docs/prereg/DS1_dev1_2026-10-30.md",
-    "sha256": "ade0f0d3cf08a28c2e5149e2fd1ac71642c8ab61787c199272e1f1c4f5d82a34",
+    "sha256": "04c52e4f77229948f04a257dbe6c0aacfab84ce4f83d387c2af0e0b62a59780d",
     "items": [
      "score:POWER:draft_r001"
     ],
-    "before_utc": "2026-10-30T04:02:00Z",
+    "before_utc": "2026-10-30T06:33:39Z",
     "why": "DS1 deviation 1 (2026-10-30): the power pre-flight on MD-S0's draft_r001, reopened by Revision 2, was refused twice (jobs 50026958 and 50027968) by the b1_ood23 reproduction, whose registered constants were B'1's plain ood23 agnostic AP, not V3F P7's statistic that the reproduction reads, and was recorded failed. The constants are corrected and the check names both readings; the pre-flight is proposed again under a new id, its earlier GPU-h kept against the family cap, and the e1a_dev and e3a_dev records it took under the earlier code are moved aside and taken again."
    }
   ],

@@ -106,10 +106,12 @@ REVISIONS = ({"n": 1, "file": "docs/prereg/DS1_rev1_2026-10-29.md",
               "stamp_file": "docs/prereg/DS1_rev2_2026-10-29.stamp.txt"})
 # Deviations recorded after DS1 held numbers (V3F.3.9; docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-30): DS1 deviation
 # 1"), each kept byte for byte under docs/prereg/ and time-stamped as the Revisions were (its two OpenTimestamps proofs
-# and stamp file beside it); the ticker's gate pins each by sha256 (the domain's ds1.deviations)
+# and stamp file beside it); the ticker's gate pins each by sha256 (the domain's ds1.deviations). Deviation 1's second
+# text (the first, ade0f0d3...2a34 of commit 97e78a5, never deployed, is kept under
+# docs/prereg/superseded/DS1_dev1_first_text/)
 DEVIATIONS = ({"n": 1, "file": "docs/prereg/DS1_dev1_2026-10-30.md",
-               "sha256": "ade0f0d3cf08a28c2e5149e2fd1ac71642c8ab61787c199272e1f1c4f5d82a34",
-               "commit": "97e78a550c97a594a78eaffb855d77aced546f74",
+               "sha256": "04c52e4f77229948f04a257dbe6c0aacfab84ce4f83d387c2af0e0b62a59780d",
+               "commit": "4bc8c94b36929219e7a0856e2410ab91162e746d",
                "stamp_file": "docs/prereg/DS1_dev1_2026-10-30.stamp.txt"},)
 DELEGATE = "the delegate under the 2026-09-30 owner grant"
 OWNER = "Harry He (owner)"

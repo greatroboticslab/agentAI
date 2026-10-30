@@ -21,7 +21,8 @@
 - the gate holds every DS1 lever until the deployed tree holds the deviation's file by its pinned sha256;
 - the registration: the deviation's byte copy hashes to its pin (inc2.ds1.DEVIATIONS, the domain's ds1.deviations
   and its reopen block), ends docs/CONTINUOUS_LOOP.md, and its proofs stamp it and its stamp file, which names its
-  sha256, its commit and the superseded records' sha256s.
+  sha256, its commit and the superseded records' sha256s; it is the second text, the first (ade0f0d3...2a34) kept
+  with its proofs and stamp file under docs/prereg/superseded/DS1_dev1_first_text/, each named by its sha256.
 
 Run:  python3 tests/test_inc2_ds1_dev1.py
 """
@@ -548,6 +549,17 @@ def t_registration():
           "and the superseded records' sha256s", dv.get("sha256") and dv["sha256"] in text and dv.get("commit") and
           dv["commit"] in text and D.PREREG_SHA256 in text and all(r["sha256"] in text for r in D.REVISIONS) and
           all(x["sha256"] in text for x in D.SUPERSEDED))
+    first = GIT / "docs" / "prereg" / "superseded" / "DS1_dev1_first_text"
+    kept = sorted(first.iterdir()) if first.is_dir() else []
+    check("  the first text (ade0f0d3...2a34, never deployed), its proofs and stamp file are kept unchanged under "
+          "docs/prereg/superseded/DS1_dev1_first_text/, each named in the stamp file by its sha256",
+          [p.name for p in kept] == ["DS1_dev1_2026-10-30.md", "DS1_dev1_2026-10-30.md.ots",
+                                     "DS1_dev1_2026-10-30.stamp.txt", "DS1_dev1_2026-10-30.stamp.txt.ots"] and
+          hashlib.sha256(kept[0].read_bytes()).hexdigest() ==
+          "ade0f0d3cf08a28c2e5149e2fd1ac71642c8ab61787c199272e1f1c4f5d82a34" and
+          all("%s  %s" % (hashlib.sha256(p.read_bytes()).hexdigest(), p.name) in text for p in kept) and
+          dv.get("sha256") != "ade0f0d3cf08a28c2e5149e2fd1ac71642c8ab61787c199272e1f1c4f5d82a34",
+          [p.name for p in kept])
     blk = next((b for b in LS.load_domain("weed")["ds1"].get("reopens") or [] if b.get("file") == dv.get("file")), {})
     check("  the reopen block's before_utc is the stamp file's written_utc", blk.get("before_utc") and
           ("written_utc: %s" % blk["before_utc"]) in text, blk.get("before_utc"))
