@@ -28,9 +28,9 @@ Fixtures: tests/fixtures/ds1/dev2/, read only from the cluster on 2026-10-30, ev
   deviation's marker once the deployed tree holds its file, their spend kept (1.0 + 0.9517 and 2.0983 GPU-h); the
   earlier blocks (failed items only) do not reopen a missing item; the gate holds every DS1 lever until the deployed
   tree holds the file;
-- item 6, KF: its record written at N_K 12,255 while SIU's supply read 0 is moved aside with its manifest, byte for
-  byte, with a MANIFEST; the status reads it as not built; the plan builds KF only once SIU is pooled or settled out
-  and names the wait; KD and KT wait, never "not run", while their supply is under an N_K fixed before SIU's;
+- item 6, the K arms: KD and KT wait, never "not run", while their supply is under KF's N_K (12,255, fixed while
+  SIU's supply read 0; N_K is never above KF's own supply), the common N_K named; the status names the wait and the
+  plan proposes no manifests step for them while it stands; both supplies at least KF's N_K: built at it;
 - item 7, the builds: build --ds1 reads the lever's --seeds 0,1,2; build:S0 and build:KF, as the lab's state held
   them, are reopened once the deployed tree holds the file, their spend kept;
 - the registration: the deviation's byte copy hashes to its pin (inc2.ds1_data.DEVIATION_2 and the domain's
@@ -598,79 +598,6 @@ def t_kwait():
           (c["maint"], w))
 
 
-# ------------------------------------------------------------------ item 6: KF's record moved aside, KF built later
-KF_LIVE = {"record_sha256": "eb0d0ef3b98588e5770dcdd44a5b4d5bb7905073ba9102d921c5cd4916f74a6d",
-           "rows_sha256": "9b0d256849b92f43d295c2e52768de08378467bc53ceb04ecc0a6a3ab46422ec"}
-
-
-def t_kf():
-    print("item 6: KF's record (N_K 12,255, fixed while SIU's supply read 0) is moved aside; KF waits for SIU's supply")
-    e = next((x for x in DD.SUPERSEDED_ARMS if x["arm"] == "KF"), {})
-    check("SUPERSEDED_ARMS names KF's record and manifest as the cluster holds them (kf.json, kf.jsonl)",
-          e.get("record_sha256") == KF_LIVE["record_sha256"] and e.get("rows_sha256") == KF_LIVE["rows_sha256"] and
-          int(e.get("deviation") or 0) == 2, e)
-    saved = DD.SUPERSEDED_ARMS
-    try:
-        with inc("kf"):
-            ad = DD.out_dir() / "arms"
-            ad.mkdir(parents=True, exist_ok=True)
-            rec = {"arm": "KF", "images": 19066, "n_k": 12255, "supplies": {"KD": 0, "KF": 12255, "KT": 0}}
-            DD.arm_record_path("KF").write_text(json.dumps(rec))
-            DD.arm_path("KF").write_text('{"key": "k1"}\n')
-            DD.arm_record_path("S0").write_text(json.dumps({"arm": "S0", "images": 37732}))
-            rb, mb = DD.arm_record_path("KF").read_bytes(), DD.arm_path("KF").read_bytes()
-            DD.SUPERSEDED_ARMS = (dict(e, record_sha256=sha(DD.arm_record_path("KF")),
-                                       rows_sha256=sha(DD.arm_path("KF"))),)
-            st = DD.plan_state()
-            check("before the move the status reads KF as not built (S0 built) and names it superseded",
-                  "KF" not in st["arms"] and "S0" in st["arms"] and st.get("arms_superseded") == ["KF"],
-                  (sorted(st["arms"]), st.get("arms_superseded")))
-            got = DD.supersede_arms()
-            dd = ad / "superseded" / "dev2"
-            man = json.loads((dd / "MANIFEST.json").read_text())
-            check("supersede_arms moves the manifest and the record byte for byte, with a MANIFEST; nothing deleted",
-                  got == [{"arm": "KF", "status": "moved"}] and not DD.arm_record_path("KF").exists() and
-                  not DD.arm_path("KF").exists() and (dd / "kf.json").read_bytes() == rb and
-                  (dd / "kf.jsonl").read_bytes() == mb and man["moves"][0]["arm"] == "KF" and
-                  man["moves"][0]["deviation"]["n"] == 2 and [f["sha256"] for f in man["moves"][0]["files"]] ==
-                  [sha(dd / "kf.jsonl"), sha(dd / "kf.json")], got)
-            check("  once only (moved before), and the status no longer names it", DD.supersede_arms() ==
-                  [{"arm": "KF", "status": "moved_before"}] and DD.plan_state().get("arms_superseded") == [])
-            DD.arm_record_path("KF").write_text(json.dumps(dict(rec, n_k=9749)))
-            DD.arm_path("KF").write_text('{"key": "k2"}\n')
-            check("  a KF record with other bytes (built again) stays and reads built",
-                  DD.supersede_arms() == [{"arm": "KF", "status": "moved_before"}] and
-                  DD.arm_record_path("KF").is_file() and "KF" in DD.plan_state()["arms"])
-    finally:
-        DD.SUPERSEDED_ARMS = saved
-    cfg = LS.load_domain("weed")["ds1"]
-    pooled = {"decided": True, "decision": "accept_training_only", "ready": True, "pooled": True, "audited": True}
-
-    def plan(siu, extra=None):
-        st = {"phases": {"1": {"revisions": 4, "new_batches": 0, "rescreen": [], "repool": [],
-                               "sources": {SIU: siu, "pending_src": {"decided": False}}}},
-              "md_s0": {"drafts": 1, "draft": "draft_r001", "power": True, "frozen": True},
-              "arms": {"S0": {"images": 37732}}, "sheets": {"source_batches": 0, "ln_batches": 0, "mtw_batches": 0,
-                                                            "rendered": [], "audit_pending": [], "audit_sets": {}},
-              "scores": {}, "verdicts": {}, "long": {"arms": {}, "pair": None}, "ra": True, "power_final": True}
-        st.update(extra or {})
-        return DS.ds1_plan(cfg, {"status": st, "items": {"data:1:manifests": "missing", "build:KF": "missing",
-                                                         "build:S0": "missing"},
-                                 "today": "2026-10-30", "phase1_gb": 33.3, "audit_render_for": None})
-    _o, w, c = plan(dict(pooled, decided=False, ready=False, pooled=False))
-    items = [x["item"] for x in c["maint"]]
-    check("KF not built, SIU not pooled: no manifests step (no loop), no build of KF; the wait is named",
-          "data:1:manifests" not in items and "build:KF" not in items and "K source's supply" in str(
-              w.get("k_arms")), (items, w.get("k_arms")))
-    check("  S0 built: its build is proposed (item 7 reopens it)", "build:S0" in items, items)
-    _o, w, c = plan(dict(pooled))
-    check("SIU pooled: the manifests step builds KF with KD and KT", "data:1:manifests" in [
-        x["item"] for x in c["maint"]], [x["item"] for x in c["maint"]])
-    _o, w, c = plan(dict(pooled, decided=False, ready=False, pooled=False), {"k_source_out": True})
-    check("  SIU settled out: KF is built alone (KD and KT not run)", "data:1:manifests" in [
-        x["item"] for x in c["maint"]], [x["item"] for x in c["maint"]])
-
-
 # ------------------------------------------------------------------ item 7: the builds' seeds argument
 def t_builds():
     print("item 7: build --ds1 reads the lever's --seeds 0,1,2; build:S0 and build:KF reopened, their spend kept")
@@ -870,11 +797,11 @@ def t_registration():
           D.ots_digest(str(f) + ".ots") == dv.get("sha256") and text and
           D.ots_digest(str(stamp) + ".ots") == hashlib.sha256(stamp.read_bytes()).hexdigest())
     check("  the stamp file names its sha256 and commit, the amendment's, both Revisions' and deviation 1's sha256s, "
-          "the six superseded pool records' and KF's superseded record's and manifest's sha256s",
+          "the six superseded pool records' sha256s and KF's record's (item 6)",
           dv.get("sha256") and dv["sha256"] in text and dv.get("commit") and dv["commit"] in text and
           D.PREREG_SHA256 in text and all(r["sha256"] in text for r in D.REVISIONS) and
           D.DEVIATIONS[0]["sha256"] in text and all(h in text for h in LIVE_POOLS.values()) and
-          all(h in text for h in KF_LIVE.values()))
+          "eb0d0ef3b98588e5770dcdd44a5b4d5bb7905073ba9102d921c5cd4916f74a6d" in text)
     blk = next((b for b in LS.load_domain("weed")["ds1"].get("reopens") or [] if b.get("file") == dv.get("file")), {})
     check("  the reopen block's before_utc is the stamp file's written_utc", blk.get("before_utc") and
           ("written_utc: %s" % blk["before_utc"]) in text, blk.get("before_utc"))
@@ -900,7 +827,7 @@ def t_registration():
 
 def main():
     for fn in (t_fixtures, t_sizes, t_keys, t_supersede, t_siu_holds, t_siu_eligibility, t_rescreen, t_scanned,
-               t_unreadable, t_quarantine_unread, t_kwait, t_kf, t_builds, t_plan, t_reopen, t_gate,
+               t_unreadable, t_quarantine_unread, t_kwait, t_builds, t_plan, t_reopen, t_gate,
                t_registration):
         try:
             fn()

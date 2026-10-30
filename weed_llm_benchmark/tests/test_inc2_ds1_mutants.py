@@ -175,10 +175,7 @@ must occur exactly once in its file), runs its target against the copy and requi
   DW28  diagnose_stream   the plan proposes KD and KT while they wait
   DW29  ds1_data          a stream that cannot be folded leaves SIU's cites D31 only (fail open)
   DW30  ds1_data          the screen does not count its unreadable rows among a source's out
-  DW31  ds1_data          the status reads KF's superseded record as built (its old N_K kept, KD and KT short)
-  DW32  ds1_data          KF's record moves before its manifest (a cut-off move leaves a stale manifest)
-  DW33  diagnose_stream   the plan builds KF before the K source's supply is known (N_K fixed over KF alone)
-  DW34  baseline          build --ds1 reads --seeds 0,1,2 character by character (every DS1 build refused)
+  DW31  baseline          build --ds1 reads --seeds 0,1,2 character by character (every DS1 build refused)
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -498,13 +495,7 @@ MUTANTS = {
              '                and not st.get("k_source_out"):\n', DEV2),
     "DW29": (DD, '                out[SIU].add("?")\n                continue\n', '                continue\n', DEV2),
     "DW30": (DD, '            per[r["source"]]["out"][r["drop"]] += 1\n', '            pass\n', DEV2),
-    "DW31": (DD, "        r = _read_json(arm_record_path(a)) if a not in pending else None\n",
-             "        r = _read_json(arm_record_path(a))\n", DEV2),
-    "DW32": (DD, '        named = ((man_, e["rows_sha256"]), (rec, e["record_sha256"]))\n',
-             '        named = ((rec, e["record_sha256"]), (man_, e["rows_sha256"]))\n', DEV2),
-    "DW33": (DSM, '            if siu.get("pooled") or st.get("k_source_out"):\n                want.append("KF")',
-             '            if True:\n                want.append("KF")', DEV2),
-    "DW34": (BLM, '[int(x) for x in (str(seeds).split(",") if isinstance(seeds, str) else seeds)]',
+    "DW31": (BLM, '[int(x) for x in (str(seeds).split(",") if isinstance(seeds, str) else seeds)]',
              '[int(x) for x in seeds]', DEV2),
 }
 

@@ -882,7 +882,7 @@
      "e879165b9182ac53efa590ba9da1d133"
     ],
     "before_utc": "2026-10-30T13:31:54Z",
-    "why": "DS1 deviation 2 (2026-10-30), item 7: the builds of S0 and KF (L32) were refused twice each before any training by inc2.baseline's ds1_args, which read the lever's --seeds 0,1,2 character by character (ValueError), and were recorded failed. The argument is read as V3F's builds read it. build:S0 is proposed again under a new id, build:KF once KF's manifest is built again with KD's and KT's (item 6); their earlier GPU-h stay counted against the family cap and their proposal ids are not used again."
+    "why": "DS1 deviation 2 (2026-10-30), item 7: the builds of S0 and KF (L32) were refused twice each before any training by inc2.baseline's ds1_args, which read the lever's --seeds 0,1,2 character by character (ValueError), and were recorded failed. The argument is read as V3F's builds read it. Both are proposed again under new ids; their earlier GPU-h stay counted against the family cap and their proposal ids are not used again."
    }
   ],
   "never_cut": {

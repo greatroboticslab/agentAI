@@ -214,19 +214,6 @@ SUPERSEDED_POOLS = tuple({"deviation": 2, "phase": 1, "source": s, "record_sha25
      "f76ee83fb74ebc9abda7ba97cd6838e12a1c00617a113bf89ffd4ec8fc9f9a90", 1229),
     ("rf_yolo-gyfyq__weed-ieda7", "1ac035e0ae4a98628488ec7f92c9be710786f3e1bd624b9d0a0ca1e421eb11b1", 1825),
     ("rf_zijian-peng__grass-weed-69hcm", "72bdb39ea7e0bc78c24f670edecfcf1de1b046fe5882a83e7f5ae1c4e06883b2", 1)))
-# DS1 deviation 2, item 6: KF's arm record the manifests step (job 50037144) wrote at 2026-10-30T13:50:11Z at N_K
-# 12,255 = min(15,000, KF's supply) while SIU's K supply read 0 (items 1-4); DS.5.3 sets N_K = min(15,000, every K
-# pool's supply at build), the same in every K arm. KF was never trained (build:KF failed twice on the seeds argument,
-# item 7). Its record and manifest are moved aside byte for byte into splits/ds1/arms/superseded/dev2/ (supersede_arms)
-# by the manifests step, and KF is built again with KD and KT once SIU's supply is known (or alone once SIU settles
-# out); until then the status reads KF as not built.
-_DEV2_ARM_WHY = ("written 2026-10-30T13:50:11Z by the manifests step (job 50037144) at N_K 12,255 = min(15,000, KF's "
-                 "supply) while SIU's K supply read 0; never trained; built again under DS1 deviation 2 (item 6) at "
-                 "N_K = min(15,000, every K pool's supply) once SIU's supply is known")
-SUPERSEDED_ARMS = ({"deviation": 2, "arm": "KF",
-                    "record_sha256": "eb0d0ef3b98588e5770dcdd44a5b4d5bb7905073ba9102d921c5cd4916f74a6d",
-                    "rows_sha256": "9b0d256849b92f43d295c2e52768de08378467bc53ceb04ecc0a6a3ab46422ec",
-                    "why": _DEV2_ARM_WHY},)
 FAMILY_CAP = 0.35
 MD_SHARE, MD_MIN, MD_MAX = 0.05, 15, 500
 MTW_SHARE, MTW_MIN, MTW_MAX = 0.10, 30, 1000
@@ -2609,76 +2596,6 @@ def _pool_paths(phase, source):
     return d / ("%s.json" % slug(source)), d / ("%s.jsonl" % slug(source))
 
 
-def arms_superseded_due():
-    """The arms whose record a recorded deviation supersedes still stands at its path, hashing as named
-    (SUPERSEDED_ARMS; DS1 deviation 2, item 6): the status reads them as not built, and the manifests step moves them
-    aside first (supersede_arms)."""
-    out = []
-    for e in SUPERSEDED_ARMS:
-        rec = arm_record_path(e["arm"])
-        if rec.is_file() and not rec.is_symlink() and C.sha256_file(rec) == e["record_sha256"]:
-            out.append(e["arm"])
-    return sorted(out)
-
-
-def supersede_arms():
-    """The arm records a recorded deviation supersedes (SUPERSEDED_ARMS; DS1 deviation 2, item 6), moved aside byte
-    for byte into arms/superseded/dev<n>/ as supersede_pools moves pools: its manifest (<arm>.jsonl, which must hash as
-    named) first and its record (<arm>.json) last, each a hard link made there and then the original unlinked; never
-    overwritten, never deleted; each move recorded in that folder's MANIFEST.json. A record at the path with other
-    bytes is not the one named and stays. Returns [{arm, status: moved | moved_before | other | absent}]."""
-    out = []
-    for e in SUPERSEDED_ARMS:
-        rec, man_ = arm_record_path(e["arm"]), arm_path(e["arm"])
-        dd = rec.parent / "superseded" / ("dev%d" % int(e["deviation"]))
-        named = ((man_, e["rows_sha256"]), (rec, e["record_sha256"]))
-        for src, sha in named:
-            dst = dd / src.name
-            if dst.is_file() and sha != C.sha256_file(dst):
-                raise DataRefused("%s holds another file than the one DS1 deviation %d supersedes (%s...)" % (
-                    dst, int(e["deviation"]), sha[:12]))
-        got = C.sha256_file(rec) if rec.is_file() and not rec.is_symlink() else None
-        if got != e["record_sha256"]:
-            st_ = "moved_before" if (dd / rec.name).is_file() else ("other" if got is not None else "absent")
-            out.append({"arm": e["arm"], "status": st_})
-            continue
-        dv = next((d for d in deviations() if int(d["n"]) == int(e["deviation"]) and d.get("sha256")), None)
-        if dv is None:
-            raise DataRefused("the superseded record of %s names DS1 deviation %s, which no pinned deviation record "
-                              "holds" % (e["arm"], e["deviation"]))
-        if man_.is_file() and C.sha256_file(man_) != e["rows_sha256"]:
-            raise DataRefused("%s does not hash as the manifest DS1 deviation %d names (%s...): its record is not "
-                              "moved" % (man_, int(dv["n"]), e["rows_sha256"][:12]))
-        if not man_.is_file() and not (dd / man_.name).is_file():
-            raise DataRefused("%s's manifest (%s) is neither at its path nor moved aside: its record is not moved" % (
-                e["arm"], man_.name))
-        dd.mkdir(parents=True, exist_ok=True)
-        files = []
-        for src, sha in named:
-            dst = dd / src.name
-            if src.is_file():
-                if not dst.is_file():
-                    os.link(str(src), str(dst))
-                size = src.stat().st_size
-                os.unlink(str(src))
-            else:
-                size = dst.stat().st_size          # moved by a run cut off after its link and unlink
-            files.append({"path": str(src.relative_to(C.INC_DIR)) if str(src).startswith(str(C.INC_DIR)) else str(src),
-                          "sha256": sha, "size": size, "moved_to": str(dst.relative_to(C.INC_DIR))
-                          if str(dst).startswith(str(C.INC_DIR)) else str(dst)})
-        man = dd / "MANIFEST.json"
-        doc = _read_json(man) if man.is_file() else None
-        doc = doc if isinstance(doc, dict) and isinstance(doc.get("moves"), list) else {"format": D.FMT_SUPERSEDED,
-                                                                                         "moves": []}
-        doc["moves"].append({"arm": e["arm"], "files": files, "moved_utc": D._utc(),
-                             "job": os.environ.get("SLURM_JOB_ID"), "host": os.uname().nodename, "why": e["why"],
-                             "deviation": {"n": int(dv["n"]), "file": dv["file"], "sha256": dv["sha256"]}})
-        D.write_json(man, doc)
-        log("superseded the arm record of %s (DS1 deviation %d): moved to %s" % (e["arm"], int(dv["n"]), dd))
-        out.append({"arm": e["arm"], "status": "moved"})
-    return out
-
-
 def pools_superseded_due(phase):
     """The sources of a phase whose pool record a recorded deviation supersedes still stands at its path, hashing as
     named (SUPERSEDED_POOLS; DS1 deviation 2, item 3): the plan reads them as not pooled, and the pools step moves
@@ -3279,11 +3196,6 @@ def manifests(phase, inputs, write=True, on_date=None):
     md_rows = read_jsonl(Path(frozen("md_s0")["root"]).parent / "rows.jsonl")
     exam_rows = never_train_rows()
     built = {}
-    if write:
-        # DS1 deviation 2, item 6: KF's record written before SIU's K supply was known is moved aside first
-        moved = [m for m in supersede_arms() if m["status"] == "moved"]
-        if moved:
-            built["superseded"] = moved
     if not arm_record_path("S0").is_file():
         s0, rec = b_prime_o(inputs, md_rows, exam_rows, write)
         if write:
@@ -3319,9 +3231,7 @@ def manifests(phase, inputs, write=True, on_date=None):
     kpools, t, n_k = k_pools(siu, kf_rows, crop)
     base_a = [dict(v, key=k) for k, v in inputs.base_a.items()]
     ahits = base_a_hits(inputs, base_a) if write and (not arm_record_path("KF").is_file() or siu_ready) else {}
-    if write and not arm_record_path("KF").is_file() and kf_rows and (siu_ready or siu_out):
-        # DS1 deviation 2, item 6: KF is built once SIU's K supply is known (N_K over every K pool, the same in every
-        # K arm), or alone, at its own supply, once SIU settles out (KD and KT then not run)
+    if write and not arm_record_path("KF").is_file() and kf_rows:
         nk_f = min(N_K_MAX, kpools["supplies"]["KF"]) if not siu_ready else n_k
         built["KF"] = write_arm("KF", base_a + [_man(r) for r in kf_draw(kpools, nk_f)],
                                 {"n_k": nk_f, "pool": "base B Field and Turf, thinned", "supplies": kpools["supplies"],
@@ -3495,9 +3405,8 @@ def plan_state(inc_dir=None):
     out["md_s0"] = {"drafts": len(drafts), "draft": last, "power": isinstance(pw, dict),
                     "enlarge": bool(((pw or {}).get("md_s0") or {}).get("enlarge")) if isinstance(pw, dict) else None,
                     "frozen": bool(frozen("md_s0"))}
-    pending = set(arms_superseded_due())            # DS1 deviation 2, item 6: built again, so not built now
     for a in D.BUILD_ARMS:
-        r = _read_json(arm_record_path(a)) if a not in pending else None
+        r = _read_json(arm_record_path(a))
         if isinstance(r, dict):
             out["arms"][a] = {"images": r.get("images"), "sha256": r.get("sha256"),
                               "over_line": bool((r.get("loader_projection") or {}).get("over_line"))}
@@ -3523,7 +3432,6 @@ def plan_state(inc_dir=None):
                      if isinstance(kw, dict) and not arm_record_path("KD").is_file() and not out["k_not_run"] else None)
     srec1 = screen_records(1)
     out["k_source_out"] = SIU in srec1 and settled_out(SIU, decs, srec1.get(SIU))
-    out["arms_superseded"] = sorted(pending)
     out["ra"] = isinstance(_read_json(D.capacity("ds1_ra_gate.json")), dict)
     out["power_final"] = isinstance(_read_json(D.capacity("ds1_power.json")), dict)
     return out

@@ -2368,18 +2368,9 @@ def ds1_plan(cfg, fs):
         settled1, w1 = False, dict(w1, screen=list(p1["rescreen"]))
     if md.get("frozen"):
         want = []
+        if not arms.get("S0") or not arms.get("KF"):
+            want.append("S0/KF")
         siu = (p1.get("sources") or {}).get(cfg.get("k_source") or "", {}) if cfg.get("k_source") else {}
-        if not arms.get("S0"):
-            want.append("S0")
-        if not arms.get("KF"):
-            # DS1 deviation 2, item 6: KF is built once the K source's supply is known (N_K over every K pool), or
-            # alone once the K source settles out; until then its wait is named
-            if siu.get("pooled") or st.get("k_source_out"):
-                want.append("KF")
-            else:
-                waits["k_arms"] = ("KF, KD and KT wait for the K source's supply (DS1 deviation 2, item 6: N_K = "
-                                   "min(15,000, every K pool's supply at build); its sheet and species-role table "
-                                   "decided and audited, its rows pooled)")
         if (not arms.get("KD") or not arms.get("KT")) and siu.get("pooled") and not st.get("k_not_run") \
                 and not st.get("k_source_out") and not st.get("k_wait"):
             want.append("KD/KT")
