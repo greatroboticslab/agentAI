@@ -11351,3 +11351,10 @@ Every result sat near test 0.85, against the 0.90 goal.
   3. Restart the dashboard.
   4. On the login node, `inc2.ds1_sheets supersede` for every audit batch after ds1_audit_001.
   5. Once the pools step writes `p1_r001_audit_v2.json` on the cluster, compare it with R2 and record any difference.
+
+## 2026-10-30 — The dashboard's public address is watched and repaired on the lab
+
+- **Why.** From 2026-10-29 ~17:00 CDT the dashboard answered only inside the tailnet. The lab's tailscaled had lost its home DERP connection (logged 20:02 CDT), and Tailscale Funnel's public ingress (209.177.145.97/.192, 2607:f740:f::67/b31) accepted TCP and closed every TLS handshake. The server, its certificate and `tailscale funnel status` all looked healthy.
+- **Repair.** `tailscale funnel --https=443 off`, `tailscale funnel --bg http://127.0.0.1:8000`, `tailscale debug rebind` and `tailscale debug restun` (no root, the node never leaves the tailnet the lab is administered over): within two minutes all four ingress addresses answered `/login` with 200 (2026-10-30 ~04:00Z).
+- **Change.** `deploy/funnel_watchdog.sh` with `funnel-watchdog.service`/`.timer` (user units, every 10 minutes): probes `/login` on every public ingress address public DNS returns for the host (AAAA only where the machine has IPv6; the lab has none), logs one line to `~/funnel_watchdog.log`, and on any failure runs the repair above and probes again.
+- **Verified.** Installed on the lab: a run reports `ok 2/2`; the timer is enabled and scheduled; probes from the workstation through each ingress address return 200.
