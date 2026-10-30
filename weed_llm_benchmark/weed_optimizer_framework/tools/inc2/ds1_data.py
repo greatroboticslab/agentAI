@@ -191,10 +191,12 @@ SCREEN_DEVIATION = 2                                # a screen revision's "devia
 # DS1 deviation 2's record (docs/CONTINUOUS_LOOP.md, "Deviation (2026-10-30): DS1 deviation 2"), kept byte for byte
 # under docs/prereg/ and time-stamped as deviation 1 was; the ticker's gate pins it by sha256 (the domain's
 # ds1.deviations). It is pinned here and not in inc2.ds1.DEVIATIONS: the reproduction records pin inc2/ds1.py's bytes
-# (inc2.ds1.code_shas), so a change of that file would refuse every later score until they are taken again.
+# (inc2.ds1.code_shas), so a change of that file would refuse every later score until they are taken again. Its second
+# text (the first, b825aa66...ed4d of commit dbd6bea, never deployed, is kept under
+# docs/prereg/superseded/DS1_dev2_first_text/).
 DEVIATION_2 = {"n": 2, "file": "docs/prereg/DS1_dev2_2026-10-30.md",
-               "sha256": "b825aa66198553a7bae49efb6f0afdfa77ce46b71226e3791ad67b467ea3ed4d",
-               "commit": "dbd6bea02e7d0b0d415b598d608d5bcecd6d056d",
+               "sha256": "58865e1d5c83f494e15c238c8e604924715048670fae11eb1f9d6b015eb574d4",
+               "commit": "d91a2641605ed1d2f115385f0fd6936e57fc1ca6",
                "stamp_file": "docs/prereg/DS1_dev2_2026-10-30.stamp.txt"}
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 _DEV2_POOL_WHY = ("written 2026-10-30T05:38Z by job 50028368 while every row lacked its image size, so base3's source "

@@ -5,6 +5,9 @@ docs/prereg/DS1_dev2_2026-10-30.md).
 Fixtures: tests/fixtures/ds1/dev2/, read only from the cluster on 2026-10-30, every file checked against its sha256
 (MANIFEST.json), the images and labels also against the cluster's sha256s.
 
+- item 2, the intake rows Step 1 keyed otherwise: 21,979 admissions of ten intake batches (a9s9v 8,946) had no file
+  record under their admission key (the manifest spells '.rf.', Step 1 '_rf_'); two a9s9v admissions become
+  candidates (on main 98ef308 neither);
 - item 1, image sizes: Step 1's v1-pool rows carry no image size, so the pools step's source rule (base3's) saw no
   weed box and dropped every row of rf_tuf__weed-3434e and rf_weed-detection-o9sfb__weed-detection-in-a-field as
   source_convention (main 98ef308: 1,019 and 1,229 live rows, 0 pooled). With the screen's own candidate rows of the
@@ -26,7 +29,8 @@ Fixtures: tests/fixtures/ds1/dev2/, read only from the cluster on 2026-10-30, ev
 - the registration: the deviation's byte copy hashes to its pin (inc2.ds1_data.DEVIATION_2 and the domain's
   ds1.deviations; inc2/ds1.py stays byte for byte as deviation 1 left it, since the reproduction records pin it), ends
   docs/CONTINUOUS_LOOP.md after deviation 1's section, its proofs stamp it and its stamp file, which names the
-  superseded pool records by sha256.
+  superseded pool records by sha256; it is the second text, the first (b825aa66...ed4d) kept with its proofs and
+  stamp file under docs/prereg/superseded/DS1_dev2_first_text/, each named by its sha256.
 
 Run:  python3 tests/test_inc2_ds1_dev2.py
 """
@@ -75,6 +79,7 @@ LIVE_POOLS = {"project_agml__mh_weed16_weed_detection":
 EMPTY = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 # inc2/ds1.py as main 98ef308 holds it (deviation 1's): the code map the reproduction records taken on 2026-10-30 pin
 DS1_PY_DEV1 = "8075ea81756c448baac20a4a516396ec90c4cc0581734a5091628e82b91cc74f"
+FIRST_TEXT = "b825aa66198553a7bae49efb6f0afdfa77ce46b71226e3791ad67b467ea3ed4d"   # deviation 2's first text, kept
 
 
 def check(name, cond, detail=""):
@@ -585,6 +590,15 @@ def t_registration():
     blk = next((b for b in LS.load_domain("weed")["ds1"].get("reopens") or [] if b.get("file") == dv.get("file")), {})
     check("  the reopen block's before_utc is the stamp file's written_utc", blk.get("before_utc") and
           ("written_utc: %s" % blk["before_utc"]) in text, blk.get("before_utc"))
+    first = GIT / "docs" / "prereg" / "superseded" / "DS1_dev2_first_text"
+    kept = sorted(first.iterdir()) if first.is_dir() else []
+    check("  the first text (b825aa66...ed4d, never deployed), its proofs and stamp file are kept unchanged under "
+          "docs/prereg/superseded/DS1_dev2_first_text/, each named in the stamp file by its sha256",
+          [p.name for p in kept] == ["DS1_dev2_2026-10-30.md", "DS1_dev2_2026-10-30.md.ots",
+                                     "DS1_dev2_2026-10-30.stamp.txt", "DS1_dev2_2026-10-30.stamp.txt.ots"] and
+          sha(kept[0]) == FIRST_TEXT and D.ots_digest(str(kept[0]) + ".ots") == FIRST_TEXT and
+          all("%s  %s" % (sha(p), p.name) in text for p in kept) and dv.get("sha256") != FIRST_TEXT,
+          [p.name for p in kept])
 
 
 def main():
