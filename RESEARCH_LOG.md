@@ -13,6 +13,18 @@ labels with humans in the loop, and train/evaluate on the cluster GPU. Live on t
 
 *Log order: newest entries first (reverse-chronological). New entries go directly BELOW this line.*
 
+## 2026-10-30 — DS1 deviation 2, third text: 81,216 more rows (SIU's 64,421 among them) were held by a stale intake hold; KD and KT kept from "not run"; every DS1 build was refused by its seeds argument
+
+- **Where the data stands.** Base B's D1 B′ holds 40,743 images and the stream's pool P_1 holds 7,493, against a target of tens to hundreds of thousands of verified images. DS1's S0 manifest holds 37,732 images and KF 19,066 (base A 6,811 + 12,255); neither has trained yet, because every DS1 build was refused (below). S0x trains on the long path. Accuracy is unchanged: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90).
+- **What the review of the second text found.**
+  - Its account of the holds was wrong. No hold had been released: Step 1 scanned these rows at ingest and set no h6_scan; the screen read the collector's h6_scan from the intake record. The same stale hold kept out every row not admitted at species level: 81,216 rows, SIU's 64,421 among them, which the registration counts as weed-level candidates.
+  - The code would have recorded KD and KT "not run" once SIU's supply fell under KF's N_K of 12,255 (set while SIU read 0), though DS.5.3's N_K is the minimum over every K pool.
+  - Every DS1 build (S0 twice, KF twice) was refused before training: `ds1_args` read `--seeds 0,1,2` character by character.
+- **Change.** DS1 deviation 2, third text (time-stamped 2026-10-30T16:01:49Z): Step 1's holds for not-admitted rows; mendeley_fcf7brsfm6 screened again; SIU stays out when a stream cannot be read; KD and KT wait instead of "not run" if a supply is under KF's N_K (KF stands: N_K is never above its own supply); the seeds read as V3F's builds read them; build:S0 and build:KF reopened with their spend kept. The second text is kept.
+- **Expected sizes** (read only on the cluster, before sheets, dedupe, masks, the guard and EXIF). SIU: 166,071 live frames, 152,533 after base3's rules, 19,223 after `thin(10)` (5,342 of the target species), against 9,749 under the second text and DS.5.2's planned 20,000–55,000. The six re-pooled sources: 1,889 rows. KT's supply bound (19,223) is above KF's N_K, so KD and KT should run at 12,255.
+- **Verified.** On lab copies the full suite fails nothing main does not (173 of 188 files pass; the same environment failures), the mutation run kills 165 of 165, and the replay gate passes. A copy of the live state, ticked with the tip, reopens the two data steps and the two builds once with their spend kept and lines up the phase-1 screen. The deploy's dry run passes.
+- **Next.** Deploy. The platform screens SIU and five sources again, re-pools the six, and trains S0 and KF. SIU's sheet and species-role table go to the delegate and then to the owner's audit before any SIU frame trains.
+
 ## 2026-10-30 — DS1 deviation 2: phase 1 lost six sources to unread image sizes, 22,000 rows to key spelling and SIU to its quarantine and stale holds; fixed, the screen and pools taken again
 
 - **Where the data stands.** Base B's D1 B′ holds 40,743 images and the stream's pool P_1 holds 7,493, against a target of tens to hundreds of thousands of verified images. DS1's phase-1 pools hold 126 images (all MFWD). MD-S0 is frozen (1,045 images, MDE 0.0141) and the manifests step is building S0 and KF. Accuracy is unchanged: E3-B 0.8859 dev species mAP50-95 (0.0141 under 0.90).
