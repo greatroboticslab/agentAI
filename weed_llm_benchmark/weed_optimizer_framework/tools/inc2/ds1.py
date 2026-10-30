@@ -108,8 +108,8 @@ REVISIONS = ({"n": 1, "file": "docs/prereg/DS1_rev1_2026-10-29.md",
 # 1"), each kept byte for byte under docs/prereg/ and time-stamped as the Revisions were (its two OpenTimestamps proofs
 # and stamp file beside it); the ticker's gate pins each by sha256 (the domain's ds1.deviations)
 DEVIATIONS = ({"n": 1, "file": "docs/prereg/DS1_dev1_2026-10-30.md",
-               "sha256": "DEV1_SHA256",
-               "commit": "DEV1_COMMIT",
+               "sha256": "ade0f0d3cf08a28c2e5149e2fd1ac71642c8ab61787c199272e1f1c4f5d82a34",
+               "commit": "97e78a550c97a594a78eaffb855d77aced546f74",
                "stamp_file": "docs/prereg/DS1_dev1_2026-10-30.stamp.txt"},)
 DELEGATE ="the delegate under the 2026-09-30 owner grant"
 OWNER = "Harry He (owner)"

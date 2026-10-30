@@ -406,7 +406,7 @@ MUTANTS = {
     "DV11": (DC, '    supersede()\n', '', DEV1),
     "DV12": (ST, '                       for r in list(cfg.get("revisions") or []) + list(cfg.get("deviations") or [])),',
              '                       for r in list(cfg.get("revisions") or [])),', DEV1),
-    "DV13": (WJ, '"before_utc": "DEV1_STAMP_UTC",', '"before_utc": "2026-10-30T03:00:00Z",', DEV1),
+    "DV13": (WJ, '"before_utc": "2026-10-30T04:02:00Z",', '"before_utc": "2026-10-30T03:00:00Z",', DEV1),
     "DV14": (DF, "ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md docs/prereg/DS1_dev1_2026-10-30.md.ots",
              "ROOT_PATHS+=(docs/prereg/DS1_dev1_2026-10-30.md.ots", DEPLOY),
 }
