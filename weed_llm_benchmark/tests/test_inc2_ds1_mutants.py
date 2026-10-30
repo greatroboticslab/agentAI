@@ -101,6 +101,34 @@ must occur exactly once in its file), runs its target against the copy and requi
   DP24  diagnose_stream   a role C or quarantined source waits for a decision
   DP25  diagnose_stream   the audit batch names no sources (the lab cannot render it)
   DP26  deploy_funnel     the deploy's pre-flight does not check what ships for DS1
+  Revision 2 (2026-10-29, before any DS1 training or score):
+  DX1   ds1               the weed check compares the key-order arrays with the validator-order AP (the refusal of
+                          POWER's pre-flight on tied confidences)
+  DX2   ds1               the weed check takes an image's rows without comparing them with the helper's record
+  DX3   ds1               the weed check does not compare the ground-truth counts
+  DX4   ds1               the weed reading is not tie-broken (it depends on the machine's sort)
+  DX5   stream            a finished audit render records the tick's context's set (none: rendered on every tick)
+  DX6   diagnose_stream   a set the cluster lists rendered is rendered again (the ticker's memory alone)
+  DX7   ds1_sheets        a decisions file naming a superseded sheet is recorded
+  DX8   ds1_sheets        a superseded audit batch still counts for its set
+  DX9   ds1_data          the screen's audit reads [class, cx, cy, w] as the box
+  DX10  ds1_data          audit_rates accepts a box that is not (cx, cy, w, h)
+  DX11  ds1_data          screen_records ignores the audit taken again
+  DX12  ds1_data          a pool applies masks from an audit taken before Revision 2
+  DX13  ds1_data          an 'accept' decision on a partially labelled source enters a pool
+  DX14  ds1_data          pools reads a screen's audit without taking it again first
+  DX15  ds1               RA's default reports take any *_s<3 digits> folder (b_v2_s640, the pre-fork segments)
+  DX16  ds1               a Revision's own time-stamp record naming another sha256 opens the gate
+  DX17  ds1               timestamp-revision takes proofs it has not checked
+  DX18  ds1_sheets        a sheet rendered after the audit was taken again shows the screen's audit
+  DX19  stream            an item attempted after the Revision is reopened by it again
+  DX20  stream            an item is reopened before the deployed tree holds the Revision's file
+  DX21  stream            the time-stamp card asked for once is never raised again for a later Revision
+  DX22  diagnose_stream   an 'accept' on a partially labelled source waits for a pool, not for its sheet
+  DX23  ds1_data          the audit is taken again with another predictor than the screen's (E1-A seed 0)
+  DX24  ds1_data          a source whose live rows are no longer the screen's is recorded as the screen's
+  DX25  stream            the time-stamp card names every Revision, also one the record names (refused)
+  DX26  ds1               timestamp_missing lists a Revision its own record names
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -138,6 +166,7 @@ AP_STORAGE = "tests/test_stream_ap_ds1.py?DS1_WORLD=storage"
 AP_CAP = "tests/test_stream_ap_ds1.py?DS1_WORLD=cap"
 AP_FAIL = "tests/test_stream_ap_ds1.py?DS1_WORLD=fail"
 DEPLOY = "tests/test_inc2_ds1_deploy.py"
+REV2 = "tests/test_inc2_ds1_rev2.py"
 REV1 = "tests/test_inc2_ds1_rev1.py"
 AP_PLANR1 = "tests/test_stream_ap_ds1.py?DS1_WORLD=plan_rev1"
 AP_REVIEW = "tests/test_stream_ap_ds1.py?DS1_WORLD=review"
@@ -204,8 +233,8 @@ MUTANTS = {
             "tools/inc2/ds1.py tools/inc2/ds1_data.py\n", LONG),
     "DP1": (DSM, '    if not fs.get("never_cut"):\n        return False, "the deployed cutter',
             '    if False:\n        return False, "the deployed cutter', AP_GATE),
-    "DP2": (DSM, '    if not (fs.get("status") or {}).get("timestamp"):\n        return False, "ds1/v1/timestamp.json',
-            '    if False:\n        return False, "ds1/v1/timestamp.json', AP_GATE),
+    "DP2": (DSM, '    if not (fs.get("status") or {}).get("timestamp"):\n        return False, ("ds1/v1/timestamp.json',
+            '    if False:\n        return False, ("ds1/v1/timestamp.json', AP_GATE),
     "DP3": (ST, "        elif phase == 1 and not v2 and not sub and after > line + V3FAM_CAP_EPS:\n",
             "        elif False:\n", AP_CAP),
     "DP4": (ST, '        elif key in ("build:S2", "build:S1CR"):\n', "        elif False:\n", AP_CAP),
@@ -280,7 +309,7 @@ MUTANTS = {
                  "groups = mtw_groups()\n", REV1),
     "DC13": (DC, '        return entry(js, "kept") if js.exists() else None\n', "        return None\n", REV1),
     "DC14": (DC, "    gone = DD.sources_out() if d.is_dir() else set()\n", "    gone = set()\n", REV1),
-    "DC15": (DC, "                and revisions_ok(d))\n", "                )\n", CORE),
+    "DC15": (DC, "                and revisions_ok(d, path or timestamp_path()))\n", "                )\n", CORE),
     "DL5": (DL, '    trash = T.move_aside(work / "data", removed)\n', "    trash = T.move_aside(work, removed)\n", REV1),
     "DL6": (DL, "    os.rename(str(work), str(dst))\n", '    __import__("shutil").rmtree(str(work))\n', REV1),
     "DP18": (ST, '        return out | set((((self.dom or {}).get("ds1") or {}).get("build_exps") or {}).values())\n',
@@ -297,8 +326,52 @@ MUTANTS = {
              "    s2x_wall = False\n", AP_PLANR1),
     "DP24": (DSM, '        if x.get("role_c") or x.get("quarantined_whole") or x.get("settled_out"):\n            continue\n',
              "        if False:\n            continue\n", AP_PLANR1),
-    "DP25": (DSM, '"item": key, "sources": sorted(pend)})', '"item": key})', AP_PLANR1),
+    "DP25": (DSM, '"item": key, "sources": pend})', '"item": key})', AP_PLANR1),
     "DP26": (DF, "PREFLIGHT+=(tests/test_inc2_ds1_deploy.py)", "PREFLIGHT+=()", DEPLOY),
+    # Revision 2 (2026-10-29)
+    "DX1": (DC, '    cap = S.collapsed_ap(tp, q, int(v.e3_s1_ngt))',
+            '    cap = S.collapsed_ap(weed["tp"], weed["conf"], int(v.e3_s1_ngt))', REV2),
+    "DX2": (DC, '        if tp_w.shape != tp_e.shape or not np.array_equal(tp_w, tp_e) or not np.array_equal(q_w, q_e):',
+            '        if tp_w.shape != tp_e.shape:', REV2),
+    "DX3": (DC, '    if n_gt != int(v.e3_s1_ngt):', '    if False:', REV2),
+    "DX4": (DC, '    tb = SC.tie_break(weed)\n', '    tb = weed\n', REV2),
+    "DX5": (ST, '            f["audit_render_for"] = ds1_audit_sources((p.get("params") or {}).get("sources"))',
+            '            f["audit_render_for"] = []', REV2),
+    "DX6": (DSM, '        if due(key) and fs.get("audit_render_for") != pend and pend not in drawn:',
+            '        if due(key) and fs.get("audit_render_for") != pend:', REV2),
+    "DX7": (DH, '    if sh in sup:\n', '    if False:\n', REV2),
+    "DX8": (DH, '            if r.get("kind") == "audit" and "%s_%03d" % (r["kind"], r["batch"]) not in sup}',
+            '            if r.get("kind") == "audit"}', REV2),
+    "DX9": (DD, '    return audit_verdict(audit_rates([dict(r, boxes=audit_boxes(r)) for r in smp], predict), ref)',
+            '    return audit_verdict(audit_rates(smp, predict), ref)', REV2),
+    "DX10": (DD, '        if any(len(g) != 4 for g in gt):', '        if False:', REV2),
+    "DX11": (DD, '            if s in ra:\n', '            if False:\n', REV2),
+    "DX12": (DD, '        if a.get("partial") and not audit_valid(a):', '        if False:', REV2),
+    "DX13": (DD, '    if d.get("decision") == "accept" and audit_valid(a) and a.get("partial"):', '    if False:', REV2),
+    "DX14": (DD, '    if audit_due(phase):\n        # a screen', '    if False:\n        # a screen', REV2),
+    "DX15": (DC, 'RA_SEGMENT_RE = re.compile(r"weed_stream_v1_fork1364_s[0-9]{3}\\Z")',
+             'RA_SEGMENT_RE = re.compile(r".*_s[0-9]{3}\\Z")', REV2),
+    "DX16": (DC, '    return bool(isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP and sep.get("sha256") == '
+                 'rv["sha256"]\n', '    return bool(isinstance(sep, dict) and sep.get("format") == FMT_REV_TIMESTAMP and True\n',
+             REV2),
+    "DX17": (DC, '           "proofs": _proof_pair(proof, stamp_proof, rv["sha256"], rv["commit"], rv["file"]), '
+                 '"written_utc": _utc()}', '           "proofs": [{"sha256": "x"}, {"sha256": "y"}], "written_utc": _utc()}',
+             REV2),
+    "DX18": (DH, '            if ra:\n', '            if False:\n', REV2),
+    "DX19": (ST, '                        str(rec["started_utc"]) >= str(ro["before_utc"]):',
+             '                        False:', REV2),
+    "DX20": (ST, 'or not self._ds1_tree_file(ro.get("file") or "",',
+             'or not (lambda *a, **k: True)(ro.get("file") or "",', REV2),
+    "DX21": (ST, 'self._ds1_card_once("timestamp", "revisions:%s" % ",".join(',
+             'self._ds1_card_once("timestamp", "missing" or ",".join(', REV2),
+    "DX22": (DSM, '        if DS1_DECIDE_AGAIN in str(x.get("why") or ""):', '        if False:', REV2),
+    # Revision 2 as registered again before its deploy (the review's points)
+    "DX23": (DD, '    if (wsha is not None or inputs.production) and wsha != AUDIT_PREDICTOR_SHA256:', '    if False:', REV2),
+    "DX24": (DD, '"rows_as_screened": len(rs) == int(v.get("live") or 0),', '"rows_as_screened": True,', REV2),
+    "DX25": (ST, '                    int(r["n"]) in [int(x) for x in tm.get("revisions") or []]]',
+             '                    True]', REV2),
+    "DX26": (DC, '    return {"record": rec, "revisions": [int(rv["n"]) for rv in REVISIONS if not revision_named(rv, d, p)]}',
+             '    return {"record": rec, "revisions": [int(rv["n"]) for rv in REVISIONS]}', REV2),
 }
 
 

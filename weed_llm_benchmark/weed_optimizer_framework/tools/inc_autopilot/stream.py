@@ -373,6 +373,13 @@ DONE_AT_ONCE = ("inc_stream_commit", "inc_stream_rollback", "inc_stream_quaranti
 
 
 # ------------------------------------------------------------------ helpers
+def ds1_audit_sources(value):
+    """The sources of an owner's audit render as its proposal names them (a comma list, or a list), sorted."""
+    if isinstance(value, str):
+        value = value.split(",")
+    return sorted(str(x).strip() for x in value or () if str(x).strip())
+
+
 def step_key(lever, policy_params):
     """The key of one step of a lane (the attempts, the step's failed runs):
     the lever and its policy params (levers_stream.policy_params) without the
@@ -6112,6 +6119,54 @@ class StreamRun(object):
             return marker is None or marker.encode("utf-8") in data
         return False
 
+    def _ds1_reopen(self):
+        """A DS1 Revision's reopening (Revision 2, 2026-10-29: the power pre-flight score:POWER:<draft>, refused twice
+        by a defect of the DS1 pass's stage-1 check and recorded failed, which held MD-S0's freeze and every training
+        item): each item a block of the domain's ds1.reopens names is proposed again once the deployed tree holds that
+        Revision's file with its sha256, once per marker, and only if its last attempt started before the block's
+        before_utc and it is recorded failed. Its spend so far moves into prior_gpuh (every attempt stays counted
+        against the family cap), its earlier proposal ids into failed_ids (a new proposal takes a new id: the executor
+        runs an id once), its record into reopen_history, its state to missing. Returns the keys reopened now."""
+        cfg = (self.dom or {}).get("ds1") or {}
+        f = self._ds1()
+        out = []
+        for ro in [b for b in cfg.get("reopens") or [] if isinstance(b, dict)]:
+            marker = ro.get("marker")
+            if not marker or not ro.get("items") or not self._ds1_tree_file(ro.get("file") or "",
+                                                                            sha=ro.get("sha256")):
+                continue
+            now = []
+            for key in ro["items"]:
+                rec = f["items"].get(key)
+                if not isinstance(rec, dict) or rec.get("state") != "failed" or rec.get("reopened") == marker or \
+                        marker in [h.get("marker") for h in rec.get("reopen_history") or [] if isinstance(h, dict)]:
+                    continue
+                if not ro.get("before_utc") or not rec.get("started_utc") or \
+                        str(rec["started_utc"]) >= str(ro["before_utc"]):
+                    continue
+                before = {k: v for k, v in rec.items() if k != "reopen_history"}
+                ids = [a.get("proposal") for a in rec.get("attempts") or [] if isinstance(a, dict)] + \
+                    [rec.get("proposal")]
+                self._v3fam_fold(rec)
+                rec.update(state="missing", fails=0, proposal=None, reopened=marker, reopened_utc=self.utc,
+                           reopen_history=list(rec.get("reopen_history") or []) + [
+                               dict(before, marker=marker, reopened_utc=self.utc)])
+                rec.pop("why", None)
+                failed = self._failed_ids()
+                earlier = [i for i in ids if i and i not in failed]
+                self.st["failed_ids"] = (failed + earlier)[-FAILED_IDS_KEEP:]
+                now.append(key)
+            if now:
+                self._ledger("ds1_reopened", record_only=True, ds1_items=now, marker=marker, reasons=[
+                    "DS1: %s reopened under %s (%s): proposed again under a new id once DS1's gate is open, earlier "
+                    "spend kept in prior_gpuh" % (", ".join(now), marker, ro.get("file"))])
+                self._card("research", "DS1: %s reopened (%s)" % (", ".join(now), marker),
+                           "%s, recorded in %s. It is proposed again under a new id once DS1's gate is open (every "
+                           "time-stamp record in place). Earlier attempts stay counted against the family cap." % (
+                               ro.get("why") or marker, ro.get("file")), lever="L33")
+                out += now
+        return out
+
     def _ds1_stage(self, exp_status, payload=None):
         """/stage/ds1 (DS.9.3), what DR0's DS1 block and DS1's cards read: the gate's inputs (the amendment and the
         cutter's never-cut change in the deployed tree, the time stamp), the cluster's derived status
@@ -6122,6 +6177,7 @@ class StreamRun(object):
         cfg = (self.dom or {}).get("ds1") or {}
         if not cfg:
             return None
+        self._ds1_reopen()
         f = self._ds1()
         status = self._artifact(cfg.get("status") or SR.DS1_STATUS) or {}
         nc = cfg.get("never_cut") or {}
@@ -6356,9 +6412,10 @@ class StreamRun(object):
         else:
             rec.update(state="done", done_utc=self.utc)
         if it["lever"] == "L31" and (p.get("params") or {}).get("kind") == "audit":
-            stg = ((self.ev.json(E.CONTEXT) or {}).get("stage") or {}).get("ds1") if self.ev is not None else None
-            f["audit_render_for"] = sorted((((stg or {}).get("status") or {}).get("sheets") or {}).get(
-                "audit_pending") or [])
+            # the set this render drew: its own proposal's sources (DR0 named them from the cluster's audit set),
+            # never this tick's context, which need not hold DS1's status when a job's end is read (Revision 2,
+            # item 3: on 2026-10-29 it held none, so [] was recorded and the same set was rendered on every tick)
+            f["audit_render_for"] = ds1_audit_sources((p.get("params") or {}).get("sources"))
         # the next proposal of the same step takes a new id: the executor runs an id once
         akey = step_key(it["lever"], LS.policy_params(it["lever"], p.get("params") or {}))
         att = st.setdefault("attempts", {})
@@ -6539,15 +6596,33 @@ class StreamRun(object):
                                 "DS1 item is proposed until a deploy ships it (deploy/deploy_funnel.sh).", "L30")
             return
         if not st.get("timestamp"):
+            rv = list(cfg.get("revisions") or [])
+            tm = st.get("timestamp_missing") if isinstance(st.get("timestamp_missing"), dict) else {}
+            upgrade = ("Nothing of DS1 is proposed before it. A proof still pending in Bitcoin is upgraded later (ots "
+                       "upgrade; ots verify's output recorded) and committed: the record names what each proof "
+                       "stamps, which the upgrade does not change.")
+            # one card per set of missing records (Revision 2, item 6): ds1/v1/timestamp.json is written once, so a
+            # Revision it does not name is recorded by its own step, named by the Revision's own number, and only the
+            # Revisions the cluster's status lists as unnamed are named (never one already recorded, which is refused)
+            need = [r for r in rv if tm.get("record") and r.get("n") is not None and
+                    int(r["n"]) in [int(x) for x in tm.get("revisions") or []]]
+            if need:
+                self._ds1_card_once("timestamp", "revisions:%s" % ",".join("%s=%s" % (r["n"], str(r.get("sha256"))[
+                    :12]) for r in need), "research", "DS1 waits for its time-stamp record",
+                    "DS.12 step 0a: ds1/v1/timestamp.json exists (it is written once) and names no record of %s. On "
+                    "the login node, from the deployed tree's root: %s (ds1/v1/timestamp_rev<n>.json). %s" % (
+                        ", ".join("Revision %s" % r["n"] for r in need), "; ".join(
+                            "%s.ds1 timestamp-revision --revision %s --proof %s.ots --stamp-proof %s.ots" % (
+                                mod, r["n"], r.get("file"), r.get("stamp_file")) for r in need), upgrade), "L30")
+                return
             revs = " ".join("--revision-proof %s.ots --revision-stamp-proof %s.ots" % (r.get("file"), r.get(
-                "stamp_file")) for r in cfg.get("revisions") or [])
-            self._ds1_card_once("timestamp", "missing", "research", "DS1 waits for its time-stamp record",
+                "stamp_file")) for r in rv)
+            self._ds1_card_once("timestamp", "missing:%s" % ",".join(str(r.get("sha256"))[:12] for r in rv),
+                                "research", "DS1 waits for its time-stamp record",
                                 "DS.12 step 0a: on the login node, %s.ds1 timestamp --proof docs/prereg/"
                                 "DS1_2026-10-29.md.ots --stamp-proof docs/prereg/DS1_2026-10-29.stamp.txt.ots %s "
-                                "(ds1/v1/timestamp.json names the prereg's and each Revision's sha256 and proofs). "
-                                "Nothing of DS1 is proposed before it. A proof still pending in Bitcoin is upgraded "
-                                "later (ots upgrade; ots verify's output recorded) and committed: the record names "
-                                "what each proof stamps, which the upgrade does not change." % (mod, revs), "L30")
+                                "(ds1/v1/timestamp.json names the prereg's and each Revision's sha256 and proofs). %s"
+                                % (mod, revs, upgrade), "L30")
             return
         steps = []
         if not st.get("ra"):
@@ -6566,6 +6641,17 @@ class StreamRun(object):
                                                                          (cfg.get("lab") or {}).get("sheets_html"),
                                                                          (cfg.get("lab") or {}).get("owner_folder"),
                                                                          mod))
+        for ph in ("1", "2"):
+            srcs = ((st.get("phases") or {}).get(ph) or {}).get("sources") or {}
+            # Revision 2, item 4: 'accept' on a source the model audit finds partially labelled waits for a new decision
+            again = sorted(s_ for s_, x in srcs.items() if x.get("decided") and DS.DS1_DECIDE_AGAIN in str(x.get("why")
+                                                                                                       or ""))
+            if again:
+                steps.append("a new sheet decision waits (phase %s; DS.5.1 item 4: the model audit finds them "
+                             "partially labelled, so they enter only as 'accept for training only'): %s; stored with "
+                             "%s.ds1_sheets record --file <it> --decided-by delegate, or --decided-by human:<his id> "
+                             "for a source whose owner's audit decision governs it (the delegate's does not override "
+                             "his)" % (ph, ", ".join(again[:12]), mod))
         if sh.get("audit_pending"):
             steps.append("owner audit waiting (DS.0 item 4): %s; the audit sheet batch is rendered on the lab; his "
                          "decisions are stored with %s.ds1_sheets record --file <it> --decided-by human:<his id>"

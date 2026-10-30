@@ -2187,6 +2187,9 @@ def v3fam_plan(fam, fs):
 
 # DS1 (2026-10-29; docs/CONTINUOUS_LOOP.md, Amendment 2026-10-29, DS.9.3, DS.12): DS1's items, in DS.12's order
 DS1_TERMINAL = ("done", "failed", "not needed")
+# inc2.ds1_data.source_ready's reason for an 'accept' decision on a source the model audit finds partially labelled
+# (Revision 2, item 4): the source waits for its sheet to be decided again, and its card says so
+DS1_DECIDE_AGAIN = "its sheet is decided again"
 DS1_PERSON = "waits for a person"
 
 
@@ -2216,7 +2219,8 @@ def _ds1_gate(v, st, cfg):
     if not fs.get("never_cut"):
         return False, "the deployed cutter does not read DS1's never-train list (DS.9.1)"
     if not (fs.get("status") or {}).get("timestamp"):
-        return False, "ds1/v1/timestamp.json does not name the amendment's sha256 and its proofs (DS.12 step 0a)"
+        return False, ("ds1/v1/timestamp.json does not name the amendment's sha256 and its proofs, or a Revision "
+                       "lacks its own (timestamp.json or timestamp_rev<n>.json; DS.12 step 0a)")
     return True, [v.ccite("/stage/ds1/amendment"), v.ccite("/stage/ds1/never_cut"), v.ccite("/stage/ds1/timestamp")]
 
 
@@ -2258,6 +2262,9 @@ def _ds1_sources_settled(ph):
             waits["sheets"].append(s_)
             continue
         if x.get("decision") == "reject":
+            continue
+        if DS1_DECIDE_AGAIN in str(x.get("why") or ""):
+            waits["sheets"].append(s_)
             continue
         if x.get("audit_required") and not x.get("audited"):
             waits["audit"].append(s_)
@@ -2323,12 +2330,15 @@ def ds1_plan(cfg, fs):
             key = "sheets:%s:%d" % (kind, b)
             if "%s_%03d" % (kind, b) not in rendered and due(key):
                 add(maint, {"lever": "L31", "kind": kind, "batch": b, "item": key})
-    pend = list(sheets.get("audit_pending") or [])
+    pend = sorted(sheets.get("audit_pending") or [])
     if pend:
         nb = 1 + len([x for x in rendered if x.startswith("audit_")])
         key = "sheets:audit:%d" % nb
-        if due(key) and fs.get("audit_render_for") != sorted(pend):
-            add(maint, {"lever": "L31", "kind": "audit", "batch": nb, "item": key, "sources": sorted(pend)})
+        # one render per pending set (Revision 2, item 3): not when the ticker's own record names the set it last
+        # rendered, nor when the cluster lists a rendered, not superseded, audit batch of exactly this set
+        drawn = [sorted(v or []) for v in (sheets.get("audit_sets") or {}).values()]
+        if due(key) and fs.get("audit_render_for") != pend and pend not in drawn:
+            add(maint, {"lever": "L31", "kind": "audit", "batch": nb, "item": key, "sources": pend})
     # ---- 3. MD-S0: drawn, its power, enlarged or frozen
     if not md.get("frozen"):
         if (not md.get("drafts") or md.get("power")) and due("data:1:md_s0"):

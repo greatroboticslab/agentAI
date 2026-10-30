@@ -1,0 +1,24 @@
+DS1 Revision 2 time-stamp file (docs/CONTINUOUS_LOOP.md, Revision (2026-10-29): DS1 Revision 2, before any DS1 training or score; the procedure of V3F.12)
+
+revision_sha256: b9c7350052c720510db4cd3188fc437d8aa54460795a90c8649d2b37d8a2bb13
+revision_text: docs/CONTINUOUS_LOOP.md from line 5657 ('## Revision (2026-10-29): DS1 Revision 2, ...') to the end of the file at the commit below; byte-identical to docs/prereg/DS1_rev2_2026-10-29.md
+revision_commit: f022a0b2f6a96dbab163d200191de799815d0e8c
+amendment_sha256: 3b63933bbb134327a0491fc65d2457434663665674e2aa3464adaf5291d49699 (unchanged; docs/prereg/DS1_2026-10-29.md)
+revision1_sha256: 543ca520485f46bea0beee74758c608450d75b5860e8f4465b04cbd3fee531b7 (unchanged; docs/prereg/DS1_rev1_2026-10-29.md)
+written_utc: 2026-10-29T20:06:31Z
+decided_by: the delegate under the owner's 2026-09-30 admin grant (Revision 2, items 1-6)
+time_stamp_record: ds1/v1/timestamp.json is written once and names Revision 1; Revision 2 is named by ds1/v1/timestamp_rev2.json (inc2.ds1 timestamp-revision --revision 2), written by the delegate on the login node once this commit is deployed
+
+outside-repository records cited (sha256, file name under the paper's working folder _work/):
+3640eafc4ceaafe73489f8c4f8985a9266c7de523767817553335ecd22721b23  v7/ds1_evidence/rev2/MANIFEST.sha256 (15 files: R1 power/ (the POWER jobs' logs, the copied records' sha256s, the read scripts and outputs, POWER_DIVERGENCE.md); R2 reaudit/ (the screen's audit samples, E1-A seed 0's predictions on the lab, the old and corrected rates per source))
+
+cluster records cited by sha256 (INC = results/framework/inc on /ocean; read only):
+d304e1634849c0070439169c1f41b88a4ea312ab728796df94d8ee62c6f85ba1  INC/e1_a_m640/runs/final__base__s0/scores/dev.json (E1-A seed 0's recorded dev score)
+8585bdbd47258723aa39b445ad989e8b32a0dcb853ed16799e2c4234a899f938  INC/e1_a_m640/runs/final__base__s0/scores/dev.agnostic.npz (its class-collapsed arrays in exam key order)
+f635abc61845cce907123a969514ca6876a74e6ddca2759e974f759dbf8032bb  INC/twostage/e3_v1/arms/A/s0/dev.json (E3-A seed 0: stage-1 agnostic 0.8568578547397661)
+e111adda7861a97200e86edf0def6ceb064e8b1b57fe46fee4ded99ebee193f8  INC/logs/inc_build_ds1_score_power_50015220.out
+72b70e736697acc994632ac4df5b143385251cb836666f6d14aab1451bf5d960  INC/logs/inc_build_ds1_score_power_50015542.out
+573e52c5321b6583cd302483b31f29bb4141e4c828ca4fe7f6b4d8523fa95be5  INC/splits/ds1/screen/p1_r001.json (the screen revision whose audit Revision 2 item 4 takes again)
+a8e1b61ad29806c11228b9a54a463e40ac466fb3a717a17fcb2d6fc620e4cfcb  INC/e1_a_m640/runs/base__s0/weights/final.pt (the audit's predictor, E1-A seed 0)
+
+Proofs: OpenTimestamps (`ots stamp`) of this file and of docs/prereg/DS1_rev2_2026-10-29.md, as DS1_rev2_2026-10-29.stamp.txt.ots and DS1_rev2_2026-10-29.md.ots beside them.

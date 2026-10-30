@@ -1026,7 +1026,9 @@ def _ds1_status(inc):
     from ..inc2 import ds1 as D
     from ..inc2 import ds1_data as DD
     from ..inc2 import ds1_long as LG
-    out = {"format": "inc_autopilot.ds1_status/1", "timestamp": D.timestamp_ok(inc / "ds1" / "v1" / "timestamp.json")}
+    out = {"format": "inc_autopilot.ds1_status/1", "timestamp": D.timestamp_ok(inc / "ds1" / "v1" / "timestamp.json"),
+           # what the time stamp still lacks: the card names only those steps (DS1 Revision 2, item 6)
+           "timestamp_missing": D.timestamp_missing(inc / "ds1" / "v1" / "timestamp.json")}
     out.update(DD.plan_state(inc))
     out["long"] = LG.status()
     sc = {}

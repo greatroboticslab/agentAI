@@ -11267,3 +11267,87 @@ Every result sat near test 0.85, against the 0.90 goal.
   - A copy of the live lab state, ticked with the final tree (no ssh, nothing launched): before the time stamp, one card naming `inc2.ds1 timestamp` with the Revision's proofs and no DS1 lever; once stamped, L30's phase-1 screen on MAINT; with SIU accepted and pooled, no draw for it and S1's manifests next; a DS1 build with a non-transient blocked unit gives a card and no pause. Collection (L16) runs on in each.
   - Read-only on the cluster: every evaluation group's images hash; the copy screen's inputs (ingest.jsonl, b0000's eval_hit_pairs, the Step 1 sidecars) parse; the capture-name rule no longer matches CottonWeedDet3's file names.
   - `deploy_funnel.sh --dry-run` passes with no `--allow-*` flag; the V3F deploy checks pass and the code_shas files are unchanged.
+
+## 2026-10-29 — DS1 Revision 2, before any DS1 training or score: the power pre-flight's weed check, one owner's audit render per set, the model audit's box format
+
+- **Why.** On its first day the deployed DS1 code (main 8ba5f75) showed three defects. No DS1 training, score or reproduction record existed, so the fixes are DS1 Revision 2 (docs/CONTINUOUS_LOOP.md, "Revision (2026-10-29): DS1 Revision 2, before any DS1 training or score"; byte copy `docs/prereg/DS1_rev2_2026-10-29.md`, sha256 b9c73500…bb13, commit f022a0b; OpenTimestamps proofs and stamp file in 80815a3). The amendment (3b63933b…9699) and Revision 1 (543ca520…b531) are unchanged, and no number, threshold, arm, exam, statistic or decision rule changes.
+  - The power pre-flight refused twice (jobs 50015220 and 50015542: "the weed arrays give AP50-95 0.856888007, the pass's stage-1 agnostic AP 0.856857855") and was recorded failed, so MD-S0 could not be frozen and no DS1 training item could start.
+  - The owner's audit batch was rendered again on every tick (ds1_audit_002 at 18:47Z, then one every 10 minutes; 011 at 20:17Z). L31 took MAINT on every tick, so the pools step was never proposed.
+  - The screen's model audit read each labelled box's [class, cx, cy, w] as the box, so every source with a confident prediction showed as partial (missing and false-box rates 1.000).
+- **Where the POWER check diverged** (read-only, on copies of the cluster's records in a lab scratch folder; `_work/v7/ds1_evidence/rev2/power/POWER_DIVERGENCE.md`). E1-A seed 0 on cwd12 dev: 1,693 stage-1 boxes, 766 distinct confidences (fp16 on the V100), 140 tie groups mixing true and false positives. The weed arrays and the stage-1 helper hold the same rows, so no detection, threshold, IoU or ground-truth count differs. Only the concatenation order differs: exam key order against the validator's aspect-ratio batch order. `ap_per_class` sorts with `np.argsort(-conf)`, which is not stable, so tied rows rank by input order and by the CPU's sort kernel. In the validator's order the pass gave 0.856857855, which is E3-A's record (0.8568578547397661). In key order: 0.856888007 on the cluster's V100 node, 0.856878961 on the lab with numpy's AVX2 sort (numpy 2.2.6 and 2.4.6), 0.856962990 with its baseline sort. The tie-broken key-order AP is 0.856954720315 under every kernel, the value `scorer_agnostic` recorded on the cluster on 2026-10-04. Random row orders of the same rows span 0.856728–0.857025. The 1e-9 check compared one array set in two orders, which ties cannot pass; `inc2/scorer_agnostic.py` already checks E1's arrays in capture order.
+- **Change.**
+  - `inc2/ds1.py`: `weed_check` (DS1's layer records the validator's image order; the weed arrays must hold the stage-1 helper's records row for row and the same ground-truth count, give the stage-1 agnostic AP50-95 and AP50 in that order within 1e-9, and their tie-broken key-order AP must lie within 0.02 of it; recorded in each pass's stats). `weed_values`: a score file's `weed_map50_95` is the tie-broken value the statistics read. `ra_reports`: RA's default reports are `weed_stream_v1_fork1364_s<3 digits>` only (no longer b_v2_s640 or the pre-fork segments). `timestamp_revision` and `ds1/v1/timestamp_rev<n>.json`: a Revision made after the written-once time-stamp record is named by its own record; `timestamp_ok` needs every Revision named in one or the other. `REVISIONS` holds Revision 2.
+  - `inc2/ds1_data.py`: `audit_boxes`/`source_audit` (the class stripped, as train_core's reference reads its labels; `audit_rates` refuses a box of another length). `reaudit` and `audit_due`: a screen revision audited before Revision 2 is audited again by the pools step before it reads any audit, on the same live rows and seeded sample, written once as `splits/ds1/screen/p<ph>_r<rev>_audit_v2.json` and copied to `ds1/v1/sheets/audit_v2/`. `screen_records` reads it, with the old verdict beside it. Pools apply no mask from an old verdict. `source_ready`: an 'accept' decision on a source whose audit is partial waits for a new decision (DS.5.1 item 4). `plan_state` lists each phase's `audit_due`, the audit batches' sets and the superseded sheets.
+  - `inc2/ds1_sheets.py`: `supersede --sheet <kind_batch> --by <kind_batch> --why …` (the delegate's): the extra render is kept, `record` refuses a decisions file naming it, and it no longer counts as a render of its set. `audit_sets`. Later renders show the audit taken again and label one taken before Revision 2.
+  - `inc_autopilot/stream.py`: a finished audit render records the set its own proposal named (`ds1_audit_sources`), never the tick's context. `_ds1_reopen`: an item a deployed Revision names in the domain's `ds1.reopens` is proposed again once (earlier GPU-h kept in `prior_gpuh`, earlier ids failed). The time-stamp card is raised once per set of Revisions and names `inc2.ds1 timestamp-revision`. A card names the sources whose sheet must be decided again.
+  - `inc_autopilot/diagnose_stream.py`: no audit render for a set the ticker rendered or the cluster lists rendered (not superseded). A source decided 'accept' on a partial audit waits for its sheet, not for a pool. The gate's card names the per-Revision record.
+  - `stream_domains/weed.json`: `ds1.revisions` pins Revision 2. `ds1.reopens` reopens `score:POWER:draft_r001` (before 2026-10-29T20:06:31Z).
+  - `deploy/deploy_funnel.sh` ships Revision 2, its proofs and its stamp file.
+  - Tests: new `test_inc2_ds1_rev2.py`; `test_stream_ap_ds1.py` (one render per set on the fake cluster); mutants DX1–DX22 (DP2, DC15 and DP25 follow their moved lines).
+- **The model audit, taken again on the lab** (`_work/v7/ds1_evidence/rev2/reaudit/`). The screen's samples were rebuilt read-only on the login node; every source's live count and sample size equal p1_r001's record. E1-A seed 0 (weights a8e1b61a…) predicted on copies of the 2,922 images on the lab GPU. The pre-Revision rates reproduce the recorded ones, and the confident-prediction counts match for 19 of the 20 audited sources (rf_srec-dthh0: 74 against 75, an RTX 3060 against a V100). Corrected against train_core's 0.021:
+  - Not partial any more: rf_new-workspace-zbm50__weeds-qftz4 (missing 0.100, excess +0.079; rejected) and rf_tuf__weed-3434e (0.134, +0.112; training only).
+  - Still partial: kg_farukalam (0.784), mediatum_1717366 (0.297, +0.275), project_agml__mh_weed16 (0.615, +0.594), rf_cotton-weed-detect (1.000), rf_fyp-oof0h (0.388), rf_itmo-mp0nn (1.000), rf_lemong (1.000), rf_robtica-unileon (0.667), rf_school-5ult5 (0.200, +0.179), rf_srec-dthh0 (0.297), rf_test-gzc3r (0.659), rf_weed-tnf9e (0.353).
+  - No confident prediction, not partial as before: francesco, the 7tviy, vizerion, o9sfb, yolo-gyfyq and zijian dock sources.
+  - None of the 20 recorded decisions rests on a changed verdict. The only effect is that rf_tuf's rows get no predicted-plant masks. The owner's audit sheet ds1_audit_001 keeps its five partial flags. A note with its corrected numbers is in `_work/v7/sheets/ds1_audit_001_机器审核更正.md`.
+- **Verified.** On lab scratch copies (`~/ds1_fix1_ci`, the platform Python, Ultralytics 8.4.37):
+  - The base 8ba5f75 passes 168 of 185 test files. The branch tip (d0f7bce) passes 168 of 185: `test_inc2_ds1_rev2.py` is new, and `test_inc2_ds1_mutants.py` runs as the mutation run below. The 17 failures are the same on both, with the same failure lines. They are environment failures; `test_funnel_job_script`'s lines differ only where the tree's path truncates them.
+  - A first run at 5d0fa3a failed two checks: `test_stream_ap_replay` S13 (a domain term in a stream docstring) and V3F deviation 4's mutant DM19 (a line of the DS1 reopen repeated V3F's line). d0f7bce fixes both.
+  - The mutation run kills 115 of 115 (DM1–DM21, DC1–DC15, DH1–DH10, DL1–DL6, DP1–DP26, DR1–DR15, DX1–DX22). The suite's other harnesses kill all their mutants, as on the base: intake-via 43, audit-stream 40, stalls 42, V3F deviations 28, 53 and 39.
+  - On the base tree, `test_inc2_ds1_rev2.py` fails 17 checks, and `test_stream_ap_ds1.py`'s world renders the owner's audit batch again on each tick (audit_1, audit_2, audit_3, …). The failures include the three defects themselves:
+    - the DS1 pass refused on tied confidences fed in another image order ("the weed arrays give AP50-95 0.330911471, …");
+    - a fifth audit render proposed on the live state, with [] recorded;
+    - an exactly labelled source shown partial (missing rate 1.000).
+  - The replay gate passes on the base and on the tip: 57 cases pass, and R2 and R4b are skipped, as before.
+  - A copy of the live lab state (2026-10-29 20:20Z) was ticked with the tip (no ssh, nothing launched):
+    - the L31 render in flight ends and records its set;
+    - `score:POWER:draft_r001` is reopened with one card, its 0.1477 GPU-h kept in `prior_gpuh`;
+    - before `timestamp_rev2.json` exists, the time-stamp card is raised again with `timestamp-revision --revision 2`, and no DS1 lever is proposed;
+    - once it exists, L33 POWER is proposed on MAINT and no audit render follows.
+  - `deploy_funnel.sh --dry-run` passes with no `--allow-*` flag. The V3F deploy checks pass, and the code_shas files are unchanged.
+- **Not deployed.** Branch `ds1-fix1` only. After a deploy with no `--allow-*` flag:
+  1. On the login node, `python -m weed_optimizer_framework.tools.inc2.ds1 timestamp-revision --revision 2 --proof docs/prereg/DS1_rev2_2026-10-29.md.ots --stamp-proof docs/prereg/DS1_rev2_2026-10-29.stamp.txt.ots`. Until it runs, the gate stays closed and the ticker's card names this step.
+  2. On the login node, `python -m weed_optimizer_framework.tools.inc2.ds1_sheets supersede --sheet audit_002 --by audit_001 --why "rendered again for the same set by the audit-render loop (DS1 Revision 2, item 3)"`, and the same for every later audit batch (audit_003, …; 011 by 20:17Z).
+  3. The ticker reopens the power pre-flight (L33 POWER). The pools step takes the model audit again before it reads one.
+  4. `ots upgrade` of Revision 2's two proofs once Bitcoin confirms them.
+
+## 2026-10-29 — DS1 Revision 2, second text before its deploy: its standing under V3F.3.9, the model audit's predictor and rows, the time-stamp card
+
+- **Why.** A review of branch `ds1-fix1` before its deploy found these problems:
+  - Revision 2's first text called each change "a Revision before any DS1 number (DS.13)". DS.13 holds no such rule, and DS1 records holding numbers existed when it was made:
+    - RA's record (`capacity/ds1_ra_gate.json`, da139d47…, written 11:39:24Z);
+    - the phase-1 screen's counts and audit rates (p1_r001, p1_r002);
+    - MD-S0's draft_r001;
+    - the two pre-flight logs.
+    V3F.3.9 counts records like these as numbers, so under it the changes are deviations.
+  - Item 4 said the audit taken again uses "the same live rows, seeded sample and predictor". The code read eligibility again and recorded the predictor, but compared neither with the screen's.
+  - Item 1 said no threshold changes, yet it adds a 0.02 bound. It also said no detection differed, which was inferred from E1's arrays, not observed on the failing pass.
+  - The time-stamp card numbered the Revisions by position and named `timestamp-revision --revision 1`, which is refused. Its ledger copy was cut at 1,000 characters, inside the Revision 2 command.
+  - The reopen card said "proposed again" while the gate was still closed. The decide-again card named only the delegate, though the owner's audit decision governs where he recorded one.
+- **Change.**
+  - Revision 2's second text: `docs/prereg/DS1_rev2_2026-10-29.md`, sha256 5970fd75…0fc4, commit 9ca7e4d. Its stamp file was written 2026-10-29T23:46:16Z, and the OpenTimestamps proofs are in 91f58f5.
+    - It lists the DS1 records that held numbers and states that its changes are deviations under V3F.3.9, listed as such in DS1's report. It also states that none was steered by those numbers.
+    - It narrows items 1 and 4 and adds two notes: the e1a_dev reproduction's tie sensitivity, and that the audit is blind where E1-A predicts nothing.
+    - It names the owner's note on ds1_audit_001 (R3).
+    - The first text (b9c73500…bb13), its proofs and its stamp file are kept unchanged under `docs/prereg/superseded/DS1_rev2_first_text/`. Neither text was deployed before.
+  - `inc2/ds1_data.py`: `reaudit` refuses weights other than E1-A seed 0's (`AUDIT_PREDICTOR_SHA256`, a8e1b61a…). Each source's record holds `rows_as_screened` and `sample_keys`, and the record holds `rows_differ`.
+  - `inc2/ds1.py`: adds `revision_named` and `timestamp_missing` (whether the record exists, and which Revisions no record names). `inc_autopilot/stream_remote.py`: the DS1 status carries `timestamp_missing`.
+  - `inc_autopilot/stream.py`:
+    - the time-stamp card names only the Revisions the status lists as unnamed, each by its own number (the domain's revisions carry `n`);
+    - the reopen card says "reopened";
+    - the decide-again card names the owner's step where his audit decision governs.
+  - `stream_domains/weed.json`: Revision 2's new sha256 in `ds1.revisions` and `ds1.reopens` (before_utc 2026-10-29T23:46:16Z), and `n` on each Revision.
+  - Tests: `test_inc2_ds1_rev2.py` checks the predictor refusal, a source with fewer live rows than the screen's, the record's keys, `timestamp_missing` and the card's steps. Mutants DX23–DX26 are new; DX16 and DX21 follow their changed lines.
+- **Verified.** On a lab scratch copy of the tip 91f58f5 (`~/ds1_fix1_ci/fix2`, the platform Python, Ultralytics 8.4.37):
+  - The full suite passes 168 of 185 test files, as the base 8ba5f75 does. The 17 failing files are the base's, with the same failure lines; `test_inc2_stream`'s line also lists the hashes of the changed modules.
+  - The mutation run kills 119 of 119, DX1–DX26 among them.
+  - The replay gate passes: 57 cases pass, and R2 and R4b are skipped.
+  - A copy of the live lab state (2026-10-29 23:17Z) was ticked with the tip, using the cluster's DS1 status as the branch derives it (no ssh, nothing launched).
+    - Before `timestamp_rev2.json` exists, the L31 render in flight ends and records its set. `score:POWER:draft_r001` is reopened, with its card saying "reopened" and 0.1477 GPU-h kept. The time-stamp card names only `timestamp-revision --revision 2`, and no DS1 lever is proposed.
+    - Once the record exists, L33 POWER is proposed on MAINT and no audit render follows.
+  - `deploy_funnel.sh --dry-run` passes with no `--allow-*` flag, and the V3F deploy checks pass.
+- **After the deploy**, in this order:
+  1. `deploy_funnel.sh --no-restart`.
+  2. On the login node, `inc2.ds1 timestamp-revision --revision 2` with the two proofs under `$CLUSTER_REPO/docs/prereg/`. This way the first tick of the new code reads a status that already names Revision 2's record, and the reopened pre-flight is never submitted to a closed gate.
+  3. Restart the dashboard.
+  4. On the login node, `inc2.ds1_sheets supersede` for every audit batch after ds1_audit_001.
+  5. Once the pools step writes `p1_r001_audit_v2.json` on the cluster, compare it with R2 and record any difference.
