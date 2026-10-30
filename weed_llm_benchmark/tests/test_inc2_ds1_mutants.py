@@ -164,6 +164,7 @@ must occur exactly once in its file), runs its target against the copy and requi
   DW17  diagnose_stream   S1 is built while a source is due to be screened again
   DW18  stream            a reopen block's missing state is ignored (the data steps are not reopened)
   DW19  ds1_data          a revision written under deviation 2 counts as screened before it (screened again)
+  DW20  ds1_data          an intake row is looked up under its manifest key only (a9s9v's '.rf.' rows no candidates)
 
 Run:  python3 tests/test_inc2_ds1_mutants.py [DM1 DP5 ...]
 """
@@ -463,6 +464,8 @@ MUTANTS = {
     "DW18": (ST, '            states = [x for x in (ro.get("states") or ["failed"]) if x in ("failed", "missing")]\n',
              '            states = ["failed"]\n', DEV2),
     "DW19": (DD, "        if int(d.get(\"deviation\") or 0) < SCREEN_DEVIATION:\n", "        if True:\n", DATA),
+    "DW20": (DD, "    for k2, r in spelt.items():\n        files.setdefault(k2, r)\n",
+             "    for k2, r in ():\n        files.setdefault(k2, r)\n", DEV2),
 }
 
 

@@ -1565,15 +1565,23 @@ def domain_never():
 def load_candidates(phase, base_b, inc_dir=None):
     """The candidate rows of a phase from Step 1's stream (module docstring): the queue's rows (holds, refusals,
     test_v1 folded in by inc2.step1_stream.load_queue) and every committed batch's not-admitted rows, each with its
-    original file and intake label (the intake batch's manifest, or the v1 pool for b0000)."""
+    original file and intake label (the intake batch's manifest, found under its own key or the key Step 1 gave it,
+    or the v1 pool for b0000)."""
     from . import step1_stream as S1
     inc = Path(inc_dir) if inc_dir else C.INC_DIR
     L = S1.Layout(inc_dir=inc)
     queue = {r["key"]: r for r in S1.load_queue(L)}
     files = {}
+    spelt = {}
     for d in sorted((inc / "intake").glob("i0*")) if (inc / "intake").is_dir() else []:
         for r in read_jsonl(d / "manifest.jsonl"):
             files[r["key"]] = dict(r, batch_dir=str(d))
+            for k2 in step1_keys(r):
+                spelt.setdefault(k2, files[r["key"]])
+    # an intake row is found under the key Step 1 gave it too (DS1 deviation 2: a manifest key holding '.rf.' is
+    # admitted as '_rf_', so 21,979 admissions of ten intake batches had no file record and were no candidates)
+    for k2, r in spelt.items():
+        files.setdefault(k2, r)
     pool = inc / "step1" / "pool.jsonl"
     for r in read_jsonl(pool):
         files.setdefault(r["key"], r)
@@ -1598,6 +1606,14 @@ def load_candidates(phase, base_b, inc_dir=None):
             if row is not None:
                 out.append(row)
     return out
+
+
+def step1_keys(r):
+    """The keys Step 1 can give an intake manifest row (inc2.step1_stream._KeyMaker.intake): its key sanitised
+    (inc.verify._sanitise), and that key with the collision suffix (the sha256 of its source and image)."""
+    from ..inc import verify as V
+    k = V._sanitise(r["key"])
+    return [k, "%s__%s" % (k, C.sha256_text("%s/%s" % (r.get("source"), r.get("image")))[:8])]
 
 
 def ingest_matches(bdir, bj=None):

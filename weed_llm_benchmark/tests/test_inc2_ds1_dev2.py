@@ -301,6 +301,48 @@ def t_supersede():
               LIVE_POOLS[TUF])
 
 
+# ------------------------------------------------------------------ item 1: the intake rows Step 1 keyed otherwise
+def t_keys():
+    print("item 1: an intake row is found under the key Step 1 gave it (a9s9v's '.rf.' admitted as '_rf_')")
+    from weed_optimizer_framework.tools.inc2 import step1_stream as S1
+    d = fx_json("a9s9v_rows.json")
+    lost = {b: v["admissions"].get("step1_spelling", 0) for b, v in d["by_batch"].items()
+            if v["admissions"].get("step1_spelling")}
+    check("the fixture: 21,979 admissions of ten intake batches are found only under Step 1's spelling (a9s9v 8,946)",
+          sum(lost.values()) == 21979 and len(lost) == 10 and lost.get("b0014") == 8946, lost)
+    imgs = sorted(p.name for p in (FX / "images").iterdir())
+    with inc("keys") as root:
+        L = S1.Layout(inc_dir=root)
+        man_dir = root / "intake" / "i0014_rf_zig-zag-lnodr__weed-detection-a9s9v"
+        man_dir.mkdir(parents=True)
+        man, adm, queue = [], [], []
+        for i, kind in enumerate(("queued", "not_admitted")):
+            x = d["pick"][kind]
+            man.append(dict(x["manifest"], image=str(FX / "images" / imgs[i]),
+                            label=str(FX / "labels" / (imgs[i].rsplit(".", 1)[0] + ".txt"))))
+            adm.append(x["adm"])
+            if x["queue_row"]:
+                queue.append(x["queue_row"])
+        (man_dir / "manifest.jsonl").write_text("".join(json.dumps(r) + "\n" for r in man))
+        bd = L.batch_dir("b0014")
+        bd.mkdir(parents=True)
+        (bd / "batch.json").write_text(json.dumps({"kind": "intake", "input": d["ledger"][0]["input"]}))
+        (bd / "admission.jsonl").write_text("".join(json.dumps(r) + "\n" for r in adm))
+        L.ledger.parent.mkdir(parents=True, exist_ok=True)
+        L.ledger.write_text(json.dumps(d["ledger"][0]) + "\n")
+        L.queue.parent.mkdir(parents=True, exist_ok=True)
+        L.queue.write_text("".join(json.dumps(r) + "\n" for r in queue))
+        got = DD.load_candidates(1, {}, inc_dir=root)
+        check("both admissions become candidates, under their admission keys (on main 98ef308: none)",
+              sorted(r["key"] for r in got) == sorted(a["key"] for a in adm) and
+              all("_rf_" in r["key"] for r in got), [r["key"][-40:] for r in got])
+        q = next((r for r in got if r["admission"] == "whole"), {})
+        n = next((r for r in got if r["admission"] == "not_admitted"), {})
+        check("  the queued row with the queue's holds and its boxes; the not-admitted one a weed-level candidate",
+              q.get("holds") == [] and q.get("boxes") and n and n.get("pool") in ("p3", "p5") and
+              n.get("image") == man[1]["image"], (q.get("holds"), n.get("pool")))
+
+
 # ------------------------------------------------------------------ item 2: SIU
 def siu_rows():
     """SIU's fixture rows through candidate_row: 4 queued (the queue holds none), 2 not admitted (no queue row)."""
@@ -546,7 +588,7 @@ def t_registration():
 
 
 def main():
-    for fn in (t_fixtures, t_sizes, t_supersede, t_siu_holds, t_siu_eligibility, t_rescreen, t_plan, t_reopen,
+    for fn in (t_fixtures, t_sizes, t_keys, t_supersede, t_siu_holds, t_siu_eligibility, t_rescreen, t_plan, t_reopen,
                t_gate, t_registration):
         try:
             fn()
