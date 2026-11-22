@@ -11462,3 +11462,18 @@ Every result sat near test 0.85, against the 0.90 goal.
   3. L31 renders the new source sheets; the delegate decides SIU's sheet and species-role table; the owner audits SIU's table (DS.0 item 4).
   4. Once SIU is pooled, the manifests step builds KD and KT at KF's N_K (12,255), or records their wait if a supply is under it.
   5. `ots upgrade` of the proofs once Bitcoin confirms them.
+
+## 2026-11-22 — An announced cluster outage is named on the page instead of the red stale-data alarm; no alarm bars on the login page
+
+**Why.** Bridges-2 went offline on 2026-11-09 (about 12:10Z) for its move to a new datacenter, announced by PSC for four to six weeks (ACCESS Operations lists 2026-11-09 to 2026-12-14). Every cluster→lab sync since then has failed, so the red "DATA MAY BE STALE" bar stood on every page, the public login page included, and would stand for the whole outage. It stated a staleness and not its cause; and the alarm's own design (sync_health.py) holds that an alarm which stays red for weeks is one people learn to scroll past.
+
+**What changed.**
+- `tools/sync_health.py`: `known_outage()` reads `results/framework/sync_outage.json`, a record written by hand on the lab when the cluster's operator announces a downtime (`note`, `since_utc`, `until_utc`, `source`). While it explains the staleness, the bar becomes a warning-coloured notice naming the outage and the date of the data synced from the cluster.
+  - It stops explaining the staleness when a sync succeeds after `since_utc` (the record is spent and a later failure alarms in full), or a week past `until_utc`.
+  - An unreadable or incomplete record explains nothing.
+  - The verdict's level and `/api/health/sync`'s 503 are unchanged; the verdict carries `known_outage`.
+- `tools/dashboard_server.py`: the sync and scheduler alarm bars are not injected into `/login`. A visitor who has not signed in sees no data and can do nothing about either.
+
+**How verified.**
+- `tests/test_sync_health_outage.py`, 16 checks: no record gives the red alarm; a valid record gives the notice with the outage and the data's date while the level stays crit; one week past the end gives red again; a later successful sync spends the record; a record with no note, no end, a malformed time or bad JSON explains nothing; the note is HTML-escaped; fresh data gives no bar.
+- On the lab: `/login` without the bar, a signed-in page with the notice, `/api/health/sync` still 503 with `known_outage` set.

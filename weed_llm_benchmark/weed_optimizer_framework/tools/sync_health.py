@@ -32,8 +32,11 @@ still reported, as detail rather than as an alarm.
 Surfaces
 --------
   GET /api/health/sync      the verdict as JSON
-  banner_html()             a page-top bar, injected on every HTML page when
-                            the verdict is not ok
+  banner_html()             a page-top bar, injected on every HTML page but the
+                            public login page when the verdict is not ok; while
+                            a recorded cluster outage explains the staleness
+                            (known_outage), a notice naming it and the data's
+                            date instead of the red alarm
   python -m weed_optimizer_framework.tools.sync_health
                             same verdict on stdout; exit 1 when alarming, so a
                             cron or a supervision tick can gate on it.
@@ -41,6 +44,8 @@ Surfaces
 Cheapness matters: banner_html() runs inside the global HTML middleware, so the
 verdict is memoised for CACHE_TTL seconds and never shells out.
 """
+import calendar
+import html
 import json
 import os
 import time
@@ -66,6 +71,55 @@ def _status_path():
     repo = _CTX.get("repo") or os.environ.get("REPO_ROOT") or os.path.expanduser(
         "~/weed_llm_benchmark")
     return os.path.join(str(repo), "results", "framework", "sync_status.json")
+
+
+# An announced cluster outage explains the staleness up to this long past its announced end; after that the
+# outage is no longer the one recorded and the alarm turns red again.
+OUTAGE_GRACE_S = float(os.environ.get("SYNC_OUTAGE_GRACE_S", 7 * 86400))
+
+
+def _outage_path():
+    return os.path.join(os.path.dirname(_status_path()), "sync_outage.json")
+
+
+def _utc_ts(s):
+    """'YYYY-MM-DDTHH:MM:SSZ' -> epoch seconds, None when it is not that."""
+    try:
+        return float(calendar.timegm(time.strptime(str(s), "%Y-%m-%dT%H:%M:%SZ")))
+    except (TypeError, ValueError):
+        return None
+
+
+def known_outage(now, last_ok):
+    """The announced cluster outage a person recorded, while it still explains the staleness; else None.
+
+    The record is results/framework/sync_outage.json next to the heartbeat, written by hand on the lab when the
+    cluster's operator announces a downtime: {"note": "...", "since_utc": "...Z", "until_utc": "...Z",
+    "source": "<the announcement's URL>"}. It explains the staleness only
+      * while no sync has succeeded since the outage began (a success after since_utc spends the record, so a
+        later failure is a new outage and alarms in full), and
+      * until OUTAGE_GRACE_S past until_utc (an outage that overruns its announced end is no longer the one
+        recorded).
+    A record that cannot be read, or lacks the note or either time, explains nothing: the alarm stays as it is.
+    It changes how the page says it (a notice that names the outage and the data's date instead of a red alarm);
+    the verdict's level, and so /api/health/sync's 503, stay what the heartbeat says."""
+    try:
+        with open(_outage_path()) as fh:
+            rec = json.load(fh)
+    except Exception:
+        return None
+    if not isinstance(rec, dict):
+        return None
+    note = str(rec.get("note") or "").strip()
+    since, until = _utc_ts(rec.get("since_utc")), _utc_ts(rec.get("until_utc"))
+    if not note or since is None or until is None:
+        return None
+    if last_ok and last_ok > since:
+        return None
+    if now > until + OUTAGE_GRACE_S:
+        return None
+    return {"note": note[:200], "since_utc": rec.get("since_utc"), "until_utc": rec.get("until_utc"),
+            "source": str(rec.get("source") or "")[:300]}
 
 
 def _human(sec):
@@ -141,6 +195,7 @@ def verdict(now=None):
         "stage": st.get("stage"), "in_flight": in_flight,
         "in_flight_for_s": in_flight_for,
         "run_started_ts": started,
+        "known_outage": known_outage(now, last_ok) if level != "ok" else None,
         "thresholds": {"warn_after_s": WARN_AFTER_S, "crit_after_s": CRIT_AFTER_S,
                        "hung_after_s": HUNG_AFTER_S},
         # relative, not absolute: this payload is served unauthenticated
@@ -175,6 +230,13 @@ def banner_html():
     v = _cached()
     if v.get("ok"):
         return ""
+    ko = v.get("known_outage")
+    if ko:
+        # an announced outage: name it and the data's date, in the warning colours, instead of the red alarm
+        last = v.get("last_success_ts")
+        asof = time.strftime("%Y-%m-%d", time.gmtime(last)) if last else "unknown"
+        return _BAR % ("#fef3c7", "#78350f", html.escape("Cluster offline: " + ko["note"]),
+                       html.escape("Data synced from the cluster is as of %s; everything else works." % asof))
     crit = v.get("level") == "crit"
     bg, fg = ("#7f1d1d", "#fff") if crit else ("#fef3c7", "#78350f")
     head = ("DATA MAY BE STALE — the registry has not refreshed"

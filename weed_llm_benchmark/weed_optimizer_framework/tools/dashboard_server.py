@@ -1102,8 +1102,9 @@ async def _inject_responsive_css(request: Request, call_next):
         # that looked current; a page that may be lying about its freshness has
         # to say so on the page itself, not in a log nobody reads. Returns ''
         # when the sync is healthy, and is memoised so this costs one stat per
-        # 30s, not one per request.
-        if 'id="_syncalarm"' not in text:
+        # 30s, not one per request. Not on the public login page: a visitor who
+        # has not signed in sees no data and can do nothing about the sync.
+        if 'id="_syncalarm"' not in text and request.url.path != "/login":
             try:
                 from . import sync_health as _sh
                 _bar = _sh.banner_html()
@@ -1118,7 +1119,8 @@ async def _inject_responsive_css(request: Request, call_next):
         # days while every page still looked healthy — a stopped loop and an idle
         # one are indistinguishable unless the page says which it is. Memoised
         # the same way, so this costs one stat per 15s rather than one per request.
-        if 'id="_schedalarm"' not in text:
+        # Not on the public login page either.
+        if 'id="_schedalarm"' not in text and request.url.path != "/login":
             try:
                 from .brain import scheduler_health as _shs
                 _sbar = _shs.banner_html()
