@@ -17770,12 +17770,14 @@ try:
 except Exception as _e:
     log.error(f"[robot] ingest module failed to mount: {_e}")
 
-# v3.22.0 — platform-relayed robot driving (uplink contract P6/§8.2): any signed-in
-# user drives the robot console through /drive/<robot>/* — the platform (a tailnet
-# member) proxies to the robot's tailnet address; viewers install nothing.
+# v3.22.0 — platform-relayed robot driving (uplink contract P6/§8.2): an approved
+# user drives the robot console through /drive/<robot>/* (HTTP and WebSocket) — the
+# platform (a tailnet member) proxies to the robot's tailnet address; viewers install
+# nothing. Who may drive: ~/.drive_access.json (see robot_proxy).
 try:
     from . import robot_proxy as _robot_proxy
-    _robot_proxy.mount(app, {"log": log})
+    _robot_proxy.mount(app, {"log": log, "session_user": _session_user,
+                             "api_key": _check_api_key})
     log.info("[drive] robot console proxy mounted (/drive/*)")
 except Exception as _e:
     log.error(f"[drive] proxy module failed to mount: {_e}")

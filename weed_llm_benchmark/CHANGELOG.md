@@ -11477,3 +11477,31 @@ Every result sat near test 0.85, against the 0.90 goal.
 **How verified.**
 - `tests/test_sync_health_outage.py`, 16 checks: no record gives the red alarm; a valid record gives the notice with the outage and the data's date while the level stays crit; one week past the end gives red again; a later successful sync spends the record; a record with no note, no end, a malformed time or bad JSON explains nothing; the note is HTML-escaped; fresh data gives no bar.
 - On the lab: `/login` without the bar, a signed-in page with the notice, `/api/health/sync` still 503 with `known_outage` set.
+
+## 2026-11-24 — Robot driving: a WebSocket relay for /drive/*, and only approved accounts may drive
+
+**Why.** The Unitree R1's console exchanges its state and commands over a WebSocket (`/ws`). The platform's relay for `/drive/<robot>/*` used urllib, which drops the Upgrade header, so the console could not be used through the platform. Reviewing the relay showed three further faults. Any caller the platform admits could open any robot's console: Google sign-in accepts any Google account, and any API key passes the login middleware. The relay forwarded the caller's X-API-Key to the robot. And several Set-Cookie headers in one robot response were collapsed into the last one.
+
+**What changed.**
+- `tools/robot_proxy.py`:
+  - **The WebSocket relay.** A WebSocket request to `/drive/<robot>/<path>` is relayed to `ws://<base>/<path>`.
+    - Headers are handled as for HTTP: the platform's session cookie and X-API-Key are stripped, Origin passes as sent, and X-Forwarded-Prefix, -Proto, -Host and -For are set by the relay. Subprotocols are offered to the robot, and the one it picks is the one returned.
+    - Text and binary frames go both ways. When either side closes, the other is closed with the robot's close code. The robot side is closed first, and its TCP connection is dropped if the closing handshake cannot finish.
+    - There is no idle limit. The robot is pinged every 20 s and closed after 60 s without an answer. Messages are capped at 16 MB.
+    - The handshake is authorised in the relay itself, because the platform's login middleware handles HTTP requests only.
+  - **Who may drive.** `~/.drive_access.json` on the server, never committed, decides. A signed-in user may drive when their email is in `users`. An API key may drive only the robots its grant names (`keys.<label>.robots`), and only until the grant's `until_utc`. A missing or unreadable file lets nobody drive.
+    - The check applies to HTTP and WebSocket alike. An account not on the list gets 403, and `/api/robot/drive_targets` lists only the robots the caller may drive.
+  - **X-Forwarded-For.** It is the TCP peer. Behind the local Funnel proxy it is the last entry of the X-Forwarded-For that proxy wrote; earlier entries can be forged by the viewer, and the robot rate-limits its password page by this address.
+  - **HTTP relay fixes.** Repeated Set-Cookie headers are kept one by one. X-API-Key is no longer forwarded.
+  - **Default target removed.** The built-in default target, a tailnet address, is gone; targets come only from `~/.robot_targets.json`.
+- `tools/dashboard_server.py`: the relay is given the platform's session and API-key checks when it is mounted.
+
+**How verified.**
+- `tests/test_robot_proxy_ws.py`, 31 checks, passed 8 runs out of 8 in the lab's Python (websockets 16.0, Starlette 1.3.1). It runs the router in a bare app against a local WebSocket server and a local HTTP server standing in for the robot, and covers:
+  - text and binary frames both ways, the subprotocol, and the path and query;
+  - the stripped credentials, Origin and the X-Forwarded headers;
+  - a forged X-Forwarded-For entry, both behind the proxy and not;
+  - closing from either side, with the close code;
+  - refusals: no login, an account not on the list, an unknown robot, an expired key grant, and a key used on a robot its grant does not name; no refused handshake reaches the robot;
+  - an offline robot, and an unreadable access file;
+  - for HTTP: the Location prefix, two Set-Cookie headers with Secure, HttpOnly and SameSite kept, the 403, and the filtering of `drive_targets`.
