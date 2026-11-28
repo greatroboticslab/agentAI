@@ -11505,3 +11505,10 @@ Every result sat near test 0.85, against the 0.90 goal.
   - refusals: no login, an account not on the list, an unknown robot, an expired key grant, and a key used on a robot its grant does not name; no refused handshake reaches the robot;
   - an offline robot, and an unreadable access file;
   - for HTTP: the Location prefix, two Set-Cookie headers with Secure, HttpOnly and SameSite kept, the 403, and the filtering of `drive_targets`.
+
+## 2026-11-28 — Records: the follow-up set's final decision of 26 October and its two sealed-test reads
+
+- **Why.** The final decision of the V3F follow-up experiments and the two reference reads after it had been read on Bridges-2 on 2026-10-26 but were not recorded in the repository, and two September documents still named a different best model from before the protocol of 26 September.
+- **What changed.** New `docs/results/V3F_final_decision_2026-10-26.md`: the nine registered comparisons and the two reads, with the report's text as read (the cluster is offline until about 2026-12-14; the JSON records follow then). A `RESEARCH_LOG.md` entry. `docs/RESULTS_TABLE.md` and `docs/BEST_MODEL_CARD.md` carry a note at the top that they are superseded and where the current results are. No code changed.
+- **How verified.** Each summary row checked against the report's own row; P1 and P4 equal the decision of 2026-10-13.
+

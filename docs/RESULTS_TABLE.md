@@ -1,5 +1,11 @@
 # Results table — every number with its provenance
 
+> **Superseded (2026-11-28).** The runs in this file come from before the evaluation protocol of 26 September 2026,
+> under which the test images had served as the validation set and several runs were unseeded; none of its numbers
+> is used in the current paper. Results under that protocol: `RESEARCH_LOG.md` (entries from 2026-09-26) and
+> `docs/results/V3F_final_decision_2026-10-26.md`.
+
+
 *Draft of 2026-09-10. Built by re-reading the artifacts, not by copying the earlier tables.
 Four separate errors in the previously published tables are corrected here and listed in §D.*
 

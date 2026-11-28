@@ -1,5 +1,11 @@
 # Best model card — cwd12 weed detection
 
+> **Superseded (2026-11-28).** The runs in this file come from before the evaluation protocol of 26 September 2026,
+> under which the test images had served as the validation set and several runs were unseeded; none of its numbers
+> is used in the current paper. Results under that protocol: `RESEARCH_LOG.md` (entries from 2026-09-26) and
+> `docs/results/V3F_final_decision_2026-10-26.md`.
+
+
 *S3's closing artifact. Everything here is measured on the sealed protocol; nothing is
 carried over from training-time logs. Regenerate the numbers with
 `run_s3_bestmodel_eval.sh` (job 44454237) — they land in
